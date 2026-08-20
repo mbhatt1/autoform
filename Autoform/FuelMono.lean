@@ -313,6 +313,31 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                   exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hy hne
                                 · rw [if_neg hcap] at hy ⊢
                                   exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hy hne
+                -- An instance of a class with a builtin base (`Val.bobj`) dispatches to
+                -- the class's own method when it has one, and otherwise to `Stdlib`.
+                -- Only the first branch is a recursive call, so only it needs an IH.
+                case bobj bcls pay =>
+                    dsimp only at hy ⊢
+                    rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
+                    rw [hB] at hy
+                    cases s with
+                    | inl e' =>
+                        cases e' <;> first
+                          | (cases hy; exact absurd rfl hne)
+                          | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                    | inr vs =>
+                        rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                        dsimp only at hy ⊢
+                        by_cases hcd : Ctx.classDefines ctx bcls m = true
+                        · rw [if_pos hcd] at hy ⊢
+                          cases hrm : Ctx.resolveMethod ctx bcls m with
+                          | none => rw [hrm] at hy; exact hy
+                          | some fn =>
+                              rw [hrm] at hy
+                              dsimp only at hy ⊢
+                              exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hy hne
+                        · rw [if_neg hcd] at hy ⊢
+                          exact hy
                 all_goals
                   (dsimp only at hy ⊢
                    rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
@@ -335,6 +360,13 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   | (rw [ihL _ hctx _ _ _ _ _ hA (by simp)]; exact hy)
             | inr vs =>
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                -- A class with a builtin base allocates a `Val.bobj` by a fuel-free
+                -- computation (`allocBuiltin`), so that branch has nothing to induct on.
+                cases hbb : Ctx.builtinBase ctx cls with
+                | some bb => rw [hbb] at hy; exact hy
+                | none =>
+                rw [hbb] at hy
                 dsimp only at hy ⊢
                 cases hcap : Env.get ρ cls
                 case clsClos cname cvs =>

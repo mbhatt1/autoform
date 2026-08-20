@@ -370,7 +370,10 @@ result is representable. `-INT_MIN` is precisely where it does not. -/
 
 /-- Membership test. -/
 def valIn (x c : Val) : EResult :=
-  match c with
+  -- An instance of a class with a builtin base is a container: `0 in A((0,))` is `True`
+  -- in CPython for `class A(tuple)`. `unbuiltin` is non-recursive, which keeps this
+  -- function non-recursive too.
+  match c.unbuiltin with
   | .list vs  => .val (.bool (vs.any (Val.beq x)))
   | .tuple vs => .val (.bool (vs.any (Val.beq x)))
   | .dict kvs => .val (.bool (kvs.any (fun kv => Val.beq x kv.1)))
@@ -386,6 +389,8 @@ abbrev FuncTable := List (String × Func)
 structure Ctx where
   dialect : Dialect
   table   : FuncTable
+  /-- Classes whose base is a builtin type — see `Program.builtinBases`. -/
+  builtinBases : List (String × BuiltinBase) := []
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
   outlive any single call, so they live on the heap rather than in `Env`. -/
   globals : Ref := 0
@@ -420,6 +425,55 @@ def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
+
+/-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
+free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
+def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
+  ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
+
+/-- The builtin base of a class, if the exporter recorded one. -/
+def Ctx.builtinBase (ctx : Ctx) (cls : String) : Option BuiltinBase :=
+  match ctx.builtinBases.find? (·.1 == cls) with
+  | some (_, b) => some b
+  | none        => none
+
+/-- Construct an instance of a class whose base is a builtin type: `X(iterable)` for
+`class X(tuple)` / `class X(list)`, `X(d)` for `class X(dict)`, `X(s)` for
+`class X(str)`, and `X()` for the empty instance.
+
+Deliberately **refuses** two shapes rather than approximating them:
+
+* a class that defines its own `__init__` — Core would have to run it against a value
+  that has no mutable attributes, so whatever it did would be lost;
+* a class that defines its own `__eq__` — `Val.beq` compares `bobj`s by contents and
+  has no dunder dispatch, so an overridden `__eq__` would be silently ignored. That is
+  precisely the silent-wrong outcome this representation is supposed to avoid, so it is
+  a hole instead.
+
+Both refusals are *holes*, i.e. counted ignorance, not wrong answers. -/
+def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : EResult :=
+  if ctx.classDefines cls "__init__" then .hole s!"alloc:builtin-base:{cls}:own-__init__"
+  else if ctx.classDefines cls "__eq__" then .hole s!"alloc:builtin-base:{cls}:own-__eq__"
+  else
+    match vs with
+    | []  => .val (.bobj cls b.empty)
+    | [v] =>
+        match b, v.unbuiltin with
+        | .tuple, w =>
+            match Stdlib.elems w with
+            | some es => .val (.bobj cls (.tuple es))
+            | none    => .hole s!"alloc:builtin-base:{cls}:non-iterable"
+        | .list,  w =>
+            match Stdlib.elems w with
+            | some es => .val (.bobj cls (.list es))
+            | none    => .hole s!"alloc:builtin-base:{cls}:non-iterable"
+        -- `dict(pairs)` and `str(x)` on a non-string need `repr`/pair-unpacking that
+        -- Core does not model, so only the identity coercions are accepted.
+        | .dict,  .dict kvs => .val (.bobj cls (.dict kvs))
+        | .dict,  _         => .hole s!"alloc:builtin-base:{cls}:dict-from-non-dict"
+        | .str,   .str t    => .val (.bobj cls (.str t))
+        | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
+    | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
 
 mutual
 
@@ -510,7 +564,8 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
-          match c, k with
+          -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
+          match c.unbuiltin, k with
           | .list vs, .int i =>
               if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
               else (h₂, .exn (.str "IndexError"))
@@ -586,6 +641,22 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             | some fn =>
               if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs
               else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs
+      | (h₁, .val (.bobj bcls pay)) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl e)  => (h₂, e)
+        | (h₂, .inr vs) =>
+          -- Method dispatch on a builtin-based instance: the class's own methods first
+          -- (`self` is bound to the whole instance, so `self` still compares as the
+          -- builtin), then the builtin's own methods on the payload.
+          if ctx.classDefines bcls m then
+            match ctx.resolveMethod bcls m with
+            | some fn => applyFunc ctx n h₂ fn (some (.bobj bcls pay)) vs
+            | none    => (h₂, .hole s!"mcall:{bcls}.{m}")
+          else
+            match Stdlib.method ctx.dialect h₂ pay m vs with
+            | some (h₃, .pure r)       => (h₃, r)
+            | some (h₃, .mutating _ _) => (h₃, .hole s!"mcall:{m}:unboxed-container")
+            | none                     => (h₂, .hole s!"mcall:{bcls}.{m}")
       | (h₁, .val recv) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
@@ -603,6 +674,11 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr vs) =>
+        match ctx.builtinBase cls with
+        -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
+        -- reference. See `Val.bobj`.
+        | some b => (h₁, allocBuiltin ctx cls b vs)
+        | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
         let cap := match ρ.get cls with
@@ -810,7 +886,8 @@ nothing and a free name falls through to the function table. This is the right e
 for a self-contained function, and keeping it stable keeps the refinement layer's
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
-  let ctx : Ctx := { dialect := p.dialect, table := p.table }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table,
+                     builtinBases := p.builtinBases }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args).2
@@ -823,7 +900,8 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 `heap.length` onward. -/
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
-  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
+                     builtinBases := p.builtinBases }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -844,7 +922,8 @@ open item rather than papered over with a guessed ordering. -/
 def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
-  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
+                     builtinBases := p.builtinBases }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)

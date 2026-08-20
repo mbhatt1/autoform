@@ -211,6 +211,48 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       .filter(_.method.name.l.contains("<body>"))
       .map(_.name).filterNot(_.contains("<")).toSet
 
+  // ---- classes with a builtin base type --------------------------------------
+  //
+  // `class _HashedTuple(tuple)` is not an ordinary class: in CPython the instance *is* a
+  // tuple, and `hashkey(0) == (0,)` is `True`. Core models this with `Val.bobj`, keyed by
+  // `Program.builtinBases`, and the base is visible right here in the CPG and was
+  // previously discarded. See STRATEGY.md §31/§33/§34 and `Autoform/BuiltinBase.lean`.
+  //
+  // Deliberately conservative in three ways, because a *wrong* base is a silent wrong
+  // answer while a missing one is just the old opaque-reference behaviour:
+  //
+  //   * exactly one base, so multiple inheritance is never guessed at;
+  //   * that base must be one of the four builtins `Core.BuiltinBase` models — `object`,
+  //     `Exception` and everything transitive are left alone;
+  //   * a short class name that resolves to two *different* bases anywhere in the corpus
+  //     is dropped entirely, because `Expr.alloc` carries only the short name.
+  val modelledBases = Set("tuple", "list", "dict", "str")
+
+  val builtinBaseRows: List[(String, String, String)] =
+    cpg.typeDecl.isExternal(false).l
+      .filter(_.method.name.l.contains("<body>"))
+      .filterNot(_.name.contains("<"))
+      .flatMap { td =>
+        val bases = td.inheritsFromTypeFullName
+          .filterNot(b => b.isEmpty || b == "ANY" || b == "object" || b.endsWith(".object"))
+        if (bases.size != 1) None
+        else {
+          // `tuple`, `builtins.tuple`, `__builtin.tuple`, `<unresolvedNamespace>.tuple`:
+          // the frontends disagree on the prefix, never on the last segment.
+          val short = bases.head.split('.').last.split(':').last
+          if (modelledBases.contains(short)) Some((td.filename, td.name, short)) else None
+        }
+      }
+
+  val conflictingBaseNames: Set[String] =
+    builtinBaseRows.groupBy(_._2)
+      .collect { case (n, rs) if rs.map(_._3).distinct.size > 1 => n }.toSet
+
+  /** Builtin bases of the classes declared in one file, by short class name. */
+  val classBasesByFile: Map[String, Map[String, String]] =
+    builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
+      .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
+
   // ---- lexical scope analysis ------------------------------------------------
   //
   // Joern's `fullName` *is* the lexical nesting path: `f.py:<module>.outer.inner`,
@@ -971,12 +1013,24 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     declaredGlobals = Set.empty
     boundMethods = Map.empty
     attrsOf = Map.empty
-    ujson.Obj(
+    val obj = ujson.Obj(
       "name"   -> mangledFullName(m.fullName),
       "file"   -> m.filename,
       "params" -> ujson.Arr.from(m.parameter.name.l.filterNot(_ == "self")),
       "body"   -> body
     )
+    // Builtin bases ride on the module *initializer* entry — the function that runs the
+    // file's `class` statements — rather than on the methods, so that a builtin-based
+    // class with no methods at all is still recorded. The key is optional and absent when
+    // empty, which is what keeps every existing AST byte-identical.
+    if (isModule) {
+      val cb = classBasesByFile.getOrElse(m.filename, Map.empty)
+      if (cb.nonEmpty)
+        obj("classBases") = ujson.Obj.from(cb.toList.sortBy(_._1).map { case (k, v) =>
+          k -> (ujson.Str(v): ujson.Value)
+        })
+    }
+    obj
   }
 
   // `<metaClassCallHandler>` joins the list §24 left it off. It is generated *per class*

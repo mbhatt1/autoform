@@ -31,17 +31,27 @@ be faithful to *that*.
 | `fn : String → Val` | A function, method or class used as a value (CPG `METHOD_REF` / `TYPE_REF`). |
 | `clos : String → List (String × Val) → Val` | A closure: a function name plus the bindings it captured. Capture is **by value**. |
 | `clsClos : String → List (String × Val) → Val` | A *class* value that captured an enclosing scope. Distinct from `clos` because a class is not a function: its methods, not it, read the captured bindings. |
+| `bobj : String → Val → Val` | An instance of a class whose **base is a builtin type** (`class X(tuple)`, `(list)`, `(dict)`, `(str)`): the class name plus the underlying builtin value. It compares, iterates, indexes and tests membership as the builtin does, which is what makes `hashkey(0) == (0,)` true as it is in CPython. It has **no mutable attributes** — a `bobj` is a value, not a heap object — so `e.f` on one is a hole. Which classes get one is recorded per program in `Program.builtinBases`; a class the exporter did not record stays an opaque `ref`. See `Autoform/BuiltinBase.lean`. |
 
 Two derived functions matter:
 
 * `Val.truthy` — the permissive truthiness shared by most dynamic languages (empty
   containers, `0`, `""` and `unit` are false; references and callables are true).
 * `Val.iterable` — what a value iterates over, if anything. `none` for everything that is
-  not a list, tuple or dict; `forIn` over anything else is a hole.
+  not a list, tuple or dict (or a `bobj` over one); `forIn` over anything else is a hole.
+* `Val.unbuiltin` — strips one layer of builtin-base wrapping. Deliberately
+  non-recursive, so the functions that use it stay plain matchers that reduce by `rfl`.
 
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring
 captured environments.
+
+A `bobj` compares by its **contents, ignoring the class**, and compares equal to the plain
+builtin: CPython's `tuple.__eq__` does the same, and `A((0,)) == B((0,))` is `True` there
+for two distinct subclasses of `tuple`. That is only sound because `Expr.alloc` *refuses*
+to build a `bobj` for a class that defines its own `__eq__` (or its own `__init__`),
+emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
+so honouring such a class would mean silently ignoring the override.
 
 There is deliberately **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a
 full IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired

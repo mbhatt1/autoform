@@ -454,7 +454,8 @@ theorem applyUnop_int_neg (x : Int) :
 
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
-def ctxOf (p : Program) : Ctx := { dialect := p.dialect, table := p.table }
+def ctxOf (p : Program) : Ctx :=
+  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -820,6 +821,9 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val} {fn : Func} {w : Val}
     (has : evalList ctx k h ρ args = (h₁, .inr vs))
     (hcap : (∀ c cap, ρ.get cls ≠ .clsClos c cap))
+    -- `cls` is an ordinary class, not one with a builtin base: those allocate a
+    -- `Val.bobj` and never reach `__init__` (see `Semantics.allocBuiltin`).
+    (hbb : ctx.builtinBase cls = none)
     (hm : ctx.resolveMethod cls "__init__" = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
         (some (.ref h₁.length)) vs = (h₃, .val w)) :
@@ -827,7 +831,7 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
   have hc : (match ρ.get cls with | .clsClos _ c => c | _ => []) = ([] : List (String × Val)) := by
     cases hg : ρ.get cls <;> simp [hg]
     case clsClos c cap => exact absurd hg (hcap c cap)
-  simp only [evalExpr, has, hc, Heap.alloc, hm, hinit]
+  simp only [evalExpr, has, hbb, hc, Heap.alloc, hm, hinit]
 
 theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {x : String} {e : Expr} {body : Stmt} {h₁ : Heap} {v : Val} {vs : List Val}
@@ -1936,6 +1940,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
       (evalList_cons_val ctxT (G+8) [] _ (evalExpr_lit_int ctxT (G+7) [] _ 0)
         (evalList_nil ctxT (G+7) [] _))
       (by intro c cap; simp [Env.get])
+      (by simp [ctxT, ctxOf, CounterProgram, Ctx.builtinBase])
       resolve_init hinit
     simpa using h
   have hgc : (Env.get ([("xs", Val.list (ys.map Val.int))] : Env) ("<glob>" ++ "c")).truthy = false := by

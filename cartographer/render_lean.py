@@ -439,8 +439,39 @@ def _run_main():
     out.append("before calling any entry point. -/")
     out.append("def moduleInits : List Func := [" + ", ".join(inits) + "]")
     out.append("")
-    out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-    out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
+    # Classes whose single base is a builtin type (`class X(tuple)`), as recorded by
+    # `cartographer/export_ast.sc` on the module initializer of the file that declares
+    # them. Collected across all entries, deduplicated, and *dropped* on conflict: two
+    # same-named classes with different bases cannot be told apart by `Expr.alloc`, which
+    # carries only the short name, so the honest answer is to record neither and leave
+    # both as opaque references -- exactly the pre-existing behaviour.
+    bases = {}
+    conflicts = set()
+    for f in funcs:
+        for cls, base in sorted((f.get("classBases") or {}).items()):
+            if cls in bases and bases[cls] != base:
+                conflicts.add(cls)
+            bases[cls] = base
+    for c in conflicts:
+        bases.pop(c, None)
+    base_ctor = {"tuple": ".tuple", "list": ".list", "dict": ".dict", "str": ".str"}
+    unknown = sorted(set(b for b in bases.values() if b not in base_ctor))
+    if unknown:
+        raise SystemExit("render_lean: unmodelled builtin base(s) {}; "
+                         "Core.BuiltinBase has no constructor for them".format(unknown))
+    bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
+                   for c in sorted(bases))
+
+    if bb:
+        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
+        out.append("")
+        out.append("`builtinBases` lists the classes whose base is a builtin type, so that")
+        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/")
+        out.append("def program : Program := { dialect := " + dialect
+                   + ", builtinBases := [" + bb + "], funcs := [")
+    else:
+        out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
+        out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
     out.append("")

@@ -105,7 +105,82 @@ inductive Val where
   /-- A closure: a function together with the bindings it captured. Capture is **by
   value**, which is why `nonlocal` *writes* remain a hole — see `Semantics.lean`. -/
   | clos  : String → List (String × Val) → Val
+  /-- An instance of a class whose base is a **builtin type**: `class X(tuple)`,
+  `class X(list)`, `class X(dict)`, `class X(str)`. Carries the class name and the
+  underlying builtin value.
+
+  ## Why this shape, and not a payload on `Obj`
+
+  The obvious cheaper alternative is `Obj.builtin : Option Val`, leaving the value a
+  `Val.ref`. It does not work, and the reason is structural rather than a matter of
+  taste: **`Val.beq`, `applyBinop`, `valIn` and `Val.truthy` do not take the heap.**
+  They are pure functions of values, and they are exactly the functions that have to
+  agree with the builtin. Making the `Obj` payload visible to them means threading a
+  `Heap` through `Val.beq` — which is also the `BEq Val` instance, is used inside
+  `Val.beqL`/`beqP`, inside `Stdlib`'s association-list helpers, and inside dozens of
+  `Refine.lean` theorems. That is a far larger and more dangerous edit than adding a
+  constructor, and it leaves `Val.beq` able to *fail* to consult the heap on any path —
+  the silent-wrong failure mode this project keeps finding.
+
+  So the payload lives in the value. There is exactly one copy of an instance's builtin
+  state and no way for a value and a heap object to disagree about it.
+
+  ## What this costs, stated plainly
+
+  A `bobj` has **no mutable instance attributes**: it is not on the heap, so `e.f` on one
+  is `field:f:non-object` and `e.f = v` is `setField:f:non-object` — holes, not wrong
+  answers. `_HashedTuple.__hash__`'s memo field is therefore a hole. Classes with a
+  builtin base that define `__init__` or `__eq__` are refused at construction
+  (`alloc:builtin-base:...`) rather than silently ignoring them.
+
+  ## What could still silently go wrong
+
+  1. `Val.beq` now compares two `bobj`s, and a `bobj` against a plain builtin, by
+     **contents, ignoring the class**. That is CPython's behaviour for `tuple`/`list`/
+     `dict`/`str` subclasses that do not override `__eq__` (measured: `A((0,)) ==
+     B((0,))` is `True`), and the `__eq__` check at construction is what keeps it true.
+     If a future exporter records a builtin base for a class whose `__eq__` it could not
+     see, equality would be wrong and nothing here would catch it.
+  2. Mutation of a `list`/`dict` base is value-semantics, exactly as Core's own
+     containers already are (`setIndex` is `setIndex:immutable-containers`). A `bobj`
+     inherits that known unsoundness rather than adding a new one — see
+     `docs/boxed-containers.md`.
+  3. Any `match` on `Val` with a catch-all that predates this constructor will treat a
+     `bobj` as "some other value". Every such site in `Semantics.lean` and `Stdlib.lean`
+     was audited; a site added later will not be. -/
+  | bobj  : String → Val → Val
   deriving Repr, Inhabited
+
+/-- The builtin types a user class may inherit from and still be modelled.
+
+Deliberately not `Exception` (Core represents exceptions as bare `Val.str` class names,
+so an exception subclass has nowhere to put its payload), not `object` (that is an
+ordinary class and already works), and not multiple bases. -/
+inductive BuiltinBase where
+  | tuple
+  | list
+  | dict
+  | str
+  deriving Repr, Inhabited, DecidableEq
+
+namespace BuiltinBase
+
+/-- The empty instance of the base, used when the constructor is called with no
+argument: `tuple()` is `()`, `str()` is `""`. -/
+def empty : BuiltinBase → Val
+  | .tuple => .tuple []
+  | .list  => .list []
+  | .dict  => .dict []
+  | .str   => .str ""
+
+/-- The builtin type name, for `isinstance`. -/
+def typeName : BuiltinBase → String
+  | .tuple => "tuple"
+  | .list  => "list"
+  | .dict  => "dict"
+  | .str   => "str"
+
+end BuiltinBase
 
 /-- A heap object: its class and its mutable fields. -/
 structure Obj where
@@ -235,6 +310,15 @@ structure Func where
 structure Program where
   funcs   : List Func
   dialect : Dialect := .python
+  /-- Classes whose (single) base is a builtin type, by the **short** class name that
+  `Expr.alloc` uses. Empty by default, so a program translated before the exporter
+  learned to record bases behaves exactly as it did: opaque `Val.ref` instances.
+
+  Keyed by short name because that is what the CPG gives the allocation site. A corpus
+  with two same-named classes in different modules and *different* bases cannot be
+  represented; the exporter drops such a name entirely rather than guessing, which
+  degrades to the pre-existing opaque-reference behaviour. -/
+  builtinBases : List (String × BuiltinBase) := []
   deriving Repr, Inhabited
 
 namespace Expr
@@ -387,6 +471,26 @@ def Val.beq : Val → Val → Bool
   | .list a,  .list b  => Val.beqL a b
   | .tuple a, .tuple b => Val.beqL a b
   | .dict a,  .dict b  => Val.beqP a b
+  -- Instances of builtin-based classes compare by **contents, ignoring the class**, and
+  -- compare equal to the plain builtin. Measured against CPython 3.9.6:
+  --   `A((0,)) == (0,)`  True      `A((0,)) == B((0,))`  True   (A, B both `(tuple)`)
+  --   `A((0,)) == (1,)`  False     `A((0,)) == [0]`      False
+  -- The twelve cases are written out rather than routed through an unwrapping helper so
+  -- that every recursive call is on a *subterm of the first argument*: that is what keeps
+  -- `Val.beq` structurally recursive, and hence reducible by `rfl`/`decide`, which the
+  -- float equations below and much of `Refine.lean` depend on.
+  | .bobj _ (.tuple a), .bobj _ (.tuple b) => Val.beqL a b
+  | .bobj _ (.list a),  .bobj _ (.list b)  => Val.beqL a b
+  | .bobj _ (.dict a),  .bobj _ (.dict b)  => Val.beqP a b
+  | .bobj _ (.str a),   .bobj _ (.str b)   => a == b
+  | .bobj _ (.tuple a), .tuple b => Val.beqL a b
+  | .bobj _ (.list a),  .list b  => Val.beqL a b
+  | .bobj _ (.dict a),  .dict b  => Val.beqP a b
+  | .bobj _ (.str a),   .str b   => a == b
+  | .tuple a, .bobj _ (.tuple b) => Val.beqL a b
+  | .list a,  .bobj _ (.list b)  => Val.beqL a b
+  | .dict a,  .bobj _ (.dict b)  => Val.beqP a b
+  | .str a,   .bobj _ (.str b)   => a == b
   | _,        _        => false
 /-- Structural equality on value lists. -/
 def Val.beqL : List Val → List Val → Bool
@@ -401,6 +505,20 @@ def Val.beqP : List (Val × Val) → List (Val × Val) → Bool
 end
 
 instance : BEq Val := ⟨Val.beq⟩
+
+/-- Strip one layer of builtin-base wrapping: the underlying `tuple`/`list`/`dict`/`str`
+of an instance of a class with a builtin base, or the value unchanged.
+
+Only one layer is ever needed: `Expr.alloc` never builds a `bobj` whose payload is itself
+a `bobj` (the payload is coerced to the declared base first).
+
+Deliberately **non-recursive**. Every consumer below unwraps with this rather than
+recursing on `Val`, which keeps `Val.truthy`, `Val.iterable` and `Stdlib.elems`
+non-recursive matchers: making them recursive compiles them through `brecOn`, and the
+`unfold`/`whnf`-based proof of `Stdlib.builtin_heap_unchanged` does not survive that. -/
+def Val.unbuiltin : Val → Val
+  | .bobj _ v => v
+  | v         => v
 
 /-- Truthiness, in the permissive sense shared by most dynamic languages. -/
 def Val.truthy : Val → Bool
@@ -417,12 +535,23 @@ def Val.truthy : Val → Bool
   | .fn _     => true
   | .clos _ _ => true
   | .clsClos _ _ => true
+  -- An instance of a class with a builtin base is truthy exactly as its base is:
+  -- `bool(A(()))` is `False` for `class A(tuple)`. Written out per base rather than
+  -- recursing, so this stays a plain matcher that reduces by `rfl`.
+  | .bobj _ (.list vs)  => !vs.isEmpty
+  | .bobj _ (.tuple vs) => !vs.isEmpty
+  | .bobj _ (.dict kvs) => !kvs.isEmpty
+  | .bobj _ (.str t)    => t != ""
+  | .bobj _ _           => true
 
 /-- What a value iterates over, if anything. -/
 def Val.iterable : Val → Option (List Val)
   | .list vs  => some vs
   | .tuple vs => some vs
   | .dict kvs => some (kvs.map (·.1))
+  | .bobj _ (.list vs)  => some vs
+  | .bobj _ (.tuple vs) => some vs
+  | .bobj _ (.dict kvs) => some (kvs.map (·.1))
   | _         => none
 
 /-- Result of evaluating an expression. -/
