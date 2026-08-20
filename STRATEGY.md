@@ -2075,3 +2075,64 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
 **What this does not fix.** `Dialect.cLike` is still 32-bit signed for *arithmetic*, so a
 `cast:i64` value that then takes part in `+` is wrapped back to 32 bits. The cast is now
 right; the arithmetic around it is still under the two-constructor `Dialect` §29 records.
+
+## §37 — The first theorem about something other than `cachetools`
+
+`Autoform/Specs/V8Spec.lean` proves a property of `v8::base::bits::SignedMod32`, from
+`v8/src/base/bits.cc`, translated by the pipeline with no holes.
+
+V8's own header states the contract:
+
+> `SignedMod32(lhs, rhs)` … **If either `|rhs|` is zero or `|lhs|` is minint and `|rhs|`
+> is -1, it returns zero.**
+
+That guard is not decoration. On x86, `INT_MIN % -1` raises `#DE` — the same trap as
+division by zero — so the property worth proving is that the guard covers the trapping
+inputs for *every* `lhs`, not for a sample.
+
+```lean
+theorem signedMod32_zero_divisor (lhs : Int) (k : Nat) :
+    (applyFunc C (k+9) [] smod32 none [.int lhs, .int 0] []).2 = .val (.int 0)
+```
+
+Universally quantified over `lhs` **and** over any fuel budget at least 9, so it is
+neither a statement about sampled inputs nor about one budget. Axiom basis
+`[propext, Classical.choice, Quot.sound]`, `#audit_axioms` clean, and `#audit_depends`
+confirms the proof actually mentions the translated function rather than proving something
+about nothing. The context carries an empty function table — `SignedMod32` calls nothing —
+which makes the theorem independent of the other 1,734 functions in the module.
+
+### What is *not* proved, and why it is a `def`
+
+The `rhs = -1` half is an open obligation, stated as a `Prop`-valued `def`. The `rhs = 0`
+case reduces because `0` is a literal; `-1` is `Expr.unop "-" (lit 1)`, so the guard's
+second disjunct routes through `NumConfig.c32Wrapv.neg` and `simp` did not close it with
+the numeric model unfolded. The *behaviour* is pinned at three inputs including `INT_MIN`
+via `#guard_msgs` (which fails the build on change and, unlike `native_decide`, adds no
+axiom) — but pinning three points is a weaker claim than a universally quantified proof,
+and the two must not be confused.
+
+### A structural limit this exposed
+
+**Only one generated corpus can be in a single import graph.** Every
+`Autoform/Generated/<M>.lean` defines `Autoform.Generated.program`, so importing two of
+them fails with "environment already contains 'Autoform.Generated.program'". `V8Spec`
+therefore builds standalone (`lake build Autoform.Specs.V8Spec`) and is deliberately NOT
+in `Autoform.lean`'s import list.
+
+This is fine for one corpus and blocks the goal for many: a repository that proves things
+about V8 *and* Linux *and* Ansible cannot put those proofs in one build today. The fix is
+to give each generated module its own namespace rather than a shared `program`, which is a
+mechanical change to `render_lean.py` and every spec that names `program` — recorded here
+rather than done, because it invalidates the committed proofs about `cachetools` until
+they are re-pointed.
+
+### An error that produced a theorem
+
+While writing this, an `open ... in` scoped to only the first declaration left the second
+unable to resolve its identifier. Lean reported the error **and admitted the theorem
+anyway**, so `#print axioms` showed `sorryAx` in the basis of a theorem that looked
+proved. The build was red, so nothing shipped — but had it been one file among many with
+its output scrolled past, only the axiom check would have caught it. That is the third
+time this session a green-looking result was false, after the mutation-gate regex and the
+conflict-marked module that built from a cached `.olean`.
