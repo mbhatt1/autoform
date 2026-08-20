@@ -89,6 +89,73 @@ jobs:
           path: audit.json
           if-no-files-found: warn
 
+      # ---------------------------------------------------------------- #
+      # Integrity checks. These were RED on main while CI was green, which
+      # is precisely the failure mode this repo keeps re-learning: a check
+      # that exists but is not run is a check that does not exist.
+      # Each step below fails LOUDLY with an attributable reason; none of
+      # them can pass by finding nothing (check_render exits 2 if it had
+      # nothing to compare, check_docs exits 2 if an artifact is absent and
+      # 1 if the artifact it cross-checks against is missing).
+      # ---------------------------------------------------------------- #
+
+      # Independent recomputation: re-render every tracked AST and compare
+      # byte-for-byte with the committed module. This is the check that
+      # caught a mutation-gate mutant which had survived four commits with
+      # every proof still passing (STRATEGY.md 17/30/31).
+      - name: check_render — committed modules are renders of committed ASTs
+        run: python3 scripts/check_render.py
+
+      # check_docs cross-checks the ledger against the AST, and the ledger
+      # is gitignored (it is a build product). On a fresh clone it is absent,
+      # and check_docs correctly treats absence as a FAILURE rather than a
+      # pass -- so CI has to produce it first. Regenerating it here is also
+      # what makes the doc figures an independent recomputation: the ledger
+      # is elaborated from the .olean by Lean, not copied from the docs.
+      - name: Regenerate ledger-Cachetools.json from the built module
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-ledger
+          sed 's/@MODULE@/Cachetools/g' scripts/ledger.lean.tmpl > .ci-ledger/Ledger.lean
+          lake env lean .ci-ledger/Ledger.lean
+          test -s ledger-Cachetools.json  # never let a silent no-op look like success
+
+      - name: check_docs — documented figures match the artifacts
+        run: python3 scripts/check_docs.py
+
+      # Cheap, deterministic guard on the one invariant this repo has an
+      # explicit rule about: the fuel-monotonicity exclusion list. Widening
+      # it is how a genuine break gets hidden instead of proved.
+      - name: FuelMono exclusion list is exactly ["Stmt.tryFinally"]
+        run: |
+          set -euo pipefail
+          line=$(grep -n 'def fuelMonoExclusions' Autoform/FuelMono.lean || true)
+          test -n "$line" || { echo "FuelMono.lean no longer defines fuelMonoExclusions — this guard stopped guarding; fix it, do not delete it."; exit 1; }
+          echo "$line" | grep -qF 'def fuelMonoExclusions : List String := ["Stmt.tryFinally"]' || {
+            echo "fuelMonoExclusions was changed: $line"
+            echo 'It must be exactly ["Stmt.tryFinally"]. A genuine break needs a proved counterexample, not a wider exclusion list.'
+            exit 1; }
+
+      # Proof-inventory floor. Deleting or commenting out a theorem is a
+      # perfectly green way to make a build pass; nothing else in CI notices.
+      # These floors are the counts that exist today; raise them when you add
+      # proofs, and never lower one without saying why in the commit message.
+      - name: Proof inventory does not shrink
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {  # name file floor
+            n=$(grep -c '^ *theorem ' "$2")
+            echo "$1: $n theorems (floor $3)"
+            if [ "$n" -lt "$3" ]; then
+              echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
+            fi
+          }
+          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
+          check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
+          check Refine              Autoform/Refine.lean             113
+          exit $fail
+
       # Demo.lean deliberately contains a `sorry`-admitted theorem and two
       # deliberately-failing audits, to demonstrate that the audit catches them.
       # `lean` therefore exits non-zero by design; what we check is that it runs
