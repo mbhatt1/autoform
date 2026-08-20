@@ -39,11 +39,47 @@ CHECKS = [
 ]
 
 
+# Cross-artifact consistency. Checking docs against artifacts is not enough: if the
+# artifact is stale, the docs can match it perfectly and still be false. That happened
+# immediately -- this script passed 5/5 while ledger-Cachetools.json said 238 functions
+# and ast-Cachetools.json had 208, because the ledger had not been re-run after an
+# exporter change. A checker that compares two things which drift together has only
+# proved they drift together.
+#
+# No new provenance is needed to catch it: independent artifacts describing the same
+# module must agree on the facts they share. Population is the sharpest one.
+CROSS = [
+    ("ledger-Cachetools.json", "functions", "ast-Cachetools.json", None,
+     "function count"),
+]
+
+
+def ast_function_count(path):
+    d = json.load(open(path))
+    return len(d) if isinstance(d, list) else len(d.get("functions", []))
+
+
+def check_cross(root):
+    out = []
+    for art, key, other, _, what in CROSS:
+        ap_, op_ = os.path.join(root, art), os.path.join(root, other)
+        if not (os.path.exists(ap_) and os.path.exists(op_)):
+            continue
+        a = json.load(open(ap_)).get(key)
+        b = ast_function_count(op_)
+        if a != b:
+            out.append(f"{art} says {what}={a}, but {other} has {b}. One of them is "
+                       f"stale -- re-run the pipeline stage that produces the older one "
+                       f"BEFORE trusting any figure derived from it.")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     a = ap.parse_args()
     stale, missing = [], []
+    stale.extend(check_cross(a.root))
     for doc, rx, art, key, cast in CHECKS:
         dp, ap_ = os.path.join(a.root, doc), os.path.join(a.root, art)
         if not os.path.exists(dp) or not os.path.exists(ap_):
