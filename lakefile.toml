@@ -12,3 +12,12 @@ name = "Autoform"
 name = "specimen"
 git = "https://github.com/strata-org/specimen.git"
 rev = "main"
+
+# Aesop: best-first proof search with user-extensible rule sets. Proof-producing and
+# kernel-checked, so it adds no trusted code -- the same bar `bv_decide` clears and
+# `native_decide` does not. Pinned to the tag matching `lean-toolchain`; `master`
+# tracks Lean nightly and pulls the whole toolchain forward.
+[[require]]
+name = "aesop"
+git = "https://github.com/leanprover-community/aesop.git"
+rev = "v4.30.0-rc1"

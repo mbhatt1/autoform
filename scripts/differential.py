@@ -26,10 +26,18 @@ not actually compared is never reported as passing — that is the cardinal sin 
 
 Usage: differential.py <ast.json> <source-dir> <lean-module> [n-cases] [--tests DIR]
 """
-import json, sys, subprocess, random, importlib.util, os, re, glob, io
+import os, sys
+import json, subprocess, random, importlib.util, re, glob, io
 import contextlib, inspect, functools
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
+
+# Test-suite-derived cases must be reproducible too. Set-iteration and dict-key hashing
+# feed which calls the suite makes and in which order, so an unseeded interpreter gives
+# a different sample of cases (and a different set of divergences) on every run.
+if os.environ.get("PYTHONHASHSEED") != "0" and not os.environ.get("AUTOFORM_NO_REEXEC"):
+    os.execve(sys.executable, [sys.executable] + sys.argv,
+              dict(os.environ, PYTHONHASHSEED="0"))
 
 FUEL = 5000
 MAX_TOTAL_CASES = 600      # keep the generated Lean file compile-bounded
@@ -1011,7 +1019,7 @@ def main():
     # otherwise clobber each other's generated file mid-bisection
     scratch = "/tmp/autoform_diff_%d.lean" % os.getpid()
 
-    def lean_eval(idxs, depth=0):
+    def lean_eval(idxs, depth=0, retried=False):
         """idxs -> {idx: repr line}. Missing keys are cases Lean could not answer."""
         if not idxs: return {}
         src = header + ["private def cases : List DCase := ["] \
@@ -1029,10 +1037,17 @@ def main():
                 continue
             m = re.match(r'@@(\d+)@@(.*)', l)
             if m and int(m.group(1)) in idxs: got[int(m.group(1))] = m.group(2)
+        if not saw_meta and not retried:
+            # No `@@meta@@` line: the file never reached the first case, so this is a
+            # compile or environment failure, not a bad case. That happens for real —
+            # another process rebuilding `Semantics.olean` removes it mid-run — so
+            # rebuild and try once more before giving up on the whole chunk.
+            subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod],
+                           capture_output=True, text=True, env=env, cwd=repo)
+            return lean_eval(idxs, depth, retried=True)
         if not saw_meta:
-            # the file never reached the first case: a compile or environment failure
-            # (stale/absent olean, renamed constructor). Bisecting that costs one lake
-            # invocation per case and answers nothing.
+            # Bisecting an environment failure costs one lake invocation per case and
+            # answers nothing.
             if depth == 0 or not meta.get("env_reported"):
                 meta["env_reported"] = True
                 print("lean environment failure, not bisecting:",
@@ -1052,11 +1067,42 @@ def main():
                   (out.stdout[:200] + out.stderr[:400]).replace("\n", " ")[:400])
         return got
 
-    got = {}
+    def olean_fingerprint():
+        """Identify the compiled artifacts the answers actually came from.
+
+        STRATEGY.md §19: a stale `.olean` answers with the *previous* semantics. That
+        can also happen *during* a run — another process rebuilding `Semantics` while
+        the chunks are being evaluated — and it produced a phantom divergence
+        (`_DefaultSize.pop` returning 0 instead of 1) that reproduced nowhere
+        afterwards. So fingerprint the artifacts and re-run if they moved."""
+        import hashlib
+        h = hashlib.sha256()
+        for p in (os.path.join(repo, ".lake/build/lib/lean/Autoform/Lang/Core",
+                               "Semantics.olean"),
+                  os.path.join(repo, ".lake/build/lib/lean/Autoform/Generated",
+                               lean_mod + ".olean")):
+            try:
+                h.update(open(p, "rb").read())
+            except OSError:
+                h.update(b"<missing>")
+        return h.hexdigest()
+
     CHUNK = 20
     order = list(range(len(cases)))
-    for i in range(0, len(order), CHUNK):
-        got.update(lean_eval(order[i:i + CHUNK]))
+    got, stable = {}, False
+    for attempt in range(2):
+        before = olean_fingerprint()
+        got = {}
+        for i in range(0, len(order), CHUNK):
+            got.update(lean_eval(order[i:i + CHUNK]))
+        if olean_fingerprint() == before:
+            stable = True; break
+        print("WARNING: the compiled Lean artifacts changed while the cases were being "
+              "evaluated (a concurrent build). Discarding and re-running.")
+    result["build_stable"] = stable
+    if not stable:
+        print("WARNING: results below were produced against a moving build and must "
+              "not be treated as conformance evidence (build_stable=false).")
     if len(got) < len(cases):
         print("lean answered %d/%d cases; the rest are INCONCLUSIVE"
               % (len(got), len(cases)))
@@ -1130,7 +1176,12 @@ def main():
             print(msg[:300])
             result["divergence_detail"].append(
                 {"function": c["name"], "args": argstr[:200], "detail": desc[:200],
-                 "origin": origin})
+                 "origin": origin,
+                 # the exact inputs, so a divergence is a reproducible artifact rather
+                 # than a line of prose
+                 "case": {"self": c["self"], "args": c["args"],
+                          "heap": json.loads(json.dumps(c["heap"]))[:6]},
+                 "lean_repr": line[:400]})
 
     total = agree + diverge
     rate = "%d%%" % (100 * agree // total) if total else "n/a"

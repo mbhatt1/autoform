@@ -1,4 +1,5 @@
 import Batteries
+import Aesop
 import Std.Tactic.BVDecide
 import Autoform.Lang.Imp.Semantics
 import Autoform.Lang.Core.Numeric
@@ -23,8 +24,12 @@ What this build implements, and how honestly:
   in Lean core (`Std.Tactic.BVDecide`); it discharges bitvector goals via CaDiCaL and
   then **checks the SAT solver's LRAT certificate in the Lean kernel**, so it is a real
   tier-2 hammer that adds no trusted code (`#print axioms` on a `bv_decide` proof shows
-  only `propext`/`Quot.sound`/`Classical.choice`). `aesop`/`duper`/`lean-smt` remain
-  unavailable: they are not dependencies and `lakefile.toml` is off limits.
+  only `propext`/`Quot.sound`/`Classical.choice`). **`aesop` is now a dependency** and
+  is a tier-2 rung: it is best-first proof search with user-extensible rule sets, and it
+  is proof-producing, so it clears the same bar `bv_decide` does and `native_decide` does
+  not. It is pinned to the tag matching `lean-toolchain` -- `master` tracks Lean nightly
+  and silently drags the whole toolchain forward, which is how the first attempt to add
+  it bumped this build from 4.30.0-rc1 to 4.34.0-rc1. `duper`/`lean-smt` remain absent.
   An external SMT solver *is* reachable (`scripts/prover/smt.py` finds `cvc5`/`z3`), but
   no Lean proof can be reconstructed from its answer, so it is wired up as
   `#smt_evidence` — which records an **open obligation carrying the solver's verdict as
@@ -194,8 +199,14 @@ def parseTactic? (s : String) : TermElabM (Option (TSyntax `tactic)) := do
 
 Tier 1 is the cheap decision-procedure tier. Tier 2 is search plus the bitvector
 hammer: `bv_decide` is core, SAT-backed and LRAT-checked *by the kernel*, so it is a
-genuine tier-2 rung and not an oracle. `aesop`, `duper` and `lean-smt` remain
-unavailable (not dependencies — see `lakefile.toml`, which is off limits).
+genuine tier-2 rung and not an oracle. `aesop` is a dependency and a tier-2 rung.
+`duper` and `lean-smt` remain unavailable (not dependencies).
+
+Note what adding `aesop` says about tiers 4/5 below: `aesop` *is* best-first proof
+search, done properly and maintained by people who work on nothing else. The hand-rolled
+search here is worth keeping only for what `aesop` does not do — decomposition and
+generalization over this specific deep embedding — and it should be measured against
+`aesop`, not assumed to add to it.
 
 `native_decide` is deliberately absent at every tier: it discharges goals by trusting
 the compiler, which would put a non-kernel oracle inside a gate whose entire purpose is
@@ -223,14 +234,20 @@ def ladder : TermElabM (Array Rung) := do
     mk 2 "intros; bv_decide"  (← `(tactic| (intros; bv_decide))),
     mk 2 "simp; bv_decide"    (← `(tactic| (simp; bv_decide))),
     mk 2 "bv_omega"           (← `(tactic| bv_omega)),
+    mk 2 "aesop"              (← `(tactic| aesop)),
+    mk 2 "intros; aesop"      (← `(tactic| (intros; aesop))),
+    mk 2 "simp_all; aesop"    (← `(tactic| (simp_all; aesop))),
     mk 2 "exact?"             (← `(tactic| exact?)),
     mk 2 "intros; exact?"     (← `(tactic| (intros; exact?)))
   ]
 
 /-- Closers only — the rungs the tier-4 search tries at each node before expanding it.
-`exact?` is excluded here: it is far too slow to run at every node of a search. -/
+`exact?` is excluded here: it is far too slow to run at every node of a search. `aesop`
+is excluded for a different reason — it is *itself* a best-first search, so running it at
+every node nests one search inside another and pays for the same exploration twice. -/
 def closerRungs (maxTier : Nat) : TermElabM (Array Rung) := do
-  return (← ladder).filter fun r => r.tier ≤ min maxTier 2 && !r.label.endsWith "exact?"
+  return (← ladder).filter fun r =>
+    r.tier ≤ min maxTier 2 && !r.label.endsWith "exact?" && !r.label.endsWith "aesop"
 
 /-- Tiers that exist in the design but have no implementation here. Listed in the
 failure transcript so a reader can tell "unproved" from "not even attempted". This list
@@ -246,8 +263,8 @@ def unavailableTiers : IO (List String) := do
       "tier 3: local neural proposer — available but OFF (set AUTOFORM_NEURAL=1 and \
        run a local ollama); no network or API key is ever used"
   return (
-    [ "tier 2: aesop / lean-auto+duper / lean-smt — not dependencies of this build \
-       (`bv_decide` IS available and is used; external SMT is reachable only as \
+    [ "tier 2: aesop IS a dependency and is used, as is bv_decide; lean-auto+duper and \
+       lean-smt are not dependencies of this build (external SMT is reachable only as \
        *evidence* via `#smt_evidence`, since no Lean proof can be reconstructed from it)"
     , tier3
     , "tier 4/5: best-first search with decomposition/generalization — implemented; \

@@ -509,6 +509,84 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
+/-! ### The instantiated program, and its name resolution
+
+`Ctx.resolve` falls back to a *unique suffix* match over the function table, and
+`Ctx.resolveMethod` to a class-qualified one. Those are the only places where a
+two-function slice could behave differently from the whole corpus, so they are discharged
+here as four named lemmas rather than buried inside an evaluation proof. -/
+
+/-- `methodkey` with its single hole implemented by `e`. -/
+def methodkeyWith (e : Expr) : Func :=
+  { f_cachetools_keys_py__module__methodkey with
+    body := (.seq (.expr (.lit (.str "\"\"Return a cache key for use with cached methods.\"\"")))
+              (.seq .skip (.ret (.call "hashkey" [e])))) }
+
+/-- The instantiated program. -/
+def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
+  [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
+
+/-- Any implementation of the one contracted label turns `keysProgram` into
+`keysProgramWith`. Note that names and parameters are untouched — which is why the
+resolution lemmas below are about the instantiated program and still describe the
+original. -/
+theorem onProgram_keysProgram {σ : Impl} {e : Expr}
+    (he : σ.lookup "op:starredUnpack" = some e) :
+    σ.onProgram keysProgram = keysProgramWith e := by
+  simp [Impl.onProgram, Impl.onFunc, keysProgram, keysProgramWith, methodkeyWith,
+    substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey]
+
+theorem table_keysProgramWith (e : Expr) : (keysProgramWith e).table =
+    [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+    , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] := by
+  simp [Program.table, keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
+
+/-- The entry point resolves, by exact match on the fully qualified CPG name. -/
+theorem resolve_methodkey (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolve "cachetools/keys.py:<module>.methodkey"
+      = some (methodkeyWith e) := by
+  simp +decide [Ctx.resolve, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey]
+
+/-- The call `hashkey(...)` resolves, and *uniquely* — the suffix rule finds exactly one
+candidate. This is the fact the `#eval` cross-checks below re-run on the full program. -/
+theorem resolve_hashkey (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolve "hashkey"
+      = some f_cachetools_keys_py__module__hashkey := by
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "hashkey") = ".hashkey" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith]
+
+/-- `kwargs` is not a function: `hashkey`'s `if kwargs:` reads an unbound name, which is
+`unit`, hence falsy. That is why the `**kwargs` branch is not taken. -/
+theorem resolve_kwargs (e : Expr) : (ctxOf (keysProgramWith e)).resolve "kwargs" = none := by
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "kwargs") = ".kwargs" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith]
+
+/-- `_HashedTuple` has no translated `__init__`, so `Expr.alloc` returns the fresh
+reference without running one — and the unpacked arguments are therefore not observable in
+`methodkey`'s result. -/
+theorem resolveMethod_hashedTuple_init (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "__init__" = none := by
+  simp only [Ctx.resolveMethod, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
+  simp +decide [List.filter_cons, String.endsWith]
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
+  rw [show ("." ++ "__init__") = ".__init__" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+
+/-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
+resolution lemmas above apply. -/
+private theorem ctx_fold (p : Program) :
+    ({ dialect := p.dialect, table := p.table } : Ctx) = ctxOf p := rfl
+
 /-! ### Satisfiability first
 
 By `refinesUnder_of_unsatisfiable`, a contract-relative theorem says nothing until its
@@ -598,39 +676,17 @@ theorem methodkey_refinesUnder_value :
     simp only []
     rw [h2]
     exact Prod.ext h1 h2
-  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
-    he, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hvf
+  rw [onProgram_keysProgram he] at hvf
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  -- `Ctx.resolve`'s suffix test hides its pattern inside a `Pattern` *instance* argument,
-  -- where `simp` does not rewrite. Normalising the three concatenations by `rw` lets the
-  -- interpreter's name resolution reduce; the alternation below is just evaluation.
-  simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, String.endsWith, hvf]
-  rw [show ("." ++ "hashkey") = ".hashkey" from by rfl]
-  simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, String.endsWith, hvf]
-  try rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__"
-        from by rfl]
-  try simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, String.endsWith, hvf]
-  try rw [show ("." ++ "__init__") = ".__init__" from by rfl]
-  try simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, String.endsWith, hvf]
+  rw [onProgram_keysProgram he]
+  -- Everything from here is evaluation of the interpreter on a concrete AST. The only
+  -- non-mechanical step is `hvf`, which is exactly where the contract is used.
+  simp +decide [runFunc, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+    resolveMethod_hashedTuple_init, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
+    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvf]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -662,7 +718,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   intro k
   simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
@@ -672,6 +728,16 @@ theorem methodkey_value_result :
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .ret (.ref 0)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
+
+/-- The raising contract, paired with the payload for which satisfiability is proved.
+The general `methodkey_refinesUnder_raise` holds for *any* payload; only this instance
+comes with a witness that the assumption can be met. -/
+theorem methodkey_raise_result :
+    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram ∧
+    RefinesUnder [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram
+      "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True)
+      (fun _ => .raise (.str "ZeroDivisionError")) :=
+  ⟨satisfiable_raises_zeroDiv, methodkey_refinesUnder_raise _⟩
 
 /-! ### The negative result
 
@@ -690,10 +756,10 @@ whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgram (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
   simp +decide [runFunc, keysProgram, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, Ctx.resolve, Program.table,
+    f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
+    Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,
-    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
-    ew_hashkey_init, ew_methodkey_init]
+    Heap.get, Heap.alloc]
 
 /-- **An unconstrained contract proves nothing.**
 
