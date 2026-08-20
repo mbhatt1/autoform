@@ -467,20 +467,80 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   }
 
   // ---- expressions ----------------------------------------------------------
+  /** Parse a C/C++/Java integer literal.
+    *
+    * `toIntOption` alone was the whole implementation, and on V8 it failed on 309 of the
+    * literals in `src/base` — every hex constant, every `u`/`U`/`L`/`ULL` suffix, C++14
+    * digit separators (`0x0010'0000'0000'0000`), binary `0b10000`, and anything past
+    * 2^31. Each became a `lit:unquoted` hole, so a function containing `0xFFFFFFFF` was
+    * unanalysable for want of a number.
+    *
+    * Returns `BigInt` because a C++ literal routinely exceeds `Int` and often exceeds
+    * `Long` (`0xFFFFFFFFFFFFFFFF`). The caller emits anything beyond 2^53 as a decimal
+    * *string*, since JSON numbers are doubles and would silently round it — the exact
+    * class of quiet corruption this project keeps finding.
+    */
+  def parseIntLiteral(raw: String): Option[BigInt] = {
+    var t = raw.trim.replace("'", "")            // C++14 digit separators
+    if (t.isEmpty) return None
+    var neg = false
+    if (t.startsWith("-")) { neg = true; t = t.drop(1) }
+    else if (t.startsWith("+")) t = t.drop(1)
+    // Integer suffixes, in any order and case: 0u, 1L, 2ULL, 3llu.
+    val body = t.reverse.dropWhile(ch => ch == 'u' || ch == 'U' || ch == 'l' || ch == 'L').reverse
+    if (body.isEmpty) return None
+    val parsed: Option[BigInt] =
+      try {
+        if (body.length > 2 && (body.startsWith("0x") || body.startsWith("0X")))
+          Some(BigInt(body.drop(2), 16))
+        else if (body.length > 2 && (body.startsWith("0b") || body.startsWith("0B")))
+          Some(BigInt(body.drop(2), 2))
+        // A leading zero is octal in C, but plain "0" is zero, and a decimal point or an
+        // exponent means this is a float and not ours to claim.
+        else if (body.length > 1 && body.head == '0' && body.forall(_.isDigit))
+          Some(BigInt(body.drop(1), 8))
+        else if (body.forall(_.isDigit)) Some(BigInt(body))
+        else None
+      } catch { case _: NumberFormatException => None }
+    parsed.map(v => if (neg) -v else v)
+  }
+
+  /** JSON for an integer literal, without losing precision to a double. */
+  def intLit(v: BigInt): ujson.Obj =
+    if (v.abs <= BigInt(2).pow(53)) ujson.Obj("k" -> "int", "v" -> v.toLong)
+    else ujson.Obj("k" -> "int", "v" -> v.toString)
+
   def expr(n: AstNode): ujson.Obj = n match {
     case l: Literal =>
-      val c = l.code.trim
+      val c0 = l.code.trim
+      // String-literal prefixes: L"x" (wide), u8"x", u"x", U"x". The prefix selects an
+      // encoding Core does not model; the *content* is what the program uses, and
+      // dropping the prefix is exactly what `unquoted` already does for the quotes.
+      val c =
+        if (c0.length >= 3 && (c0.startsWith("L\"") || c0.startsWith("u\"") || c0.startsWith("U\""))) c0.drop(1)
+        else if (c0.length >= 4 && c0.startsWith("u8\"")) c0.drop(2)
+        else c0
       val unquoted =
         if (c.length >= 2 && (c.head == '"' || c.head == '\'')) c.drop(1).dropRight(1) else c
-      c.toIntOption match {
-        case Some(i) => ujson.Obj("k" -> "int", "v" -> i)
+      parseIntLiteral(c) match {
+        case Some(i) => intLit(i)
         case None =>
           if (c == "True" || c == "true")        ujson.Obj("k" -> "bool", "v" -> true)
           else if (c == "False" || c == "false") ujson.Obj("k" -> "bool", "v" -> false)
           else if (c == "None" || c == "null" || c == "nil") ujson.Obj("k" -> "unit")
           // A float is not a string. Core has no floats, so this is a hole, not a lie.
-          else if (c.matches("""[-+]?\d+\.\d*([eE][-+]?\d+)?|[-+]?\.\d+([eE][-+]?\d+)?"""))
+          // Float forms, including the C/C++ `f`/`F`/`l`/`L` suffix and exponent-only
+          // spellings (`1e300`). These were falling through to `lit:unquoted`, which
+          // reported a *parsing* failure for something we simply do not model yet —
+          // wrong label, wrong remedy. `Autoform/Lang/Core/Float.lean` models IEEE-754,
+          // so emitting `Lit.float` here is real pending work, not a permanent hole.
+          else if (c.matches("""[-+]?(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?[fFlL]?""") &&
+                   c.exists(ch => ch == '.' || ch == 'e' || ch == 'E'))
             hole("lit:float")
+          // Joern synthesises `<global>` as a namespace marker. It is not a literal the
+          // source contains, and counting it as an unparsed one overstated the literal
+          // problem roughly tenfold on V8.
+          else if (c == "<global>") hole("lit:joern-synthetic")
           else if (c.headOption.exists(ch => ch == '"' || ch == '\''))
             ujson.Obj("k" -> "str", "v" -> unquoted)
           else if (c.isEmpty) ujson.Obj("k" -> "unit")
