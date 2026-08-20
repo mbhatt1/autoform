@@ -10,7 +10,7 @@ whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is 
 other half, and until now it did not exist.
 
 The cost of not having it is measurable. On `cachetools`, 165 of 238 functions are
-hole-free and 74 are call-closed. A single untranslated construct anywhere in a function
+hole-free and 69 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is

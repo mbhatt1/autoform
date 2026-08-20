@@ -30,7 +30,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 208 | 76% | 45 (19%) | 1.1% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 238 | 69% | 69 (29%) | 1.1% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
 | Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
@@ -284,3 +284,5 @@ python3 scripts/lang_matrix.py ast-LangGo.json   # or specific ones
 
 `scripts/lang_matrix.py` measures corpora the ledger cannot reach, because it does not
 depend on the corpus having rendered.
+
+> **On the function count.** This table uses the ledger's population (238 for `cachetools`), not the neutral AST's (208). The two differ because the ledger counts module-level synthesized functions that the AST does not list separately. Percentages elsewhere in the docs must state which population they are over; mixing the two populations silently inflates or deflates every ratio by about 13%.

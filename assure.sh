@@ -57,6 +57,12 @@ hdr "5/5 assurance case"
 # contracts-$MOD.json is absent, sacm.py simply omits the G.CONTRACT branch, and a
 # conditional theorem that never reaches the case reads exactly like an unconditional
 # one. A failure here is therefore not "|| true" -- it is a missing argument branch.
+# The docs are part of the claim. A figure that was true when written and is false now
+# is the same defect class as a metric computed from the artifact it describes -- and
+# this repo had three documents quoting three different verifiable-core numbers, none
+# current, because nothing checked.
+python3 scripts/check_docs.py || true
+
 python3 scripts/emit_contracts.py "$MOD"
 
 python3 scripts/sacm.py --module "$MOD"
