@@ -8,3 +8,5 @@ sacm-*.json
 mutation.json
 audit.json
 fvspec-report.json
+__pycache__/
+*.pyc
