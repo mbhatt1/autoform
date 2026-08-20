@@ -326,7 +326,7 @@ private def orun (c : OCase) : EResult :=
   else
     match octx.resolve c.fn with
     | none    => .hole s!"entry:{{c.fn}}"
-    | some fn => (applyFunc octx {fuel} h fn c.slf c.args).2
+    | some fn => (applyFunc octx {fuel} h fn c.slf c.args []).2
 """
 
 FOOTER = """
@@ -354,6 +354,7 @@ class Driver:
         self.header = HEADER.format(mod=module, fuel=fuel, inits=inits).splitlines()
         self.path = os.path.join(scratch, "core_oracle_scratch.lean")
         self.base = 0
+        self.last = ""
 
     def eval(self, cases, idxs, depth=0):
         """idx -> repr line. Bisects on failure: one bad case must not lose a batch."""
@@ -366,7 +367,9 @@ class Driver:
             out = subprocess.run(["lake", "env", "lean", self.path], capture_output=True,
                                  text=True, env=env(), cwd=REPO, timeout=1800)
         except subprocess.TimeoutExpired:
+            self.last = "TIMEOUT"
             return {}
+        self.last = (out.stdout + out.stderr)
         got = {}
         for l in out.stdout.splitlines():
             m = re.match(r'@@meta@@(\d+) (\d+)', l)
@@ -480,6 +483,22 @@ def main():
 
     # ---- 4. execute
     drv = Driver(a.module, a.fuel, a.scratch)
+
+    # ---- 3b. SMOKE GATE. If the harness itself cannot elaborate, every case comes back
+    # unanswered and the report reads "INCONCLUSIVE" for the whole core — a silence that
+    # looks like a finding. That is exactly what happened on 2026-08-19: `applyFunc`
+    # had gained a keyword-argument parameter, the generated scratch file no longer
+    # type-checked, and the oracle would have reported 0 refutations over 318 functions.
+    # One case must answer before any of them are believed.
+    if cases:
+        if not drv.eval(cases, [0]):
+            print("ABORT: the oracle harness produced no answer for its first case. The "
+                  "scratch module did not elaborate, so every case would come back "
+                  "unanswered and the report would read as 'nothing refuted'. Lean said:")
+            print((drv.last or "")[:2000])
+            return 2
+        print("smoke gate: OK — the harness elaborates and the interpreter answers.")
+
     got = {}
     CHUNK = 20
     order = list(range(len(cases)))

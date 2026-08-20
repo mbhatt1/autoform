@@ -1,0 +1,6049 @@
+{
+ "module": "LinuxCrypto",
+ "ast": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-6/ast-LinuxCrypto.json",
+ "source_root": null,
+ "fuel": 5000,
+ "synthetic_inputs_per_function": 12,
+ "claim": {
+  "functions": 1955,
+  "hole_free": 692,
+  "verifiable_core_static": 318
+ },
+ "executed": {
+  "cases": 3816,
+  "answered": 3816,
+  "core_functions_exercised": 318,
+  "core_functions_with_real_inputs": 0
+ },
+ "result": {
+  "verifiable_core_executed": 182,
+  "verifiable_core_executed_real_inputs_only": 0,
+  "holed_on_some_input": 136,
+  "holed_on_a_real_input": 0,
+  "inconclusive_never_exercised": 0
+ },
+ "holed_functions": [
+  {
+   "name": "crypto_alloc_acomp",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], int 2, tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "crypto_alloc_acomp_node",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit, fn 'len', {int 1: int 2}, str '')"
+    }
+   ]
+  },
+  {
+   "name": "acomp_restore_req",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:base:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "acomp_reqchain_finish",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:field:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "acomp_do_req_chain",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:field:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, int 256)"
+    }
+   ]
+  },
+  {
+   "name": "adiantum_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 2)"
+    }
+   ]
+  },
+  {
+   "name": "adiantum_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256)"
+    }
+   ]
+  },
+  {
+   "name": "alg_setkey_by_key_serial<duplicate>0",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool True, bool True, {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "ahash_nosetkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', list[int 1, int 2], bool True)"
+    }
+   ]
+  },
+  {
+   "name": "ahash_save_req",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:saved_complete:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "ahash_restore_req",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:base:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:base:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "ahash_update_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:saved_complete:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({int 1: int 2}, {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "ahash_finup_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:saved_complete:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit, int -1)"
+    }
+   ]
+  },
+  {
+   "name": "ahash_def_finup_done1",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:saved_complete:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'key', list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "ahash_def_finup",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:saved_complete:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "setField:saved_complete:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "ahash_default_export_core",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "ahash_default_import_core",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[], tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "akcipher_default_op",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "akcipher_default_set_key",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len', list[str 'a'], int -1)"
+    }
+   ]
+  },
+  {
+   "name": "aead_sendmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', int 256, list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "aead_recvmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, str 'a', unit, tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "aead_bind",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:local:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a', int 7, int 2)"
+    }
+   ]
+  },
+  {
+   "name": "aead_setauthsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_maxauthsize": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_maxauthsize",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_aead_maxauthsize",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_maxauthsize",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:crypto_aead_maxauthsize",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'key', {int 1: int 2})"
+    }
+   ]
+  },
+  {
+   "name": "aead_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_alignmask": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_aead_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_aead_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a', int 1, str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "hash_sendmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit, {}, tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "hash_recvmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'], int -13, int 1000000, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "hash_accept_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13, int 0, int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "hash_bind",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:local:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'], str 'a', str '0')"
+    }
+   ]
+  },
+  {
+   "name": "hash_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:using_shash:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:using_shash:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:using_shash:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:using_shash:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:using_shash:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], tuple[], str '')"
+    }
+   ]
+  },
+  {
+   "name": "skcipher_sendmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13, unit, list[])"
+    }
+   ]
+  },
+  {
+   "name": "skcipher_recvmsg_nokey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:sk:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:sk:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a', int -13, {str 'a': int 1}, bool False)"
+    }
+   ]
+  },
+  {
+   "name": "skcipher_bind",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], tuple[int 1, str 'a'], {})"
+    }
+   ]
+  },
+  {
+   "name": "skcipher_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_alg": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_skcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], int -1, int -1)"
+    }
+   ]
+  },
+  {
+   "name": "__crypto_alloc_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, list[str 'a'], str '')"
+    }
+   ]
+  },
+  {
+   "name": "authenc_geniv_ahash_done2",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_reqtfm": 6,
+    "unop:-": 6
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len', int 7)"
+    }
+   ]
+  },
+  {
+   "name": "authenc_decrypt_tail_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 2, fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "crypto_authenc_esn_encrypt_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_reqtfm": 3,
+    "unop:-": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, int -13)"
+    }
+   ]
+  },
+  {
+   "name": "bpf_crypto_lskcipher_alloc_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:local:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "op:addressOf:local:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[])"
+    }
+   ]
+  },
+  {
+   "name": "bpf_crypto_lskcipher_has_algo",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "import:operand": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "bpf_crypto_lskcipher_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_lskcipher_alignmask": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_lskcipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_lskcipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_lskcipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_lskcipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'], tuple[], list[])"
+    }
+   ]
+  },
+  {
+   "name": "bpf_crypto_lskcipher_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_lskcipher_alg": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7, int 2, str '0', fn 'len', str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "bpf_crypto_lskcipher_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_lskcipher_alg": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "call:crypto_lskcipher_alg",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', tuple[], bool True, list[], bool False)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_rfc4309_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:assoclen:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "crypto_rfc4309_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:assoclen:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:assoclen:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "chacha20_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'], str '0', int 1)"
+    }
+   ]
+  },
+  {
+   "name": "chacha12_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_skcipher_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, tuple[], str '0')"
+    }
+   ]
+  },
+  {
+   "name": "chacha_decrypt_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:aead_request_ctx": 3,
+    "unop:-": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13, tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "poly_genkey_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:aead_request_ctx": 4,
+    "unop:-": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a', int 7)"
+    }
+   ]
+  },
+  {
+   "name": "chacha_encrypt_done",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:aead_request_ctx": 5,
+    "unop:-": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "rfc7539_create",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'key', unit)"
+    }
+   ]
+  },
+  {
+   "name": "rfc7539esp_create",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'], str '')"
+    }
+   ]
+  },
+  {
+   "name": "crypto_cipher_encrypt_one",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_cipher_alignmask": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', int -13, bool False)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_cipher_decrypt_one",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_cipher_alignmask": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:crypto_cipher_alignmask",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, int 256, bool False)"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_skcipher_encrypt_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:skcipher_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_skcipher_decrypt_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:skcipher_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_hash_init_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:ahash_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_hash_update_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:ahash_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_hash_final_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:ahash_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_hash_finup_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:ahash_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False)"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_hash_digest_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:ahash_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:ahash_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_aead_encrypt_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:aead_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "cryptd_aead_decrypt_enqueue",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:aead_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:aead_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_pump_work",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:field:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_transfer_request_to_engine",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:addressOf:field:unknown-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "op:addressOf:field:unknown-type",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', {})"
+    }
+   ]
+  },
+  {
+   "name": "crypto_reportstat",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({int 1: int 2}, int -13, {})"
+    }
+   ]
+  },
+  {
+   "name": "dh_check_params_length",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 7,
+    "binop:<": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "binop:<",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "binop:<",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256)"
+    }
+   ]
+  },
+  {
+   "name": "dh_exit_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:kpp_tfm_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256)"
+    }
+   ]
+  },
+  {
+   "name": "dh_data_size",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:key_size:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:key_size:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:key_size:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:key_size:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:key_size:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "vli_is_negative",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:and": 1,
+    "binop:*": 11
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:and",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "binop:*",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:*",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:*",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, {int 1: int 2})"
+    }
+   ]
+  },
+  {
+   "name": "add_128_128",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:m_low:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:m_low:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "setField:m_low:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "setField:m_low:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "setField:m_low:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "vli_mod_add",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, tuple[int 1, str 'a'], {str 'a': int 1}, int 0, int 256)"
+    }
+   ]
+  },
+  {
+   "name": "vli_mod_sub",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], {str 'a': int 1}, str 'key', tuple[int 1, str 'a'], fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "ecdh_nist_p192_init_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:kpp_tfm_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "ecdh_nist_p256_init_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:kpp_tfm_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    }
+   ]
+  },
+  {
+   "name": "ecdh_nist_p384_init_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:kpp_tfm_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:kpp_tfm_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "ecdsa_ecc_ctx_init",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:curve_id:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:curve_id:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "setField:curve_id:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "setField:curve_id:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "setField:curve_id:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'], int 0)"
+    }
+   ]
+  },
+  {
+   "name": "ecdsa_ecc_ctx_deinit",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:pub_key_set:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:pub_key_set:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "setField:pub_key_set:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "setField:pub_key_set:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "setField:pub_key_set:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "ecrdsa_parse_pub_key",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:key:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:key:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "setField:key:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "setField:key:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "setField:key:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], tuple[int 1, str 'a'], list[], str 'key', str '')"
+    }
+   ]
+  },
+  {
+   "name": "essiv_skcipher_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "essiv_skcipher_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "essiv_aead_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13)"
+    }
+   ]
+  },
+  {
+   "name": "essiv_aead_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_aead_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_aead_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 2)"
+    }
+   ]
+  },
+  {
+   "name": "hctr2_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False)"
+    }
+   ]
+  },
+  {
+   "name": "hctr2_decrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_skcipher_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_skcipher_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "jent_apt_reset",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:apt_count:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:apt_count:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "setField:apt_count:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "setField:apt_count:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "setField:apt_count:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, int 1)"
+    }
+   ]
+  },
+  {
+   "name": "lrw_xor_tweak_pre",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:LRW_BLOCK_SIZE": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "lrw_xor_tweak_post",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:LRW_BLOCK_SIZE": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:LRW_BLOCK_SIZE",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "lz4_scompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 2, int 7, int 256, int 2, int 7, int 256)"
+    }
+   ]
+  },
+  {
+   "name": "lz4_sdecompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', list[str 'a'], tuple[int 1, str 'a'], int 1000000, tuple[int 1, str 'a'], list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "lz4hc_scompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 1000000, bool True, int 2, {int 1: int 2}, unit, list[])"
+    }
+   ]
+  },
+  {
+   "name": "lz4hc_sdecompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, int -13, int 1, bool False, bool False, {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "lzorle_scompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False, int 256, int 256, int 1000000, int 256, {int 1: int 2})"
+    }
+   ]
+  },
+  {
+   "name": "lzorle_sdecompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool True, str '0', fn 'len', int 7, int 1000000, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "lzo_scompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[], {}, bool False, str 'a', int 0, fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "lzo_sdecompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:indirection:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:indirection:pointer",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool True, int 2, str 'key', bool False, int 2, list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "crypto_mldsa_sign",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'], int 1, tuple[int 1, str 'a'], tuple[int 1, str 'a'], int -1)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_mldsa_set_priv_key",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7, str '0', str '')"
+    }
+   ]
+  },
+  {
+   "name": "seedsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:seedsize:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:seedsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:seedsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:seedsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:seedsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_e",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 3,
+    "field:n_sz:non-object": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', str '0', str 'a', {str 'a': int 1}, int -13)"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_d",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 3,
+    "field:n_sz:non-object": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int -13, {}, int -13, int 7)"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_p",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 5,
+    "field:n_sz:non-object": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'], int 0, int 7, str 'key', str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_q",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 9,
+    "field:n_sz:non-object": 3
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -1, int 0, bool False, int 1000000, fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_dp",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 4,
+    "field:n_sz:non-object": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13, fn 'len', tuple[int 1, str 'a'], tuple[int 1, str 'a'], fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_dq",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 5,
+    "field:n_sz:non-object": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool True, int -13, str 'key', list[], tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "rsa_get_qinv",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 7,
+    "field:n_sz:non-object": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:n_sz:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 1, fn 'len', int -1, str '', str '0')"
+    }
+   ]
+  },
+  {
+   "name": "scomp_acomp_compress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_acomp_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "scomp_acomp_decompress",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:crypto_acomp_reqtfm": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "call:crypto_acomp_reqtfm",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "shash_no_setkey",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', str 'key', str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "shash_default_export_core",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', int 0)"
+    }
+   ]
+  },
+  {
+   "name": "shash_default_import_core",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', bool True)"
+    }
+   ]
+  },
+  {
+   "name": "sig_default_sign",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False, tuple[], {str 'a': int 1}, int 7, fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "sig_default_verify",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '0', tuple[int 1, str 'a'], str 'key', int -1, int 1)"
+    }
+   ]
+  },
+  {
+   "name": "sig_default_set_key",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, list[str 'a'], {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "skcipher_walk_aead_encrypt",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:total:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:total:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "setField:total:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "setField:total:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "setField:total:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], tuple[int 1, str 'a'], list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "crypto_alloc_skcipher",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[int 1, str 'a'], str '0', int 7)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_has_skcipher",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "import:operand": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "import:operand",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 2, int 1000000, str '')"
+    }
+   ]
+  },
+  {
+   "name": "sm4_key_sub",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:cast:scalar": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "sm4_enc_sub",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:cast:scalar": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    }
+   ]
+  },
+  {
+   "name": "test_ahash_speed",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:alloc:array-decl": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7, int 7, int 0)"
+    }
+   ]
+  },
+  {
+   "name": "test_hash_speed",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:alloc:array-decl": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], list[int 1, int 2], {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "test_acipher_speed",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:alloc:array-decl": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(tuple[], int 0, int 2, bool True, {}, str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "test_cipher_speed",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:alloc:array-decl": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "op:alloc:array-decl",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'key', list[str 'a'], unit, list[], fn 'len', tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "xts_xor_tweak_pre",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:skcipher_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, int 0)"
+    }
+   ]
+  },
+  {
+   "name": "xts_xor_tweak_post",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:skcipher_request_ctx": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:skcipher_request_ctx",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "crypto_cipher_ctxsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:cra_ctxsize:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -13)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_compress_ctxsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:cra_ctxsize:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:cra_ctxsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_create_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:tfmsize:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:tfmsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:tfmsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:tfmsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:tfmsize:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 1, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_alloc_tfm",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(fn 'len', fn 'len', int 1, str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "crypto_is_test_larval",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:alg:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:alg:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:alg:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:alg:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({})"
+    },
+    {
+     "label": "field:alg:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "chachapoly_setauthsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:-": 11
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str '', {int 1: int 2})"
+    }
+   ]
+  },
+  {
+   "name": "dh_unpack_data",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-arithmetic-not-modelled": 2,
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool True, tuple[int 1, str 'a'], str '0')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False, int 7, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "ecdh_unpack_data",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-arithmetic-not-modelled": 3,
+    "binop:+": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, fn 'len', list[str 'a'])"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'key', int -13, tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "crypto_ccm_check_iv",
+   "cases": 12,
+   "answered": 12,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 9,
+    "binop:>": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256)"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "ecdh_pack_data",
+   "cases": 12,
+   "answered": 12,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-arithmetic-not-modelled": 1,
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(bool False, str 'a', int -1)"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({str 'a': int 1}, list[str 'a'], int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "crypto_authenc_esn_setauthsize",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>": 7,
+    "unop:-": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 7, {})"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 256, list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "dh_pack_data",
+   "cases": 12,
+   "answered": 12,
+   "clean": 7,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:-": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({int 1: int 2}, tuple[int 1, str 'a'], list[str 'a'], int -1)"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'a', int 256, bool True, {str 'a': int 1})"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int -1, {int 1: int 2}, tuple[], str '')"
+    }
+   ]
+  }
+ ],
+ "verified_functions": [
+  {
+   "name": "ATOMIC_NOTIFIER_HEAD",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "BLOCKING_NOTIFIER_HEAD",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DECLARE_RWSEM",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DECLARE_STATIC_KEY_FALSE",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DECLARE_WORK",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DEFINE_MUTEX",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DEFINE_PER_CPU",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "DEFINE_STATIC_KEY_FALSE",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "EXPORT_SYMBOL",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "EXPORT_SYMBOL_GPL",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "LIST_HEAD",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "MODULE_ALIAS_NETPROTO",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__alg_test_hash",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_acomp_alg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_lskcipher_alg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_lskcipher_cast",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_md5_export_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_md5_import_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha1_export_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha1_import_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha256_export_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha256_import_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha512_export_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_sha512_import_core",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__crypto_skcipher_alg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__testmgr_alloc_buf",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__testmgr_free_buf",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "aegis-neon.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "aegis128_do_simd",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_check_test_descs_order",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_check_testvec_configs",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_find_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_fips_disabled",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_setkey_by_key_serial",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_aead",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_akcipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_cipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_comp",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_drbg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_hash",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_kpp",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_null",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_sig",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alg_test_skcipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alloc_cipher_test_sglists",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "alloc_shash",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "build_cipher_test_sglists",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "build_generic_driver_name",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "build_hash_sglist",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "build_test_sglist",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "c_next",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "c_start",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "c_stop",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "check_hash_result",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "check_nonfinal_ahash_op",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "check_shash_op",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "count_test_sg_divisions",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_alg_finish_registration",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_boot_test_finished",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_boot_test_finished<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_del_default_rng",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_disable_simd_for_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_dump_report_done",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_exit_proc",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_init_proc",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_mldsa_alg_exit",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_reenable_simd_for_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_rng_init_tfm",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_scomp_alloc_scratches",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "crypto_scomp_free_scratches",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "destroy_test_sglist",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "dh_helper.c:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "do_ahash_op",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "do_test_kpp",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_cavs_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_fini_hash_kernel",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_fini_sym_kernel",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_fips_continuous_test",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_generate",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_get_random_bytes",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_init_hash_kernel",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_init_sym_kernel",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_kcapi_hash",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_kcapi_hmacsetkey",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_kcapi_sym_ctr",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_seed",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "drbg_seed_from_random",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ecdh_helper.c:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ecdsa_digest_size",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ecrdsa_exit_tfm",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "flip_random_bit",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "flip_random_byte",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "flush_type.<clinit>:flush_type()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "free_cipher_test_sglists",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_aead_message",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_aead_testvec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_bytes",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_cipher_testvec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_hash_testvec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_length",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_sgl_divisions",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "generate_random_testvec_config",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "hash.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "hexdump",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "init_rnd_state",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "init_test_sglist",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "is_test_sglist_corrupted",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "jent_health_failure",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "jent_kcapi_reset",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "jent_raw_hires_entropy_store<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "jent_testing_exit<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "jent_testing_init<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "key_data_ptr_encrypted",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "key_data_ptr_trusted",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "key_data_ptr_user",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "late_initcall",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "lookup_key",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "memcpy",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "module_exit",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "module_init",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "mutate_aead_message",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "mutate_buffer",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_crypt",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_digest",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_final",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_hash_setkey",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_init",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_setkey",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_skcipher_setkey",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "null_update",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "prandom_bool",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "prandom_u32_below",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "prandom_u32_inclusive",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "prandom_u8",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "prepare_keybuf",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ripemd.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "rng_default_set_ent",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "rsa_helper.c:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "scatterwalk.c:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "scomp_unlock_scratch",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "set_crypto_boot_test_finished",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "set_crypto_boot_test_finished<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "skcipher.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "skcipher_noexport",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "skcipher_noimport",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_acomp",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead_inauthentic_inputs",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead_slow",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead_vec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead_vec_cfg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_aead_vs_generic_impl",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_ahash_vec_cfg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_akcipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_akcipher_one",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_cipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_hash_vec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_hash_vec_cfg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_hash_vs_generic_impl",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_kpp",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_pack_u32",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_shash_vec_cfg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_sig",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_sig_one",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_skcipher",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_skcipher_vec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_skcipher_vec_cfg",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "test_skcipher_vs_generic_impl",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "testmgr_alloc_buf<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "testmgr_free_buf<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "testmgr_is_poison",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "testmgr_onetime_init",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "testmgr_poison",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "try_to_generate_inauthentic_testvec",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "valid_sg_divisions",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "valid_testvec_config",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "verify_correct_output",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vminvq_s8",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vqtbl1q_u8",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vqtbx1q_u8",
+   "inputs": 12,
+   "real_inputs": 0
+  }
+ ],
+ "inconclusive_functions": [],
+ "hole_labels": {
+  "unop:-": 298,
+  "op:indirection:pointer": 96,
+  "control:FOR": 84,
+  "field:sk:non-object": 84,
+  "call:crypto_skcipher_reqtfm": 72,
+  "call:ahash_request_ctx": 60,
+  "op:addressOf:field:unknown-type": 48,
+  "call:skcipher_request_ctx": 48,
+  "call:kpp_tfm_ctx": 48,
+  "field:n_sz:non-object": 48,
+  "op:alloc:array-decl": 48,
+  "field:saved_complete:non-object": 36,
+  "op:addressOf:local:unknown-type": 36,
+  "call:aead_request_ctx": 36,
+  "call:crypto_aead_reqtfm": 33,
+  "binop:>": 32,
+  "binop:+": 26,
+  "field:base:non-object": 24,
+  "setField:saved_complete:non-object": 24,
+  "import:operand": 24,
+  "call:crypto_lskcipher_alg": 24,
+  "field:assoclen:non-object": 24,
+  "call:crypto_skcipher_ctx": 24,
+  "call:crypto_cipher_alignmask": 24,
+  "call:LRW_BLOCK_SIZE": 24,
+  "call:crypto_acomp_reqtfm": 24,
+  "op:cast:scalar": 24,
+  "field:cra_ctxsize:non-object": 24,
+  "call:crypto_aead_maxauthsize": 12,
+  "call:crypto_aead_alignmask": 12,
+  "field:using_shash:non-object": 12,
+  "call:crypto_skcipher_alg": 12,
+  "call:crypto_lskcipher_alignmask": 12,
+  "field:key_size:non-object": 12,
+  "setField:m_low:non-object": 12,
+  "setField:curve_id:non-object": 12,
+  "setField:pub_key_set:non-object": 12,
+  "setField:key:non-object": 12,
+  "setField:apt_count:non-object": 12,
+  "field:seedsize:non-object": 12,
+  "setField:total:non-object": 12,
+  "field:tfmsize:non-object": 12,
+  "field:alg:non-object": 12,
+  "binop:*": 11,
+  "index:unsupported": 9,
+  "str:pointer-arithmetic-not-modelled": 6,
+  "binop:<": 5,
+  "binop:-": 5,
+  "op:and": 1
+ },
+ "skipped": {
+  "skip_varargs": 0,
+  "skip_unencodable_args": 0,
+  "skip_unencodable_ret": 0,
+  "skip_no_instance": 0
+ },
+ "unencodable_reasons": {}
+}
