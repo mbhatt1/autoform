@@ -2,10 +2,10 @@
 
 ## 0. The central bet
 
-Do **not** try to translate code directly into Lean definitions and then guess theorems
-about them. That is the failure mode of every naive "LLM → Lean" pipeline: the
-translation is unfaithful, nothing checks the faithfulness, and the theorems are
-vacuous or trivially true.
+Do **not** translate code directly into Lean definitions and then guess theorems about
+them. That is the failure mode of naive "LLM → Lean" pipelines: the translation is
+unfaithful, nothing checks the faithfulness, and the theorems are vacuous or trivially
+true.
 
 Instead: **formalize the language, not the program.**
 
@@ -15,16 +15,16 @@ Instead: **formalize the language, not the program.**
 2. Mechanically **transpile the codebase into a term of that `Syntax` type** — a deep
    embedding. This step is a parser + printer, not an LLM: it is total, deterministic,
    and diff-testable.
-3. Now every property about the program is a theorem *about `eval` applied to a
-   concrete AST*. Specifications become statable, and — crucially — **checkable against
-   reality** by differential-testing `eval` against the real runtime.
+3. Every property about the program is then a theorem *about `eval` applied to a
+   concrete AST*. Specifications become statable and **checkable against reality** by
+   differential-testing `eval` against the real runtime.
 4. Layer a **shallow embedding** on top for tractability: prove once that the deep term
    is observationally equivalent to a clean Lean function, then reason in the clean
-   world (this is the Aeneas/`hax` playbook and it is the only thing that scales).
+   world (the Aeneas/`hax` playbook, and the only approach that scales).
 
-The agentic system's job is everything the compiler can't do: **choosing what to
-formalize, inventing the specification, discovering invariants, and driving proof
-search** — with the Lean kernel as an unfakeable oracle at every step.
+The agentic system handles what the compiler cannot: **choosing what to formalize,
+inventing the specification, discovering invariants, and driving proof search** — with the
+Lean kernel as an unfakeable oracle at every step.
 
 ## 1. Why this is now feasible off-the-shelf
 
@@ -35,16 +35,16 @@ Reusable open-source pieces, by layer:
 - Language-native: `libclang`, `rustc`/`charon`, `go/ast`, `ast` (Python), `ts-morph`.
 - LLVM IR / MLIR as a convergence point for compiled languages.
 - WebAssembly as a *universal* target: one small semantics covers everything that
-  compiles to Wasm. There are already Wasm semantics in Coq (Wasmcert) and K.
+  compiles to Wasm. Wasm semantics exist in Coq (Wasmcert) and K.
 
-**Existing formal semantics you should steal rather than rebuild**
+**Existing formal semantics to reuse rather than rebuild**
 - **K framework**: complete executable semantics for C (`C-semantics`), Java, JavaScript,
-  Python, EVM (KEVM), LLVM, x86. These are the single largest asset in the field.
-  Strategy: use K semantics as the *reference oracle* and as the spec you port to Lean.
+  Python, EVM (KEVM), LLVM, x86. The largest single asset in the field.
+  Strategy: use K semantics as the *reference oracle* and as the spec ported to Lean.
 - **CompCert** (C, Coq), **CakeML** (ML, HOL4), **JSCert/JSExplain** (JS, Coq),
   **Iris/RustBelt** (Rust concurrency, Coq) — port targets, and correctness benchmarks.
 - **Aeneas** (Rust → pure functional Lean, via `charon`) — *already emits Lean 4*.
-  For Rust, this is essentially step 1–3 done for you.
+  For Rust, this is steps 1–3 done.
 - **hax** (Rust → F*/Coq/**Lean**) — same, different subset, panic-freedom focus.
 - **Lampe** (Noir → Lean), **Verus**/**Kani**/**Creusot** (Rust, SMT tier).
 - **Lean core**: `Std`, `Mathlib`, `Batteries`; `bv_decide` (bit-blasting to CaDiCaL with
@@ -61,8 +61,7 @@ Reusable open-source pieces, by layer:
 
 **Interaction substrate (the agent's hands)**
 - **`leanprover-community/repl`** — JSON-in/JSON-out Lean REPL with *proof-state pickling*.
-  This is the load-bearing component: it gives you snapshot/restore, so tree search over
-  proof states is cheap.
+  Load-bearing: it gives snapshot/restore, so tree search over proof states is cheap.
 - **Pantograph** — richer goal-level API, designed for ML agents.
 - **LeanDojo** — trace a whole repo, extract premises, replay tactics.
 - `lake` + `reservoir` for builds; `leanchecker` (ships with the toolchain since v4.28.0;
@@ -92,27 +91,27 @@ Builds the *formalization graph*: modules, call graph, purity/effect classificat
 external boundaries (I/O, FFI, network, unsafe, reflection), and a **formalizability
 score** per function. Output: a topologically sorted work queue where leaves are pure
 total functions and the frontier grows outward. Tools: tree-sitter + language servers +
-`cloc` + existing call-graph tools. This is 90% deterministic tooling, 10% LLM
-(classifying "what is this module *for*").
+`cloc` + existing call-graph tools. About 90% deterministic tooling, 10% LLM
+(classifying what a module is for).
 
-Key product decision: **you will never formalize the whole codebase.** You formalize a
-*verified core* and generate machine-checked *boundary contracts* for everything else.
+Product decision: **the whole codebase is never formalized.** A *verified core* is
+formalized and machine-checked *boundary contracts* are generated for everything else.
 
 ### Layer 2 — Semanticist (per language, one-time, human-reviewed)
 Produces `Autoform/Lang/<L>/{Syntax,Semantics,Metatheory}.lean`:
 - `inductive Expr | Stmt | Value`
 - `Env`, `Heap`, `step`/`eval` (fuel-indexed or well-founded)
 - Determinism, progress, preservation lemmas
-- A `Decidable`/executable `eval` so `#eval` works — this is what enables the oracle below.
+- A `Decidable`/executable `eval` so `#eval` works — this enables the oracle below.
 
 **The conformance oracle**: extract `eval` to native code (Lean's compiler, or via
 `native_decide`-free extraction), then differential-fuzz it against the *real*
 interpreter/compiler on a corpus (the language's own test suite — CPython's, V8's
-test262, csmith for C). Any divergence is a bug in your semantics, found automatically.
-This is what makes an LLM-assisted semantics trustworthy: **the semantics is testable
-even before it's proved.**
+test262, csmith for C). Any divergence is a bug in the semantics, found automatically.
+This is what makes an LLM-assisted semantics trustworthy: the semantics is testable
+before it is proved.
 
-Agent loop here: propose rule → fuzz → shrink counterexample → repair rule → prove
+Agent loop: propose rule → fuzz → shrink counterexample → repair rule → prove
 metatheory lemma → repeat. Escalate to a human on repeated failure.
 
 ### Layer 3 — Transpiler (deterministic, verified-by-testing)
@@ -120,13 +119,13 @@ metatheory lemma → repeat. Escalate to a human on repeated failure.
 correctness checks:
 - **Round-trip**: `pretty(parse(s)) ≡ s` modulo formatting, on the whole repo.
 - **Behavioral**: `eval (transpile p) input == run p input` on the project's own test
-  suite. The project's tests become the transpiler's validation set. This is the single
-  highest-leverage trick in the design — every repo ships its own conformance suite.
+  suite. The project's tests become the transpiler's validation set: every repo ships its
+  own conformance suite.
 
 Unsupported constructs are *not* silently dropped; they become `Expr.opaque (name, spec)`
 holes that carry an explicit, tracked assumption. The ledger counts them.
 
-### Layer 4 — Specifier (the hard, genuinely agentic part)
+### Layer 4 — Specifier (the agentic part)
 Given a function's deep-embedded AST, propose Lean statements worth proving. Sources of
 specifications, in descending order of trustworthiness:
 1. **Existing artifacts**: type signatures, refinement types, assertions, `require`s,
@@ -134,48 +133,46 @@ specifications, in descending order of trustworthiness:
    almost directly to `∀`-statements), issue trackers, RFCs.
 2. **Structural/safety specs, free for all code**: totality, no-panic, no-overflow,
    memory safety, termination, absence of division by zero, resource bounds.
-   These need no domain knowledge and are where you get volume.
-3. **Algebraic laws mined from behavior**: run Daikon-style invariant detection over
-   the test corpus, or fuzz for candidate equalities (idempotence, commutativity,
+   These need no domain knowledge and supply volume.
+3. **Algebraic laws mined from behavior**: Daikon-style invariant detection over
+   the test corpus, or fuzzing for candidate equalities (idempotence, commutativity,
    inverse pairs `decode ∘ encode = id`, monotonicity, refinement between two impls).
    Candidates are *conjectures*; the fuzzer prunes the false ones before a prover
-   wastes time.
+   spends time on them.
 4. **Cross-implementation equivalence**: the richest specs. `optimized == reference`,
-   `new_version == old_version`, `rust_impl == c_impl`. Free from the repo's own history.
+   `new_version == old_version`, `rust_impl == c_impl`. Available from the repo's history.
 5. **LLM-invented domain specs** — lowest trust, always fuzz-tested before proof attempt,
    always human-reviewed before being counted as an assurance claim.
 
 **Anti-vacuity gate** (mandatory): every candidate theorem must survive
 (a) mutation testing — inject a bug into the implementation; if the theorem still proves,
 it is vacuous; (b) `#print axioms` clean; (c) hypothesis satisfiability check — prove the
-premises are inhabited, else you proved something about the empty set. A "proved" theorem
-that fails the mutation gate is scored as a *failure*, not a success. This is what keeps
-the system honest.
+premises are inhabited, else the theorem is about the empty set. A "proved" theorem
+that fails the mutation gate is scored as a *failure*, not a success.
 
 ### Layer 5 — Prover (portfolio + search, kernel-gated)
 Tiered escalation with a per-goal budget:
-1. `rfl` / `decide` / `simp` / `omega` / `bv_decide` / `norm_num` — pennies.
+1. `rfl` / `decide` / `simp` / `omega` / `bv_decide` / `norm_num` — cheapest.
 2. `aesop`, `exact?`, hammer (`lean-auto`+`duper`), `lean-smt`+cvc5.
 3. Neural proposer (DeepSeek-Prover-V2 / Kimina) whole-proof sampling, n=8..64.
 4. Best-first tree search over REPL proof states (pickled snapshots), premise retrieval
    from ReProver, with the neural model as the tactic policy.
-5. Decompose: agent proposes lemmas, recurses. Generalize the goal (often *easier*).
-6. Give up → record as an open obligation, not a lie.
+5. Decompose: agent proposes lemmas, recurses. Generalize the goal (often easier).
+6. Give up → record as an open obligation.
 
 Everything the prover emits is checked by the Lean kernel; the agent cannot fake a
-proof. This is why the system is safe to run unsupervised — **the reward is not
-LLM-judged.**
+proof. The reward signal is not LLM-judged, so the system is safe to run unsupervised.
 
 ### Layer 6 — Auditor (adversarial)
 Independent agent that tries to break the result: hunts `sorry`, `axiom`, `unsafe`,
 `native_decide`, `@[implemented_by]` divergence, opaque holes, vacuous hypotheses,
-spec/implementation drift (does the theorem talk about the AST you actually ship?), and
+spec/implementation drift (does the theorem talk about the AST that ships?), and
 re-verifies all `.olean`s with `leanchecker --fresh` in a clean environment. Produces the
 **trust ledger**.
 
-## 3. The trust ledger (the actual product)
+## 3. The trust ledger (the product)
 
-The deliverable is not "your codebase is verified." It is a precise, machine-generated
+The deliverable is not "your codebase is verified." It is a machine-generated
 statement of *what is proved, about what model, under what assumptions*:
 
 ```
@@ -193,109 +190,106 @@ module payments/ledger.py
   open obligations: 9
 ```
 
-Anyone reading this can locate the trust boundary in seconds. That is the thing nobody
-currently ships, and it's more valuable than a bigger green checkmark.
+A reader can locate the trust boundary from this directly.
 
 ## 4. Sequencing (what to build in what order)
 
 **Phase 0 — Skeleton (weeks 1–3).** Lean repo + `lake`, REPL harness with pickled state,
 theorem/obligation database (SQLite), `#print axioms` + `leanchecker` gate in CI, trust
-ledger renderer. No agents yet. Prove the plumbing on hand-written examples.
+ledger renderer. No agents yet. Test the plumbing on hand-written examples.
 
 **Phase 1 — Pick one narrow language.** *Recommendation: start with Rust via Aeneas*
-(semantics + transpiler already exist and emit Lean 4, so you skip Layers 2–3 entirely
-and can validate Layers 4–6 immediately) **and** in parallel a **toy imperative
-language / Wasm subset** where you own the whole stack end-to-end. Resist starting with
-Python or C++ — dynamic/undefined-behavior-rich languages will eat a year.
+(semantics + transpiler already exist and emit Lean 4, so Layers 2–3 are skipped and
+Layers 4–6 can be validated immediately) **and** in parallel a **toy imperative
+language / Wasm subset** with the whole stack owned end-to-end. Do not start with
+Python or C++: dynamic and undefined-behavior-rich languages cost a year.
 
-**Phase 2 — Specifier + anti-vacuity.** This is the research risk. Build the mutation
-gate before the spec generator; otherwise you'll fool yourself for months.
+**Phase 2 — Specifier + anti-vacuity.** The research risk. Build the mutation
+gate before the spec generator.
 
 **Phase 3 — Prover portfolio.** Cheap tactics first; measure what fraction each tier
-closes. Only add the neural tier once tier-1/2 is exhausted and instrumented — for
-safety/structural specs the classical tools close a surprising majority.
+closes. Add the neural tier only once tier-1/2 is exhausted and instrumented — for
+safety/structural specs the classical tools close a large majority.
 
 **Phase 4 — Second language (Python or C subset), from K semantics as reference.**
-Now the Semanticist agent + conformance fuzzer earn their keep.
+The Semanticist agent and conformance fuzzer become necessary here.
 
 **Phase 5 — Shallow-embedding refinement.** Prove deep ≈ shallow, so proofs scale.
 
-## 5. Honest failure modes
+## 5. Failure modes
 
-- **Semantic gap is the whole game.** A proof about a semantics that doesn't match the
-  real runtime is theater. The conformance fuzzer is not optional infrastructure.
-- **Vacuous theorems.** LLMs are extremely good at producing provable-and-useless
-  statements. Mutation testing is the counterweight.
-- **Concurrency, I/O, FFI, reflection, `eval`, dynamic loading** — these do not have
-  cheap answers. Design the opaque-hole mechanism first-class from day one rather than
-  pretending they'll be handled later.
-- **Proof burden grows superlinearly with program size.** Hence: verified core +
+- **Semantic gap.** A proof about a semantics that does not match the real runtime is
+  worthless. The conformance fuzzer is not optional infrastructure.
+- **Vacuous theorems.** LLMs readily produce provable-and-useless statements. Mutation
+  testing is the counterweight.
+- **Concurrency, I/O, FFI, reflection, `eval`, dynamic loading** — no cheap answers.
+  Design the opaque-hole mechanism first-class from day one.
+- **Proof burden grows superlinearly with program size.** Hence verified core +
   contracts, never whole-repo.
 - **Mathlib drift / build times.** Pin toolchains; cache aggressively; expect the
   formalization to bit-rot without CI.
 
-## 6. Minimal viable demo (what to aim at first)
+## 6. Minimal viable demo
 
-Take a real, small, pure Rust crate (e.g. a parser, a codec, a data structure), run
+Take a small, pure Rust crate (a parser, a codec, a data structure), run
 `charon`+Aeneas to get Lean, auto-generate: totality + panic-freedom + `decode ∘ encode
 = id` + equivalence against a reference implementation, prove them with the portfolio,
 mutation-gate them, and emit the trust ledger. If that pipeline runs unattended on 20
 crates with an honest ledger, the architecture is validated and every later language is
-"just" Layers 2–3.
+Layers 2–3 only.
 
 ## 7. CSLib (cslib.io / `leanprover/cslib`) — where it fits
 
 **What it is:** "Mathlib for computer science." Lean 4, from de Moura, Barrett, Montesi,
 Chaudhuri, Kohli, Grundy, Rademaker, Yingchareonthawornchai (arXiv 2602.04846), with
-Amazon / Google DeepMind / Stanford backing. Already contains: operational semantics
+Amazon / Google DeepMind / Stanford backing. Contains: operational semantics
 infrastructure, program equivalences, automata models, linear logic, some verified
-sorting/searching. Explicit stated goals include a *program-reasoning toolkit* and
+sorting/searching. Stated goals include a *program-reasoning toolkit* and
 "a shared vocabulary to train models on."
 
-**This is directly load-bearing for Layer 2, and it changes the plan.**
+It is load-bearing for Layer 2 and changes the plan.
 
 Do not invent private conventions for `Syntax` / `step` / `eval` / refinement. Build each
 language kernel **against CSLib's operational-semantics API** (LTS, bisimulation, program
-equivalence). Concretely:
+equivalence):
 
 - **Layer 2 substrate.** CSLib's bundled operational semantics + computable-definition
-  discipline is exactly the interface the Semanticist agent should target. Free
+  discipline is the interface the Semanticist agent should target. Free
   metatheory: determinism/confluence lemmas, bisimulation congruence, equivalence
-  combinators — the machinery that otherwise eats months.
+  combinators.
 - **Layer 5 (deep ≈ shallow) becomes reuse, not research.** The refinement step —
   "prove the deep-embedded AST is observationally equivalent to a clean Lean function" —
-  is precisely a program-equivalence/bisimulation obligation. CSLib is where that
-  machinery should live, not in our repo.
+  is a program-equivalence/bisimulation obligation. That machinery belongs in CSLib,
+  not in this repo.
 - **Layer 5 retrieval.** ReProver/LeanDojo premise selection is Mathlib-shaped and
-  performs badly on CS goals. **CSLibPremiseBench** (arXiv 2605.14549) exists for
-  structure-guided premise retrieval over CSLib theorems — drop it in as the retriever
-  for CS-flavored obligations and keep ReProver for the arithmetic/Mathlib tail.
-- **Distribution strategy.** Language semantics are generic, reusable, and exactly what
-  CSLib wants. Upstream them. That converts our per-language cost center into shared,
-  externally-reviewed infrastructure — and external review of the semantics is worth
-  more to trustworthiness than anything we can do alone.
+  performs badly on CS goals. **CSLibPremiseBench** (arXiv 2605.14549) provides
+  structure-guided premise retrieval over CSLib theorems — use it for CS-flavored
+  obligations and keep ReProver for the arithmetic/Mathlib tail.
+- **Distribution.** Language semantics are generic, reusable, and what CSLib wants.
+  Upstream them. That converts a per-language cost center into shared, externally
+  reviewed infrastructure; external review of the semantics contributes more to
+  trustworthiness than internal work.
 
-**What CSLib is not, and what we still own.** It is a *metatheory and pedagogy* library,
-not a pipeline for verifying real codebases. It will not ship a production-grade C,
-Python, or JS semantics soon; it says nothing about extracting ASTs from a real repo,
-inventing specifications, anti-vacuity, or trust accounting. Layers 1, 3, 4, 6 — the
-Cartographer, Transpiler, Specifier, and Auditor — remain entirely ours. CSLib gives us a
-better foundation and a better vocabulary; it does not give us the product.
+**What CSLib is not.** It is a *metatheory and pedagogy* library, not a pipeline for
+verifying real codebases. It will not ship a production-grade C, Python, or JS semantics
+soon; it says nothing about extracting ASTs from a real repo, inventing specifications,
+anti-vacuity, or trust accounting. Layers 1, 3, 4, 6 — Cartographer, Transpiler,
+Specifier, Auditor — remain ours. CSLib gives a foundation and a vocabulary, not the
+product.
 
 **Risks:** young library, expect API churn (pin revisions, run against `main` in CI);
-breadth-first coverage, so depth where we need it may be thin; governance/contribution
+breadth-first coverage, so depth may be thin where needed; governance/contribution
 standards are Mathlib-strict, so upstreaming has latency — vendor locally, upstream
 asynchronously.
 
 **Revised Phase 0/1 action:** before writing any semantics, read `Cslib/Semantics`
 and the whitepaper, and write the toy-imperative-language kernel *as a CSLib-conformant
-development*. If our language kernels can't be phrased in CSLib's vocabulary, that's a
-signal worth acting on early — either we're doing it wrong or it's a genuine upstream
-contribution.
+development*. If the language kernels cannot be phrased in CSLib's vocabulary, that
+indicates either an error on our side or an upstream contribution.
 
-## 8. Build/buy inventory — what we actually hand-roll
+## 8. Build/buy inventory — what is hand-rolled
 
-Default posture: **buy or adapt everything; hand-roll only what is irreducibly ours.**
+Default posture: buy or adapt everything; hand-roll only what is irreducible.
 Re-audited after CSLib, this is the full component list.
 
 | Component | Verdict | Source |
@@ -320,36 +314,36 @@ Re-audited after CSLib, this is the full component list.
 **Correction to §4:** the Specifier and the anti-vacuity gate were listed as the research
 risk. They are not novel — IronSpec already does mutation-based specification validation,
 mutation analysis for Coq exists, and SpecGen/Spec-Agent already do
-counterexample-guided LLM spec synthesis validated against a verifier. Our work there is
-*integration and porting to Lean*, not invention. Downgrade the risk, and reuse the
-designs rather than rediscovering them.
+counterexample-guided LLM spec synthesis validated against a verifier. The work there is
+integration and porting to Lean, not invention. Downgrade the risk and reuse the designs.
 
-### What is genuinely ours (and therefore where the effort goes)
+### What is ours (and where the effort goes)
 
 1. **The transpiler + effect-boundary calculus, per language.** Source AST → deep-embedded
-   Lean term, with a principled treatment of what *cannot* be embedded (I/O, FFI, reflection,
+   Lean term, with a principled treatment of what cannot be embedded (I/O, FFI, reflection,
    concurrency, dynamic loading) as tracked `opaque` holes carrying explicit assumptions.
-   This is the bulk of the engineering mass and nobody ships it for us.
+   This is the bulk of the engineering mass and no external project supplies it.
    *Main cost lever:* target **Wasm** and collapse N language front-ends into one semantics
-   plus N existing production compilers. Pay for it in lost source-level structure — the
+   plus N existing production compilers. The cost is lost source-level structure — the
    shallow-embedding refinement gets harder — so treat it as a per-language decision, not
    a global one.
 2. **The Cartographer.** Formalization graph, effect classification, formalizability
    scoring, and the *budget policy* deciding what to formalize and in what order. No prior
-   art, because nobody attempts repo-scale — everyone formalizes a hand-picked artifact.
+   art, because repo-scale is not attempted elsewhere; everyone formalizes a hand-picked
+   artifact.
 3. **The trust-ledger calculus.** Composing heterogeneous evidence — kernel proof,
    semantics conformance %, transpiler behavioral-equivalence rate, mutation score, hole
    count, axiom set — into one auditable claim with an explicit trust boundary. The
-   *format* is in-toto/SARIF; the *composition rules* are ours, and this is the product.
+   *format* is in-toto/SARIF; the *composition rules* are ours, and are the product.
 4. **Thin oracle harnesses**: differential-fuzz driver, Lean-side mutation-gate driver,
-   obligation database. Small, boring, unavoidable glue.
+   obligation database.
 
-Everything else is integration. If a design discussion concludes "we should build our own
-X" and X is not on that list of four, that is a signal to search harder first.
+Everything else is integration. A design discussion concluding "we should build our own
+X" where X is not on that list of four is a signal to search harder first.
 
 ## 9. Killing #2, and making #4 Lean-native
 
-### #2 Cartographer — mostly buyable after all
+### #2 Cartographer — mostly buyable
 
 The formalization graph is a **code property graph** plus a policy. The graph is a solved,
 commoditized problem:
@@ -370,28 +364,26 @@ commoditized problem:
 **Revised verdict:** the Cartographer is *Joern or SCIP+Glean, plus ~a few hundred lines of
 policy*: formalizability scoring, effect classification into the opaque-hole taxonomy, and
 the budget/ordering decision. The policy is ours; the graph is not. Drop it from the
-"build" list — it becomes a query layer over a bought index.
+"build" list — it is a query layer over a bought index.
 
-That leaves the genuinely-ours list at **three**: the transpiler + effect-boundary
+That leaves the ours list at **three**: the transpiler + effect-boundary
 calculus, the trust-ledger calculus, and the harness.
 
 ### #4 harness — build it in Lean
 
-Everything in the harness that touches Lean terms should be written in Lean, and the
-ecosystem is now good enough to do it:
+Everything in the harness that touches Lean terms should be written in Lean:
 
 - **Plausible** (`leanprover-community/plausible`) — QuickCheck for Lean 4, integrated into
-  the *tactic framework*: give it a goal, it derives generators from typeclasses and tries
-  to **refute** it with a counterexample. This is precisely the conjecture-pruning and
+  the *tactic framework*: given a goal, it derives generators from typeclasses and tries
+  to **refute** it with a counterexample. This is the conjecture-pruning and
   anti-vacuity engine, operating on the *same statement object* the prover will attack.
-  No serialization layer, no drift between "the property we fuzzed" and "the theorem we
-  proved."
+  No serialization layer, no drift between the property fuzzed and the theorem proved.
 - **Chamelean** — extends Plausible to auto-derive generators, enumerators, and checkers
   for **inductive relations**. Our semantics *are* inductive relations (`step`, typing
-  judgments), so this is the differential-fuzzing engine for Layer 2, for free.
+  judgments), so this is the differential-fuzzing engine for Layer 2.
 - **LSpec** — Lean test framework with `checkPlausibleIO'` for deferred runtime property
   tests; the CI-facing runner.
-- **Lean's own metaprogramming** — and here Lean beats Coq structurally: mutation analysis
+- **Lean's own metaprogramming** — Lean beats Coq structurally here: mutation analysis
   needs no MetaCoq analog, because `Lean.Environment` / `ConstantInfo` / `Lean.Meta` are
   first-class in-language. Mutating a definition, re-elaborating dependents, and checking
   whether the proof survives is an ordinary Lean program.
@@ -400,11 +392,11 @@ ecosystem is now good enough to do it:
   scraper parsing logs.
 - **`FVSpec`** (arXiv 2606.01008) — 11,039 real-world Python property-based tests scraped
   and 2,772 auto-translated into 9,415 Lean 4 specifications with proof-obligation
-  placeholders. This is *direct evidence* for the §4 claim that a repo's own property
-  tests are the highest-value spec source — and it is both a corpus and a benchmark for
-  our Specifier. Use it as the evaluation set.
+  placeholders. Direct evidence for the §4 claim that a repo's own property
+  tests are the highest-value spec source, and both a corpus and a benchmark for
+  the Specifier. Use it as the evaluation set.
 
-**The elegant collapse this enables:** candidate spec → Plausible tries to refute it →
+**The resulting pipeline:** candidate spec → Plausible tries to refute it →
 survivors go to the proof portfolio → mutation gate re-runs via Lean metaprogramming →
 `#print axioms` audit → ledger. One language, one statement representation, end to end.
 The only non-Lean glue left is process orchestration, external-runtime differential
@@ -416,21 +408,20 @@ Thin ecosystem, and no benefit — those components never touch a Lean term.
 ## 10. #3 (trust ledger) — also mostly prior art
 
 The "composition calculus for heterogeneous verification evidence" is the **assurance
-case** field, which has been standardized for decades in safety-critical engineering.
-Do not reinvent it.
+case** field, standardized for decades in safety-critical engineering. Do not reinvent it.
 
 - **SACM** (OMG *Structured Assurance Case Metamodel*, v2.1) — the target model. Unifies
   and extends **GSN** (Goal Structuring Notation) and **CAE** (Claims–Arguments–Evidence).
-  Models exactly our three concerns: *arguments* (claims + inferential links),
+  Models our three concerns: *arguments* (claims + inferential links),
   *artifacts* (evidence: results, techniques, activities, traceability), and *terminology*.
-  Gives fine-grained modularity and argument-evidence traceability out of the box.
+  Provides fine-grained modularity and argument-evidence traceability.
 - **Isabelle/SACM** (arXiv 2009.12154) — *integration of mechanized formal proof into
-  SACM assurance cases*. This is precisely our problem, already solved once for Isabelle;
+  SACM assurance cases*. The same problem, already solved once for Isabelle;
   SACM claims admit structured expressions, so formal statements embed directly.
   Port the pattern to Lean rather than inventing a ledger format.
 - **ACCESS** (arXiv 2403.15236), model-based system assurance tooling (arXiv 1905.02427),
   Adelard/ASCE, AMASS/OpenCert — tooling and metrics, including auto-generated assurance
-  case fragments and case metrics, which is exactly what we want to emit per module.
+  case fragments and case metrics, which is what we want to emit per module.
 - Transport/provenance envelope stays **in-toto/SLSA** + **SARIF** for findings.
 - Domain precedent for arguing *from* formal evidence: **DO-178C / DO-333** (formal
   methods supplement), ISO 26262.
@@ -441,44 +432,43 @@ pattern + in-toto as the envelope*. Ours is only the domain-specific evidence ty
 score, axiom basis) and the rules for combining them into a claim. That is a schema and a
 few hundred lines, not a research program.
 
-**The genuinely-ours list is now two things:**
+**The ours list is now two items:**
 
 1. **The transpiler + effect-boundary calculus, per language.**
 2. **The domain evidence types and their combination rules** (a SACM profile).
 
-Plus integration glue. That is the honest scope of this project. Everything else is
-assembly of existing parts — which is the correct outcome of a build/buy audit, not a
-disappointment.
+Plus integration glue. That is the scope of this project; everything else is
+assembly of existing parts, which is the expected outcome of a build/buy audit.
 
 ## 11. FVSpec — the Specifier's corpus, baseline, and leaderboard
 
 **[GaloisInc/fvspec](https://github.com/GaloisInc/fvspec)** — benchmark of **9,415 Lean 4
 verification challenges** derived from **2,772 of 11,039 real-world Python property-based
 tests** scraped from **333 open-source repositories**. Leaderboard at `fvspec.galois.com`;
-corpus on Hugging Face. **Correction, established by actually fetching it:** the GitHub
+corpus on Hugging Face. **Correction, established by fetching the artifacts:** the GitHub
 repo ships the generation pipeline, leaderboard and baselines — *not* the formalizations;
 `GaloisInc/fvspec-pbt` is the upstream *Python* PBT corpus; the Lean benchmark is a third
 artifact, **`GaloisInc/fvspec-fv`** (`train.jsonl`, 235 MB, exactly 9,415 rows).
 
-Why it matters more than a benchmark citation:
+Relevance:
 
-- **It is a working instance of our Layer 4.** The pipeline scrapes GitHub for Hypothesis
+- **It is a working instance of Layer 4.** The pipeline scrapes GitHub for Hypothesis
   PBTs and uses a **three-agent LLM pipeline** to transpile them to Lean specs,
-  *autoformalizing each function under test*. Each problem ships four artifacts, with
+  autoformalizing each function under test. Each problem ships four artifacts, with
   `sorry` placeholders (~3 formalizations per PBT). Read their agent decomposition before
-  writing ours; adapt rather than re-derive.
-- **It validates the §4 ordering.** Their highest-yield spec source is the repo's own
+  writing ours.
+- **It corroborates the §4 ordering.** Their highest-yield spec source is the repo's own
   property-based tests — the same conclusion, arrived at independently and at scale.
-  Note the yield: **25%** of scraped PBTs translated. Plan for that hit rate.
-- **It is the right eval set**, and unusually clean: the source PBTs were written by
-  practicing engineers and were **never formally verified**, so the resulting theorems are
-  largely absent from model training data. Contamination risk is low, which is rare.
-- **It gives us baselines for free** — the paper reports automated and model-based proof
-  generation baselines, so our portfolio has something to beat on day one.
-- **It is a ready-made target for the anti-vacuity gate.** Their specs are LLM-transpiled
-  and *not* mutation-validated. Running our Plausible refutation gate and dependency-vacuity
-  check across all 9,415 would (a) exercise our harness at scale immediately and (b) be a
-  genuine contribution back to the benchmark.
+  Yield: **25%** of scraped PBTs translated. Plan for that hit rate.
+- **It is a suitable eval set:** the source PBTs were written by practicing engineers and
+  were **never formally verified**, so the resulting theorems are largely absent from
+  model training data. Contamination risk is low.
+- **It provides baselines** — the paper reports automated and model-based proof
+  generation baselines, so the portfolio has a comparison point on day one.
+- **It is a target for the anti-vacuity gate.** Their specs are LLM-transpiled
+  and *not* mutation-validated. Running the Plausible refutation gate and dependency-vacuity
+  check across all 9,415 would (a) exercise the harness at scale and (b) contribute
+  back to the benchmark.
 
 **Action:** adopt FVSpec as the Phase-2 evaluation harness, and make "refute/confirm the
 FVSpec specification set" the first at-scale run of the harness.
@@ -494,9 +484,8 @@ FVSpec specification set" the first at-scale run of the harness.
 ## 12. Built: the CPG as universal front end
 
 The §8 conclusion was that the per-language transpiler is the irreducible cost centre,
-with Wasm floated as the way to collapse N front ends into one. There is a better answer,
-and it was already sitting in the Layer 1 tooling: **Joern's code property graph is
-itself a universal AST.**
+with Wasm floated as the way to collapse N front ends into one. A better answer was
+already in the Layer 1 tooling: **Joern's code property graph is itself a universal AST.**
 
 C, C++, Java, JavaScript, Python, Kotlin and binaries all normalize to one node
 vocabulary — `CALL` / `IDENTIFIER` / `LITERAL` / `CONTROL_STRUCTURE` / `RETURN` / `BLOCK`,
@@ -512,21 +501,20 @@ the same code path.
 
 ### The dialect lesson
 
-The conformance oracle earned its place immediately. Its first run reported
-`fmod(6,-9)`: CPython `-3`, Lean `6` — Python floors integer division and modulo, C and
-Java truncate toward zero, and the semantics had silently picked one.
+The conformance oracle's first run reported `fmod(6,-9)`: CPython `-3`, Lean `6`. Python
+floors integer division and modulo; C and Java truncate toward zero; the semantics had
+silently picked one.
 
-The tempting fix is to patch the operator. The correct fix is structural: a **universal
-core language must be parameterized by the dialects it unifies**, and the transpiler must
-record which one produced each program. Anything else is a semantics that is right for
-one language and silently wrong for the rest — precisely the "semantic gap is the whole
-game" failure of §5, and exactly the class of bug that no amount of proving would ever
-surface, because the proofs would all have been about the wrong `eval`.
+Patching the operator is not the fix. The fix is structural: a **universal core language
+must be parameterized by the dialects it unifies**, and the transpiler must record which
+one produced each program. Otherwise the semantics is right for one language and silently
+wrong for the rest — the "semantic gap" failure of §5, and a class of bug that proving
+would never surface, because the proofs would be about the wrong `eval`.
 
-Generalize the lesson: every place the core language merges constructs that *look* alike
+Generalization: every place the core language merges constructs that look alike
 across languages (string mutability, integer width and overflow, evaluation order, name
 resolution, equality) is a latent dialect parameter. Assume there are more, and let the
-oracle find them rather than trying to enumerate them up front.
+oracle find them rather than enumerating them up front.
 
 ## 13. Gaps remaining — measured, not estimated
 
@@ -544,15 +532,14 @@ Marginal value = functions whose *only* remaining blockers fall in that group.
 | Containers (tuple/list literals, `starredUnpack` 33) + identity (`is`/`in`) | +44 | 255 |
 | Iteration (`FOR`) | **+0** | — |
 
-Two conclusions, both non-obvious:
+Two conclusions:
 
-* **Objects are the whole game.** One gap is worth more than every other gap combined.
+* **Objects dominate.** That one gap is worth more than every other gap combined.
   Attribute access, method dispatch, allocation, and assignment-to-non-identifier are one
-  feature, and they need a heap — which the Core semantics does not have.
-* **`FOR` has zero marginal value** despite looking like an obvious omission: every
-  function containing a `FOR` is blocked by something else too. Fixing it in isolation
-  would unblock nothing. This is exactly why the marginal metric beats the frequency
-  histogram for prioritisation.
+  feature, and they need a heap, which the Core semantics does not have.
+* **`FOR` has zero marginal value.** Every function containing a `FOR` is blocked by
+  something else too, so fixing it in isolation would unblock nothing. The marginal metric
+  beats the frequency histogram for prioritisation.
 
 Cheap unmapped operators worth closing regardless (`floorDiv` — found by testing and
 currently a hole for every Python `//`, `in`/`notIn`, `is`/`isNot`, `+=`/`-=`,
@@ -564,21 +551,19 @@ These matter more than coverage, because they are wrong rather than absent.
 
 1. **Integer width is unmodelled.** Confirmed: `mulbig(100000, 100000)` gives
    `1410065408` in C (32-bit wraparound) and `10000000000` in Core. A latent dialect
-   parameter of exactly the kind §12 predicted. C/Java/Go need fixed-width wrapping
-   integers; Python needs bignums. **This silently produces wrong answers** — the worst
-   category.
+   parameter of the kind §12 predicted. C/Java/Go need fixed-width wrapping
+   integers; Python needs bignums. This silently produces wrong answers.
 2. **No short-circuit evaluation.** Confirmed: `b != 0 and a % b == 0` with `b = 0`
    returns `0` in Python, but Core eagerly evaluates both operands and yields
-   `hole "mod-by-zero"`. Currently *conservative* (a hole, not a wrong answer) only
-   because Core has no side effects — it becomes a genuine soundness bug the moment
+   `hole "mod-by-zero"`. Currently conservative (a hole, not a wrong answer) only
+   because Core has no side effects; it becomes a soundness bug once
    assignment-in-expression or effectful calls are modelled.
 3. **Differential coverage is thin.** Only module-level, int→int functions are compared.
    `cachetools` yielded **zero** comparable cases. Needed: instance construction for
    methods, comparison of lists/strings/dicts, and — the highest-leverage item, from §3
    and still unimplemented — **driving the differential harness from the repository's own
    test suite** instead of random arguments.
-4. **No heap, aliasing, or mutation.** A prerequisite for Tier 1's objects, not
-   independent of it.
+4. **No heap, aliasing, or mutation.** A prerequisite for Tier 1's objects.
 5. **Scoping is naive.** `Env.set` conses; no block scope, globals, closures, or
    `nonlocal`.
 6. **Strings are conflated.** Python `str` and C `char*` are the same `Val.str`.
@@ -594,7 +579,7 @@ The system produces *verifiable* code and proves nothing about it.
 * No SACM ledger schema (§10); the ledger is still ad-hoc text.
 * **The deep ≈ shallow refinement has not been started.** Without it, proofs are
   conducted against `evalExpr`/`execStmt` applied to a concrete AST, and will not scale
-  past toy functions. This is the single largest architectural debt.
+  past toy functions. This is the largest architectural debt.
 
 ### Tier 4 — engineering
 
@@ -604,9 +589,9 @@ No CI; kernel re-check not in the loop; Cartographer scoring weights uncalibrate
 ### If you do one thing next
 
 **Objects + a heap.** It unblocks 166 functions (5% → ~76% on `cachetools`), and it is a
-prerequisite for making the differential harness meaningful on real code, which in turn
-is what makes every later number trustworthy. Integer width is a close second because it
-is actively wrong rather than merely missing.
+prerequisite for making the differential harness meaningful on real code, which is what
+makes every later number trustworthy. Integer width is a close second because it
+is actively wrong rather than missing.
 
 ## 14. Execution log — Tier 1 spine and Tier 3
 
@@ -618,11 +603,11 @@ the dominant gap:
 * **Objects** — `Val.ref`, an explicit `Heap` of `Obj { cls, fields }`, `Expr.field`,
   `Expr.mcall` with dispatch on the receiver's class, `Expr.alloc` running `__init__`,
   `Stmt.setField`. The heap is threaded explicitly through `evalExpr`/`execStmt` rather
-  than hidden in a monad, so the fuel recursion stays visibly structural and the
+  than hidden in a monad, so the fuel recursion stays structural and the
   interpreter remains total.
 * **Exceptions** — `EResult.exn` / `Ctl.exn`, `Stmt.raise`, `Stmt.tryCatch`. Division by
   zero and out-of-range indexing now raise `ZeroDivisionError` / `IndexError` / `KeyError`
-  instead of being holes, which is both more faithful and more useful.
+  instead of being holes.
 * **Containers** — `Val.list`/`tuple`/`dict`, `listE`/`tupleE`/`dictE`, `inOp`, `isOp`
   (reference identity for objects, structural for immediates), `cond`.
 * **Iteration** — `Stmt.forIn` over any `Val.iterable`, with `break`/`continue`.
@@ -631,14 +616,13 @@ the dominant gap:
   ambiguous match resolves to a hole, not a guess.
 
 `Stmt.setIndex` is deliberately still a hole (`setIndex:immutable-containers`): container
-mutation needs boxed containers, and inventing an answer would be exactly the
+mutation needs boxed containers, and inventing an answer would be the
 silent-mistranslation failure this project exists to prevent.
 
 ### Tier 3: the mutation gate found real vacuity, and closing it worked
 
 `scripts/mutate.py` scored `evalStmt_sound` at **2 killed / 6 survived (25%, WEAK)**, and
-every survivor was a mutation of `evalBExpr`. The diagnosis is worth recording because it
-generalizes:
+every survivor was a mutation of `evalBExpr`. The diagnosis generalizes:
 
 > `BigStep`'s `iteTrue`/`iteFalse`/`loopTrue`/`loopFalse` side conditions are *themselves*
 > stated in terms of `evalBExpr`. Mutating `evalBExpr` therefore mutates both sides of the
@@ -646,7 +630,7 @@ generalizes:
 
 This is the vacuity class `#audit_depends` **cannot** see — `evalStmt_sound` does depend on
 `evalBExpr` transitively, it simply says nothing about it. It is the concrete argument for
-why §4's "dependency vacuity is necessary but not sufficient" is not a hedge.
+§4's "dependency vacuity is necessary but not sufficient".
 
 The fix was to pin `evalBExpr` against something not defined in terms of itself — the
 integer order and equality on `evalExpr`'s results (`Characterization` section in
@@ -664,12 +648,12 @@ yet trustworthy and should be refined by isolating theorems into separate module
   `Quot.sound` (42), `Classical.choice` (15) — **zero** `sorryAx`/`ofReduceBool`/
   `ofReduceNat`, zero project axioms. `Autoform/Lang/Core/*` verified free of
   `sorry`/`partial`/`unsafe`/`native_decide`/`@[implemented_by]`/`@[extern]`, so the
-  README's "total, no sorry" claim is now *checked* rather than asserted.
-  Two honest findings: `Autoform/Harness/Audit.lean` uses `partial def transitiveDeps`
+  README's "total, no sorry" claim is checked rather than asserted.
+  Two findings: `Autoform/Harness/Audit.lean` uses `partial def transitiveDeps`
   (the audit tool's own walker is unproven-terminating), and at the time **`lean4checker`
   was not installed** — since closed, see §23.
-* `Autoform/Tactics/Portfolio.lean` implements the escalation ladder with the honesty
-  guard that matters: a rung counts as success only if it closes the goal *and* the proof
+* `Autoform/Tactics/Portfolio.lean` implements the escalation ladder with an honesty
+  guard: a rung counts as success only if it closes the goal *and* the proof
   term passes `hasSorry`/`hasExprMVar` screening; on exhaustion it errors with a full
   transcript, and unavailable tiers are printed so "unproved" is distinguishable from
   "not attempted". Open goals are recorded as `Obligation` *data*, never as admitted
@@ -678,8 +662,8 @@ yet trustworthy and should be refined by isolating theorems into separate module
   profile (Claim / ArgumentReasoning / ArtifactReference / Assumption / typed
   relationships) wrapped in an in-toto Statement. Every hole label becomes a named
   `Assumption` node, so untranslated constructs appear *in the argument* rather than
-  vanishing. On Cachetools the top claim comes out **UNDEVELOPED**, which is the correct
-  answer, and it caught a provenance defect: `conformance.json` carried no module tag, so
+  vanishing. On Cachetools the top claim comes out **UNDEVELOPED**, which is correct, and
+  it caught a provenance defect: `conformance.json` carried no module tag, so
   its numbers could not be attributed and the faithfulness claim was capped at WEAK
   rather than accepted.
 
@@ -702,14 +686,14 @@ rather than passing), **73,046 theorems**, 251 source repos, 78,751 `sorry` plac
 **3,833 of 9,352 analyzed problems (41.0%) are flagged**; 10,699 of 73,046 theorems
 (14.6%); 1,047 of the 2,772 canonical formalizations (37.8%).
 
-The dominant pattern is instructive and directly relevant to our own Specifier: Python
+The dominant pattern is directly relevant to our own Specifier: Python
 *determinism* property-tests (`f(x) == f(x)`) transliterated literally into Lean, where
-purity makes them `rfl` and therefore contentless. A property that is meaningful in a
-language with mutable state and nondeterminism becomes vacuous the moment it is moved
-into a pure setting. **Spec translation is not spec preservation** — §4's anti-vacuity gate
-is not defensive pedantry, it is load-bearing, and this is the empirical proof.
+purity makes them `rfl` and therefore contentless. A property meaningful in a
+language with mutable state and nondeterminism becomes vacuous when moved
+into a pure setting. Spec translation is not spec preservation; §4's anti-vacuity gate
+is load-bearing, and this is the empirical evidence.
 
-Two honesty notes carried in the report rather than smoothed over: survivors are labelled
+Two limits carried in the report: survivors are labelled
 `clean_static` ("no check that ran fired"), never "passed", with an explicit `not_checked`
 list (Lean elaboration, Plausible refutation, mutation gate, axiom audit) — all of which
 need Lean and are out of scope for a static screen. And the dataset's own
@@ -717,7 +701,7 @@ need Lean and are out of scope for a static screen. And the dataset's own
 both directions; both are heuristics, and the report states the disagreement instead of
 adjudicating it.
 
-## 16. Tier 2: machine integers, and a choice that has to be made explicitly
+## 16. Tier 2: machine integers, and a choice that must be explicit
 
 `Autoform/Lang/Core/Numeric.lean` closes §13 Tier 2 item 1 — the confirmed silent
 mistranslation where `mulbig(100000,100000)` gave `10000000000` in Lean against `cc`'s
@@ -727,7 +711,7 @@ It follows §12's rule (parameterize, don't hardcode): `Width`, `IntType`
 (unbounded / signed / unsigned × 8/16/32/64), `NumConfig` with presets for Python, C32,
 C64, unsigned, Java, Go, and `Dialect.toNumConfig` as the hook into the interpreter.
 
-The important structural choice is that **`NumResult` has four outcomes**, mirroring the
+The structural choice is that **`NumResult` has four outcomes**, mirroring the
 discipline `EResult` already applies to evaluation:
 
 | Outcome | Meaning |
@@ -737,27 +721,26 @@ discipline `EResult` already applies to evaluation:
 | `trap r` | the language defines this as a runtime fault (Go's `INT_MIN / -1`) |
 | **`ub r`** | **the language does not define this at all** |
 
-`ub` is the one that matters. C's signed overflow, `INT_MIN / -1`, and shifts past the
-width have *no* correct answer — the program's meaning depends on the compiler. Returning
-a number there would be the same category of error as the original modulo bug, just
-harder to detect. Wiring `ub ↦ Expr.hole` keeps undefined behaviour out of proofs
-entirely: a program that relies on UB cannot be proved to do anything at that point, which
-is exactly right.
+C's signed overflow, `INT_MIN / -1`, and shifts past the width have *no* correct answer —
+the program's meaning depends on the compiler. Returning a number there would be the same
+category of error as the original modulo bug, and harder to detect. Wiring
+`ub ↦ Expr.hole` keeps undefined behaviour out of proofs: a program that relies on UB
+cannot be proved to do anything at that point.
 
 ### The configuration that must be recorded, not defaulted
 
 `NumConfig.c32` uses `Policy.undefined` — what the C standard says, so UB *surfaces*.
 `NumConfig.c32Wrapv` wraps — what `cc` actually does, so the differential oracle *agrees*.
-These are both defensible and they are not interchangeable:
+Both are defensible and they are not interchangeable:
 
-* Verifying with `c32Wrapv` proves things about the compiler you happened to test, and
-  will silently bless code whose behaviour another compiler is free to change.
+* Verifying with `c32Wrapv` proves things about the compiler that was tested, and
+  will bless code whose behaviour another compiler is free to change.
 * Verifying with `c32` finds UB, but then the differential harness reports divergences
-  against `cc` that are not bugs in the semantics — they are the semantics correctly
-  refusing to commit.
+  against `cc` that are not bugs in the semantics — they are the semantics declining to
+  commit.
 
 So this cannot be a hidden default. **The ledger must record which integer policy a
-result was obtained under**, exactly as it records the dialect — an assurance claim that
+result was obtained under**, as it records the dialect; an assurance claim that
 does not name its arithmetic model is not attributable. Current wiring picks `c32Wrapv`
 so the conformance oracle stays meaningful; a verification run should flip to `c32`.
 
@@ -784,24 +767,23 @@ trusting it. Both moved it **down**.
    run sneaky3 3 ==> hole "index:unsupported"
    ```
 
-   The dangerous one is `call:`. A call to a function that was never translated is, in the
+   `call:` is the dangerous case. A call to a function that was never translated is, in the
    AST, indistinguishable from a call to one that was — so the metric counted functions as
-   verifiable whose behaviour is entirely unknown. Requiring **call closure** (every
+   verifiable whose behaviour is unknown. Requiring **call closure** (every
    call/method target resolves inside the program) gives **6/233 (2%)**, and the ledger now
    reports a third figure, `dynamic-hole risk` (384 constructs), for the residue that is
    input-dependent and therefore the conformance oracle's business, not the type system's.
 
-The pattern is worth naming, because it will recur: **a coverage metric that is computed
-from the same artifact it describes will flatter itself.** Static hole-counting over an
-AST cannot see what the interpreter does with that AST, exactly as `#audit_depends` cannot
-see whether a theorem constrains what it mentions (§14) and as FVSpec's translated
-determinism properties cannot see that purity made them vacuous (§15). Three instances of
-one failure mode: *the check and the thing checked share an assumption.*
+The pattern will recur: **a coverage metric computed from the same artifact it
+describes will flatter itself.** Static hole-counting over an AST cannot see what the
+interpreter does with that AST, exactly as `#audit_depends` cannot see whether a theorem
+constrains what it mentions (§14) and as FVSpec's translated determinism properties cannot
+see that purity made them vacuous (§15). Three instances of one failure mode: the check
+and the thing checked share an assumption.
 
-The general defence is the one this project already relies on — an oracle that does not
-share the artifact's assumptions. For semantics that is the real runtime; for
-specifications it is mutation; for coverage it is execution. Any number reported without
-one should be read as an upper bound.
+The defence is an oracle that does not share the artifact's assumptions. For semantics
+that is the real runtime; for specifications it is mutation; for coverage it is execution.
+Any number reported without one is an upper bound.
 
 ## 18. Tier 1 measured: objects closed the gap
 
@@ -813,30 +795,29 @@ Full pipeline on `cachetools` (233 real functions), before and after the Tier 1 
 | hole-free (upper bound) | 12 (5%) | **166 (71%)** |
 | verifiable core (hole-free **and** call-closed) | 6 (2%) | **45 (19%)** |
 
-§13 predicted "+166 from objects", and 166 is exactly what landed. The marginal-value
-metric was right.
+§13 predicted "+166 from objects", and 166 landed. The marginal-value metric was correct.
 
-### What the exporter work actually found
+### What the exporter work found
 
-The CPG side turned out to matter more than the Lean side, and several of §13's
-assumptions were wrong:
+The CPG side mattered more than the Lean side, and several of §13's assumptions were
+wrong:
 
 * **`FOR` does not exist in a Python CPG.** The frontend pre-desugars every `for` and
   every comprehension into `tmp = e.__iter__()` plus a `WHILE` whose condition is an
-  `UNKNOWN` node. So §13's measurement of "`FOR` marginal value = +0" was right for the
-  wrong reason — it was never a `control:FOR` hole, it was hiding inside `expr:UNKNOWN`.
-  Reconstructing `forIn` from that shape is what unlocked iteration.
+  `UNKNOWN` node. §13's measurement of "`FOR` marginal value = +0" was right for the
+  wrong reason — it was never a `control:FOR` hole, it was inside `expr:UNKNOWN`.
+  Reconstructing `forIn` from that shape unlocked iteration.
 * **A latent fidelity bug, removed.** `<operator>.and` / `.or` had been mapped to `&&`/`||`.
   They are **bitwise** `&`/`|` (the logical ones are `logicalAnd`/`logicalOr`), and Core has
-  no bitwise operators — so that mapping was silently computing the wrong answer. They are
+  no bitwise operators — so that mapping computed the wrong answer. They are
   now holes. Same for float literals, which were becoming strings. This is the §12 lesson
-  recurring: *constructs that look alike across languages are the dangerous ones.*
+  recurring: constructs that look alike across languages are the dangerous ones.
 
   **Update — they are no longer holes; they are bitwise operators.** `Core` now has `"&"`,
   `"|"`, `"^"`, `"<<"`, `">>"` and `">>>"` as operator strings of their own, implemented
   by `NumConfig.band`/`bor`/`bxor`/`shl`/`shr` at the dialect's width. They are *not*
   aliases of `"&&"`/`"||"` and must never become so; the two are separate `applyBinop`
-  cases for exactly that reason. `<operator>.not` was mapped to `"!"` by the same mistake
+  cases for that reason. `<operator>.not` was mapped to `"!"` by the same mistake
   in unary form — it is `~`, in C, C++, Java **and** Python — and now maps to `"~"`.
 
   The one place the operand's *type* is still needed is `>>`: it is arithmetic on a signed
@@ -852,7 +833,7 @@ assumptions were wrong:
 
 ### What is deliberately still a hole (102 total)
 
-Every one is a case where a faithful translation is not available and inventing one would
+Each is a case where a faithful translation is not available and inventing one would
 be the §12 failure:
 
 * `starredUnpack` (33) — `*args` has no Core representation; splicing it changes arity.
@@ -863,48 +844,47 @@ be the §12 failure:
   exceptions must not be caught. One `tryCatch` cannot express that.
 * `nonlocal` (8), `del d[k]` (8), multi-`except` (1, the CPG discards exception types).
 
-### The call-closure gap is now the interesting number
+### The call-closure gap
 
 166 hole-free but only 45 call-closed. The 121-function difference is functions that
 contain no holes themselves but call something outside the translated program — mostly
-Python builtins and stdlib. That is not a transpiler defect; it is the honest observation
-that **a function is only as analysable as its callees**, and it points at the next piece
-of work: a modelled standard library, not more CPG mapping.
+Python builtins and stdlib. That is not a transpiler defect; **a function is only as
+analysable as its callees**. The next work item is a modelled standard library, not more
+CPG mapping.
 
 ## 19. Tier 2 closed, and the oracle caught itself lying
 
 ### The short-circuit bug became real, then was fixed
 
 §13 Tier 2 item 2 recorded that `&&`/`||` evaluated both operands eagerly, and called it
-*conservative* — a hole rather than a wrong answer — "only because Core has no side
-effects". Adding exceptions removed that excuse. With `%0` now raising, the harness caught:
+conservative — a hole rather than a wrong answer — "only because Core has no side
+effects". Adding exceptions removed that condition. With `%0` now raising, the harness
+caught:
 
 ```
 safemod(-11, 0):  cpython = 0,  lean = raised ZeroDivisionError
 ```
 
-`b != 0 and a % b == 0` divides anyway. That is an actively wrong answer. `evalExpr` now
+`b != 0 and a % b == 0` divides anyway. That is a wrong answer. `evalExpr` now
 short-circuits before evaluating the right operand: **6/6 agree**.
 
-Worth noting *why* this became detectable: the bug existed all along, but was invisible
-until exceptions were first class. Fidelity work makes other fidelity bugs findable — the
-gaps are not independent.
+The bug existed all along and was invisible until exceptions were first class. Fidelity
+work makes other fidelity bugs findable; the gaps are not independent.
 
 ### `hole-free ≠ runnable`, confirmed independently
 
 The harness found two supposedly hole-free `cachetools` functions that hit unresolvable
-calls at runtime — `call:_CacheInfo`, `call:info`. This is §17's finding arrived at from
-the other direction, by execution rather than by static analysis, and it is why the ledger
-now reports call-closure separately.
+calls at runtime — `call:_CacheInfo`, `call:info`. This is §17's finding reached from
+the other direction, by execution rather than static analysis, and is why the ledger
+reports call-closure separately.
 
-### The oracle was lying, silently
+### The oracle was reading a stale artifact
 
-The single most important process finding of this pass: **a stale `.olean` was answering
-with the previous semantics.** It produced 10 fictitious divergences and 22 fake
-inconclusives before being noticed. The harness now runs `lake build` on the generated
-module before comparing.
+A stale `.olean` was answering with the previous semantics. It produced 10 fictitious
+divergences and 22 fake inconclusives before being noticed. The harness now runs
+`lake build` on the generated module before comparing.
 
-Generalize it: this project's entire trust story rests on oracles that do not share the
+Generalization: this project's trust story rests on oracles that do not share the
 artifact's assumptions (§17). An oracle reading a stale cache shares the *old* artifact's
 assumptions, which is worse than having no oracle — it produces confident, specific,
 wrong findings. **Any oracle must establish that it is reading the current artifact
@@ -921,14 +901,13 @@ before it reports anything.** That check belongs in the oracle, not in the calle
 | shortcircuit | 1 / 1 / 1 | 6 | 6/6 | 0 | 0 |
 
 `cachetools` went from **zero** comparable cases to 42 compared and agreeing, including
-method calls against reconstructed receivers — because the harness now drives from the
-repository's own test suite (§3's "every repo ships its own conformance suite"), snapshots
-the receiver into a Lean `Heap` literal, and compares structured values and exceptions
-rather than only integers.
+method calls against reconstructed receivers, because the harness now drives from the
+repository's own test suite (§3), snapshots the receiver into a Lean `Heap` literal, and
+compares structured values and exceptions rather than only integers.
 
-Honest coverage limits, reported rather than smoothed: 109 calls skipped because the
-receiver is a `tuple` subclass (a value, not an object with fields — Core cannot represent
-it), 34 skipped for `float` arguments, 2 hole-free methods never reached by the suite.
+Coverage limits: 109 calls skipped because the receiver is a `tuple` subclass (a value,
+not an object with fields — Core cannot represent it), 34 skipped for `float` arguments,
+2 hole-free methods never reached by the suite.
 
 ### Tier 2 status
 
@@ -941,9 +920,9 @@ it), 34 skipped for `float` arguments, 2 hole-free methods never reached by the 
 | 5. naive scoping | open — no closures, globals, `nonlocal` (8 holes on cachetools) |
 | 6. strings conflated | open — Python `str` and C `char*` are one `Val.str` |
 
-## 20. Refinement: the debt that mattered most
+## 20. Refinement: the largest debt
 
-§13 called the missing deep≈shallow refinement "the single largest architectural debt",
+§13 called the missing deep≈shallow refinement the largest architectural debt,
 because proving anything against `execStmt` applied to a concrete AST does not scale.
 `Autoform/Refine.lean` closes it.
 
@@ -953,36 +932,35 @@ def Refines p name N dom spec : Prop :=
   ∀ args, dom args → ∀ fuel, N ≤ fuel → runFunc p fuel name args = (spec args).toEResult
 ```
 
-Three design choices make it non-vacuous, each backed by a theorem rather than a comment:
+Three design choices make it non-vacuous, each backed by a theorem:
 
 * **`Outcome` has no `hole` and no `outOfFuel` constructor.** A refined function provably
   never reports either (`refines_not_hole`, `refines_terminates`). Exceptions *are*
   refinable — "raises `ZeroDivisionError`" is a specification — but hole and outOfFuel are
-  statements about our ignorance, so a spec cannot quietly absorb them.
+  statements about ignorance, so a spec cannot absorb them.
 * **Fuel is universally quantified above a concrete bound**, not existential, so the answer
   must be fuel-stable.
 * **`refines_unique`**: two shallow specs refining the same entry point agree on the domain.
 
 Proved on real translated functions: `poly`, `clamp`, `cdiv` (C) and `add`, `absval`,
 `cmpchain`, `fmod` (Python). `cdiv`/`fmod` are the dialect-sensitive pair — same shape,
-`.cLike ↦ Int.tdiv`, `.python ↦ Int.fmod` — both now proved.
+`.cLike ↦ Int.tdiv`, `.python ↦ Int.fmod` — both proved.
 
-### The two negative results are the real evidence
+### The two negative results
 
 * `fdiv_not_refinable` — `ops.py:fdiv` contains `Expr.hole "op:floorDiv"`, and **no**
   shallow spec, at any fuel bound, on any domain containing a nonzero divisor, refines it.
-  Holes are not merely inconvenient; they are provably unspecifiable.
+  Holes are provably unspecifiable.
 * `poly_not_refinable` — with fixed-width arithmetic wired in, `poly` does **not** refine
   `a*b + c - a` on the unrestricted domain. The witness is `a = b = 100000`, the same
   value that produced the original `1410065408` divergence against `cc`.
 
-That is the loop closing on itself: a bug found by the differential oracle, fixed by
-parameterizing the semantics, and now permanently recorded as a machine-checked
-impossibility theorem. `poly_refines` holds only under `Fits32 (a*b) ∧ Fits32 (a*b+c) ∧
-Fits32 (a*b+c-a)` — which is what the `dom` parameter was for, and why it is not decoration.
+A bug found by the differential oracle, fixed by parameterizing the semantics, is now
+recorded as a machine-checked impossibility theorem. `poly_refines` holds only under
+`Fits32 (a*b) ∧ Fits32 (a*b+c) ∧ Fits32 (a*b+c-a)` — the purpose of the `dom` parameter.
 
 `clamp_deep_idem` shows the payoff: idempotence is proved by `omega` on the plain Lean
-function, then transferred to the deep term with no interpreter in sight.
+function, then transferred to the deep term with no interpreter involved.
 
 All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.
 
@@ -994,12 +972,12 @@ heap-mutating methods (need a representation predicate).
 
 Wiring `Numeric` into `applyBinop` left `applyUnop` untouched, so unary minus still
 returned mathematical negation unconditionally. Under `.cLike` that made `-INT_MIN`
-evaluate to `2147483648` — a value that does not exist in a 32-bit signed integer.
+evaluate to `2147483648`, a value that does not exist in a 32-bit signed integer.
 
-Exactly the defect class `Numeric.lean` was built to eliminate, surviving on the path
-nobody thought to check. Found not by the differential oracle (no test negated `INT_MIN`)
-but by the **refinement layer**, which had to state `applyUnop_int_neg` as an unconditional
-`rfl` and noticed that the unconditionality was itself the bug.
+This is the defect class `Numeric.lean` was built to eliminate, on a path
+that was not checked. It was found not by the differential oracle (no test negated
+`INT_MIN`) but by the **refinement layer**, which had to state `applyUnop_int_neg` as an
+unconditional `rfl`; the unconditionality was the bug.
 
 Now: negation routes through `NumConfig.neg`, and the C equation carries a `Fits32`
 hypothesis like every other operator.
@@ -1011,9 +989,8 @@ applyUnop .python "-" (-2147483648)  ==>   2147483648   (bignum, correct)
 
 Third distinct oracle, third class of finding: differential testing catches semantics that
 disagree with reality, mutation catches specifications that constrain nothing, and
-**proof catches operations that were never given a specification at all.** They are not
-redundant — each sees a failure mode the others are blind to, which is the argument for
-paying for all three.
+proof catches operations that were never given a specification at all. Each sees a
+failure mode the others miss, which is the argument for paying for all three.
 
 ## 22. Tier 2 items 5 and 6
 
@@ -1024,12 +1001,11 @@ paying for all three.
 * `+` on `char*` is **pointer arithmetic**, not concatenation.
 * `<` / `>` compare **addresses**, not contents.
 * `==` compares **addresses**, not contents — and `Val.beq` is structural, so this was
-  silently returning the Python answer for C programs.
+  returning the Python answer for C programs.
 
 All three are now dialect-split: correct under `.python`, precise holes under `.cLike`
 (`str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`,
-`str:pointer-equality-not-modelled`). Third instance of the §12 pattern — the constructs
-that *look* identical across languages are the ones that mistranslate silently.
+`str:pointer-equality-not-modelled`). Third instance of the §12 pattern.
 
 ### Item 5 — scoping: closures and function values
 
@@ -1050,18 +1026,17 @@ def make_adder(n): return inner     # inner(x) = x + n
 use() = apply2(make_adder(10), 5)   ==>  15
 ```
 
-**What is deliberately NOT done, and why.** `nonlocal` *writes* remain a hole
+**What is deliberately not done.** `nonlocal` *writes* remain a hole
 (`scope:nonlocal-write`). Capture is by value, so a closure cannot mutate a binding in its
 enclosing frame. Making that work requires variables to be shared mutable cells — every
-scope a heap frame, `Env` becoming a `Ref` — which is a correct design and a genuinely
-large refactor of the interpreter, and would require re-repairing the 74-theorem
+scope a heap frame, `Env` becoming a `Ref` — which is a correct design and a large
+refactor of the interpreter, and would require re-repairing the 74-theorem
 refinement layer. Global *rebinding* (`global x; x = 5`) is unsupported for the same
 reason.
 
-This is the honest boundary: reads across scopes work and are correct; writes across
-scopes are a hole. Implementing writes by copying values back would appear to work on
-simple cases and be silently wrong on aliased ones, which is the failure mode this project
-exists to prevent.
+The boundary: reads across scopes work and are correct; writes across
+scopes are a hole. Implementing writes by copying values back would work on
+simple cases and be silently wrong on aliased ones.
 
 ### Revised Tier 2 status
 
@@ -1077,7 +1052,7 @@ exists to prevent.
 ## 23. Kernel re-verification — closed, and a trap avoided
 
 Tier 4's last open gap was that the `.olean` files had never been re-checked by an
-independent kernel. It is now closed, and the way it closed is instructive.
+independent kernel. It is now closed.
 
 **There was nothing to install.** `lean4checker` is deprecated: it was merged into the
 Lean repository and ships as **`leanchecker`** with every toolchain from v4.28.0. We are
@@ -1091,22 +1066,22 @@ lake env leanchecker --fresh Autoform     exit 0,  ~92s,  status VERIFIED
 ### The trap: non-fresh mode can silently pass
 
 `leanchecker <Module>` without `--fresh` **can no-op on a module that has only imports and
-no declarations of its own** — which is exactly the shape of `Autoform.lean`. Demonstrated
+no declarations of its own** — the shape of `Autoform.lean`. Demonstrated
 directly: a scratch `Bad` module with an env-hacked bogus declaration plus a `Root` module
 importing it — `leanchecker Root` exits 0 silently, while `leanchecker Bad` and
 `leanchecker --fresh Root` both reject it.
 
-So the naive invocation would have produced a confident VERIFIED that checked nothing.
-This is §19's lesson recurring at the very last link in the chain: **an oracle that
-silently passes is worse than no oracle.** The audit therefore uses `--fresh` by default
+The naive invocation would have produced a VERIFIED that checked nothing.
+This is §19's lesson at the last link in the chain: an oracle that
+silently passes is worse than no oracle. The audit uses `--fresh` by default
 and records *which mode ran* in `audit.json`, because the two are not equally strong.
 
-### Proof the checker actually rejects bad input
+### Evidence the checker rejects bad input
 
-Two independent demonstrations, since "exit 0" is exactly the shape a no-op takes:
+Two independent demonstrations, since "exit 0" is also the shape of a no-op:
 
 1. **Environment hacking** — `Environment.addDeclCore (doCheck := false)` installing
-   `bogusFalse : False := False`. The elaborator writes the `.olean` happily; `leanchecker`
+   `bogusFalse : False := False`. The elaborator writes the `.olean`; `leanchecker`
    exits 1 with `(kernel) declaration type mismatch`.
 2. **Tampering this project's own build tree** — a copy of `Autoform/Refine.olean`
    recompiled with an injected bogus declaration. `leanchecker --fresh Autoform` exits 1
@@ -1114,19 +1089,18 @@ Two independent demonstrations, since "exit 0" is exactly the shape a no-op take
    mismatch`. The untampered copy of the same scratch setup passes, so the failure is
    caused by the tamper and not by the harness.
 
-Also verified: `LEANCHECKER=/usr/bin/false` → FAILED → VERDICT FAIL; a genuinely absent
-binary → UNVERIFIED (never a pass), and `--strict` turns that into a failure. CI now runs
-`audit_all.py --strict`, so a missing checker fails the build rather than quietly
-downgrading.
+Also verified: `LEANCHECKER=/usr/bin/false` → FAILED → VERDICT FAIL; an absent
+binary → UNVERIFIED (never a pass), and `--strict` turns that into a failure. CI runs
+`audit_all.py --strict`, so a missing checker fails the build rather than downgrading.
 
 Current audit state: **PASS**, axiom sweep clean over 1,696 declarations
 (`propext`, `Quot.sound`, `Classical.choice` only), kernel re-verification **VERIFIED**.
 
-## 24. Globals, closures, and a coverage number that moved the honest way
+## 24. Globals, closures, and a coverage number that moved down
 
 The CPG side of item 5 landed, and the exporter's findings sharpened the design.
 
-### What the CPG actually says
+### What the CPG says
 
 * **`Method.local` is a *reference*, not a binding.** pysrc2cpg emits a `LOCAL` in the
   *inner* method for every name it closes over and for every module global it reads. A
@@ -1143,7 +1117,7 @@ The CPG side of item 5 landed, and the exporter's findings sharpened the design.
 * **C `typeFullName` gives `char*` directly**, including on literals, so item 6 needed no
   inference.
 
-### The numbers moved down, and that is the finding
+### The numbers moved down
 
 | | before | after |
 |---|--:|--:|
@@ -1157,13 +1131,13 @@ names that exist nowhere in the translated program. `Expr.closure` names a *func
 there is no constructor for a class-valued closure, and `fnref` would have been the
 silently-wrong answer.
 
-The C string result is starker: on a purpose-built C corpus, **5/5 functions were reported
-hole-free before and 1/5 after** — because four of the five were being mistranslated,
+The C string result: on a purpose-built C corpus, **5/5 functions were reported
+hole-free before and 1/5 after** — four of the five were being mistranslated,
 `s + n` concatenating a pointer and `a < b` comparing contents instead of addresses.
 
-Both movements are the metric getting *more honest*, not the tool getting worse. This is
-now the fourth instance of §17's rule: a number computed without an oracle that disagrees
-with the artifact will flatter itself.
+Both movements are the metric becoming more honest, not the tool getting worse. Fourth
+instance of §17's rule: a number computed without an oracle that disagrees with the
+artifact will flatter itself.
 
 ### Open, and deliberately not guessed
 
@@ -1180,18 +1154,17 @@ with the artifact will flatter itself.
 ## 25. The oracle recovered, and found the next silent mistranslation
 
 Adding globals regressed the differential harness to 0/0 — it started from an empty heap,
-so every global read resolved to `unit`. Re-integrated via `initGlobals`, with two details
-worth recording:
+so every global read resolved to `unit`. Re-integrated via `initGlobals`, with two details:
 
 * **Receiver addresses are computed Lean-side.** The globals frame occupies ref 0, so
   receiver objects must be allocated from `h₀.length` onward. Rather than trust Python
-  arithmetic to get that offset right, the harness emits `Val.ref (base + k)` with
+  arithmetic for that offset, the harness emits `Val.ref (base + k)` with
   `base := h₀.length` evaluated in Lean.
 * **The harness checks its own setup before reporting.** Each case carries the class name
   Python recorded for every receiver; the runner refuses to compare unless the object at
   `gref` is still `<globals>` and each receiver's class matches, returning
   `harness:receiver-alias` / `harness:globals-frame-clobbered` as INCONCLUSIVE. Verified by
-  fault injection: with `base - 1` — the exact off-by-one that would alias the globals
+  fault injection: with `base - 1` — the off-by-one that would alias the globals
   frame — it reports the alias rather than a false agreement.
 
 That is §19's rule applied to the oracle itself: an oracle must establish it is measuring
@@ -1211,12 +1184,11 @@ while CPython stores `_Cache__maxsize`. The read misses and returns `unit`:
     Cache.maxsize():  cpython = 2,  lean = unit
 
 Silently wrong, not absent — the same category as `floorDiv` and the bitwise `and`/`or`
-mapping. Notably the harness author declined to make the *value encoder* also expose
-unmangled aliases, which would have made the numbers agree while leaving the transpiler
-wrong. Fixing the measurement to match a broken artifact is the most tempting failure mode
-in this whole design, and refusing it is what keeps the conformance number meaningful.
+mapping. The *value encoder* was not changed to expose unmangled aliases, which would have
+made the numbers agree while leaving the transpiler wrong. Fixing the measurement to match
+a broken artifact is what would destroy the conformance number's meaning.
 
-### Honest ceilings on this corpus
+### Ceilings on this corpus
 
 The structural losses are now larger than the fixable ones: `skip_self_not_object` 1,527
 (receivers that are `tuple`/`dict` subclasses, which Core cannot represent as objects),
@@ -1227,22 +1199,22 @@ Dominant inconclusive labels, i.e. what would buy the most oracle reach next:
 `setField:non-object` (49), `call:set` (25), `mcall:__init__:non-object` (20),
 `in:non-container` (15).
 
-## 26. Name mangling, and a fix that paid for itself twice
+## 26. Name mangling, and a fix that paid twice
 
 CPython rewrites `__name` to `_ClassName__name` inside a class body, at compile time. The
 transpiler did not, so `Cache.maxsize` read a field that does not exist and returned
 `unit` where CPython returned `2`. Sixteen divergences, one root cause.
 
-The fix hooks in at exactly two places — `asField` (the single source of the attribute
+The fix hooks in at two places — `asField` (the single source of the attribute
 name for `field`, `setField` *and* `mcall`) and `mangledFullName` (the last segment of a
-method's `fullName`) — so **references and definitions move together**. Getting only one
-side would have converted a silent wrong answer into a silent unresolvable call, which is
-not obviously an improvement. Verified against CPython `__dict__` on a purpose-built
+method's `fullName`) — so references and definitions move together. Fixing only one
+side would have converted a silent wrong answer into a silent unresolvable call.
+Verified against CPython `__dict__` on a purpose-built
 corpus: `__priv`, `___three`, `__trail_` mangle; `__dun__` and `_one` do not; the
 mangling class is the *lexically enclosing* class, not the receiver's, which is what makes
 `Cache.__getitem__` reach `_Cache__data` even when `self` is an `LRUCache`.
 
-Hole counts are **completely unchanged** — mangling is a renaming, not a coverage change.
+Hole counts are unchanged — mangling is a renaming, not a coverage change.
 Divergences went to **zero**.
 
 ### The second payoff
@@ -1251,16 +1223,15 @@ The harness recovers qualified names from the source AST (Python 3.9 has no
 `co_qualname`), and it was not mangling them — so a traced call to `LFUCache.__touch`
 never matched the translated `LFUCache._LFUCache__touch`, and two functions were silently
 dropped from the oracle's reach. Applying the same rule there restored them, and one of
-the two restored functions **immediately produced a new divergence**:
+the two restored functions produced a new divergence:
 
     LFUCache._LFUCache__touch(tuple[ref 6]): cpython = unit, lean raised KeyError
 
-So the coverage fix and the bug it found were the same change. That is the general shape
-worth noticing: *the oracle's blind spots and the artifact's bugs are correlated, because
-both come from the same unmodelled language rule.* Fixing reach is not separate from
-finding defects; it is how you find them.
+The coverage fix and the bug it found were the same change. General shape: the oracle's
+blind spots and the artifact's bugs are correlated, because both come from the same
+unmodelled language rule. Fixing reach is how defects are found.
 
-### That last divergence is the apparatus, not the artifact
+### That divergence was the apparatus, not the artifact
 
 `__touch` begins `link = self.__links[key]`. The `key` argument arrives encoded as an
 object reference (a `_HashedTuple` — a tuple subclass — snapshotted as a heap object),
@@ -1268,25 +1239,25 @@ while the keys stored inside the receiver's `__links` dict were encoded as tuple
 `Val.beq` cannot equate `.ref n` with `.tuple [...]`, the lookup misses, and Core raises
 `KeyError` where CPython succeeds.
 
-The deeper defect is that the representability check applies to top-level arguments but
+The underlying defect is that the representability check applies to top-level arguments but
 not to values nested inside a receiver's fields, so an unrepresentable nested value can
-surface as a *confident divergence*. **An oracle must not report a disagreement it caused
+surface as a confident divergence. **An oracle must not report a disagreement it caused
 itself** — the same discipline as §19's stale `.olean` and the receiver-alias guard of
 §25, one level further in.
 
 ### Ceilings, restated with current numbers
 
 `skip_self_not_object` 1,527 · `skip_unencodable_args` 521 · `skip_varargs` 340 ·
-`skip_no_instance` 57. These now dominate, and they bound how much of a real Python
-codebase this oracle can reach *regardless* of translation coverage.
+`skip_no_instance` 57. These dominate, and they bound how much of a real Python
+codebase this oracle can reach regardless of translation coverage.
 
 One practical note: `find_tests` did not locate `tests/` when given the repo root, because
 the AST paths are relative to `src/`. The `src/`-layout-with-sibling-tests arrangement is
 the modern default, so discovery needs to walk up from `src_root`.
 
-## 27. The last divergence was the apparatus — and the diagnosis is a scope boundary
+## 27. The last divergence was the apparatus — the cause is a scope boundary
 
-Resolved, with a sharper cause than the encoding inconsistency I guessed at in §26.
+Resolved, with a different cause than the encoding inconsistency proposed in §26.
 
 The failing case is `LFUCache.__touch` driven by `test_func.py`, whose helper is:
 
@@ -1301,15 +1272,14 @@ compares equal**. CPython's dict lookup succeeds through `__hash__`/`__eq__`; Co
 `Val`s structurally with `.ref` identity, misses, and raises `KeyError`.
 
 **This is a scope boundary, not a bug.** A Python dict keyed by objects with user-defined
-equality is outside what a structural `Val` comparison can model at all. 27 cases are now
+equality is outside what a structural `Val` comparison can model. 27 cases are now
 refused on that ground and appear in `conformance.json` under `unencodable_reasons`
-rather than being compared. Naming the boundary is the deliverable; pretending the
-comparison is meaningful would not be.
+rather than being compared. Naming the boundary is the deliverable.
 
 A second, independent silent-wrongness source was live in the same case: the encoder
 **swallowed** nested representability failures, counting `dropped_fields` and continuing.
-A dropped `__links` field reads back as `unit` in Core — which is exactly how an apparatus
-artifact becomes a confident divergence. Representability is now recursive and fatal: an
+A dropped `__links` field reads back as `unit` in Core — an apparatus
+artifact becoming a confident divergence. Representability is now recursive and fatal: an
 unrepresentable value at any depth aborts the case, which is counted by reason rather than
 compared.
 
@@ -1338,14 +1308,13 @@ Independently re-verified: **99/99 agree (100%), 0 divergences**, and passing th
 repo root now works — `resolve_src_root` corrects to `<repo>/src` and finds
 `<repo>/tests`. Regressions green: stress 30/30, sample 10/10, ctest 25/25 vs `cc`.
 
-### The pattern, stated once more
+### The pattern
 
 Every divergence in this episode was the measurement, not the artifact — and each was
-found only because refusing to compare exposed what dropping had hidden. **Strictness in
-an oracle buys accuracy, not just safety**: the stricter the refusal, the more of the
+found only because refusing to compare exposed what dropping had hidden. Strictness in
+an oracle buys accuracy, not just safety: the stricter the refusal, the more of the
 remaining agreements mean something. `MAX_DEPTH` and `MAX_ELEMS` were raised to pay back
-the coverage that stricter refusal cost, which is the right trade — reach bought by
-honesty, not by leniency.
+the coverage that stricter refusal cost.
 
 ### Ceilings, current
 
@@ -1356,31 +1325,30 @@ Top inconclusive labels: `setField:cache_clear:non-object` 49, `mcall:__init__:n
 
 ## 28. Refinement reaches real code shapes
 
-§13 called the missing deep≈shallow refinement "the single largest architectural debt", and
-§20 closed the straight-line case. Two obligations remained, and they were the ones that
-mattered: refinement could not touch a loop or a mutated object — i.e. not what programs
-are made of. Both are now closed.
+§13 called the missing deep≈shallow refinement the largest architectural debt, and
+§20 closed the straight-line case. Two obligations remained: refinement could not touch a
+loop or a mutated object. Both are now closed.
 
 ### The loop rule
 
-`execStmt_loop_rule` is a Hoare while-rule adapted to the fuel-indexed interpreter, with
-one design choice doing the work: the invariant `I : Nat → Heap → Env → Prop` is **indexed
-by a termination measure that must strictly decrease**, and the fuel bound is derived from
-it. Partial correctness and termination are therefore proved *together* — at measure `0`
-the step obligation would have to produce `m' < 0`, so the invariant can only exit.
-`execFor_rule` is the `for` counterpart with the remaining sequence as the measure.
+`execStmt_loop_rule` is a Hoare while-rule adapted to the fuel-indexed interpreter. The
+invariant `I : Nat → Heap → Env → Prop` is **indexed by a termination measure that must
+strictly decrease**, and the fuel bound is derived from it. Partial correctness and
+termination are therefore proved together — at measure `0` the step obligation would have
+to produce `m' < 0`, so the invariant can only exit. `execFor_rule` is the `for`
+counterpart with the remaining sequence as the measure.
 
-Proved on real translated functions, not toys:
+Proved on real translated functions:
 
 * `sumto_refines` (C, from `math.c`): `sumto n = n*(n+1)/2`. The per-iteration `Fits32`
   obligations are discharged from a **closed-form** domain via monotonicity of the
   triangular-number function, so the domain reads `0 ≤ n ∧ n ≤ 65535 ∧ Fits32 (n*(n+1)/2)`
-  rather than a quantified per-step mess.
+  rather than a quantified per-step condition.
 * `gcdish_refines` (Python, from `ops.py`): `gcdish a b = Int.gcd a b`. The measure is
   `b.natAbs`; correctness rests on `gcd a b = gcd b (a % b)`, and `%` here is `.python`
   (`Int.fmod`), which agrees with `Int.emod` only because both operands are nonnegative.
-  **The dialect split reappearing inside a loop invariant** — §16's parameterization is not
-  a peripheral concern, it reaches into the proof obligations themselves.
+  The dialect split reappears inside a loop invariant: §16's parameterization reaches into
+  the proof obligations themselves.
 
 ### The representation predicate
 
@@ -1391,8 +1359,8 @@ usable: `Represents.frame` (a write to another address preserves it) and
 real `Heap.setField` (`List.mapIdx`).
 
 `abs` being partial is the load-bearing choice: an ill-formed object represents *nothing*
-rather than something wrong. Concretely, an instance of a function-local class (one with a
-captured frame) returns `none`, so it is not represented rather than silently
+rather than something wrong. An instance of a function-local class (one with a
+captured frame) returns `none`, so it is not represented rather than
 mis-represented.
 
 Proved end to end on a `Counter` class: `bump_step` is a full dispatch of a method that
@@ -1402,19 +1370,19 @@ dispatch, field read, field write, return — ending in a heap that still repres
 through object construction and `__init__`; `total_refines` lands in `Refines` proper, so
 §20's non-vacuity theorems apply (no hole, terminates in `|ys| + 13` fuel).
 
-### An incidental finding worth knowing
+### An incidental finding
 
 **`String.endsWith` does not reduce definitionally** — it goes through `String.Slice`
 pattern matching. So `Ctx.resolveMethod`, which resolves by suffix, cannot be discharged by
 `rfl` the way `Ctx.resolve` can on an exact name; it needs `simp [String.endsWith]; decide`
 per name. Any proof touching method dispatch will hit this.
 
-### Still open, stated not admitted
+### Still open
 
 **Loop cost is input-dependent, but `Refines` carries a constant fuel bound.** So the
 `Refines` instances need bounded domains (`n ≤ 65535`, `b ≤ 1000000`) while the parametric
 `_run` theorems are the sharp statements. Making `Refines` carry an argument-dependent
-bound is the honest fix and is not done — this is a real limitation of the refinement
+bound is the correct fix and is not done — a limitation of the refinement
 relation, not of these proofs.
 
 Also: `n ≤ 65535` in `sumto`'s domain is *implied* by `Fits32 (n*(n+1)/2)` but stated
@@ -1426,8 +1394,7 @@ All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.
 
 ## 29. "Universal" is aspirational: the front end generalizes, the back end does not
 
-Five new languages were run through the unmodified pipeline. The architectural bet is
-half-vindicated and half-refuted, and the split is clean.
+Five new languages were run through the unmodified pipeline.
 
 | language | corpus | parses | compiles | hole-free | verifiable core | oracle |
 |---|---|:--:|:--:|--:|--:|---|
@@ -1438,24 +1405,24 @@ half-vindicated and half-refuted, and the split is clean.
 | C | antirez/sds | ✅ | ✅ | 29% | 13% | crashed |
 | Go | envconfig | ✅ | ✅ | 25% | 7% | none |
 
-**The front end is real.** Five languages parsed, exported and type-checked with *zero*
-exporter or semantics changes, and Java gave the best hole-free rate measured anywhere.
-That is the CPG-as-universal-AST bet paying off.
+**The front end generalizes.** Five languages parsed, exported and type-checked with
+*zero* exporter or semantics changes, and Java gave the best hole-free rate measured
+anywhere. That is the CPG-as-universal-AST bet paying off.
 
-**The back end is not.** There are two dialects for six languages, `.cLike` means
+**The back end does not.** There are two dialects for six languages, `.cLike` means
 "32-bit truncating C", and `differential.py` picks its runtime with one line —
 `runtime = "cc" if is_c else "cpython"` — so Java, Go, JS, TS and Kotlin are all handed
-to CPython, produce zero cases, and print "no comparable cases". **The oracle that found
-every dialect bug in this project's history does not exist for four of six languages**,
-which is why the findings below had to be found by hand.
+to CPython, produce zero cases, and print "no comparable cases". The oracle that found
+every dialect bug in this project's history does not exist for four of six languages,
+so the findings below were found by hand.
 
-### Six silent mistranslations, one of which was in the flagship corpus
+### Six silent mistranslations, one in the flagship corpus
 
 1. **`and`/`or` return an operand, not a bool — including Python.** `pick(0,5)` is `0` in
    CPython and was `True` in Core; `both(2,3)` is `3` and was `True`. It survived because
    cachetools only uses them in *conditions*, where truthiness makes the two
-   indistinguishable — lodash uses 551 of them in *value* position. **Fixed**, and
-   dialect-split: C's `&&`/`||` genuinely do yield 0/1.
+   indistinguishable; lodash uses 551 of them in *value* position. **Fixed**, and
+   dialect-split: C's `&&`/`||` do yield 0/1.
 2. **Unknown extensions silently got the Python dialect.** `infer_dialect` returned
    `.python` when nothing voted, so a `.tsx` file was translated with floored division:
    `-7 % 3` gave `2` where TypeScript gives `-1`. The §12 modulo bug re-entering through
@@ -1469,17 +1436,17 @@ which is why the findings below had to be found by hand.
    `Numeric.lean` already defines `java32`/`java64`/`go64` — but `Dialect` has only
    `python | cLike`, so they are unreachable dead code.
 6. **`.cLike` string rules are C's, applied to Java/JS/TS.** `"a"+"b"` becomes a pointer
-   hole instead of `"ab"` — safe, but the exact inverse of the case §22 fixed.
+   hole instead of `"ab"` — safe, but the inverse of the case §22 fixed.
 
 ### The lesson
 
 §22 split strings by dialect and called item 6 closed. It was closed *for C versus
-Python* — and then applied C's rules to three languages that are neither. **A two-valued
-parameter cannot express a six-way distinction**, and every time this project has added a
-dialect axis it has under-provisioned it: one for integer division, then unary minus, then
+Python*, and then applied C's rules to three languages that are neither. A two-valued
+parameter cannot express a six-way distinction, and every dialect axis added to this
+project has been under-provisioned: one for integer division, then unary minus, then
 strings, now widths and boolean-operator semantics. The right shape is a dialect per
 *language*, wired to the `NumConfig`s that already exist, with `infer_dialect` refusing
-rather than guessing — not another boolean.
+rather than guessing.
 
 ## §30 — The verifiable core survives execution about 40% of the time
 
@@ -1490,22 +1457,22 @@ cachetools' own pytest suite under `sys.settrace` — **30 of 74 never holed**, 
 were refuted on a real input a CPython test actually passed**. Against the earlier
 45-function claim the same harness gave 24/45. The ratio is stable at roughly 40%.
 
-This is §17 again, measured. §17 said static hole-freedom is an upper bound on runtime
+This is §17, measured. §17 said static hole-freedom is an upper bound on runtime
 hole-freedom. It is, and the factor is about 2.5x.
 
-Two distinct errors were tangled together, and separating them mattered:
+Two distinct errors were tangled together:
 
-1. **A real bug in the ledger, now fixed.** `Ctx.resolvable` was widened to mirror
+1. **A bug in the ledger, now fixed.** `Ctx.resolvable` was widened to mirror
    `Ctx.resolveMethod`'s first-match rule — correct for method calls, where `clear` has
    9 candidates and the interpreter dispatches fine. But `Analysis.eCalls` flattened
    `.call` and `.mcall` into one untagged `List String`, so the method rule was applied
-   to **free** calls too, which really use `Ctx.resolve` and its *unique*-match
+   to **free** calls too, which use `Ctx.resolve` and its *unique*-match
    requirement. `_wrapper` and `cache_clear` have several definitions each: the ledger
    called them resolvable, `Ctx.resolve` returns `none` on the ambiguity, and the
    interpreter holes. Calls are now tagged with their dispatch path and answered per
    path. Cachetools' core: **74 → 69**.
 
-   Note the shape. The first version was too strict, understating the core by 14. The
+   The first version was too strict, understating the core by 14. The
    fix for that overshot into too loose. Both were single-rule answers to a two-path
    question, and a flat `List String` made the second error unstatable rather than
    merely unnoticed.
@@ -1519,17 +1486,21 @@ Two distinct errors were tangled together, and separating them mattered:
 
 The recurring rule holds a fourth time: a metric computed from the same artifact it
 describes will flatter itself. `verifiableCore` is computed from the AST and the program
-table; the only thing that refuted it was running the program.
+table; only running the program refuted it.
 
-Two apparatus defects the oracle's author caught in their own harness, worth recording
-because both would have produced a *better-looking* number: `differential.py`'s
-`parse_result` rejects `Val.clos`, which would have turned three genuine closure results
-into fake INCONCLUSIVEs; and a synthetic receiver with no fields makes every attribute
-access hole for reasons that are ours, not the program's, so `harness:` holes are
-excluded from the evidence entirely. §27 said the last divergence was the apparatus. It
-keeps being the apparatus.
+Two apparatus defects caught in the harness itself, both of which would have produced a
+better-looking number: `differential.py`'s `parse_result` rejects `Val.clos`, which would
+have turned three genuine closure results into fake INCONCLUSIVEs; and a synthetic
+receiver with no fields makes every attribute access hole for reasons that are the
+harness's, not the program's, so `harness:` holes are excluded from the evidence entirely.
 
-## 20. Fuel monotonicity (`Autoform/FuelMono.lean`)
+## §30.2 — Fuel monotonicity (`Autoform/FuelMono.lean`)
+
+*(Appended as a second "## 20." by mistake and renumbered here. It sits between §30 and
+§31 chronologically. Nothing outside this file cited it under the old number.)*
+
+*(Numbering note: this section is numbered 20 in the source and collides with the earlier
+§20 on refinement. Both numbers are preserved as written.)*
 
 Open obligation #1 of `Refine.lean` §5 is closed, with one exclusion that is not a proof
 artefact. All seven mutually recursive interpreter functions (`evalExpr`, `applyFunc`,
@@ -1554,7 +1525,7 @@ Four of six supported languages have no conformance oracle, and commissioning on
 surfaced a prerequisite: nothing in the build ever named a language. `Dialect` has two
 constructors, so Java, Go, JavaScript, TypeScript and Kotlin were all run as `.cLike`.
 That is right about `and`/`or` for Java, Go and Kotlin — they yield a bool — and **wrong**
-for JavaScript and TypeScript, where `0 || 5` is `5`, exactly as in Python.
+for JavaScript and TypeScript, where `0 || 5` is `5`, as in Python.
 
 `Lang` (in `Numeric.lean`) names the language and states, per language, the dialect it is
 evaluated under, its `NumConfig`, its file extensions, and whether that pairing is
@@ -1569,25 +1540,24 @@ state; it is blocked on those sites, not on this type. What `Lang` buys now is t
 divergence found by the new oracle can be attributed: caused by the transpiler, or caused
 by an approximation the build already admits to.
 
-## §31 — Silently wrong beats absent, and 104 nodes were silently wrong
+## §31 — 104 nodes were silently wrong
 
 The exporter pass that closed `control:TRY-finally-escaping` (31 → 0) and
-`scope:class-closure` (18 → 0) found something worse than either: **104 call nodes with an
-empty callee name**. `{"k":"call","f":""}` is well-typed. It rendered, it type-checked, it
-counted as *translated* — and at run time it resolved to nothing. Every hole in this
-project is an admission of ignorance the ledger can count. These were not holes. They were
-translated code that did nothing, inflating the coverage number in the one direction the
-ledger cannot detect, because a hole-free function is exactly what the ledger looks for.
+`scope:class-closure` (18 → 0) found **104 call nodes with an empty callee name**.
+`{"k":"call","f":""}` is well-typed. It rendered, it type-checked, it counted as
+*translated*, and at run time it resolved to nothing. Holes are admissions of ignorance
+the ledger can count; these were not holes. They were translated code that did nothing,
+inflating the coverage number in the one direction the ledger cannot detect, because a
+hole-free function is what the ledger looks for.
 
 Ninety of them were the `with` statement. `pysrc2cpg` lowers `with cm as x:` into
 `manager_tmp0 = cm; enter_tmp0 = manager_tmp0.__enter__; value_tmp0 = enter_tmp0()`, so
 the invocation carries no name — but both halves of the method's identity are present,
 split across two statements: the receiver on the call, the attribute name on the
-assignment that made the temporary. Rejoining them is what made `with` translatable at
-all, and it is why the `_TimedCache`/`TTLCache`/`TLRUCache` timer methods stopped being
-calls into nothing.
+assignment that made the temporary. Rejoining them made `with` translatable, and it is why
+the `_TimedCache`/`TTLCache`/`TLRUCache` timer methods stopped being calls into nothing.
 
-Six were genuinely inexpressible — `cached(...)(func)`, a *computed* callee, where
+Six were inexpressible — `cached(...)(func)`, a *computed* callee, where
 `Expr.call` is by name and Core has no "apply this value". Those six functions were
 counted hole-free and are not. Coverage went down for the right reason, the third time
 on this project.
@@ -1597,7 +1567,7 @@ Two further results from the same pass:
 * **Verifiable core 74 → 97, with no Lean change.** The exporter was discarding Joern's
   resolved `fullName` and emitting the short name, so `Ctx.resolve`'s unique-suffix
   fallback could not separate `_cached.py:_wrapper` from `_cachedmethod.py:_wrapper`.
-  Emitting the `fullName` makes the *exact* match fire. Note this interacts with §30: the
+  Emitting the `fullName` makes the *exact* match fire. This interacts with §30: the
   ledger fix made the free-call path correctly strict, and this makes the exporter supply
   the name that strictness needs. Neither alone was enough.
 
@@ -1606,40 +1576,42 @@ Two further results from the same pass:
   fell, and none of it was coverage. On the common 208-function basis the real movement is
   hole-free **147 → 159**, holes **106 → 78**.
 
-### The decision this leaves me: no inheritance from builtin types
+### The decision: no inheritance from builtin types
 
 `class _HashedTuple(tuple)` translates to an ordinary class, so instances are opaque
 `Val.ref`s. CPython's instance *is* a tuple: `hashkey(0) == (0,)` is `True`. `Val.beq`
-cannot equate a `.ref` with a `.tuple`, and `hashkey` is cachetools' cache-key function —
+cannot equate a `.ref` with a `.tuple`, and `hashkey` is cachetools' cache-key function,
 so this is a behavioural gap, not an encoding artifact. It was verified against the
 *pre-change* 238-function program, which returns the same `ref 1`, so it predates the
-exporter work and was merely exposed when the harness stopped skipping varargs.
+exporter work and was exposed when the harness stopped skipping varargs.
 
-**Decision: it stays a DIVERGENCE.** The tempting move is an oracle-side representability
-rule that reclassifies it INCONCLUSIVE — "we cannot encode this comparison". That would be
-false. The semantics genuinely computes a different answer from CPython, and calling that
-"unrepresentable" would convert a known-wrong result into a not-measured one, which is the
-§17/§30 failure in its most seductive form: the artifact that makes a metric look better
-by narrowing what it measures. A real fix is a Core notion of builtin base classes, or
-`alloc` producing a tagged value for such classes. Until then the divergence is the honest
-output.
+**Decision: it stays a DIVERGENCE.** An oracle-side representability rule reclassifying it
+INCONCLUSIVE — "we cannot encode this comparison" — would be false. The semantics computes
+a different answer from CPython, and calling that "unrepresentable" would convert a
+known-wrong result into a not-measured one: the §17/§30 failure, an artifact that makes a
+metric look better by narrowing what it measures. A real fix is a Core notion of builtin
+base classes, or `alloc` producing a tagged value for such classes. Until then the
+divergence is the honest output.
+
+*(§33 and §34 revise this section; see below. §33 attributed the five divergences to
+mutation contamination; §34 established that the `_HashedTuple` divergence is real and
+independent of mutation, i.e. §31's finding stands.)*
 
 ### An apparatus hazard that generated phantom results
 
 `scripts/differential.py` writes its harness to a fixed `/tmp/autoform_diff.lean`. With
 several agents running it concurrently they overwrite each other mid-run, so a run can
 report conformance for *another agent's program*. This was live for every concurrent run
-today. §27 said the last divergence was the apparatus; here the apparatus was not even
-measuring the right artifact.
+that day. The apparatus was not measuring the intended artifact.
 
 ## §32 — Velvet/Loom: take the DSL, refuse the oracle
 
 `verse-lab/velvet` is a Dafny-style auto-active verifier for Lean 4, built on `verse-lab/loom`,
 with `requires`/`ensures`/`invariant`/`decreasing` macros, cvc5 and z3 wired in, and
-property-based testing in the same environment. On the surface it is exactly the tier-2
-hammer §5 asks for and this build does not have.
+property-based testing in the same environment. It resembles the tier-2 hammer §5 asks
+for and this build does not have.
 
-It is not, and the reason is one line — `Loom/SMT.lean:215`:
+It is not one, because of `Loom/SMT.lean:215`:
 
 ```lean
 axiom trust_smt : ∀ (p : Prop), p
@@ -1656,15 +1628,14 @@ build:
 
 Adopting it would let `portfolio` close all 89 open obligations immediately, and every
 one would be worthless. `scripts/audit_all.py` allows exactly
-`{propext, Quot.sound, Classical.choice}`, so the sweep rejects it on sight — the gate
-works, and this is the first time it has been tested against a real external tool rather
-than a hypothetical.
+`{propext, Quot.sound, Classical.choice}`, so the sweep rejects it — the first time the
+gate has been tested against a real external tool rather than a hypothetical.
 
-This vindicates `#smt_evidence`. §5 wanted SMT at tier 2; the design instead reaches
+This supports `#smt_evidence`. §5 wanted SMT at tier 2; the design instead reaches
 cvc5/z3 through `scripts/prover/smt.py` and records the verdict as an **open obligation
 carrying the solver's answer as evidence**, because no Lean proof can be reconstructed
-from it. Velvet shows the alternative and what it costs: an axiom that makes the logic
-inconsistent, in exchange for a green checkmark. `bv_decide` remains the counterexample
+from it. Velvet shows the alternative and its cost: an axiom that makes the logic
+inconsistent, in exchange for a green checkmark. `bv_decide` is the counterexample
 that proves the rule — SAT-backed *and* LRAT-replayed in the kernel, hence a real rung.
 
 What is worth taking, none of which costs trust:
@@ -1673,9 +1644,9 @@ What is worth taking, none of which costs trust:
   an existing semantics. `Autoform/Contracts.lean` builds `Contract` values by hand and
   `execStmt_loop_rule` takes its invariant and decreasing measure as explicit arguments;
   both would read better as macros, and macros carry no soundness weight.
-* **Angelic vs demonic non-determinism.** This is the vocabulary for something already
+* **Angelic vs demonic non-determinism.** Vocabulary for something already
   built: `RefinesUnder` quantifies over *every* implementation consistent with the
-  contract, which is precisely demonic non-determinism, and `refinesUnder_of_unsatisfiable`
+  contract, which is demonic non-determinism, and `refinesUnder_of_unsatisfiable`
   is the degenerate angelic case. Naming it connects the hole mechanism to existing
   literature instead of inventing terms.
 * **Partial vs total correctness kept apart, with termination separate.** The fuel-indexed
@@ -1687,14 +1658,15 @@ What Velvet does **not** help with: the remaining holes. `op:starredUnpack` (36)
 `call:computed-callee` (6) and the `_HashedTuple` builtin-base gap are all missing
 *language modelling* in Core, not missing proof automation. No verifier closes them.
 
-## §33 — Correction to §31: the apparatus lied again, and I repeated it
+## §33 — Correction to §31: contamination in the measurement
 
 §31 attributed five `cachetools` conformance divergences to `class _HashedTuple(tuple)`
-and Core's lack of inheritance from builtin types. **That attribution was wrong**, and it
-reached the README before it was checked.
+and Core's lack of inheritance from builtin types. That attribution was recorded as wrong
+here, and had reached the README before being checked. (§34 revises this correction:
+see below.)
 
-All five were contamination. A **concurrent mutation run** held
-`Autoform/Generated/Cachetools.lean` while the differential harness read it, and
+The claim made here was that all five were contamination. A **concurrent mutation run**
+held `Autoform/Generated/Cachetools.lean` while the differential harness read it, and
 `_DefaultSize.pop` was a live mutant returning `0` instead of `1`. Corroborated by an
 independent artifact rather than by the same agent that found it:
 `f_cachetools___init___py__module___DefaultSize_pop` appears in `mutation-Cachetools.json`'s
@@ -1703,18 +1675,18 @@ independent artifact rather than by the same agent that found it:
 
 The oracle was measuring a program nobody had written.
 
-What makes this worth a section rather than a fix: §27 concluded the last divergence was
-the apparatus, and §31 quoted that rule while committing the same error one level down.
-The exporter agent's reasoning was careful and its evidence was real — it evaluated
-`hashkey` on the pre-change build and got `ref 1` — but "this gap exists" and "this gap
-caused those five divergences" are different claims, and only the first was established.
-A true fact adjacent to the failure is the most convincing wrong explanation available.
+§27 concluded the last divergence was the apparatus, and §31 quoted that rule while
+committing the same error one level down. The exporter agent's reasoning was careful and
+its evidence was real — it evaluated `hashkey` on the pre-change build and got `ref 1` —
+but "this gap exists" and "this gap caused those five divergences" are different claims,
+and only the first was established. A true fact adjacent to a failure is not an
+explanation of it.
 
-Three defences now exist, and none of them existed this morning:
+Three defences now exist:
 
-* `scripts/differential.py` detects the `.mutate-backup` sentinel, warns loudly, and sets
+* `scripts/differential.py` detects the `.mutate-backup` sentinel, warns, and sets
   `build_stable: false` / `mutation_in_progress: true`. A measurement taken over a mutant
-  is now labelled as one.
+  is labelled as one.
 * The harness copies the compiled `Autoform/Lang` tree and the generated `.olean` into a
   private directory and points `LEAN_PATH` at it, so a concurrent rebuild cannot change
   the program mid-run.
@@ -1722,39 +1694,41 @@ Three defences now exist, and none of them existed this morning:
   concurrent agents overwrote each other's harness and could report conformance for
   *another agent's program*.
 
-### The `_HashedTuple` gap, restated correctly
+### The `_HashedTuple` gap, restated
 
-It is real and it is not a divergence. Core has no inheritance from builtin types, so
-`_HashedTuple` instances are opaque `Val.ref`s while CPython's instance *is* a tuple. The
-harness rules this a counted `representation:value-vs-object` INCONCLUSIVE.
+It is real. This section classified it as not a divergence: Core has no inheritance from
+builtin types, so `_HashedTuple` instances are opaque `Val.ref`s while CPython's instance
+*is* a tuple, and the harness rules this a counted `representation:value-vs-object`
+INCONCLUSIVE. (§34 reverses this classification: the divergence is real and independent
+of mutation.)
 
-§31 argued that reclassifying a divergence as "unrepresentable" would be the flattering
-lie. That argument stands as a principle and was applied to the wrong facts: there was no
-divergence to reclassify. The distinction that matters is whether the class is **counted
-and named** — an INCONCLUSIVE bucket with a label and a number is an admission, while one
-that quietly absorbs disagreements is laundering. This one is counted.
+§31 argued that reclassifying a divergence as "unrepresentable" would be a flattering
+lie. That argument stands as a principle and was applied here to facts believed to show
+there was no divergence to reclassify. The distinction that matters is whether the class
+is **counted and named** — an INCONCLUSIVE bucket with a label and a number is an
+admission, while one that quietly absorbs disagreements is not.
 
-### And the headline was overstated in the other direction
+### The headline was overstated in the other direction
 
 `0 divergences` on `cachetools` is true and nearly uninformative: **30 of 208 functions**
 are compared. The rest are INCONCLUSIVE. Reach is the binding constraint, not agreement,
-and a conformance rate quoted without its coverage is exactly the metric shape §17, §30
+and a conformance rate quoted without its coverage is the metric shape §17, §30
 and §31 keep catching.
 
-## §34 — Correction to §33: I made the same inferential error twice
+## §34 — Correction to §33: the same inferential error, repeated
 
 §31 attributed five conformance divergences to `_HashedTuple` and Core's lack of builtin
-inheritance. §33 "corrected" that, saying all five were mutation contamination. **§33 was
-an over-correction, and it was reached by exactly the reasoning §33 itself condemned.**
+inheritance. §33 corrected that, saying all five were mutation contamination. **§33 was
+an over-correction, reached by the reasoning §33 itself records as invalid.**
 
 The evidence offered for §33 was that `f_..._DefaultSize_pop` appears in
 `mutation-Cachetools.json`'s `decls` list. That establishes `_DefaultSize.pop` *was being
-mutated*. It does not establish that it *caused those divergences* — the identical
-"true fact adjacent to the failure" error §33 was written to record.
+mutated*. It does not establish that it *caused those divergences* — the "true fact
+adjacent to the failure" error §33 was written to record.
 
-Settled first-hand rather than by agent report. `hashkey` is **not** in the mutation
-`decls` list and its body is untouched by the live mutant, so it can be evaluated even
-with the gate running:
+Settled by direct execution rather than by agent report. `hashkey` is **not** in the
+mutation `decls` list and its body is untouched by the live mutant, so it can be evaluated
+even with the gate running:
 
 ```
 Lean:    hashkey (tuple [int 0])  =  Val.ref 0          -- an opaque reference
@@ -1765,21 +1739,21 @@ CPython: hashkey((0,))            =  ((0,),)            -- type _HashedTuple
 
 So the `_HashedTuple` divergence is **real, and independent of mutation**. §31 was right.
 
-And the contamination is *also* real — in the current tree
+The contamination is *also* real — in the current tree
 `_DefaultSize.__getitem__` evaluates to `int 1` where the pristine body returns `int 0`,
-because that decl is live-mutated right now.
+because that decl is live-mutated.
 
 Both are true because they are **different runs**. Two agents each reported "5
 divergences" from separate invocations at separate times, one against a pristine subject
-in an isolated copy and one against the main repo mid-mutation. Neither was lying and
-neither was wrong about its own run; the error was mine, in assuming two reports of the
-same *count* were reports of the same *event*.
+in an isolated copy and one against the main repo mid-mutation. Neither report was wrong
+about its own run; the error was assuming two reports of the same *count* were reports of
+the same *event*.
 
 The standing rule needs a clause. "The last divergence was the apparatus" (§27) is a
-prior, not a verdict — and applying it reflexively produced a wrong correction to a right
+prior, not a verdict — applying it reflexively produced a wrong correction to a right
 finding. A report is evidence about the run that produced it, and two runs are not
 comparable unless something ties them together. `conformance.json` now carries
-`measurement_basis`, `build_stable` and `mutation_in_progress` precisely so that a
+`measurement_basis`, `build_stable` and `mutation_in_progress` so that a
 future comparison can check whether it is entitled to compare.
 
 ### Standing hazard while agents run concurrently
@@ -1787,7 +1761,7 @@ future comparison can check whether it is entitled to compare.
 `Autoform/Generated/Cachetools.lean` currently has **238** functions while
 `ast-Cachetools.json` has **208**: a concurrent pipeline re-rendered the module from an
 AST that is not the checked-in one, three separate times. Any `cachetools` conformance or
-ledger number produced right now describes a build that does not correspond to the
+ledger number produced in that state describes a build that does not correspond to the
 committed AST. `scripts/check_docs.py` reports this as STALE and should keep failing
 until the module is re-rendered from the AST and both are committed together.
 
@@ -1795,29 +1769,28 @@ until the module is re-rendered from the AST and both are committed together.
 
 §34 settled that the divergence is real: `hashkey (tuple [int 0])` was `Val.ref 0` where
 CPython's `hashkey(0)` is `(0,)`, of type `_HashedTuple`, and `== (0,)` is `True`. This
-section is the fix and, more usefully, why the cheap version of the fix does not exist.
+section is the fix, and why the cheaper version is not available.
 
 ### The representation, and why the other one is not available
 
-The obvious cheap move is `Obj.builtin : Option Val` — leave the instance a `Val.ref` and
-have equality consult the heap. **It is not implementable without a much larger change
-than the alternative**, and the reason is structural rather than aesthetic: `Val.beq`,
+The cheap option is `Obj.builtin : Option Val` — leave the instance a `Val.ref` and
+have equality consult the heap. It is not implementable without a larger change
+than the alternative, for structural reasons: `Val.beq`,
 `applyBinop`, `valIn` and `Val.truthy` are pure functions of values and do not take a
-`Heap`. They are also precisely the functions that have to agree with the builtin. Making
+`Heap`. They are also the functions that have to agree with the builtin. Making
 an `Obj` payload visible to them means threading a heap through `Val.beq` — which is the
 `BEq Val` instance, is called from `Val.beqL`/`beqP`, from `Stdlib`'s association-list
 helpers, and from dozens of `Refine.lean` theorems — and it leaves every one of those call
 sites able to *forget* to consult the heap. That is the silent-wrong shape this project
-keeps finding, bought at a higher price than the alternative.
+keeps finding, at a higher price than the alternative.
 
 So the payload lives in the value: `Val.bobj : String → Val → Val`, the class name plus
 the underlying `tuple`/`list`/`dict`/`str`. There is exactly one copy of the state and no
 way for a value and a heap object to disagree about it.
 
-The predicted cost of a new `Val` constructor — "every existing match goes non-exhaustive
-at once" — was **not** what the change cost. Lean flagged four matchers, all of which had
-catch-alls that were already honest. What it did cost was two things nobody would have
-predicted:
+The predicted cost of a new `Val` constructor — every existing match going non-exhaustive
+at once — was **not** what the change cost. Lean flagged four matchers, all of which had
+catch-alls that were already honest. The actual costs were:
 
 * Making `Val.truthy`, `Val.iterable` and `Stdlib.elems` *recursive* (`| .bobj _ v => f v`)
   compiles them through `brecOn`, and that broke ~30 `Refine.lean` proofs and the
@@ -1827,7 +1800,7 @@ predicted:
   the *first* argument or the definition falls off structural recursion into well-founded
   recursion, and a well-founded `Val.beq` is not reducible by `decide` — which
   `beq_float_nan_self` and much of `Refine.lean` depend on.
-* One case genuinely did not fit: `len` of a builtin-based instance. Adding it to
+* One case did not fit: `len` of a builtin-based instance. Adding it to
   `Stdlib.builtinCore` defeats the brute-force branch enumeration in
   `builtin_heap_unchanged`, and raising `maxHeartbeats` does not help. It is a **hole**
   with a test pinning it (`excluded_len`), not a silent `none`. `list`, `tuple`, `sorted`,
@@ -1838,23 +1811,22 @@ predicted:
 computation, so there is nothing to induct on), and `mcall` gains a `bobj` receiver case
 mirroring the `ref` one. `fuelMonoExclusions` is unchanged at `["Stmt.tryFinally"]`.
 
-### The refusals are the load-bearing part
+### The refusals
 
 `Val.beq` compares a `bobj` by contents and **ignores the class**, because CPython does:
 `A((0,)) == B((0,))` is `True` for two distinct subclasses of `tuple`. That is only sound
 for a class that does not override `__eq__`, so `allocBuiltin` **refuses** to build a
 `bobj` for a class that defines its own `__eq__` or `__init__`, emitting
 `alloc:builtin-base:<cls>:own-__eq__`. A refusal is a counted hole; honouring the class
-while ignoring the override would be a silent wrong answer of the exact kind this whole
-mechanism exists to remove. Same for `str(x)` of a non-string, `dict(pairs)`, a
-non-iterable argument, and more than one constructor argument.
+while ignoring the override would be a silent wrong answer. Same for `str(x)` of a
+non-string, `dict(pairs)`, a non-iterable argument, and more than one constructor argument.
 
-The feature is also **opt-in per class**: `Program.builtinBases` is empty by default, so a
-class the exporter did not record behaves exactly as before — an opaque `Val.ref`. Every
+The feature is **opt-in per class**: `Program.builtinBases` is empty by default, so a
+class the exporter did not record behaves as before — an opaque `Val.ref`. Every
 existing corpus is byte-for-byte unaffected, which is what makes the 113 `Refine.lean` and
-79 `SpecsGen` theorems a meaningful regression check rather than a coincidence.
+79 `SpecsGen` theorems a meaningful regression check.
 
-### What is still open, and it is the exporter
+### What is still open: the exporter
 
 `cartographer/export_ast.sc` now reads `TypeDecl.inheritsFromTypeFullName` and emits a
 `classBases` map on the module initializer; `render_lean.py` turns it into
@@ -1862,9 +1834,8 @@ existing corpus is byte-for-byte unaffected, which is what makes the 113 `Refine
 corpus source, so `ast-Cachetools.json` still carries no `classBases` and the shipped
 `Autoform/Generated/Cachetools.lean` therefore still has an empty `builtinBases`. The Lean
 side is demonstrated against the *committed* `hashkey` body with the one base supplied at
-the test site (`Autoform/BuiltinBase.lean`). That is a real gap and it is named rather
-than papered over: until the exporter is re-run, the capability exists and the corpus does
-not use it.
+the test site (`Autoform/BuiltinBase.lean`). Until the exporter is re-run, the capability
+exists and the corpus does not use it.
 
 `Autoform/Generated/Cachetools.lean` is also still stale against its AST (238 functions
 against 208, §34's standing hazard). Re-rendering it would delete declarations
@@ -1921,38 +1892,38 @@ implements CPython's binding rule. `applyFunc`/`applyClosure` gained a `kws` arg
 | **total** | **78** | **42** |
 
 Hole-free **159 → 179** of 208; verifiable core **94 → 100**. No other label rose — the
-outcome §29/§31 warn about (a category that moves rather than closes) did not happen here.
+outcome §29/§31 warn about (a category that moves rather than closes) did not occur.
 
 `Autoform/Contracts.lean`'s `methodkey_refinesUnder_value` is now
 **`methodkey_refines`, unconditional** (`Γ = []`, an ordinary `Refine.Refines`), on
 `[propext, Classical.choice, Quot.sound]`. The contract machinery is kept and re-pointed
 at `keysProgramHoled` — `methodkey` *as the transpiler used to emit it* — so the
-worked example is now explicitly historical.
+worked example is explicitly historical.
 
-### The part that is not a win: nine arguments were being dropped in silence
+### Nine arguments were being dropped in silence
 
 `**kwargs` and `k = v` arrive from `pysrc2cpg` with `ARGUMENT_INDEX = -1` and an
 `ARGUMENT_NAME`. The exporter selected arguments with `argumentIndex >= 1`, so **every
 keyword argument in the corpus was discarded without a hole and without a count** — the
-§31 category exactly: well-typed output that type-checked, counted as translated, and did
+§31 category: well-typed output that type-checked, counted as translated, and did
 the wrong thing. Nine sites, including `sorted(..., key = ...)` in `TTLCache.__setstate__`
 (sorted by the wrong key, silently) and `_wrapper(..., info = make_info)` in both
-`cached.decorator` and `cachedmethod.decorator`, where `_wrapper` really does have an
-`info` parameter and simply never received it.
+`cached.decorator` and `cachedmethod.decorator`, where `_wrapper` does have an
+`info` parameter and never received it.
 
-Those nine are now expressed. Two consequences are honest losses, not gains: a keyword
+Those nine are now expressed. Two consequences are losses, not gains: a keyword
 argument to a *modelled builtin* is now the named hole `call:<f>:keyword-to-builtin`
 rather than a silent drop, and `Consistent` gained a clause forbidding a hole
 implementation from being a bare argument form (see below), which narrows `RefinesUnder`.
 
-### An exporter precondition that is new and fails loudly
+### An exporter precondition that fails loudly
 
 `pysrc2cpg` marks `*args` with `IS_VARIADIC` and marks `**kwargs` with **nothing at all** —
 its parameter node is indistinguishable from an ordinary one by any graph property. What
 is present is `OFFSET`, so the exporter reads the source text at that offset and counts
 the `*`s. That makes `export_ast.sc` require the source tree the CPG was built from, and
-it `sys.error`s rather than falling back, because the fallback would be "treat `**kwargs`
-as a positional parameter", which is a silent mistranslation.
+it `sys.error`s rather than falling back, because the fallback would be treating
+`**kwargs` as a positional parameter, which is a silent mistranslation.
 
 ### Fuel monotonicity: no new exclusion
 
@@ -1961,7 +1932,7 @@ exclusion. The starred forms propagate `outOfFuel` like every other argument, so
 seven-way induction extends mechanically (three new `evalExpr` leaf cases, three new
 `evalList` head cases, and one `if` split in `applyFunc`/`applyClosure`).
 
-### One place the mechanism genuinely could not be stretched
+### One place the mechanism could not be stretched
 
 An `Impl` may not replace a hole with `starred`/`kwargE`/`dstarred`. Those are not
 expressions that produce a value — `f(*xs)` passes several arguments and `f(**d)` passes
@@ -1997,12 +1968,12 @@ been unsound, not merely imprecise.
 ### The anti-vacuity evidence
 
 `Autoform/CallingConvention.lean` is 20 `#eval`s against CPython 3.9.6, each carrying the
-value CPython actually printed, plus ten kernel-checked theorems. It covers `f(*[1,2])`,
+value CPython printed, plus ten kernel-checked theorems. It covers `f(*[1,2])`,
 `f(1,*[2])`, `def g(*a)` at 0/1/3 arguments, `def h(a,*rest)` (the interaction with a
 positional parameter, including the empty remainder), `k(**{'a':1})` vs `k(**{'z':9})`,
 all four forms in one call, `*` on a tuple and on a dict (which iterates keys), and the
 four `TypeError` cases. Every one agrees. Without it, a construct that always returned
-`unit` would have produced exactly the same hole table.
+`unit` would have produced the same hole table.
 
 ### What is *not* established
 
@@ -2014,7 +1985,75 @@ for the exporter is that a re-export reproduces the committed AST byte-for-byte 
 `scripts/check_render.py` passes on all 10 modules.
 
 
-## §36 — C: `for`, aggregate initializers, bitwise arithmetic, tail `goto`, and a data model
+## §37 — The first theorem about something other than `cachetools`
+
+`Autoform/Specs/V8Spec.lean` proves a property of `v8::base::bits::SignedMod32`, from
+`v8/src/base/bits.cc`, translated by the pipeline with no holes.
+
+V8's own header states the contract:
+
+> `SignedMod32(lhs, rhs)` … **If either `|rhs|` is zero or `|lhs|` is minint and `|rhs|`
+> is -1, it returns zero.**
+
+On x86, `INT_MIN % -1` raises `#DE` — the same trap as division by zero — so the property
+worth proving is that the guard covers the trapping inputs for *every* `lhs`, not for a
+sample.
+
+```lean
+theorem signedMod32_zero_divisor (lhs : Int) (k : Nat) :
+    (applyFunc C (k+9) [] smod32 none [.int lhs, .int 0] []).2 = .val (.int 0)
+```
+
+Universally quantified over `lhs` **and** over any fuel budget at least 9, so it is
+neither a statement about sampled inputs nor about one budget. Axiom basis
+`[propext, Classical.choice, Quot.sound]`, `#audit_axioms` clean, and `#audit_depends`
+confirms the proof mentions the translated function rather than proving something
+about nothing. The context carries an empty function table — `SignedMod32` calls nothing —
+which makes the theorem independent of the other 1,734 functions in the module.
+
+### What is *not* proved, and why it is a `def`
+
+The `rhs = -1` half is an open obligation, stated as a `Prop`-valued `def`. The `rhs = 0`
+case reduces because `0` is a literal; `-1` is `Expr.unop "-" (lit 1)`, so the guard's
+second disjunct routes through `NumConfig.c32Wrapv.neg` and `simp` did not close it with
+the numeric model unfolded. The *behaviour* is pinned at three inputs including `INT_MIN`
+via `#guard_msgs` (which fails the build on change and, unlike `native_decide`, adds no
+axiom). Pinning three points is a weaker claim than a universally quantified proof, and
+the two must not be confused.
+
+### A structural limit this exposed
+
+**Only one generated corpus can be in a single import graph.** Every
+`Autoform/Generated/<M>.lean` defines `Autoform.Generated.program`, so importing two of
+them fails with "environment already contains 'Autoform.Generated.program'". `V8Spec`
+therefore builds standalone (`lake build Autoform.Specs.V8Spec`) and is deliberately NOT
+in `Autoform.lean`'s import list.
+
+This is acceptable for one corpus and blocks the goal for many: a repository that proves
+things about V8 *and* Linux *and* Ansible cannot put those proofs in one build today. The
+fix is to give each generated module its own namespace rather than a shared `program`,
+which is a mechanical change to `render_lean.py` and every spec that names `program` —
+recorded here rather than done, because it invalidates the committed proofs about
+`cachetools` until they are re-pointed.
+
+### An error that produced a theorem
+
+An `open ... in` scoped to only the first declaration left the second unable to resolve
+its identifier. Lean reported the error **and admitted the theorem anyway**, so
+`#print axioms` showed `sorryAx` in the basis of a theorem that looked proved. The build
+was red, so nothing shipped — but in one file among many with its output scrolled past,
+only the axiom check would have caught it. That is the third time this session a
+green-looking result was false, after the mutation-gate regex and the conflict-marked
+module that built from a cached `.olean`.
+
+
+## §38 — C: `for`, aggregate initializers, bitwise arithmetic, tail `goto`, and a data model
+
+*(Written as a second "§36" and renumbered here. Commit `f6085ce` cites it as §36; the
+`op:starredUnpack` section above is the other §36.)*
+
+*(Numbering note: this is the second section numbered §36 in the source. Both are
+preserved as written.)*
 
 Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), V8
 `src/base`, and — for the two that are not C-specific — Ansible.
@@ -2032,24 +2071,24 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
 * **Brace initializers.** `{1,2,3}` is `Expr.listE`; `{ .a = 1, .b = 2 }` is `Expr.dictE`
   keyed by the field names, with `Dialect.fieldsOnDicts` making `s.a` read it back under a
   C-family dialect only (in Python `{'a':1}.a` is an `AttributeError` and stays a hole).
-  A struct literal really is a finite map from field names to values and C copies structs
+  A struct literal is a finite map from field names to values and C copies structs
   by value, so value semantics is the right semantics. `{ [IDX] = v }` — an *index*
   designator — is refused (`op:arrayInitializer:index-designator`): reading it
   positionally would put the right value in the wrong place. `T x[N]` in declaration
   position wears the same CPG operator and is not an initializer at all; it is now
-  `op:arrayDecl:size`, still a hole, because modelling it needs the size model this
+  `op:arrayDecl:size`, still a hole, because modelling it needs a size model this
   project does not have.
 
 * **Bitwise operators.** `&`, `|`, `^`, `<<`, `>>`, `>>>` and `~` are now real
-  operations on `NumConfig`, not holes and emphatically not the logical operators. See the
-  §-note above on `<operator>.and`. `>>` is the one that needs the operand's *type*: it is
+  operations on `NumConfig`, not holes and not the logical operators. See the
+  §-note above on `<operator>.and`. `>>` needs the operand's *type*: it is
   arithmetic on a signed operand and logical on an unsigned one, Joern spells both
   `arithmeticShiftRight`, and a `Val.int` has no signedness — so the exporter chooses from
   the static type and emits `op:shiftRight:unknown-signedness` when it cannot.
 
 * **`goto`, partially.** A *forward* jump to a *single* label that is a *direct child of
   the function body*, with no jump inside a loop or switch, is `while (true) { prefix;
-  break } suffix` — structured control flow wearing an unstructured spelling. Everything
+  break } suffix` — structured control flow with an unstructured spelling. Everything
   else keeps `control:GOTO`. On `crypto/` that is 114 of 434; on `lib/`, 83 of 402. Each
   condition is load-bearing and each one, dropped, gives a wrong answer rather than a
   hole: a `break` inside a real loop leaves *that* loop.
@@ -2068,7 +2107,7 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
   `(long)x` is `unop "cast:i64"` under LP64 and `"cast:i32"` under LLP64.
 
   The exactly-sized kernel spellings `s8`..`u64` and `__s8`..`__u64` were added to the
-  model-*independent* table, since those names exist precisely to be target-invariant.
+  model-*independent* table, since those names exist to be target-invariant.
   `__le32`/`__be32` were **not**: their value is byte-swapped as well as narrowed, and
   modelling only the narrowing would be half a translation.
 
@@ -2076,63 +2115,36 @@ Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), 
 `cast:i64` value that then takes part in `+` is wrapped back to 32 bits. The cast is now
 right; the arithmetic around it is still under the two-constructor `Dialect` §29 records.
 
-## §37 — The first theorem about something other than `cachetools`
+## §39 — Reconciling the `cachetools` figures
 
-`Autoform/Specs/V8Spec.lean` proves a property of `v8::base::bits::SignedMod32`, from
-`v8/src/base/bits.cc`, translated by the pipeline with no holes.
+Sections above quote the verifiable core as 45, 69, 74, 94, 97, 100 and 101, and the
+function count as 208, 209, 233 and 238. They are consistent as a sequence and confusing
+as a set, because both the numerator and the denominator moved, sometimes in the same
+revision. This section states the current values and what moved.
 
-V8's own header states the contract:
+**Current, from `ledger-Cachetools.json`, regenerated after the last exporter change:**
 
-> `SignedMod32(lhs, rhs)` … **If either `|rhs|` is zero or `|lhs|` is minint and `|rhs|`
-> is -1, it returns zero.**
+    functions        209
+    hole-free        180
+    verifiable core  101
+    holes            40
 
-That guard is not decoration. On x86, `INT_MIN % -1` raises `#DE` — the same trap as
-division by zero — so the property worth proving is that the guard covers the trapping
-inputs for *every* `lhs`, not for a sample.
+What moved the denominator: `<metaClassCallHandler>` synthetics were excluded (§31),
+removing 30 functions of which 18 had counted as hole-free — padding in both the numerator
+and the denominator, and no real coverage either way.
 
-```lean
-theorem signedMod32_zero_divisor (lhs : Int) (k : Nat) :
-    (applyFunc C (k+9) [] smod32 none [.int lhs, .int 0] []).2 = .val (.int 0)
-```
+What moved the numerator, in order: `Ctx.resolvable` was split by dispatch path so free
+calls use `Ctx.resolve`'s unique-match rule (§30, core down to 69); the exporter began
+emitting Joern's resolved `fullName` so the exact match fires (§31, up to 97);
+`op:starredUnpack` closed (§36); module objects and import resolution closed most of the
+Python import holes.
 
-Universally quantified over `lhs` **and** over any fuel budget at least 9, so it is
-neither a statement about sampled inputs nor about one budget. Axiom basis
-`[propext, Classical.choice, Quot.sound]`, `#audit_axioms` clean, and `#audit_depends`
-confirms the proof actually mentions the translated function rather than proving something
-about nothing. The context carries an empty function table — `SignedMod32` calls nothing —
-which makes the theorem independent of the other 1,734 functions in the module.
+**A figure in an earlier section is a snapshot, not a claim about today.** Only
+`ledger-Cachetools.json` is authoritative, `scripts/check_docs.py` compares eight
+documented figures against it and fails on a mismatch, and `scripts/check_render.py`
+verifies the module those figures describe is a render of the checked-in AST.
 
-### What is *not* proved, and why it is a `def`
-
-The `rhs = -1` half is an open obligation, stated as a `Prop`-valued `def`. The `rhs = 0`
-case reduces because `0` is a literal; `-1` is `Expr.unop "-" (lit 1)`, so the guard's
-second disjunct routes through `NumConfig.c32Wrapv.neg` and `simp` did not close it with
-the numeric model unfolded. The *behaviour* is pinned at three inputs including `INT_MIN`
-via `#guard_msgs` (which fails the build on change and, unlike `native_decide`, adds no
-axiom) — but pinning three points is a weaker claim than a universally quantified proof,
-and the two must not be confused.
-
-### A structural limit this exposed
-
-**Only one generated corpus can be in a single import graph.** Every
-`Autoform/Generated/<M>.lean` defines `Autoform.Generated.program`, so importing two of
-them fails with "environment already contains 'Autoform.Generated.program'". `V8Spec`
-therefore builds standalone (`lake build Autoform.Specs.V8Spec`) and is deliberately NOT
-in `Autoform.lean`'s import list.
-
-This is fine for one corpus and blocks the goal for many: a repository that proves things
-about V8 *and* Linux *and* Ansible cannot put those proofs in one build today. The fix is
-to give each generated module its own namespace rather than a shared `program`, which is a
-mechanical change to `render_lean.py` and every spec that names `program` — recorded here
-rather than done, because it invalidates the committed proofs about `cachetools` until
-they are re-pointed.
-
-### An error that produced a theorem
-
-While writing this, an `open ... in` scoped to only the first declaration left the second
-unable to resolve its identifier. Lean reported the error **and admitted the theorem
-anyway**, so `#print axioms` showed `sorryAx` in the basis of a theorem that looked
-proved. The build was red, so nothing shipped — but had it been one file among many with
-its output scrolled past, only the axiom check would have caught it. That is the third
-time this session a green-looking result was false, after the mutation-gate regex and the
-conflict-marked module that built from a cached `.olean`.
+Two smaller discrepancies remain unreconciled and are recorded rather than fixed:
+`skip_unencodable_args` is 534 in §25 and 521 in §26 with no stated cause, and §27 reports
+that category on a different basis again. Whether §34's 238-vs-208 hazard is still live is
+answered by running `scripts/check_render.py`, which currently passes 11/11.
