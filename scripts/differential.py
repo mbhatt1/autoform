@@ -301,6 +301,19 @@ def build_lineno_index(src_root, wanted_files):
     Python 3.9 has no `co_qualname`, so we recover the qualified name from the source
     with the `ast` module and key on the code object's `co_firstlineno`."""
     import ast as pyast
+
+    def mangle(name, cls):
+        """CPython private name mangling: inside `class C`, `__x` becomes `_C__x`.
+
+        The transpiler applies this rule, so the qualnames recovered here must too —
+        otherwise a traced call to `LFUCache.__touch` never matches the translated
+        `LFUCache._LFUCache__touch` and the function is silently dropped from the oracle's
+        reach. Two or more leading underscores, at most one trailing."""
+        if cls is None: return name
+        if not name.startswith("__"): return name
+        if name.endswith("__"): return name
+        return "_" + cls.lstrip("_") + name
+
     idx = {}
     for rel in wanted_files:
         path = os.path.join(src_root, rel)
@@ -311,20 +324,21 @@ def build_lineno_index(src_root, wanted_files):
             continue
         stack = []
 
-        def walk(node, prefix):
+        def walk(node, prefix, cls):
             for ch in pyast.iter_child_nodes(node):
                 if isinstance(ch, (pyast.FunctionDef, pyast.AsyncFunctionDef)):
-                    qual = prefix + ch.name
+                    qual = prefix + mangle(ch.name, cls)
                     # decorators shift co_firstlineno to the first decorator line
                     lines = [ch.lineno] + [d.lineno for d in ch.decorator_list]
                     for ln in lines:
                         idx.setdefault((os.path.abspath(path), ln), (rel, qual))
-                    walk(ch, qual + ".")
+                    # a nested def does not change the mangling class
+                    walk(ch, qual + ".", cls)
                 elif isinstance(ch, pyast.ClassDef):
-                    walk(ch, prefix + ch.name + ".")
+                    walk(ch, prefix + ch.name + ".", ch.name)
                 else:
-                    walk(ch, prefix)
-        walk(tree, "")
+                    walk(ch, prefix, cls)
+        walk(tree, "", None)
     return idx
 
 

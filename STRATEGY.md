@@ -1213,3 +1213,60 @@ reached by the test suite" skips are unrelated to globals and did not move.
 Dominant inconclusive labels, i.e. what would buy the most oracle reach next:
 `setField:non-object` (49), `call:set` (25), `mcall:__init__:non-object` (20),
 `in:non-container` (15).
+
+## 26. Name mangling, and a fix that paid for itself twice
+
+CPython rewrites `__name` to `_ClassName__name` inside a class body, at compile time. The
+transpiler did not, so `Cache.maxsize` read a field that does not exist and returned
+`unit` where CPython returned `2`. Sixteen divergences, one root cause.
+
+The fix hooks in at exactly two places — `asField` (the single source of the attribute
+name for `field`, `setField` *and* `mcall`) and `mangledFullName` (the last segment of a
+method's `fullName`) — so **references and definitions move together**. Getting only one
+side would have converted a silent wrong answer into a silent unresolvable call, which is
+not obviously an improvement. Verified against CPython `__dict__` on a purpose-built
+corpus: `__priv`, `___three`, `__trail_` mangle; `__dun__` and `_one` do not; the
+mangling class is the *lexically enclosing* class, not the receiver's, which is what makes
+`Cache.__getitem__` reach `_Cache__data` even when `self` is an `LRUCache`.
+
+Hole counts are **completely unchanged** — mangling is a renaming, not a coverage change.
+Divergences went to **zero**.
+
+### The second payoff
+
+The harness recovers qualified names from the source AST (Python 3.9 has no
+`co_qualname`), and it was not mangling them — so a traced call to `LFUCache.__touch`
+never matched the translated `LFUCache._LFUCache__touch`, and two functions were silently
+dropped from the oracle's reach. Applying the same rule there restored them, and one of
+the two restored functions **immediately produced a new divergence**:
+
+    LFUCache._LFUCache__touch(tuple[ref 6]): cpython = unit, lean raised KeyError
+
+So the coverage fix and the bug it found were the same change. That is the general shape
+worth noticing: *the oracle's blind spots and the artifact's bugs are correlated, because
+both come from the same unmodelled language rule.* Fixing reach is not separate from
+finding defects; it is how you find them.
+
+### That last divergence is the apparatus, not the artifact
+
+`__touch` begins `link = self.__links[key]`. The `key` argument arrives encoded as an
+object reference (a `_HashedTuple` — a tuple subclass — snapshotted as a heap object),
+while the keys stored inside the receiver's `__links` dict were encoded as tuple *values*.
+`Val.beq` cannot equate `.ref n` with `.tuple [...]`, the lookup misses, and Core raises
+`KeyError` where CPython succeeds.
+
+The deeper defect is that the representability check applies to top-level arguments but
+not to values nested inside a receiver's fields, so an unrepresentable nested value can
+surface as a *confident divergence*. **An oracle must not report a disagreement it caused
+itself** — the same discipline as §19's stale `.olean` and the receiver-alias guard of
+§25, one level further in.
+
+### Ceilings, restated with current numbers
+
+`skip_self_not_object` 1,527 · `skip_unencodable_args` 521 · `skip_varargs` 340 ·
+`skip_no_instance` 57. These now dominate, and they bound how much of a real Python
+codebase this oracle can reach *regardless* of translation coverage.
+
+One practical note: `find_tests` did not locate `tests/` when given the repo root, because
+the AST paths are relative to `src/`. The `src/`-layout-with-sibling-tests arrangement is
+the modern default, so discovery needs to walk up from `src_root`.

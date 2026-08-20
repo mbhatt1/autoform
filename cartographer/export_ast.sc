@@ -83,6 +83,61 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case _       => false
   }
 
+  // ---- Python private name mangling -----------------------------------------
+  //
+  // Inside a class body, CPython rewrites any identifier with **two or more leading
+  // underscores and at most one trailing underscore** to `_<Class><name>`, with leading
+  // underscores stripped from the class name. So `self.__maxsize` in `class Cache` is
+  // really the attribute `_Cache__maxsize`, and `class _Foo`'s `__bar` is `_Foo__bar`.
+  //
+  // The CPG carries the *unmangled* source text on every FIELD_IDENTIFIER, so translating
+  // it literally produces a read that misses and yields `unit` — the silently-wrong
+  // category, not the absent category. This is the same shape as the `floorDiv` and
+  // `<operator>.and` finds.
+  //
+  // The rewrite is **lexical and compile-time**: it depends on where the code is written,
+  // not on the receiver's runtime class. That is exactly why it matters here — `Cache`'s
+  // methods reach `_Cache__data` even when `self` is an `LRUCache`.
+  //
+  // A class's lexical path is its TypeDecl `fullName`, so the enclosing class is found the
+  // same way closures found their enclosing function: walk the `fullName` prefixes and
+  // test *membership* in a map of known full names, taking the simple name from the node
+  // rather than splitting the string (see `enclosingFunctionBindings` for why).
+  val classByFullName: Map[String, String] =
+    cpg.typeDecl.isExternal(false).l
+      .filter(_.method.name.l.contains("<body>"))
+      .map(t => t.fullName -> t.name).toMap
+
+  val enclClassCache = collection.mutable.HashMap.empty[String, Option[String]]
+
+  /** The innermost class lexically enclosing `fn`, by simple name. */
+  def enclosingClassOf(fn: String): Option[String] =
+    enclClassCache.getOrElseUpdate(fn, {
+      def go(cur: String): Option[String] = {
+        val i = cur.lastIndexOf('.')
+        if (i < 0) None
+        else {
+          val parent = cur.substring(0, i)
+          classByFullName.get(parent).orElse(go(parent))
+        }
+      }
+      go(fn)
+    })
+
+  /** CPython's rule, exactly: 2+ leading underscores, at most one trailing. `__x__` and
+    * `_x` are untouched; a class whose name is all underscores does not mangle. */
+  def mangleName(name: String, cls: Option[String]): String = cls match {
+    case Some(c) if name.startsWith("__") && !name.endsWith("__") =>
+      val bare = c.dropWhile(_ == '_')
+      if (bare.isEmpty) name else "_" + bare + name
+    case _ => name
+  }
+
+  /** The class lexically enclosing the method currently being translated. Mangling is a
+    * property of the *writing* site, so this is the method's own class, never the
+    * receiver's. */
+  var currentClass: Option[String] = None
+
   /** `e.f` — a fieldAccess is [receiver, FIELD_IDENTIFIER], except that when the Python
     * frontend has *resolved* the attribute it prepends the resolved METHOD_REF/TYPE_REF,
     * giving [METHOD_REF, receiver, FIELD_IDENTIFIER]. */
@@ -90,7 +145,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case c: Call if c.methodFullName == "<operator>.fieldAccess" =>
       val k = kidsOf(c)
       k.lastOption match {
-        case Some(f: FieldIdentifier) if k.size >= 2 => Some((k(k.size - 2), f.canonicalName))
+        // The attribute name is mangled here, once, so every consumer — `field`,
+        // `setField`, and the `mcall` method name, which all read it from this one
+        // place — stays consistent with the definition names mangled below.
+        case Some(f: FieldIdentifier) if k.size >= 2 =>
+          Some((k(k.size - 2), mangleName(f.canonicalName, currentClass)))
         case _                                       => None
       }
     case _ => None
@@ -222,9 +281,24 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     m.fullName -> freeOf(m.fullName).intersect(enclosingFunctionBindings(m.fullName)).nonEmpty
   }.toMap
 
-  def fnValue(target: String): ujson.Obj =
-    if (capturesEnv.getOrElse(target, false)) ujson.Obj("k" -> "closure", "f" -> target)
-    else ujson.Obj("k" -> "fnref", "v" -> target)
+  /** A method *definition* mangles too: `def __touch` in `class LRUCache` is stored as
+    * `_LRUCache__touch`. Reference and definition must be mangled together — mangling
+    * only the reference would trade a silently-wrong field read for a silently
+    * unresolvable call, which is not an improvement. */
+  def mangledFullName(fn: String): String = methodByName.get(fn) match {
+    case Some(m) if fn.endsWith(m.name) =>
+      val mg = mangleName(m.name, enclosingClassOf(fn))
+      if (mg == m.name) fn else fn.dropRight(m.name.length) + mg
+    case _ => fn
+  }
+
+  /** `target` is the *unmangled* CPG fullName: capture analysis is keyed on it, and the
+    * emitted name is mangled on the way out so it matches the exported definition. */
+  def fnValue(target: String): ujson.Obj = {
+    val out = mangledFullName(target)
+    if (capturesEnv.getOrElse(target, false)) ujson.Obj("k" -> "closure", "f" -> out)
+    else ujson.Obj("k" -> "fnref", "v" -> out)
+  }
 
   /** A class used as a value. Usually an `fnref` — but a class *defined inside a
     * function* whose methods read that function's variables is a capturing value too, and
@@ -620,16 +694,18 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
-    moduleScope = isModule
-    cLikeFile   = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    moduleScope  = isModule
+    currentClass = enclosingClassOf(m.fullName)
+    cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     declaredGlobals =
       m.body.ast.collect { case u: Unknown if u.code.trim.startsWith("global ") => u }
         .flatMap(globalDeclNames).toSet
     val body = stmt(m.body)
     moduleScope = false
+    currentClass = None
     declaredGlobals = Set.empty
     ujson.Obj(
-      "name"   -> m.fullName,
+      "name"   -> mangledFullName(m.fullName),
       "file"   -> m.filename,
       "params" -> ujson.Arr.from(m.parameter.name.l.filterNot(_ == "self")),
       "body"   -> body

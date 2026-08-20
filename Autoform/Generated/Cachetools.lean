@@ -59,16 +59,16 @@ def f_cachetools___init___py__module__Cache___init__ : Func :=
                   (.fnref "cachetools/__init__.py:<module>.Cache.getsizeof"))
                 (.seq
                   (.assign "tmp0" (.dictE []))
-                  (.setField (.name "self") "__size" (.name "tmp0")))
+                  (.setField (.name "self") "_Cache__size" (.name "tmp0")))
                 .skip)
               (.seq
                 (.seq
                   (.assign "tmp1" (.dictE []))
-                  (.setField (.name "self") "__data" (.name "tmp1")))
+                  (.setField (.name "self") "_Cache__data" (.name "tmp1")))
                 (.seq
-                  (.setField (.name "self") "__currsize" (.lit (.int 0)))
+                  (.setField (.name "self") "_Cache__currsize" (.lit (.int 0)))
                   (.seq
-                    (.setField (.name "self") "__maxsize" (.name "maxsize"))
+                    (.setField (.name "self") "_Cache__maxsize" (.name "maxsize"))
                     (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__repr__`  (from `cachetools/__init__.py`) -/
@@ -82,9 +82,9 @@ def f_cachetools___init___py__module__Cache___repr__ : Func :=
                 (.lit (.str "%s(%s, maxsize=%r, currsize=%r)"))
                 (.tupleE
                   [ (.field (.call "type" [(.name "self")]) "__name__")
-                  , (.call "repr" [(.field (.name "self") "__data")])
-                  , (.field (.name "self") "__maxsize")
-                  , (.field (.name "self") "__currsize") ])))
+                  , (.call "repr" [(.field (.name "self") "_Cache__data")])
+                  , (.field (.name "self") "_Cache__maxsize")
+                  , (.field (.name "self") "_Cache__currsize") ])))
             (.seq .skip .skip)) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__getitem__`  (from `cachetools/__init__.py`) -/
@@ -92,7 +92,7 @@ def f_cachetools___init___py__module__Cache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__getitem__"
   , params := ["key"]
   , body := (.tryCatch
-            (.ret (.index (.field (.name "self") "__data") (.name "key")))
+            (.ret (.index (.field (.name "self") "_Cache__data") (.name "key")))
             "__exc"
             (.ret (.mcall (.name "self") "__missing__" [(.name "key")]))) }
 
@@ -101,7 +101,7 @@ def f_cachetools___init___py__module__Cache___setitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__setitem__"
   , params := ["key", "value"]
   , body := (.seq
-            (.assign "maxsize" (.field (.name "self") "__maxsize"))
+            (.assign "maxsize" (.field (.name "self") "_Cache__maxsize"))
             (.seq
               .skip
               (.seq
@@ -125,7 +125,7 @@ def f_cachetools___init___py__module__Cache___setitem__ : Func :=
                           .skip
                           (.seq
                             (.ifte
-                              (.inOp true (.name "key") (.field (.name "self") "__data"))
+                              (.inOp true (.name "key") (.field (.name "self") "_Cache__data"))
                               (.seq
                                 (.assign "diffsize" (.name "size"))
                                 (.loop
@@ -133,7 +133,7 @@ def f_cachetools___init___py__module__Cache___setitem__ : Func :=
                                     ">"
                                     (.binop
                                       "+"
-                                      (.field (.name "self") "__currsize")
+                                      (.field (.name "self") "_Cache__currsize")
                                       (.name "diffsize"))
                                     (.name "maxsize"))
                                   (.expr (.mcall (.name "self") "popitem" []))))
@@ -143,37 +143,40 @@ def f_cachetools___init___py__module__Cache___setitem__ : Func :=
                                   (.binop
                                     "-"
                                     (.name "size")
-                                    (.index (.field (.name "self") "__size") (.name "key"))))
+                                    (.index (.field (.name "self") "_Cache__size") (.name "key"))))
                                 (.loop
                                   (.binop
                                     ">"
                                     (.binop
                                       "+"
-                                      (.field (.name "self") "__currsize")
+                                      (.field (.name "self") "_Cache__currsize")
                                       (.name "diffsize"))
                                     (.name "maxsize"))
                                   (.seq
                                     (.expr (.mcall (.name "self") "popitem" []))
                                     (.ifte
-                                      (.inOp true (.name "key") (.field (.name "self") "__data"))
+                                      (.inOp
+                                        true
+                                        (.name "key")
+                                        (.field (.name "self") "_Cache__data"))
                                       (.assign "diffsize" (.name "size"))
                                       .skip)))))
                             (.seq
                               (.setIndex
-                                (.field (.name "self") "__data")
+                                (.field (.name "self") "_Cache__data")
                                 (.name "key")
                                 (.name "value"))
                               (.seq
                                 (.setIndex
-                                  (.field (.name "self") "__size")
+                                  (.field (.name "self") "_Cache__size")
                                   (.name "key")
                                   (.name "size"))
                                 (.setField
                                   (.name "self")
-                                  "__currsize"
+                                  "_Cache__currsize"
                                   (.binop
                                     "+"
-                                    (.field (.name "self") "__currsize")
+                                    (.field (.name "self") "_Cache__currsize")
                                     (.name "diffsize")))))))))))))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__delitem__`  (from `cachetools/__init__.py`) -/
@@ -182,7 +185,7 @@ def f_cachetools___init___py__module__Cache___delitem__ : Func :=
   , params := ["key"]
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.field (.name "self") "__size"))
+              (.assign "tmp0" (.field (.name "self") "_Cache__size"))
               (.assign "size" (.mcall (.name "tmp0") "pop" [(.name "key")])))
             (.seq
               .skip
@@ -192,14 +195,14 @@ def f_cachetools___init___py__module__Cache___delitem__ : Func :=
                   .skip
                   (.setField
                     (.name "self")
-                    "__currsize"
-                    (.binop "-" (.field (.name "self") "__currsize") (.name "size"))))))) }
+                    "_Cache__currsize"
+                    (.binop "-" (.field (.name "self") "_Cache__currsize") (.name "size"))))))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__contains__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___contains__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__contains__"
   , params := ["key"]
-  , body := (.ret (.inOp false (.name "key") (.field (.name "self") "__data"))) }
+  , body := (.ret (.inOp false (.name "key") (.field (.name "self") "_Cache__data"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__missing__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___missing__ : Func :=
@@ -211,13 +214,13 @@ def f_cachetools___init___py__module__Cache___missing__ : Func :=
 def f_cachetools___init___py__module__Cache___iter__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__iter__"
   , params := []
-  , body := (.seq (.ret (.call "iter" [(.field (.name "self") "__data")])) .skip) }
+  , body := (.seq (.ret (.call "iter" [(.field (.name "self") "_Cache__data")])) .skip) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__len__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___len__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__len__"
   , params := []
-  , body := (.seq (.ret (.call "len" [(.field (.name "self") "__data")])) .skip) }
+  , body := (.seq (.ret (.call "len" [(.field (.name "self") "_Cache__data")])) .skip) }
 
 /-- `cachetools/__init__.py:<module>.Cache.get`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache_get : Func :=
@@ -239,7 +242,7 @@ def f_cachetools___init___py__module__Cache_pop : Func :=
                 (.assign "value" (.index (.name "self") (.name "key")))
                 (.hole "op:delete-index"))
               (.ifte
-                (.isOp false (.name "default") (.field (.name "self") "__marker"))
+                (.isOp false (.name "default") (.field (.name "self") "_Cache__marker"))
                 (.raise (.call "KeyError" [(.name "key")]))
                 (.assign "value" (.name "default"))))
             (.seq .skip (.seq (.ret (.name "value")) .skip))) }
@@ -265,15 +268,15 @@ def f_cachetools___init___py__module__Cache_clear : Func :=
   , params := []
   , body := (.seq
             (.seq
-              (.assign "tmp0" (.field (.name "self") "__data"))
+              (.assign "tmp0" (.field (.name "self") "_Cache__data"))
               (.expr (.mcall (.name "tmp0") "clear" [])))
             (.seq
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp1" (.field (.name "self") "__size"))
+                  (.assign "tmp1" (.field (.name "self") "_Cache__size"))
                   (.expr (.mcall (.name "tmp1") "clear" [])))
-                (.seq .skip (.setField (.name "self") "__currsize" (.lit (.int 0))))))) }
+                (.seq .skip (.setField (.name "self") "_Cache__currsize" (.lit (.int 0))))))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.maxsize`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache_maxsize : Func :=
@@ -281,7 +284,7 @@ def f_cachetools___init___py__module__Cache_maxsize : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The maximum size of the cache.\"\"")))
-            (.ret (.field (.name "self") "__maxsize"))) }
+            (.ret (.field (.name "self") "_Cache__maxsize"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.currsize`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache_currsize : Func :=
@@ -289,7 +292,7 @@ def f_cachetools___init___py__module__Cache_currsize : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The current size of the cache.\"\"")))
-            (.ret (.field (.name "self") "__currsize"))) }
+            (.ret (.field (.name "self") "_Cache__currsize"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.getsizeof`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache_getsizeof : Func :=
@@ -319,7 +322,9 @@ def f_cachetools___init___py__module__FIFOCache___init__ : Func :=
                 (.name "Cache")
                 "__init__"
                 [(.name "self"), (.name "maxsize"), (.name "getsizeof")]))
-            (.seq (.setField (.name "self") "__order" (.alloc "OrderedDict" [])) (.seq .skip .skip))) }
+            (.seq
+              (.setField (.name "self") "_FIFOCache__order" (.alloc "OrderedDict" []))
+              (.seq .skip .skip))) }
 
 /-- `cachetools/__init__.py:<module>.FIFOCache.__setitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__FIFOCache___setitem__ : Func :=
@@ -330,11 +335,11 @@ def f_cachetools___init___py__module__FIFOCache___setitem__ : Func :=
             (.seq
               .skip
               (.ifte
-                (.inOp false (.name "key") (.field (.name "self") "__order"))
+                (.inOp false (.name "key") (.field (.name "self") "_FIFOCache__order"))
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__order"))
+                  (.assign "tmp0" (.field (.name "self") "_FIFOCache__order"))
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
-                (.setIndex (.field (.name "self") "__order") (.name "key") (.lit .unit))))) }
+                (.setIndex (.field (.name "self") "_FIFOCache__order") (.name "key") (.lit .unit))))) }
 
 /-- `cachetools/__init__.py:<module>.FIFOCache.__delitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__FIFOCache___delitem__ : Func :=
@@ -365,7 +370,7 @@ def f_cachetools___init___py__module__FIFOCache_clear : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__order"))
+                  (.assign "tmp0" (.field (.name "self") "_FIFOCache__order"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 .skip))) }
 
@@ -423,7 +428,7 @@ def f_cachetools___init___py__module__LFUCache___init__ : Func :=
               (.seq
                 (.assign "tmp0" (.mcall (.name "LFUCache") "_Link" [(.lit (.int 0))]))
                 (.seq
-                  (.setField (.name "self") "__root" (.name "tmp0"))
+                  (.setField (.name "self") "_LFUCache__root" (.name "tmp0"))
                   (.assign "root" (.name "tmp0"))))
               (.seq
                 (.seq
@@ -436,7 +441,7 @@ def f_cachetools___init___py__module__LFUCache___init__ : Func :=
                   (.seq
                     (.seq
                       (.assign "tmp2" (.dictE []))
-                      (.setField (.name "self") "__links" (.name "tmp2")))
+                      (.setField (.name "self") "_LFUCache__links" (.name "tmp2")))
                     (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))) }
 
 /-- `cachetools/__init__.py:<module>.LFUCache.__getitem__`  (from `cachetools/__init__.py`) -/
@@ -450,7 +455,7 @@ def f_cachetools___init___py__module__LFUCache___getitem__ : Func :=
               (.seq
                 (.ifte
                   (.inOp false (.name "key") (.name "self"))
-                  (.expr (.mcall (.name "self") "__touch" [(.name "key")]))
+                  (.expr (.mcall (.name "self") "_LFUCache__touch" [(.name "key")]))
                   .skip)
                 (.ret (.name "value"))))) }
 
@@ -464,15 +469,15 @@ def f_cachetools___init___py__module__LFUCache___setitem__ : Func :=
               .skip
               (.seq
                 (.ifte
-                  (.inOp false (.name "key") (.field (.name "self") "__links"))
+                  (.inOp false (.name "key") (.field (.name "self") "_LFUCache__links"))
                   (.seq
-                    (.expr (.mcall (.name "self") "__touch" [(.name "key")]))
+                    (.expr (.mcall (.name "self") "_LFUCache__touch" [(.name "key")]))
                     (.ret (.lit .unit)))
                   .skip)
                 (.seq
                   .skip
                   (.seq
-                    (.assign "root" (.field (.name "self") "__root"))
+                    (.assign "root" (.field (.name "self") "_LFUCache__root"))
                     (.seq
                       .skip
                       (.seq
@@ -506,7 +511,7 @@ def f_cachetools___init___py__module__LFUCache___setitem__ : Func :=
                                   (.assign "tmp1" (.field (.name "link") "keys"))
                                   (.expr (.mcall (.name "tmp1") "add" [(.name "key")])))
                                 (.setIndex
-                                  (.field (.name "self") "__links")
+                                  (.field (.name "self") "_LFUCache__links")
                                   (.name "key")
                                   (.name "link"))))))))))))) }
 
@@ -520,7 +525,7 @@ def f_cachetools___init___py__module__LFUCache___delitem__ : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__links"))
+                  (.assign "tmp0" (.field (.name "self") "_LFUCache__links"))
                   (.assign "link" (.mcall (.name "tmp0") "pop" [(.name "key")])))
                 (.seq
                   .skip
@@ -546,7 +551,7 @@ def f_cachetools___init___py__module__LFUCache_popitem : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "root" (.field (.name "self") "__root"))
+                (.assign "root" (.field (.name "self") "_LFUCache__root"))
                 (.seq
                   .skip
                   (.seq
@@ -587,7 +592,7 @@ def f_cachetools___init___py__module__LFUCache_clear : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "root" (.field (.name "self") "__root"))
+                (.assign "root" (.field (.name "self") "_LFUCache__root"))
                 (.seq
                   .skip
                   (.seq
@@ -600,20 +605,20 @@ def f_cachetools___init___py__module__LFUCache_clear : Func :=
                       .skip
                       (.seq
                         (.seq
-                          (.assign "tmp1" (.field (.name "self") "__links"))
+                          (.assign "tmp1" (.field (.name "self") "_LFUCache__links"))
                           (.expr (.mcall (.name "tmp1") "clear" [])))
                         .skip))))))) }
 
-/-- `cachetools/__init__.py:<module>.LFUCache.__touch`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__LFUCache___touch : Func :=
-  { name := "cachetools/__init__.py:<module>.LFUCache.__touch"
+/-- `cachetools/__init__.py:<module>.LFUCache._LFUCache__touch`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module__LFUCache__LFUCache__touch : Func :=
+  { name := "cachetools/__init__.py:<module>.LFUCache._LFUCache__touch"
   , params := ["key"]
   , body := (.seq
             (.expr (.lit (.str "\"\"Increment use count\"\"")))
             (.seq
               .skip
               (.seq
-                (.assign "link" (.index (.field (.name "self") "__links") (.name "key")))
+                (.assign "link" (.index (.field (.name "self") "_LFUCache__links") (.name "key")))
                 (.seq
                   .skip
                   (.seq
@@ -681,7 +686,7 @@ def f_cachetools___init___py__module__LFUCache___touch : Func :=
                                     (.seq
                                       .skip
                                       (.setIndex
-                                        (.field (.name "self") "__links")
+                                        (.field (.name "self") "_LFUCache__links")
                                         (.name "key")
                                         (.name "curr")))))))))))))))) }
 
@@ -705,7 +710,9 @@ def f_cachetools___init___py__module__LRUCache___init__ : Func :=
                 (.name "Cache")
                 "__init__"
                 [(.name "self"), (.name "maxsize"), (.name "getsizeof")]))
-            (.seq (.setField (.name "self") "__order" (.alloc "OrderedDict" [])) (.seq .skip .skip))) }
+            (.seq
+              (.setField (.name "self") "_LRUCache__order" (.alloc "OrderedDict" []))
+              (.seq .skip .skip))) }
 
 /-- `cachetools/__init__.py:<module>.LRUCache.__getitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LRUCache___getitem__ : Func :=
@@ -718,7 +725,7 @@ def f_cachetools___init___py__module__LRUCache___getitem__ : Func :=
               (.seq
                 (.ifte
                   (.inOp false (.name "key") (.name "self"))
-                  (.expr (.mcall (.name "self") "__touch" [(.name "key")]))
+                  (.expr (.mcall (.name "self") "_LRUCache__touch" [(.name "key")]))
                   .skip)
                 (.ret (.name "value"))))) }
 
@@ -728,7 +735,7 @@ def f_cachetools___init___py__module__LRUCache___setitem__ : Func :=
   , params := ["key", "value", "cache_setitem"]
   , body := (.seq
             (.expr (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))
-            (.expr (.mcall (.name "self") "__touch" [(.name "key")]))) }
+            (.expr (.mcall (.name "self") "_LRUCache__touch" [(.name "key")]))) }
 
 /-- `cachetools/__init__.py:<module>.LRUCache.__delitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LRUCache___delitem__ : Func :=
@@ -759,13 +766,13 @@ def f_cachetools___init___py__module__LRUCache_clear : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__order"))
+                  (.assign "tmp0" (.field (.name "self") "_LRUCache__order"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 .skip))) }
 
-/-- `cachetools/__init__.py:<module>.LRUCache.__touch`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__LRUCache___touch : Func :=
-  { name := "cachetools/__init__.py:<module>.LRUCache.__touch"
+/-- `cachetools/__init__.py:<module>.LRUCache._LRUCache__touch`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module__LRUCache__LRUCache__touch : Func :=
+  { name := "cachetools/__init__.py:<module>.LRUCache._LRUCache__touch"
   , params := ["key"]
   , body := (.seq
             (.expr (.lit (.str "\"\"Mark as recently used\"\"")))
@@ -773,10 +780,10 @@ def f_cachetools___init___py__module__LRUCache___touch : Func :=
               .skip
               (.tryCatch
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__order"))
+                  (.assign "tmp0" (.field (.name "self") "_LRUCache__order"))
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
                 "__exc"
-                (.setIndex (.field (.name "self") "__order") (.name "key") (.lit .unit))))) }
+                (.setIndex (.field (.name "self") "_LRUCache__order") (.name "key") (.lit .unit))))) }
 
 /-- `cachetools/__init__.py:<module>.LRUCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LRUCache__metaClassCallHandler_ : Func :=
@@ -799,12 +806,12 @@ def f_cachetools___init___py__module__RRCache___init__ : Func :=
                 "__init__"
                 [(.name "self"), (.name "maxsize"), (.name "getsizeof")]))
             (.seq
-              (.setField (.name "self") "__choice" (.name "choice"))
+              (.setField (.name "self") "_RRCache__choice" (.name "choice"))
               (.seq
                 (.seq
                   (.assign "tmp0" (.dictE []))
-                  (.setField (.name "self") "__index" (.name "tmp0")))
-                (.seq (.setField (.name "self") "__keys" (.listE [])) (.seq .skip .skip))))) }
+                  (.setField (.name "self") "_RRCache__index" (.name "tmp0")))
+                (.seq (.setField (.name "self") "_RRCache__keys" (.listE [])) (.seq .skip .skip))))) }
 
 /-- `cachetools/__init__.py:<module>.RRCache.choice`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__RRCache_choice : Func :=
@@ -812,7 +819,7 @@ def f_cachetools___init___py__module__RRCache_choice : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The `choice` function used by the cache.\"\"")))
-            (.ret (.field (.name "self") "__choice"))) }
+            (.ret (.field (.name "self") "_RRCache__choice"))) }
 
 /-- `cachetools/__init__.py:<module>.RRCache.__setitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__RRCache___setitem__ : Func :=
@@ -824,14 +831,14 @@ def f_cachetools___init___py__module__RRCache___setitem__ : Func :=
               .skip
               (.seq
                 (.ifte
-                  (.inOp true (.name "key") (.field (.name "self") "__index"))
+                  (.inOp true (.name "key") (.field (.name "self") "_RRCache__index"))
                   (.seq
                     (.setIndex
-                      (.field (.name "self") "__index")
+                      (.field (.name "self") "_RRCache__index")
                       (.name "key")
-                      (.call "len" [(.field (.name "self") "__keys")]))
+                      (.call "len" [(.field (.name "self") "_RRCache__keys")]))
                     (.seq
-                      (.assign "tmp0" (.field (.name "self") "__keys"))
+                      (.assign "tmp0" (.field (.name "self") "_RRCache__keys"))
                       (.expr (.mcall (.name "tmp0") "append" [(.name "key")]))))
                   .skip)
                 .skip))) }
@@ -846,7 +853,7 @@ def f_cachetools___init___py__module__RRCache___delitem__ : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__index"))
+                  (.assign "tmp0" (.field (.name "self") "_RRCache__index"))
                   (.assign "index" (.mcall (.name "tmp0") "pop" [(.name "key")])))
                 (.seq
                   .skip
@@ -857,19 +864,21 @@ def f_cachetools___init___py__module__RRCache___delitem__ : Func :=
                         (.name "index")
                         (.binop
                           "-"
-                          (.call "len" [(.field (.name "self") "__keys")])
+                          (.call "len" [(.field (.name "self") "_RRCache__keys")])
                           (.lit (.int 1))))
                       (.seq
                         (.assign
                           "last"
-                          (.index (.field (.name "self") "__keys") (.unop "-" (.lit (.int 1)))))
+                          (.index
+                            (.field (.name "self") "_RRCache__keys")
+                            (.unop "-" (.lit (.int 1)))))
                         (.seq
                           (.setIndex
-                            (.field (.name "self") "__keys")
+                            (.field (.name "self") "_RRCache__keys")
                             (.name "index")
                             (.name "last"))
                           (.setIndex
-                            (.field (.name "self") "__index")
+                            (.field (.name "self") "_RRCache__index")
                             (.name "last")
                             (.name "index"))))
                       .skip)
@@ -877,7 +886,7 @@ def f_cachetools___init___py__module__RRCache___delitem__ : Func :=
                       .skip
                       (.seq
                         (.seq
-                          (.assign "tmp1" (.field (.name "self") "__keys"))
+                          (.assign "tmp1" (.field (.name "self") "_RRCache__keys"))
                           (.expr (.mcall (.name "tmp1") "pop" [])))
                         (.seq .skip .skip)))))))) }
 
@@ -899,7 +908,7 @@ def f_cachetools___init___py__module__RRCache_clear : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__index"))
+                  (.assign "tmp0" (.field (.name "self") "_RRCache__index"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 (.seq .skip (.hole "op:delete-slice"))))) }
 
@@ -918,17 +927,17 @@ def f_cachetools___init___py__module___TimedCache__Timer___init__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__init__"
   , params := ["timer"]
   , body := (.seq
-            (.setField (.name "self") "__timer" (.name "timer"))
-            (.setField (.name "self") "__nesting" (.lit (.int 0)))) }
+            (.setField (.name "self") "_Timer__timer" (.name "timer"))
+            (.setField (.name "self") "_Timer__nesting" (.lit (.int 0)))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__call__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___call__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__call__"
   , params := []
   , body := (.ifte
-            (.binop "==" (.field (.name "self") "__nesting") (.lit (.int 0)))
-            (.ret (.mcall (.name "self") "__timer" []))
-            (.ret (.field (.name "self") "__time"))) }
+            (.binop "==" (.field (.name "self") "_Timer__nesting") (.lit (.int 0)))
+            (.ret (.mcall (.name "self") "_Timer__timer" []))
+            (.ret (.field (.name "self") "_Timer__time"))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__enter__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___enter__ : Func :=
@@ -936,20 +945,20 @@ def f_cachetools___init___py__module___TimedCache__Timer___enter__ : Func :=
   , params := []
   , body := (.seq
             (.ifte
-              (.binop "==" (.field (.name "self") "__nesting") (.lit (.int 0)))
+              (.binop "==" (.field (.name "self") "_Timer__nesting") (.lit (.int 0)))
               (.seq
-                (.assign "tmp0" (.mcall (.name "self") "__timer" []))
+                (.assign "tmp0" (.mcall (.name "self") "_Timer__timer" []))
                 (.seq
-                  (.setField (.name "self") "__time" (.name "tmp0"))
+                  (.setField (.name "self") "_Timer__time" (.name "tmp0"))
                   (.assign "time" (.name "tmp0"))))
-              (.assign "time" (.field (.name "self") "__time")))
+              (.assign "time" (.field (.name "self") "_Timer__time")))
             (.seq
               .skip
               (.seq
                 (.setField
                   (.name "self")
-                  "__nesting"
-                  (.binop "+" (.field (.name "self") "__nesting") (.lit (.int 1))))
+                  "_Timer__nesting"
+                  (.binop "+" (.field (.name "self") "_Timer__nesting") (.lit (.int 1))))
                 (.seq .skip (.ret (.name "time")))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__exit__`  (from `cachetools/__init__.py`) -/
@@ -958,8 +967,8 @@ def f_cachetools___init___py__module___TimedCache__Timer___exit__ : Func :=
   , params := ["exc"]
   , body := (.setField
             (.name "self")
-            "__nesting"
-            (.binop "-" (.field (.name "self") "__nesting") (.lit (.int 1)))) }
+            "_Timer__nesting"
+            (.binop "-" (.field (.name "self") "_Timer__nesting") (.lit (.int 1)))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___reduce__ : Func :=
@@ -969,14 +978,16 @@ def f_cachetools___init___py__module___TimedCache__Timer___reduce__ : Func :=
             (.ret
               (.tupleE
                 [ (.fnref "cachetools/__init__.py:<module>._TimedCache._Timer")
-                , (.tupleE [(.field (.name "self") "__timer")]) ]))
+                , (.tupleE [(.field (.name "self") "_Timer__timer")]) ]))
             .skip) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__getattr__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___getattr__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__getattr__"
   , params := ["name"]
-  , body := (.seq (.ret (.call "getattr" [(.field (.name "self") "__timer"), (.name "name")])) .skip) }
+  , body := (.seq
+            (.ret (.call "getattr" [(.field (.name "self") "_Timer__timer"), (.name "name")]))
+            .skip) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer__metaClassCallHandler_ : Func :=
@@ -1001,7 +1012,7 @@ def f_cachetools___init___py__module___TimedCache___init__ : Func :=
             (.seq
               (.setField
                 (.name "self")
-                "__timer"
+                "_TimedCache__timer"
                 (.mcall (.name "_TimedCache") "_Timer" [(.name "timer")]))
               (.seq .skip .skip))) }
 
@@ -1011,7 +1022,7 @@ def f_cachetools___init___py__module___TimedCache___repr__ : Func :=
   , params := ["cache_repr"]
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1025,7 +1036,7 @@ def f_cachetools___init___py__module___TimedCache___len__ : Func :=
   , params := ["cache_len"]
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1039,7 +1050,7 @@ def f_cachetools___init___py__module___TimedCache_currsize : Func :=
   , params := []
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1053,7 +1064,7 @@ def f_cachetools___init___py__module___TimedCache_timer : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The timer function used by the cache.\"\"")))
-            (.ret (.field (.name "self") "__timer"))) }
+            (.ret (.field (.name "self") "_TimedCache__timer"))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.get`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_get : Func :=
@@ -1061,7 +1072,7 @@ def f_cachetools___init___py__module___TimedCache_get : Func :=
   , params := ["args", "kwargs"]
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1075,7 +1086,7 @@ def f_cachetools___init___py__module___TimedCache_pop : Func :=
   , params := ["args", "kwargs"]
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1089,7 +1100,7 @@ def f_cachetools___init___py__module___TimedCache_setdefault : Func :=
   , params := ["args", "kwargs"]
   , body := (.seq
             (.seq
-              (.assign "manager_tmp0" (.field (.name "self") "__timer"))
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
               (.seq
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
@@ -1174,7 +1185,7 @@ def f_cachetools___init___py__module__TTLCache___init__ : Func :=
               (.seq
                 (.assign "tmp0" (.mcall (.name "TTLCache") "_Link" []))
                 (.seq
-                  (.setField (.name "self") "__root" (.name "tmp0"))
+                  (.setField (.name "self") "_TTLCache__root" (.name "tmp0"))
                   (.assign "root" (.name "tmp0"))))
               (.seq
                 (.seq
@@ -1183,11 +1194,11 @@ def f_cachetools___init___py__module__TTLCache___init__ : Func :=
                     (.setField (.name "root") "prev" (.name "tmp1"))
                     (.setField (.name "root") "next" (.name "tmp1"))))
                 (.seq
-                  (.setField (.name "self") "__links" (.alloc "OrderedDict" []))
+                  (.setField (.name "self") "_TTLCache__links" (.alloc "OrderedDict" []))
                   (.seq
                     .skip
                     (.seq
-                      (.setField (.name "self") "__ttl" (.name "ttl"))
+                      (.setField (.name "self") "_TTLCache__ttl" (.name "ttl"))
                       (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.__contains__`  (from `cachetools/__init__.py`) -/
@@ -1245,12 +1256,12 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
                   (.setField
                     (.name "link")
                     "expires"
-                    (.binop "+" (.name "time") (.field (.name "self") "__ttl")))
+                    (.binop "+" (.name "time") (.field (.name "self") "_TTLCache__ttl")))
                   (.seq
                     .skip
                     (.seq
                       (.seq
-                        (.assign "tmp1" (.field (.name "self") "__root"))
+                        (.assign "tmp1" (.field (.name "self") "_TTLCache__root"))
                         (.seq
                           (.setField (.name "link") "next" (.name "tmp1"))
                           (.assign "root" (.name "tmp1"))))
@@ -1292,7 +1303,7 @@ def f_cachetools___init___py__module__TTLCache___delitem__ : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__links"))
+                  (.assign "tmp0" (.field (.name "self") "_TTLCache__links"))
                   (.assign "link" (.mcall (.name "tmp0") "pop" [(.name "key")])))
                 (.seq
                   .skip
@@ -1315,7 +1326,7 @@ def f_cachetools___init___py__module__TTLCache___iter__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__iter__"
   , params := []
   , body := (.seq
-            (.assign "root" (.field (.name "self") "__root"))
+            (.assign "root" (.field (.name "self") "_TTLCache__root"))
             (.seq
               .skip
               (.seq
@@ -1347,7 +1358,7 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
               (.assign "tmp0" (.field (.name "self") "__dict__"))
               (.expr (.mcall (.name "tmp0") "update" [(.name "state")])))
             (.seq
-              (.assign "root" (.field (.name "self") "__root"))
+              (.assign "root" (.field (.name "self") "_TTLCache__root"))
               (.seq
                 (.seq
                   (.assign "tmp1" (.name "root"))
@@ -1399,7 +1410,7 @@ def f_cachetools___init___py__module__TTLCache_ttl : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The time-to-live value of the cache's items.\"\"")))
-            (.ret (.field (.name "self") "__ttl"))) }
+            (.ret (.field (.name "self") "_TTLCache__ttl"))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.expire`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache_expire : Func :=
@@ -1419,7 +1430,7 @@ def f_cachetools___init___py__module__TTLCache_expire : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.assign "root" (.field (.name "self") "__root"))
+                    (.assign "root" (.field (.name "self") "_TTLCache__root"))
                     (.seq
                       .skip
                       (.seq
@@ -1427,7 +1438,7 @@ def f_cachetools___init___py__module__TTLCache_expire : Func :=
                         (.seq
                           .skip
                           (.seq
-                            (.assign "links" (.field (.name "self") "__links"))
+                            (.assign "links" (.field (.name "self") "_TTLCache__links"))
                             (.seq
                               .skip
                               (.seq
@@ -1534,7 +1545,7 @@ def f_cachetools___init___py__module__TTLCache_clear : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "root" (.field (.name "self") "__root"))
+                (.assign "root" (.field (.name "self") "_TTLCache__root"))
                 (.seq
                   .skip
                   (.seq
@@ -1547,21 +1558,21 @@ def f_cachetools___init___py__module__TTLCache_clear : Func :=
                       .skip
                       (.seq
                         (.seq
-                          (.assign "tmp1" (.field (.name "self") "__links"))
+                          (.assign "tmp1" (.field (.name "self") "_TTLCache__links"))
                           (.expr (.mcall (.name "tmp1") "clear" [])))
                         .skip))))))) }
 
-/-- `cachetools/__init__.py:<module>.TTLCache.__getlink`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TTLCache___getlink : Func :=
-  { name := "cachetools/__init__.py:<module>.TTLCache.__getlink"
+/-- `cachetools/__init__.py:<module>.TTLCache._TTLCache__getlink`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module__TTLCache__TTLCache__getlink : Func :=
+  { name := "cachetools/__init__.py:<module>.TTLCache._TTLCache__getlink"
   , params := ["key"]
   , body := (.seq
-            (.assign "value" (.index (.field (.name "self") "__links") (.name "key")))
+            (.assign "value" (.index (.field (.name "self") "_TTLCache__links") (.name "key")))
             (.seq
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__links"))
+                  (.assign "tmp0" (.field (.name "self") "_TTLCache__links"))
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
                 (.seq .skip (.ret (.name "value")))))) }
 
@@ -1612,10 +1623,10 @@ def f_cachetools___init___py__module__TLRUCache___init__ : Func :=
                 "__init__"
                 [(.name "self"), (.name "maxsize"), (.name "timer"), (.name "getsizeof")]))
             (.seq
-              (.setField (.name "self") "__items" (.alloc "OrderedDict" []))
+              (.setField (.name "self") "_TLRUCache__items" (.alloc "OrderedDict" []))
               (.seq
-                (.setField (.name "self") "__order" (.listE []))
-                (.seq (.setField (.name "self") "__ttu" (.name "ttu")) (.seq .skip .skip))))) }
+                (.setField (.name "self") "_TLRUCache__order" (.listE []))
+                (.seq (.setField (.name "self") "_TLRUCache__ttu" (.name "ttu")) (.seq .skip .skip))))) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache.__contains__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache___contains__ : Func :=
@@ -1653,7 +1664,7 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
             (.seq
               (.tryCatch
                 (.setField
-                  (.mcall (.name "self") "__getitem" [(.name "key")])
+                  (.mcall (.name "self") "_TLRUCache__getitem" [(.name "key")])
                   "removed"
                   (.lit (.bool true)))
                 "__exc"
@@ -1666,7 +1677,10 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
                       "tmp0"
                       (.mcall (.name "TLRUCache") "_Item" [(.name "key"), (.name "expires")]))
                     (.seq
-                      (.setIndex (.field (.name "self") "__items") (.name "key") (.name "tmp0"))
+                      (.setIndex
+                        (.field (.name "self") "_TLRUCache__items")
+                        (.name "key")
+                        (.name "tmp0"))
                       (.assign "item" (.name "tmp0"))))
                   (.seq
                     .skip
@@ -1675,7 +1689,7 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
                         (.mcall
                           (.name "heapq")
                           "heappush"
-                          [(.field (.name "self") "__order"), (.name "item")]))
+                          [(.field (.name "self") "_TLRUCache__order"), (.name "item")]))
                       (.seq
                         .skip
                         (.seq
@@ -1709,7 +1723,7 @@ def f_cachetools___init___py__module__TLRUCache___delitem__ : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__items"))
+                  (.assign "tmp0" (.field (.name "self") "_TLRUCache__items"))
                   (.assign "item" (.mcall (.name "tmp0") "pop" [(.name "key")])))
                 (.seq
                   .skip
@@ -1730,7 +1744,7 @@ def f_cachetools___init___py__module__TLRUCache___iter__ : Func :=
   , params := []
   , body := (.seq
             (.seq
-              (.assign "tmp1" (.field (.name "self") "__order"))
+              (.assign "tmp1" (.field (.name "self") "_TLRUCache__order"))
               (.forIn
                 "curr"
                 (.name "tmp1")
@@ -1755,7 +1769,7 @@ def f_cachetools___init___py__module__TLRUCache_ttu : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"The local time-to-use function used by the cache.\"\"")))
-            (.ret (.field (.name "self") "__ttu"))) }
+            (.ret (.field (.name "self") "_TLRUCache__ttu"))) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache.expire`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache_expire : Func :=
@@ -1775,11 +1789,11 @@ def f_cachetools___init___py__module__TLRUCache_expire : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.assign "items" (.field (.name "self") "__items"))
+                    (.assign "items" (.field (.name "self") "_TLRUCache__items"))
                     (.seq
                       .skip
                       (.seq
-                        (.assign "order" (.field (.name "self") "__order"))
+                        (.assign "order" (.field (.name "self") "_TLRUCache__order"))
                         (.seq
                           .skip
                           (.seq
@@ -1790,7 +1804,7 @@ def f_cachetools___init___py__module__TLRUCache_expire : Func :=
                                 (.binop
                                   "*"
                                   (.call "len" [(.name "items")])
-                                  (.field (.name "self") "__HEAP_CLEANUP_FACTOR")))
+                                  (.field (.name "self") "_TLRUCache__HEAP_CLEANUP_FACTOR")))
                               (.seq
                                 (.seq
                                   (.seq
@@ -1812,7 +1826,7 @@ def f_cachetools___init___py__module__TLRUCache_expire : Func :=
                                               (.mcall (.name "tmp0") "append" [(.name "item")]))))
                                         (.assign "tmp2" (.name "tmp0")))))
                                   (.seq
-                                    (.setField (.name "self") "__order" (.name "tmp2"))
+                                    (.setField (.name "self") "_TLRUCache__order" (.name "tmp2"))
                                     (.assign "order" (.name "tmp2"))))
                                 (.expr (.mcall (.name "heapq") "heapify" [(.name "order")])))
                               .skip)
@@ -1936,27 +1950,27 @@ def f_cachetools___init___py__module__TLRUCache_clear : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__items"))
+                  (.assign "tmp0" (.field (.name "self") "_TLRUCache__items"))
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 (.seq .skip (.hole "op:delete-slice"))))) }
 
-/-- `cachetools/__init__.py:<module>.TLRUCache.__getitem`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TLRUCache___getitem : Func :=
-  { name := "cachetools/__init__.py:<module>.TLRUCache.__getitem"
+/-- `cachetools/__init__.py:<module>.TLRUCache._TLRUCache__getitem`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem : Func :=
+  { name := "cachetools/__init__.py:<module>.TLRUCache._TLRUCache__getitem"
   , params := ["key"]
   , body := (.seq
-            (.assign "value" (.index (.field (.name "self") "__items") (.name "key")))
+            (.assign "value" (.index (.field (.name "self") "_TLRUCache__items") (.name "key")))
             (.seq
               .skip
               (.seq
                 (.seq
-                  (.assign "tmp0" (.field (.name "self") "__items"))
+                  (.assign "tmp0" (.field (.name "self") "_TLRUCache__items"))
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
                 (.seq .skip (.ret (.name "value")))))) }
 
-/-- `cachetools/__init__.py:<module>.TLRUCache.__delitem`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TLRUCache___delitem : Func :=
-  { name := "cachetools/__init__.py:<module>.TLRUCache.__delitem"
+/-- `cachetools/__init__.py:<module>.TLRUCache._TLRUCache__delitem`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
+  { name := "cachetools/__init__.py:<module>.TLRUCache._TLRUCache__delitem"
   , params := ["key", "cache_delitem"]
   , body := (.seq (.hole "control:TRY-else") .skip) }
 
@@ -3128,16 +3142,16 @@ def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
               (.seq
                 (.setField (.name "self") "_obj" (.name "obj"))
                 (.seq
-                  (.setField (.name "self") "__cache" (.name "cache"))
+                  (.setField (.name "self") "_WrapperBase__cache" (.name "cache"))
                   (.seq
                     (.setField
                       (.name "self")
-                      "__key"
+                      "_WrapperBase__key"
                       (.mcall (.name "functools") "partial" [(.name "key"), (.name "obj")]))
                     (.seq
                       (.setField
                         (.name "self")
-                        "__lock"
+                        "_WrapperBase__lock"
                         (.cond
                           (.isOp true (.name "lock") (.lit .unit))
                           (.name "lock")
@@ -3147,7 +3161,7 @@ def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
                         (.seq
                           (.setField
                             (.name "self")
-                            "__cond"
+                            "_WrapperBase__cond"
                             (.cond
                               (.isOp true (.name "cond") (.lit .unit))
                               (.name "cond")
@@ -3170,25 +3184,25 @@ def f_cachetools__cachedmethod_py__module___WrapperBase_cache_clear : Func :=
 def f_cachetools__cachedmethod_py__module___WrapperBase_cache : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.cache"
   , params := []
-  , body := (.ret (.mcall (.name "self") "__cache" [(.field (.name "self") "_obj")])) }
+  , body := (.ret (.mcall (.name "self") "_WrapperBase__cache" [(.field (.name "self") "_obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.cache_key`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase_cache_key : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_key"
   , params := []
-  , body := (.ret (.field (.name "self") "__key")) }
+  , body := (.ret (.field (.name "self") "_WrapperBase__key")) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.cache_lock`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase_cache_lock : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_lock"
   , params := []
-  , body := (.ret (.mcall (.name "self") "__lock" [(.field (.name "self") "_obj")])) }
+  , body := (.ret (.mcall (.name "self") "_WrapperBase__lock" [(.field (.name "self") "_obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.cache_condition`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase_cache_condition : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_condition"
   , params := []
-  , body := (.ret (.mcall (.name "self") "__cond" [(.field (.name "self") "_obj")])) }
+  , body := (.ret (.mcall (.name "self") "_WrapperBase__cond" [(.field (.name "self") "_obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase__metaClassCallHandler_ : Func :=
@@ -3211,8 +3225,8 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___init__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._DescriptorBase.__init__"
   , params := ["deprecated"]
   , body := (.seq
-            (.setField (.name "self") "__attrname" (.lit .unit))
-            (.setField (.name "self") "__deprecated" (.name "deprecated"))) }
+            (.setField (.name "self") "_DescriptorBase__attrname" (.lit .unit))
+            (.setField (.name "self") "_DescriptorBase__deprecated" (.name "deprecated"))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DescriptorBase.__set_name__`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DescriptorBase___set_name__ : Func :=
@@ -3220,10 +3234,10 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___set_name__ : Func :
   , params := ["owner", "name"]
   , body := (.seq
             (.ifte
-              (.isOp false (.field (.name "self") "__attrname") (.lit .unit))
-              (.setField (.name "self") "__attrname" (.name "name"))
+              (.isOp false (.field (.name "self") "_DescriptorBase__attrname") (.lit .unit))
+              (.setField (.name "self") "_DescriptorBase__attrname" (.name "name"))
               (.ifte
-                (.binop "!=" (.name "name") (.field (.name "self") "__attrname"))
+                (.binop "!=" (.name "name") (.field (.name "self") "_DescriptorBase__attrname"))
                 (.raise (.call "TypeError" [(.hole "op:stringExpressionList")]))
                 .skip))
             .skip) }
@@ -3241,10 +3255,10 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                   (.isOp false (.name "obj") (.lit .unit))
                   .skip
                   (.ifte
-                    (.isOp true (.field (.name "self") "__attrname") (.lit .unit))
+                    (.isOp true (.field (.name "self") "_DescriptorBase__attrname") (.lit .unit))
                     (.hole "control:TRY-multiCatch")
                     (.ifte
-                      (.field (.name "self") "__deprecated")
+                      (.field (.name "self") "_DescriptorBase__deprecated")
                       .skip
                       (.seq
                         (.assign
@@ -3273,9 +3287,12 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__ : 
   , body := (.seq
             (.seq (.assign "tmp0" (.call "super" [])) (.expr (.mcall (.name "tmp0") "__init__" [])))
             (.seq
-              (.setField (.name "self") "__wrapper" (.name "wrapper"))
+              (.setField (.name "self") "_DeprecatedDescriptorBase__wrapper" (.name "wrapper"))
               (.seq
-                (.setField (.name "self") "__cache_clear" (.name "cache_clear"))
+                (.setField
+                  (.name "self")
+                  "_DeprecatedDescriptorBase__cache_clear"
+                  (.name "cache_clear"))
                 (.seq .skip .skip)))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__call__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3284,7 +3301,13 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___call__ : 
   , params := ["args", "kwargs"]
   , body := (.seq
             (.expr (.call "_warn_classmethod" []))
-            (.seq .skip (.ret (.mcall (.name "self") "__wrapper" [(.hole "op:starredUnpack")])))) }
+            (.seq
+              .skip
+              (.ret
+                (.mcall
+                  (.name "self")
+                  "_DeprecatedDescriptorBase__wrapper"
+                  [(.hole "op:starredUnpack")])))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase_cache_clear : Func :=
@@ -3292,7 +3315,10 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase_cache_clear
   , params := ["objtype"]
   , body := (.seq
             (.expr (.call "_warn_classmethod" []))
-            (.seq .skip (.ret (.mcall (.name "self") "__cache_clear" [(.name "objtype")])))) }
+            (.seq
+              .skip
+              (.ret
+                (.mcall (.name "self") "_DeprecatedDescriptorBase__cache_clear" [(.name "objtype")])))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase__metaClassCallHandler_ : Func :=
@@ -3335,10 +3361,10 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
               (.seq
                 (.assign "tmp1" (.lit (.int 0)))
                 (.seq
-                  (.setField (.name "self") "__hits" (.name "tmp1"))
-                  (.setField (.name "self") "__misses" (.name "tmp1"))))
+                  (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                  (.setField (.name "self") "_Wrapper__misses" (.name "tmp1"))))
               (.seq
-                (.setField (.name "self") "__pending" (.call "set" []))
+                (.setField (.name "self") "_Wrapper__pending" (.call "set" []))
                 (.seq
                   .skip
                   (.seq
@@ -3401,7 +3427,9 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
                                       (.tryCatch
                                         (.seq
                                           (.seq
-                                            (.assign "tmp1" (.field (.name "self") "__pending"))
+                                            (.assign
+                                              "tmp1"
+                                              (.field (.name "self") "_Wrapper__pending"))
                                             (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
                                           (.expr (.mcall (.name "cond") "notify_all" [])))
                                         "__exc"
@@ -3420,7 +3448,7 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
                                   (.tryCatch
                                     (.seq
                                       (.seq
-                                        (.assign "tmp1" (.field (.name "self") "__pending"))
+                                        (.assign "tmp1" (.field (.name "self") "_Wrapper__pending"))
                                         (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
                                       (.expr (.mcall (.name "cond") "notify_all" [])))
                                     "__exc"
@@ -3471,7 +3499,7 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
   { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0"
   , params := []
   , body := (.seq
-            (.ret (.inOp true (.name "key") (.field (.name "self") "__pending")))
+            (.ret (.inOp true (.name "key") (.field (.name "self") "_Wrapper__pending")))
             (.seq .skip .skip)) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -3496,8 +3524,8 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_ca
                           (.seq
                             (.assign "tmp1" (.lit (.int 0)))
                             (.seq
-                              (.setField (.name "self") "__hits" (.name "tmp1"))
-                              (.setField (.name "self") "__misses" (.name "tmp1")))))
+                              (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                              (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
                         "__exc"
                         (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
                       (.expr (.call "" [])))))))
@@ -3559,8 +3587,8 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___ini
               (.seq
                 (.assign "tmp1" (.lit (.int 0)))
                 (.seq
-                  (.setField (.name "self") "__hits" (.name "tmp1"))
-                  (.setField (.name "self") "__misses" (.name "tmp1"))))
+                  (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                  (.setField (.name "self") "_Wrapper__misses" (.name "tmp1"))))
               (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.__call__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3643,8 +3671,8 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache
                           (.seq
                             (.assign "tmp1" (.lit (.int 0)))
                             (.seq
-                              (.setField (.name "self") "__hits" (.name "tmp1"))
-                              (.setField (.name "self") "__misses" (.name "tmp1")))))
+                              (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                              (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
                         "__exc"
                         (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
                       (.expr (.call "" [])))))))
@@ -3704,8 +3732,8 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___i
               (.seq
                 (.assign "tmp1" (.lit (.int 0)))
                 (.seq
-                  (.setField (.name "self") "__hits" (.name "tmp1"))
-                  (.setField (.name "self") "__misses" (.name "tmp1"))))
+                  (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                  (.setField (.name "self") "_Wrapper__misses" (.name "tmp1"))))
               (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.__call__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3723,14 +3751,14 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___c
                     (.seq
                       (.setField
                         (.name "self")
-                        "__hits"
-                        (.binop "+" (.field (.name "self") "__hits") (.lit (.int 1))))
+                        "_Wrapper__hits"
+                        (.binop "+" (.field (.name "self") "_Wrapper__hits") (.lit (.int 1))))
                       (.ret (.name "result"))))
                   "__exc"
                   (.setField
                     (.name "self")
-                    "__misses"
-                    (.binop "+" (.field (.name "self") "__misses") (.lit (.int 1)))))
+                    "_Wrapper__misses"
+                    (.binop "+" (.field (.name "self") "_Wrapper__misses") (.lit (.int 1)))))
                 (.seq
                   .skip
                   (.seq
@@ -3760,8 +3788,8 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cac
                 (.seq
                   (.assign "tmp1" (.lit (.int 0)))
                   (.seq
-                    (.setField (.name "self") "__hits" (.name "tmp1"))
-                    (.setField (.name "self") "__misses" (.name "tmp1"))))
+                    (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                    (.setField (.name "self") "_Wrapper__misses" (.name "tmp1"))))
                 .skip))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_info`  (from `cachetools/_cachedmethod.py`) -/
@@ -3773,8 +3801,8 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cac
               (.call
                 "info"
                 [ (.field (.name "self") "cache")
-                , (.field (.name "self") "__hits")
-                , (.field (.name "self") "__misses") ]))
+                , (.field (.name "self") "_Wrapper__hits")
+                , (.field (.name "self") "_Wrapper__misses") ]))
             .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
@@ -3998,7 +4026,7 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___init_
                   , (.name "lock")
                   , (.name "cond") ])))
             (.seq
-              (.setField (.name "self") "__pending" (.call "set" []))
+              (.setField (.name "self") "_Wrapper__pending" (.call "set" []))
               (.seq
                 .skip
                 (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))) }
@@ -4012,7 +4040,7 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___call_
               (.call
                 "wrapper"
                 [ (.field (.name "self") "_obj")
-                , (.field (.name "self") "__pending")
+                , (.field (.name "self") "_Wrapper__pending")
                 , (.hole "op:starredUnpack") ]))
             .skip) }
 
@@ -4598,7 +4626,7 @@ def f_cachetools_keys_py__module___HashedTuple___hash__ : Func :=
   { name := "cachetools/keys.py:<module>._HashedTuple.__hash__"
   , params := ["hash"]
   , body := (.seq
-            (.assign "hashvalue" (.field (.name "self") "__hashvalue"))
+            (.assign "hashvalue" (.field (.name "self") "_HashedTuple__hashvalue"))
             (.seq
               .skip
               (.seq
@@ -4607,7 +4635,7 @@ def f_cachetools_keys_py__module___HashedTuple___hash__ : Func :=
                   (.seq
                     (.assign "tmp0" (.call "hash" [(.name "self")]))
                     (.seq
-                      (.setField (.name "self") "__hashvalue" (.name "tmp0"))
+                      (.setField (.name "self") "_HashedTuple__hashvalue" (.name "tmp0"))
                       (.assign "hashvalue" (.name "tmp0"))))
                   .skip)
                 (.seq .skip (.ret (.name "hashvalue")))))) }
@@ -5471,7 +5499,7 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__LFUCache___delitem__,
   f_cachetools___init___py__module__LFUCache_popitem,
   f_cachetools___init___py__module__LFUCache_clear,
-  f_cachetools___init___py__module__LFUCache___touch,
+  f_cachetools___init___py__module__LFUCache__LFUCache__touch,
   f_cachetools___init___py__module__LFUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__LRUCache___init__,
   f_cachetools___init___py__module__LRUCache___getitem__,
@@ -5479,7 +5507,7 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__LRUCache___delitem__,
   f_cachetools___init___py__module__LRUCache_popitem,
   f_cachetools___init___py__module__LRUCache_clear,
-  f_cachetools___init___py__module__LRUCache___touch,
+  f_cachetools___init___py__module__LRUCache__LRUCache__touch,
   f_cachetools___init___py__module__LRUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__RRCache___init__,
   f_cachetools___init___py__module__RRCache_choice,
@@ -5522,7 +5550,7 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__TTLCache_expire,
   f_cachetools___init___py__module__TTLCache_popitem,
   f_cachetools___init___py__module__TTLCache_clear,
-  f_cachetools___init___py__module__TTLCache___getlink,
+  f_cachetools___init___py__module__TTLCache__TTLCache__getlink,
   f_cachetools___init___py__module__TTLCache__metaClassCallHandler_,
   f_cachetools___init___py__module__TLRUCache__Item___init__,
   f_cachetools___init___py__module__TLRUCache__Item___lt__,
@@ -5537,8 +5565,8 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__TLRUCache_expire,
   f_cachetools___init___py__module__TLRUCache_popitem,
   f_cachetools___init___py__module__TLRUCache_clear,
-  f_cachetools___init___py__module__TLRUCache___getitem,
-  f_cachetools___init___py__module__TLRUCache___delitem,
+  f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem,
+  f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem,
   f_cachetools___init___py__module__TLRUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__cached,
   f_cachetools___init___py__module__cached_decorator,
