@@ -22,7 +22,8 @@
 
 import io.shiftleft.codepropertygraph.generated.nodes._
 
-@main def exec(cpgPath: String, out: String = "ast.json", maxMethods: Int = 100000) = {
+@main def exec(cpgPath: String, out: String = "ast.json", maxMethods: Int = 100000,
+               dataModel: String = "lp64") = {
   importCpg(cpgPath)
 
   // CPG operator name -> Core binary operator.
@@ -30,10 +31,18 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // `floorDiv` is Python's `//`. It maps to "/" because the Core semantics is
   // dialect-parameterized: `Dialect.python` already floors, `Dialect.cLike` truncates.
   //
-  // Deliberately absent: `<operator>.and` / `<operator>.or` / `xor` / shifts. Those are
-  // *bitwise*, not logical (`logicalAnd` / `logicalOr` are the logical ones), and Core has
-  // no bitwise ops. Mapping them to "&&"/"||" — as this exporter previously did — is a
-  // silently wrong answer, which is worse than a hole.
+  // `<operator>.and` / `.or` / `.xor` / the shifts are **bitwise**, not logical
+  // (`logicalAnd` / `logicalOr` are the logical ones). They used to be mapped to
+  // `"&&"`/`"||"`, which returned a boolean where C returns a number, and they were then
+  // deliberately left *unmapped* because a hole beats a silent wrong answer. They are now
+  // mapped to their own operator strings — `"&"`, `"|"`, `"^"`, `"<<"` — which
+  // `applyBinop` implements with `NumConfig.band`/`bor`/`bxor`/`shl`, i.e. genuine
+  // two's-complement bit operations at the dialect's width. They are *not* aliases of the
+  // logical operators and must never become so.
+  //
+  // `>>` is absent from this table on purpose: it is two operators wearing one spelling
+  // (arithmetic on a signed operand, logical on an unsigned one) and needs the operand's
+  // static type to choose. See `shiftRightExpr`.
   val binops = Map(
     "<operator>.addition" -> "+", "<operator>.subtraction" -> "-",
     "<operator>.multiplication" -> "*", "<operator>.division" -> "/",
@@ -42,8 +51,55 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     "<operator>.lessEqualsThan" -> "<=", "<operator>.greaterThan" -> ">",
     "<operator>.greaterEqualsThan" -> ">=", "<operator>.equals" -> "==",
     "<operator>.notEquals" -> "!=", "<operator>.logicalAnd" -> "&&",
-    "<operator>.logicalOr" -> "||"
+    "<operator>.logicalOr" -> "||",
+    // Bitwise. See the note above: these are not `&&`/`||`.
+    "<operator>.and" -> "&", "<operator>.or" -> "|", "<operator>.xor" -> "^",
+    "<operator>.shiftLeft" -> "<<",
+    // Java's `>>>`: zero-filling, whatever the operand's sign. C has no such spelling.
+    "<operator>.logicalShiftRight" -> ">>>"
   )
+
+  /** `a >> b`, which is **two** operators.
+    *
+    * C's `>>` on a *signed* negative value is arithmetic (sign-extending); on an
+    * *unsigned* value it is logical (zero-filling), and `0x80000000u >> 31` is `1` while
+    * `((int)0x80000000) >> 31` is `-1`. Joern spells both `<operator>.arithmeticShiftRight`
+    * — the name records the token, not the semantics — so the choice has to be made from
+    * the left operand's static type, which is the only place the signedness survives.
+    *
+    * A `Val.int` carries no type, so this cannot be deferred to the interpreter: if the
+    * exporter cannot tell, nobody downstream can, and the honest answer is a hole that
+    * says which piece of information was missing.
+    *
+    * Outside the C family the token is unambiguous (Java/Kotlin `>>` is arithmetic and
+    * `>>>` is the logical one; Python and JS have only the arithmetic form), so no type is
+    * consulted there. */
+  val unsignedTypeNames = Set(
+    "uint8_t", "unsignedchar", "uint16_t", "unsignedshort", "uint32_t", "unsignedint",
+    "unsigned", "uint64_t", "unsignedlonglong", "unsignedlong", "longunsigned",
+    "size_t", "uintptr_t", "u8", "u16", "u32", "u64", "__u8", "__u16", "__u32", "__u64",
+    "__be16", "__be32", "__be64", "__le16", "__le32", "__le64", "gfp_t", "dev_t",
+    "sector_t", "phys_addr_t", "dma_addr_t", "resource_size_t", "uid_t", "gid_t"
+  )
+  val signedTypeNames = Set(
+    "int8_t", "signedchar", "int16_t", "short", "shortint", "int32_t", "int", "signedint",
+    "long", "signedlong", "int64_t", "longlong", "ptrdiff_t", "s8", "s16", "s32", "s64",
+    "__s8", "__s16", "__s32", "__s64", "ssize_t", "loff_t", "off_t", "pid_t", "cycles_t",
+    "ktime_t", "intptr_t"
+  )
+
+  /** Augmented assignment operators, `x op= e`, mapped to the binary operator they
+    * expand to. `>>=` is absent for the reason `>>` is: it needs the target's type, and
+    * `shiftRightOp` supplies it. */
+  val augOps = Map(
+    "<operator>.assignmentPlus" -> "+", "<operator>.assignmentMinus" -> "-",
+    "<operator>.assignmentMultiplication" -> "*", "<operator>.assignmentDivision" -> "/",
+    "<operator>.assignmentModulo" -> "%",
+    "<operator>.assignmentAnd" -> "&", "<operator>.assignmentOr" -> "|",
+    "<operator>.assignmentXor" -> "^", "<operator>.assignmentShiftLeft" -> "<<",
+    "<operator>.assignmentLogicalShiftRight" -> ">>>"
+  )
+
   // Operators whose Core meaning is wrong when an operand is a C `char*`. `+`/`-` are
   // pointer arithmetic, not concatenation; the orderings and equalities compare
   // addresses, not contents. Each keeps its own hole label so the cause is separable in
@@ -61,8 +117,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     "<operator>.notEquals"          -> "cstr:address-equality"
   )
 
+  // `<operator>.not` is **`~`**, not `!`. Joern's `logicalNot` is `!`; `not` is the
+  // bitwise complement, in C, C++, Java and Python alike (`~x` in all four). Mapping it
+  // to `"!"` — as this file did — turned `~CRYPTO_ALG_TYPE_MASK` into a boolean, and
+  // `flags & ~MASK` into `flags && false`. That is the same mistake as `<operator>.and`
+  // in its unary form, and it was live on every corpus, Python included.
   val unops = Map(
-    "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "!"
+    "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "~"
   )
 
   // ---- parameter star-ness ---------------------------------------------------
@@ -488,6 +549,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // Set while translating a method from a C-family file, where a `char*` is an address,
   // not a string value.
   var cLikeFile       = false
+
+  /** The label a `goto` may currently be translated as a `break` for — see `methodBody`.
+    * `None` everywhere except inside the prefix of a function whose single `goto` target
+    * has been proved to be a structured forward jump. */
+  var gotoAsBreak: Option[String] = None
+
   /** C and C++ specifically, as opposed to the whole `cLike` *dialect* family (which
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
     * implicit `this`, and stack object construction are C++ facts, not `cLike` facts. */
@@ -602,20 +669,77 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     b.endsWith("*") || b.matches(""".*\[.*\]""") || b == "std.nullptr_t"
   }
 
-  /** The fixed-width integer types, mapped to the width tag `applyUnop` understands.
-    * `size_t`/`uintptr_t` are here because they are integers on the platform the oracle
-    * measures, not because they are portable. */
+  /** Integer types whose width is fixed by the **language**, not by the target.
+    *
+    * `long` is not here, and its absence is the point. `long` is 64 bits under LP64
+    * (Linux and macOS on x86-64 and arm64) and 32 bits under LLP64 (Windows): its width
+    * is a property of the target *data model*, not of C. It used to be mapped to `i32`,
+    * which meant `(long)x` truncated to 32 bits on the very platforms both C corpora
+    * target — a well-typed, hole-free, silently wrong translation, which is the one
+    * failure mode the ledger cannot see, because a hole-free function is what it counts
+    * as good. The same is true of `size_t`, `ssize_t`, `ptrdiff_t`, `intptr_t` and
+    * `uintptr_t`, all of which are pointer- or target-sized; they live in
+    * `modelDependentInts` below and are resolved only against a *stated* data model.
+    *
+    * `char` is deliberately absent for a different reason: its signedness is
+    * implementation-defined, so `(char)300` has no standard-mandated value.
+    *
+    * The kernel's `s8`..`u64` and `__s8`..`__u64` **are** here: those spellings exist
+    * precisely to name an exact width and mean the same thing on every target. `__le32`
+    * and friends are not, because their value is byte-swapped as well as narrowed and
+    * only the narrowing would be modelled. */
   val intTypeNames: Map[String, String] = Map(
-    "int8_t" -> "i8", "signedchar" -> "i8",
-    "uint8_t" -> "u8", "unsignedchar" -> "u8",
-    "int16_t" -> "i16", "short" -> "i16", "shortint" -> "i16",
-    "uint16_t" -> "u16", "unsignedshort" -> "u16",
-    "int32_t" -> "i32", "int" -> "i32", "signedint" -> "i32", "long" -> "i32",
-    "uint32_t" -> "u32", "unsignedint" -> "u32", "unsigned" -> "u32",
-    "int64_t" -> "i64", "longlong" -> "i64", "ptrdiff_t" -> "i64",
-    "uint64_t" -> "u64", "unsignedlonglong" -> "u64", "size_t" -> "u64",
-    "uintptr_t" -> "u64"
+    "int8_t" -> "i8", "signedchar" -> "i8", "s8" -> "i8", "__s8" -> "i8",
+    "uint8_t" -> "u8", "unsignedchar" -> "u8", "u8" -> "u8", "__u8" -> "u8",
+    "int16_t" -> "i16", "short" -> "i16", "shortint" -> "i16", "s16" -> "i16",
+    "__s16" -> "i16",
+    "uint16_t" -> "u16", "unsignedshort" -> "u16", "u16" -> "u16", "__u16" -> "u16",
+    "int32_t" -> "i32", "int" -> "i32", "signedint" -> "i32", "s32" -> "i32",
+    "__s32" -> "i32",
+    "uint32_t" -> "u32", "unsignedint" -> "u32", "unsigned" -> "u32", "u32" -> "u32",
+    "__u32" -> "u32",
+    "int64_t" -> "i64", "longlong" -> "i64", "s64" -> "i64", "__s64" -> "i64",
+    "uint64_t" -> "u64", "unsignedlonglong" -> "u64", "u64" -> "u64", "__u64" -> "u64"
   )
+
+  /** Integer types whose width is a property of the **target data model**.
+    *
+    * Three models are tabulated. `lp64` is Linux/macOS/BSD on any 64-bit architecture and
+    * is the default, because that is what both C corpora — the Linux kernel and V8 — are
+    * built for. `llp64` is 64-bit Windows, where `long` stays 32 bits. `ilp32` is any
+    * 32-bit target. Passing `--param dataModel=unknown` (or any unlisted name) makes every
+    * one of these types a hole labelled `op:cast:model-dependent`, which is the honest
+    * answer when the model is not known: the alternative is to guess a width silently,
+    * and guessing a width silently is exactly the defect this table exists to remove.
+    *
+    * The assumption does not have to be taken on trust when reading the output: the
+    * emitted operator names the width it chose, so `(long)x` under `lp64` renders as
+    * `Expr.unop "cast:i64"` and under `llp64` as `"cast:i32"`. The number is in the
+    * artifact, at every site. */
+  val dataModelTable: Map[String, Map[String, String]] = Map(
+    "lp64" -> Map(
+      "long" -> "i64", "longint" -> "i64", "signedlong" -> "i64",
+      "unsignedlong" -> "u64", "longunsigned" -> "u64", "unsignedlongint" -> "u64",
+      "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
+      "intptr_t" -> "i64", "uintptr_t" -> "u64"),
+    "llp64" -> Map(
+      "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
+      "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
+      "intptr_t" -> "i64", "uintptr_t" -> "u64"),
+    "ilp32" -> Map(
+      "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
+      "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "size_t" -> "u32", "ssize_t" -> "i32", "ptrdiff_t" -> "i32",
+      "intptr_t" -> "i32", "uintptr_t" -> "u32")
+  )
+
+  /** Every type name whose width depends on the model, whichever model is in force. */
+  val modelDependentNames: Set[String] = dataModelTable.values.flatMap(_.keys).toSet
+
+  /** The widths in force, empty when the model is unknown. */
+  val modelInts: Map[String, String] =
+    dataModelTable.getOrElse(dataModel.toLowerCase, Map.empty)
 
   /** The typedef graph, taken from the CPG rather than from a table of names we happen to
     * recognise.
@@ -659,6 +783,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     var go   = true
     while (go) {
       if (intTypeNames.contains(t)) { res = intTypeNames.get(t); go = false }
+      else if (modelInts.contains(t)) { res = modelInts.get(t); go = false }
       else if (seen.contains(t) || isPointerType(t) || t.contains("(")) go = false
       else {
         seen += t
@@ -691,7 +816,8 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   /** `char` is deliberately absent from `intTypeNames`: its signedness is
     * implementation-defined, so `static_cast<char>(300)` has no standard-mandated value.
     * Naming it separately keeps the hole label specific instead of guessing a sign. */
-  def isArithType(ty: String): Boolean = intTypeNames.contains(bareType(ty))
+  def isArithType(ty: String): Boolean =
+    intTypeNames.contains(bareType(ty)) || modelDependentNames.contains(bareType(ty))
 
   /** Aggregates — struct, union, class — for which the CPG carries **positive
     * evidence**: a TypeDecl that has members, or (C++) one that has methods.
@@ -1171,6 +1297,88 @@ import io.shiftleft.codepropertygraph.generated.nodes._
                       "m" -> mangleName(m, currentClass),
                       "args" -> argExprs(args.filterNot(isKeywordArg), args.filter(isKeywordArg)))
 
+  /** Which right-shift `a >> b` is, from the left operand's static type.
+    *
+    * `None` means the type is unrecovered (`ANY`, an opaque typedef), and then neither
+    * `">>"` nor `">>>"` can be justified — 531 of `crypto/`'s 1,545 right shifts are in
+    * that state. The caller turns it into `op:shiftRight:unknown-signedness`, which names
+    * the missing *type* rather than pretending to a semantics.
+    *
+    * A `char*` operand cannot reach here (shifting a pointer is not C). */
+  def shiftRightOp(lhs: AstNode): Option[String] =
+    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, JS, Python: the token is unambiguous
+    else {
+      val b = bareType(staticTypeOf(lhs))
+      if (signedTypeNames.contains(b)) Some(">>")
+      else if (unsignedTypeNames.contains(b)) Some(">>>")
+      else None
+    }
+
+  /** One element of a brace initializer, classified.
+    *
+    * C gives an element three spellings and they are three different things:
+    *
+    *   `{ 1, 2, 3 }`               positional  — order *is* the meaning
+    *   `{ .name = "x" }`           a **field** designator
+    *   `{ [IDX] = v }`             an **index** designator — position is `IDX`, not the
+    *                               element's place in the list
+    *
+    * Joern spells the two designated forms identically (an `<operator>.assignment` whose
+    * left child is an Identifier), and only the source text separates them. The index
+    * form must not be read positionally: `{ [3] = 7 }` is a four-element array whose
+    * fourth entry is 7, and emitting `[7]` would be a one-element list with the wrong
+    * value at the wrong place — the exact silent-wrong-answer failure mode. It gets its
+    * own hole. */
+  def initElement(n: AstNode): (String, Option[String], AstNode) = n match {
+    case c: Call if c.methodFullName == "<operator>.assignment" && c.code.trim.startsWith(".") =>
+      kidsOf(c) match {
+        case (i: Identifier) :: v :: Nil => ("field", Some(i.name), v)
+        case _                           => ("shape", None, n)
+      }
+    case c: Call if c.methodFullName == "<operator>.assignment" && c.code.trim.startsWith("[") =>
+      ("index", None, n)
+    case other => ("plain", None, other)
+  }
+
+  /** `<operator>.arrayInitializer`, which is **two unrelated constructs** sharing a name.
+    *
+    * 1. A brace initializer, `{ ... }`: each child is a BLOCK wrapping one element.
+    *    - all-positional  -> `Expr.listE`. A C array is an ordered sequence of values and
+    *      that is what `Val.list` is; `a[i]` already maps to `Expr.index`, so the reads
+    *      work. (Writes do not: `Stmt.setIndex` on a `Val.list` is Core's known
+    *      immutable-container hole, unchanged by this.)
+    *    - all-field-designated -> `Expr.dictE` keyed by the field names. A struct literal
+    *      is a finite map from field names to values, C copies structs by value, and
+    *      `Dialect.fieldsOnDicts` makes `s.f` read it back. This is what makes the
+    *      kernel's `static struct x foo = { .a = 1 }` tables mean something.
+    *    - anything mixed, or an index designator anywhere -> a hole naming which.
+    *
+    * 2. An array **declarator**: `u8 buf[NH_KEY_WORDS]` arrives as an arrayInitializer
+    *    whose single child is the *size*, in statement position. It is a declaration, not
+    *    a value, and modelling it needs the size model this project does not have — so it
+    *    keeps a hole, but under `op:arrayDecl:size`, which says what it actually is
+    *    rather than filing it with the initializers it has nothing to do with. */
+  def arrayInit(kids: List[AstNode]): ujson.Obj =
+    if (kids.isEmpty) hole("op:arrayInitializer:zero-init")
+    else if (!kids.forall(_.isInstanceOf[Block])) hole("op:arrayDecl:size")
+    else {
+      val inner = kids.map(b => kidsOf(b))
+      if (!inner.forall(_.size == 1)) hole("op:arrayInitializer:element-shape")
+      else {
+        val es = inner.map(_.head).map(initElement)
+        val kinds = es.map(_._1).distinct
+        if (kinds == List("plain"))
+          ujson.Obj("k" -> "listE", "items" -> ujson.Arr.from(es.map(e => expr(e._3))))
+        else if (kinds == List("field"))
+          ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr.from(es.map { e =>
+            ujson.Arr(ujson.Obj("k" -> "str", "v" -> e._2.get), expr(e._3))
+          }))
+        else if (kinds.contains("index")) hole("op:arrayInitializer:index-designator")
+        else if (kinds.contains("shape")) hole("op:arrayInitializer:element-shape")
+        else hole("op:arrayInitializer:mixed-designators")
+      }
+    }
+
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
     val mfn  = c.methodFullName
@@ -1185,6 +1393,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       hole(cStringUnsafe(mfn))
     else if (binops.contains(mfn) && kids.size == 2)
       ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+    else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2)
+      shiftRightOp(kids(0)) match {
+        case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
+                                   "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+        case None     => hole("op:shiftRight:unknown-signedness")
+      }
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
     else if (indexOps.contains(mfn) && kids.size == 2)
@@ -1264,6 +1478,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         case None =>
           if (bareType(tty) == "void")
             (if (pureExpr(kids(1))) ujson.Obj("k" -> "unit") else expr(kids(1)))
+          // The width is known to be a function of the target and the target was not
+          // stated. Distinct from `op:cast:scalar`, which is a missing *model*, and from
+          // `op:cast:opaque-type`, which is a missing *type*: this one is closed by
+          // naming a data model, not by a better frontend.
+          else if (modelDependentNames.contains(bareType(tty)))
+            hole("op:cast:model-dependent")
           else hole("op:cast:" + addrKind(tty))
       }
     }
@@ -1340,6 +1560,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       hole(if (kids.nonEmpty) "op:alloc:array-decl"
            else if (inCtorShape(c)) "op:alloc:ctor-unresolved-class"
            else "op:alloc:ctor-shape")
+    else if (mfn == "<operator>.arrayInitializer") arrayInit(kids)
     // `static_assert(cond)` / `static_assert(cond, "msg")`.
     //
     // This is the one construct in the C++ ledger that is genuinely *nothing* at run time,
@@ -1521,6 +1742,75 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case _ => None
   }
 
+  /** Run `f` with `gotoAsBreak` cleared, and restore it afterwards.
+    *
+    * Used when descending into a loop body. `methodBody` has already proved that no
+    * `goto` sits inside a loop, so this changes nothing today; it is here so that if that
+    * proof is ever weakened, the failure is a `control:GOTO` hole rather than a `break`
+    * that silently leaves the wrong loop. */
+  def outsideLoopScope[A](f: => A): A = {
+    val saved = gotoAsBreak
+    gotoAsBreak = None
+    val r = f
+    gotoAsBreak = saved
+    r
+  }
+
+  /** Rewrite every `continue` that belongs to *this* loop into `step; continue`.
+    *
+    * This is the whole of the `for`/`while` difference, and it is why the textbook
+    * desugaring is not enough. `for (i = 0; i < n; i++) { if (p) continue; f(i); }`
+    * becomes `i = 0; while (i < n) { ...; i++ }`, and a `continue` in the body jumps
+    * straight back to the test **without running `i++`** — an infinite loop, from a
+    * translation that type-checks and looks right. C's `continue` in a `for` jumps to the
+    * *step*, so putting a copy of the step in front of each `continue` is not an
+    * approximation: it is exactly what the standard says, and it is why this does not
+    * need a hole.
+    *
+    * The recursion stops at `loop` and `forIn`, because a `continue` inside a nested loop
+    * belongs to *that* loop and must not be given this one's step. `break` is left alone:
+    * C's `break` leaves the loop without running the step, which is what the desugared
+    * `break` already does.
+    *
+    * Duplicating the step is safe however many times it appears — each copy runs on a
+    * path where the original would have run exactly once. */
+  def pushStep(v: ujson.Value, step: ujson.Value): ujson.Value = v match {
+    case o: ujson.Obj =>
+      o.value.get("k").map(_.str) match {
+        case Some("cont") =>
+          ujson.Obj("k" -> "seq", "a" -> step, "b" -> ujson.Obj("k" -> "cont"))
+        case Some("loop") | Some("forIn") => o
+        case _ =>
+          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushStep(x, step)) })
+      }
+    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushStep(x, step)))
+    case other        => other
+  }
+
+  /** A C-family `for (init; cond; step) body`.
+    *
+    *     init; while (cond) { body-with-step-before-each-continue; step }
+    *
+    * Joern gives the four clauses as the FOR node's children in source order, with `body`
+    * last, and **omits** any clause the source left out — so a node with fewer than four
+    * children is ambiguous (is the single expression the condition or the step?) and there
+    * is nothing in the graph that says which. Those keep a hole that names the ambiguity
+    * rather than picking. Measured on `crypto/`: 194 of 205 `for`s carry all four.
+    *
+    * `LOCAL` children (`for (int i = 0; ...)`) are declarations and carry no behaviour;
+    * the initializing assignment is a separate child and is kept. */
+  def forStmt(cs: ControlStructure): ujson.Obj = {
+    val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
+    if (ks.size != 4) holeS("control:FOR:elided-clause")
+    else outsideLoopScope {
+      val step = stmt(ks(2))
+      val body = pushStep(stmt(ks(3)), step)
+      seqOf(List(stmt(ks(0)),
+                 ujson.Obj("k" -> "loop", "c" -> expr(ks(1)),
+                           "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
+    }
+  }
+
   /** Assignment, including the augmented forms, to any of the three target shapes. */
   def assignTo(lhs: AstNode, rhs: AstNode, aug: Option[String]): ujson.Obj = {
     val (prelude, rhsE) = valueOf(rhs)
@@ -1642,12 +1932,21 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         case lhs :: rhs :: Nil => assignTo(lhs, rhs, None)
         case _                 => holeS("assign:arity")
       }
-    case c: Call if c.methodFullName == "<operator>.assignmentPlus" ||
-                    c.methodFullName == "<operator>.assignmentMinus" =>
-      val op = if (c.methodFullName.endsWith("Plus")) "+" else "-"
+    case c: Call if augOps.contains(c.methodFullName) =>
       kidsOf(c) match {
-        case lhs :: rhs :: Nil => assignTo(lhs, rhs, Some(op))
+        case lhs :: rhs :: Nil => assignTo(lhs, rhs, Some(augOps(c.methodFullName)))
         case _                 => holeS("assign:arity")
+      }
+    // `x >>= n`. Same two-operators-one-token problem as `>>`, and the target's type is
+    // what decides; an unrecovered type is a hole rather than a guessed sign.
+    case c: Call if c.methodFullName == "<operator>.assignmentArithmeticShiftRight" =>
+      kidsOf(c) match {
+        case lhs :: rhs :: Nil =>
+          shiftRightOp(lhs) match {
+            case Some(op) => assignTo(lhs, rhs, Some(op))
+            case None     => holeS("op:shiftRight:unknown-signedness")
+          }
+        case _ => holeS("assign:arity")
       }
     case c: Call if incrOps.contains(c.methodFullName) =>
       kidsOf(c) match {
@@ -1686,7 +1985,15 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           // A `while` whose condition is the frontend's synthetic iterator probe only
           // makes sense inside the `for` shape above; on its own it is not a condition.
           if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
-          else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)), "body" -> stmt(kids(1)))
+          else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
+                         "body" -> outsideLoopScope(stmt(kids(1))))
+        case "FOR"      => forStmt(cs)
+        // `goto L` where `L` has been proved to be the single forward exit label of this
+        // function, and this `goto` is not inside any loop or switch: see `methodBody`.
+        // Everything else keeps the `control:GOTO` hole.
+        case "GOTO" if gotoAsBreak.isDefined &&
+                       kids.map(_.code.trim) == List(gotoAsBreak.get) =>
+          ujson.Obj("k" -> "brk")
         case "BREAK"    => ujson.Obj("k" -> "brk")
         case "CONTINUE" => ujson.Obj("k" -> "cont")
         case "ELSE" | "CATCH" | "FINALLY" => seqOf(kids.map(stmt))
@@ -1829,6 +2136,95 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     }
   }
 
+  /** The AST parent of a node, or `None` for a root. `astParent` throws on a root. */
+  def parentOf(n: AstNode): Option[AstNode] = scala.util.Try(n.astParent).toOption
+
+  /** A method body, translating the kernel's `goto out;` idiom when — and only when — it
+    * is a *reducible forward jump to a tail label*, which is structured control flow
+    * wearing an unstructured spelling.
+    *
+    *     A;  if (e) goto out;  B;  out:  C;  return r;
+    *
+    * is exactly
+    *
+    *     while (true) { A; if (e) break; B; break }   C;  return r;
+    *
+    * The `while (true) { ...; break }` runs its body once; a jump inside it is a `break`,
+    * which leaves for `C`. Nothing is invented: `Stmt.loop` plus `Stmt.brk` already mean
+    * "a block you can jump out of", and that is all this jump is. `return` passes
+    * straight through a loop, so the early-return paths are unaffected.
+    *
+    * **Every one of these conditions is load-bearing**, and each one, dropped, turns the
+    * translation from correct into silently wrong rather than into a hole:
+    *
+    *  - Exactly **one** label in the function, and every jump targets it. Two labels need
+    *    two nested wrappers and a choice about which; jumps between them can be
+    *    irreducible, and an irreducible flow graph is not structured control flow at all.
+    *  - The label is a **direct child of the function body**, so "the rest of the
+    *    function" is a suffix of one statement list rather than a jump into the middle of
+    *    a nested block.
+    *  - Every jump is **before** the label in that list — a *forward* jump. A backward one
+    *    is a loop, and this encoding would turn it into a straight line.
+    *  - No jump is inside a `for`/`while`/`do`/`switch`. This is the one that would bite:
+    *    `break` inside a loop leaves *that* loop, so the jump would land in the wrong
+    *    place and the program would still type-check. (`switch` is a hole today, so its
+    *    body is not translated at all — but the check does not rely on that.)
+    *
+    * Measured on `crypto/`: 234 functions contain a jump of this kind, 161 have a single
+    * label, 105 of those are forward jumps to a tail label, and 82 also clear the loop
+    * condition. The other 152 keep `control:GOTO`, which is the honest answer for them. */
+  def methodBody(m: Method): ujson.Obj = {
+    val body   = m.body
+    val ks     = kidsOf(body)
+    val labels = body.ast.collect {
+      case j: JumpTarget if j.parserTypeName == "CASTLabelStatement" => j
+    }.l
+    val jumps  = body.ast.collect {
+      case c: ControlStructure if c.controlStructureType == "GOTO" => c
+    }.l
+    val idx = ks.indexWhere {
+      case j: JumpTarget => j.parserTypeName == "CASTLabelStatement"
+      case _             => false
+    }
+    def ancestorsTo(n: AstNode): List[AstNode] = {
+      var cur = n; var acc = List.empty[AstNode]; var guard = 0
+      while (guard < 500 && !(cur eq body) && parentOf(cur).isDefined) {
+        guard += 1; cur = parentOf(cur).get; acc = cur :: acc
+      }
+      acc
+    }
+    def insideLoop(n: AstNode): Boolean = ancestorsTo(n).exists {
+      case cs: ControlStructure =>
+        Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType)
+      case _ => false
+    }
+    def topIndex(n: AstNode): Int = {
+      var cur = n; var guard = 0
+      while (guard < 500 && parentOf(cur).isDefined && !(parentOf(cur).get eq body)) {
+        guard += 1; cur = parentOf(cur).get
+      }
+      ks.indexWhere(_ eq cur)
+    }
+    val targets = jumps.flatMap(g => kidsOf(g).map(_.code.trim)).distinct
+    val ok =
+      jumps.nonEmpty && labels.size == 1 && idx >= 0 && (labels.head eq ks(idx)) &&
+      targets == List(labels.head.name) &&
+      jumps.forall(g => !insideLoop(g) && { val i = topIndex(g); i >= 0 && i < idx })
+    if (!ok) stmt(body)
+    else {
+      val saved = gotoAsBreak
+      gotoAsBreak = Some(labels.head.name)
+      val prefix = seqOf(stmts(ks.take(idx)))
+      gotoAsBreak = saved
+      val suffix = seqOf(stmts(ks.drop(idx + 1)))
+      ujson.Obj("k" -> "seq",
+        "a" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                         "body" -> ujson.Obj("k" -> "seq", "a" -> prefix,
+                                             "b" -> ujson.Obj("k" -> "brk"))),
+        "b" -> suffix)
+    }
+  }
+
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
@@ -1867,7 +2263,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       .filter(c => fieldOps.contains(c.methodFullName)).l
       .flatMap(fa => asField(fa).collect { case (r: Identifier, f) => r.name -> f })
       .groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
-    val body = stmt(m.body)
+    val body = methodBody(m)
     moduleScope = false
     localTypes = Map.empty
     valueReceivers = Set.empty
@@ -1941,6 +2337,8 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case _            => 0
   }
   val doc = ujson.Arr.from(all)
+  println(s"data model assumed for target-sized integer types: ${dataModel.toLowerCase}"
+        + (if (modelInts.isEmpty) " (UNKNOWN -- `long`/`size_t` casts are holes)" else ""))
   println(s"exported ${funcs.size} functions + ${inits.size} module initializers to $out "
         + s"(${countKind(doc, "closure")} closures, ${countKind(doc, "setGlobal")} global writes)")
 }

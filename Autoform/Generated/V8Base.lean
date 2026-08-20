@@ -45,7 +45,7 @@ def f_v8_base_bits_SignedMulHigh32_int32_t_int32_t_int32_t_ : Func :=
                       [ (.binop
                           ">"
                           (.binop "<" (.field (.name "base") "bit_cast") (.name "uint64_t"))
-                          (.hole "op:arithmeticShiftRight")) ])))))) }
+                          (.binop ">>" (.name "value") (.lit (.int 32)))) ])))))) }
 
 /-- `v8.base.bits.SignedMulHigh64:int64_t(int64_t,int64_t)`  (from `bits.cc`) -/
 def f_v8_base_bits_SignedMulHigh64_int64_t_int64_t_int64_t_ : Func :=
@@ -54,19 +54,19 @@ def f_v8_base_bits_SignedMulHigh64_int64_t_int64_t_int64_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "u0" (.hole "op:and"))
+              (.assign "u0" (.binop "&" (.name "u") (.lit (.int 4294967295))))
               (.seq
                 .skip
                 (.seq
-                  (.assign "u1" (.hole "op:arithmeticShiftRight"))
+                  (.assign "u1" (.binop ">>" (.name "u") (.lit (.int 32))))
                   (.seq
                     .skip
                     (.seq
-                      (.assign "v0" (.hole "op:and"))
+                      (.assign "v0" (.binop "&" (.name "v") (.lit (.int 4294967295))))
                       (.seq
                         .skip
                         (.seq
-                          (.assign "v1" (.hole "op:arithmeticShiftRight"))
+                          (.assign "v1" (.binop ">>" (.name "v") (.lit (.int 32))))
                           (.seq
                             .skip
                             (.seq
@@ -79,15 +79,17 @@ def f_v8_base_bits_SignedMulHigh64_int64_t_int64_t_int64_t_ : Func :=
                                     (.binop
                                       "+"
                                       (.binop "*" (.name "u1") (.name "v0"))
-                                      (.hole "op:arithmeticShiftRight")))
+                                      (.binop ">>>" (.name "w0") (.lit (.int 32)))))
                                   (.seq
                                     .skip
                                     (.seq
-                                      (.assign "w1" (.hole "op:and"))
+                                      (.assign
+                                        "w1"
+                                        (.binop "&" (.name "t") (.lit (.int 4294967295))))
                                       (.seq
                                         .skip
                                         (.seq
-                                        (.assign "w2" (.hole "op:arithmeticShiftRight"))
+                                        (.assign "w2" (.binop ">>" (.name "t") (.lit (.int 32))))
                                         (.seq
                                         (.assign
                                         "w1"
@@ -102,7 +104,7 @@ def f_v8_base_bits_SignedMulHigh64_int64_t_int64_t_int64_t_ : Func :=
                                         "+"
                                         (.binop "*" (.name "u1") (.name "v1"))
                                         (.name "w2"))
-                                        (.hole "op:arithmeticShiftRight")))))))))))))))))))) }
+                                        (.binop ">>" (.name "w1") (.lit (.int 32)))))))))))))))))))))) }
 
 /-- `v8.base.bits.UnsignedMulHigh64:uint64_t(uint64_t,uint64_t)`  (from `bits.cc`) -/
 def f_v8_base_bits_UnsignedMulHigh64_uint64_t_uint64_t_uint64_t_ : Func :=
@@ -111,19 +113,19 @@ def f_v8_base_bits_UnsignedMulHigh64_uint64_t_uint64_t_uint64_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "u0" (.hole "op:and"))
+              (.assign "u0" (.binop "&" (.name "u") (.lit (.int 4294967295))))
               (.seq
                 .skip
                 (.seq
-                  (.assign "u1" (.hole "op:arithmeticShiftRight"))
+                  (.assign "u1" (.binop ">>>" (.name "u") (.lit (.int 32))))
                   (.seq
                     .skip
                     (.seq
-                      (.assign "v0" (.hole "op:and"))
+                      (.assign "v0" (.binop "&" (.name "v") (.lit (.int 4294967295))))
                       (.seq
                         .skip
                         (.seq
-                          (.assign "v1" (.hole "op:arithmeticShiftRight"))
+                          (.assign "v1" (.binop ">>>" (.name "v") (.lit (.int 32))))
                           (.seq
                             .skip
                             (.seq
@@ -136,15 +138,17 @@ def f_v8_base_bits_UnsignedMulHigh64_uint64_t_uint64_t_uint64_t_ : Func :=
                                     (.binop
                                       "+"
                                       (.binop "*" (.name "u1") (.name "v0"))
-                                      (.hole "op:arithmeticShiftRight")))
+                                      (.binop ">>>" (.name "w0") (.lit (.int 32)))))
                                   (.seq
                                     .skip
                                     (.seq
-                                      (.assign "w1" (.hole "op:and"))
+                                      (.assign
+                                        "w1"
+                                        (.binop "&" (.name "t") (.lit (.int 4294967295))))
                                       (.seq
                                         .skip
                                         (.seq
-                                        (.assign "w2" (.hole "op:arithmeticShiftRight"))
+                                        (.assign "w2" (.binop ">>>" (.name "t") (.lit (.int 32))))
                                         (.seq
                                         (.assign
                                         "w1"
@@ -159,7 +163,7 @@ def f_v8_base_bits_UnsignedMulHigh64_uint64_t_uint64_t_uint64_t_ : Func :=
                                         "+"
                                         (.binop "*" (.name "u1") (.name "v1"))
                                         (.name "w2"))
-                                        (.hole "op:arithmeticShiftRight")))))))))))))))))))) }
+                                        (.binop ">>>" (.name "w1") (.lit (.int 32)))))))))))))))))))))) }
 
 /-- `v8.base.bits.UnsignedMulHigh32:uint32_t(uint32_t,uint32_t)`  (from `bits.cc`) -/
 def f_v8_base_bits_UnsignedMulHigh32_uint32_t_uint32_t_uint32_t_ : Func :=
@@ -171,7 +175,7 @@ def f_v8_base_bits_UnsignedMulHigh32_uint32_t_uint32_t_uint32_t_ : Func :=
               (.assign
                 "value"
                 (.binop "*" (.unop "cast:u64" (.name "lhs")) (.unop "cast:u64" (.name "rhs"))))
-              (.ret (.unop "cast:u32" (.hole "op:arithmeticShiftRight"))))) }
+              (.ret (.unop "cast:u32" (.binop ">>>" (.name "value") (.lit (.int 32))))))) }
 
 /-- `v8.base.bits.SignedMulHighAndAdd32:int32_t(int32_t,int32_t,int32_t)`  (from `bits.cc`) -/
 def f_v8_base_bits_SignedMulHighAndAdd32_int32_t_int32_t_int32_t_int32_t_ : Func :=
@@ -1303,7 +1307,26 @@ def f_v8_base_debug_StackTrace_Print_void___const_ : Func :=
 def f_v8_base_debug_StackTrace_OutputToStream_void_std_ostream___const_ : Func :=
   { name := "v8.base.debug.StackTrace.OutputToStream:void(std.ostream*)<const>"
   , params := ["os"]
-  , body := (.hole "control:FOR") }
+  , body := (.seq
+            (.assign "i" (.lit (.int 0)))
+            (.loop
+              (.binop "<" (.name "i") (.field (.name "self") "count_"))
+              (.seq
+                (.expr
+                  (.binop
+                    "<<"
+                    (.binop
+                      "<<"
+                      (.binop
+                        "<<"
+                        (.binop
+                          "<<"
+                          (.binop "<<" (.hole "op:indirection:pointer") (.lit (.str "#")))
+                          (.call "setw" [(.lit (.int 2))]))
+                        (.name "i"))
+                      (.index (.field (.name "self") "trace_") (.name "i")))
+                    (.lit (.str "\\n"))))
+                (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))) }
 
 /-- `v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()`  (from `debug/stack_trace_fuchsia.cc`) -/
 def f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__ : Func :=
@@ -1340,7 +1363,26 @@ def f_v8_base_debug_StackTrace_Print_duplicate_0_void___const_ : Func :=
 def f_v8_base_debug_StackTrace_OutputToStream_duplicate_0_void_std_ostream___const_ : Func :=
   { name := "v8.base.debug.StackTrace.OutputToStream<duplicate>0:void(std.ostream*)<const>"
   , params := ["os"]
-  , body := (.hole "control:FOR") }
+  , body := (.seq
+            (.assign "i" (.lit (.int 0)))
+            (.loop
+              (.binop "<" (.name "i") (.field (.name "self") "count_"))
+              (.seq
+                (.expr
+                  (.binop
+                    "<<"
+                    (.binop
+                      "<<"
+                      (.binop
+                        "<<"
+                        (.binop
+                          "<<"
+                          (.binop "<<" (.hole "op:indirection:pointer") (.lit (.str "#")))
+                          (.call "setw" [(.lit (.int 2))]))
+                        (.name "i"))
+                      (.index (.field (.name "self") "trace_") (.name "i")))
+                    (.lit (.str "\\n"))))
+                (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))) }
 
 /-- `v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>`  (from `debug/stack_trace_posix.cc`) -/
 def f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_ : Func :=
@@ -1446,7 +1488,7 @@ def f_v8_base_debug_StackDumpSignalHandler_void_int_siginfo_t__void__ : Func :=
                                         (.seq
                                         (.assign "buf" (.hole "op:alloc:array-decl"))
                                         (.seq
-                                        (.assign "buf" (.hole "op:arrayInitializer"))
+                                        (.assign "buf" (.hole "op:arrayDecl:size"))
                                         (.seq
                                         (.expr
                                         (.call
@@ -1683,7 +1725,7 @@ def f_v8_base_debug_StackDumpSignalHandler_void_int_siginfo_t__void__ : Func :=
                                         (.expr
                                         (.call
                                         "itoa_r"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.unop "cast:i64" (.field (.name "info") "si_addr"))
                                         , (.name "buf")
                                         , (.hole "op:sizeOf")
                                         , (.lit (.int 16))
@@ -1772,7 +1814,7 @@ def f_v8_base_debug_StreamBacktraceOutputHandler___v8_base_debug__StreamBacktrac
 def f_v8_base_debug_StreamBacktraceOutputHandler_HandleOutput_void_char__ : Func :=
   { name := "v8.base.debug.StreamBacktraceOutputHandler.HandleOutput:void(char*)"
   , params := ["output"]
-  , body := (.seq .skip (.expr (.hole "op:shiftLeft"))) }
+  , body := (.seq .skip (.expr (.binop "<<" (.hole "op:indirection:unknown-type") (.name "output")))) }
 
 /-- `v8.base.debug.WarmUpBacktrace:void()`  (from `debug/stack_trace_posix.cc`) -/
 def f_v8_base_debug_WarmUpBacktrace_void__ : Func :=
@@ -1848,7 +1890,13 @@ def f_v8_base_debug_EnableInProcessStackDumping_duplicate_1_bool__ : Func :=
                                         "memset"
                                         [(.name "action"), (.lit (.int 0)), (.hole "op:sizeOf")]))
                                         (.seq
-                                        (.setField (.name "action") "sa_flags" (.hole "op:or"))
+                                        (.setField
+                                        (.name "action")
+                                        "sa_flags"
+                                        (.binop
+                                        "|"
+                                        (.binop "|" (.name "SA_RESETHAND") (.name "SA_SIGINFO"))
+                                        (.name "SA_ONSTACK")))
                                         (.seq
                                         (.setField
                                         (.name "action")
@@ -2068,7 +2116,16 @@ def f_v8_base_debug_InitializeSymbols_bool__ : Func :=
                                     (.seq
                                       (.assign "g_initialized_symbols" (.lit (.bool true)))
                                       (.seq
-                                        (.expr (.call "SymSetOptions" [(.hole "op:or")]))
+                                        (.expr
+                                        (.call
+                                        "SymSetOptions"
+                                        [ (.binop
+                                        "|"
+                                        (.binop
+                                        "|"
+                                        (.name "SYMOPT_DEFERRED_LOADS")
+                                        (.name "SYMOPT_UNDNAME"))
+                                        (.name "SYMOPT_LOAD_LINES")) ]))
                                         (.seq
                                         (.ifte
                                         (.unop
@@ -2156,7 +2213,156 @@ def f_v8_base_debug_InitializeSymbols_bool__ : Func :=
 def f_v8_base_debug_OutputTraceToStream_void_void___size_t_std_ostream__ : Func :=
   { name := "v8.base.debug.OutputTraceToStream:void(void**,size_t,std.ostream*)"
   , params := ["trace", "count", "os"]
-  , body := (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.hole "control:FOR"))))) }
+  , body := (.seq
+            .skip
+            (.seq
+              .skip
+              (.seq
+                .skip
+                (.seq
+                  .skip
+                  (.seq
+                    (.assign "i" (.lit (.int 0)))
+                    (.loop
+                      (.binop "&&" (.binop "<" (.name "i") (.name "count")) (.call "good" []))
+                      (.seq
+                        (.seq
+                          .skip
+                          (.seq
+                            (.assign "kMaxNameLength" (.lit (.int 256)))
+                            (.seq
+                              .skip
+                              (.seq
+                                (.assign "frame" (.hole "op:cast:opaque-type"))
+                                (.seq
+                                  .skip
+                                  (.seq
+                                    (.assign "buffer" (.hole "op:alloc:array-decl"))
+                                    (.seq
+                                      (.expr
+                                        (.call
+                                        "memset"
+                                        [(.name "buffer"), (.lit (.int 0)), (.hole "op:sizeOf")]))
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "sym_displacement" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "symbol" (.hole "op:cast:object"))
+                                        (.seq
+                                        (.setField
+                                        (.name "symbol")
+                                        "SizeOfStruct"
+                                        (.hole "op:sizeOf"))
+                                        (.seq
+                                        (.setField
+                                        (.name "symbol")
+                                        "MaxNameLen"
+                                        (.binop "-" (.name "kMaxNameLength") (.lit (.int 1))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "has_symbol"
+                                        (.call
+                                        "SymFromAddr"
+                                        [ (.call "GetCurrentProcess" [])
+                                        , (.name "frame")
+                                        , (.hole "op:addressOf:local:opaque-type")
+                                        , (.name "symbol") ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "line_displacement" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "line" (.hole "op:arrayInitializer:zero-init"))
+                                        (.seq
+                                        (.setField
+                                        (.name "line")
+                                        "SizeOfStruct"
+                                        (.hole "op:sizeOf"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "has_line"
+                                        (.call
+                                        "SymGetLineFromAddr64"
+                                        [ (.call "GetCurrentProcess" [])
+                                        , (.name "frame")
+                                        , (.hole "op:addressOf:local:opaque-type")
+                                        , (.name "line") ]))
+                                        (.seq
+                                        (.expr
+                                        (.binop
+                                        "<<"
+                                        (.hole "op:indirection:pointer")
+                                        (.lit (.str "\\t"))))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "has_symbol") (.lit (.int 0)))
+                                        (.expr
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.hole "op:indirection:pointer")
+                                        (.field (.name "symbol") "Name"))
+                                        (.lit (.str " [0x")))
+                                        (.index (.name "trace") (.name "i")))
+                                        (.lit (.str "+")))
+                                        (.name "sym_displacement"))
+                                        (.lit (.str "]"))))
+                                        (.expr
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.hole "op:indirection:pointer")
+                                        (.lit (.str "(No symbol) [0x")))
+                                        (.index (.name "trace") (.name "i")))
+                                        (.lit (.str "]")))))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "has_line") (.lit (.int 0)))
+                                        (.expr
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.binop
+                                        "<<"
+                                        (.hole "op:indirection:pointer")
+                                        (.lit (.str " (")))
+                                        (.field (.name "line") "FileName"))
+                                        (.lit (.str ":")))
+                                        (.field (.name "line") "LineNumber"))
+                                        (.lit (.str ")"))))
+                                        .skip)
+                                        (.expr
+                                        (.binop
+                                        "<<"
+                                        (.hole "op:indirection:pointer")
+                                        (.lit (.str "\\n")))))))))))))))))))))))))))))
+                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))))))) }
 
 /-- `v8.base.debug.EnableInProcessStackDumping<duplicate>2:bool()`  (from `debug/stack_trace_win.cc`) -/
 def f_v8_base_debug_EnableInProcessStackDumping_duplicate_2_bool__ : Func :=
@@ -2244,7 +2450,10 @@ def f_StackTrace_InitTrace_void_CONTEXT__ : Func :=
                                   , (.name "context_record")
                                   , (.hole "op:sizeOf") ]))
                               (.seq
-                                (.setField (.name "context_copy") "ContextFlags" (.hole "op:or"))
+                                (.setField
+                                  (.name "context_copy")
+                                  "ContextFlags"
+                                  (.binop "|" (.name "CONTEXT_INTEGER") (.name "CONTEXT_CONTROL")))
                                 (.seq
                                   (.assign "count_" (.lit (.int 0)))
                                   (.seq
@@ -2313,7 +2522,16 @@ def f_StackTrace_InitTrace_void_CONTEXT__ : Func :=
                                         (.name "trace_")
                                         (.hole "op:postIncrement:value")
                                         (.hole "op:cast:pointer")))
-                                        (.hole "control:FOR")))))))))))))))))))))))) }
+                                        (.seq
+                                        (.assign "i" (.name "count_"))
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.call "arraysize" [(.name "trace_"), (.hole "op:sizeOf")]))
+                                        (.seq
+                                        (.setIndex (.name "trace_") (.name "i") (.lit .unit))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))))))))))))))))))))))))) }
 
 /-- `v8.base.debug.StackTrace.Print<duplicate>2:void()<const>`  (from `debug/stack_trace_win.cc`) -/
 def f_v8_base_debug_StackTrace_Print_duplicate_2_void___const_ : Func :=
@@ -2333,13 +2551,45 @@ def f_v8_base_debug_StackTrace_OutputToStream_duplicate_2_void_std_ostream___con
                 (.expr (.call "v8.base.debug.InitializeSymbols:bool()" []))
                 (.ifte
                   (.binop "!=" (.name "g_init_error") (.name "ERROR_SUCCESS"))
-                  (.seq (.expr (.hole "op:shiftLeft")) (.hole "control:FOR"))
                   (.seq
-                    (.expr (.hole "op:shiftLeft"))
+                    (.expr
+                      (.binop
+                        "<<"
+                        (.binop
+                          "<<"
+                          (.binop
+                            "<<"
+                            (.hole "op:indirection:pointer")
+                            (.lit (.str "Error initializing symbols (")))
+                          (.name "g_init_error"))
+                        (.lit (.str ").  Dumping unresolved backtrace:\\n"))))
                     (.seq
-                      (.expr (.hole "op:shiftLeft"))
+                      (.assign "i" (.lit (.int 0)))
+                      (.loop
+                        (.binop
+                          "&&"
+                          (.binop "<" (.name "i") (.field (.name "self") "count_"))
+                          (.call "good" []))
+                        (.seq
+                          (.expr
+                            (.binop
+                              "<<"
+                              (.binop
+                                "<<"
+                                (.binop "<<" (.hole "op:indirection:pointer") (.lit (.str "\\t")))
+                                (.index (.field (.name "self") "trace_") (.name "i")))
+                              (.lit (.str "\\n"))))
+                          (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))))
+                  (.seq
+                    (.expr (.binop "<<" (.hole "op:indirection:pointer") (.lit (.str "\\n"))))
+                    (.seq
+                      (.expr
+                        (.binop
+                          "<<"
+                          (.hole "op:indirection:pointer")
+                          (.lit (.str "==== C stack trace ===============================\\n"))))
                       (.seq
-                        (.expr (.hole "op:shiftLeft"))
+                        (.expr (.binop "<<" (.hole "op:indirection:pointer") (.lit (.str "\\n"))))
                         (.expr
                           (.mcall
                             (.name "self")
@@ -2544,7 +2794,13 @@ def f_v8_base_debug_StackDumpingSignalThread_void__void__ : Func :=
                                         "memset"
                                         [(.name "action"), (.lit (.int 0)), (.hole "op:sizeOf")]))
                                         (.seq
-                                        (.setField (.name "action") "sa_flags" (.hole "op:or"))
+                                        (.setField
+                                        (.name "action")
+                                        "sa_flags"
+                                        (.binop
+                                        "|"
+                                        (.binop "|" (.name "SA_RESETHAND") (.name "SA_SIGINFO"))
+                                        (.name "SA_ONSTACK")))
                                         (.seq
                                         (.setField
                                         (.name "action")
@@ -2745,11 +3001,18 @@ def f_SignedDivisionByConstant_MagicNumbersForDivision_T_ : Func :=
                   (.seq
                     .skip
                     (.seq
-                      (.assign "min" (.hole "op:shiftLeft"))
+                      (.assign
+                        "min"
+                        (.binop
+                          "<<"
+                          (.hole "op:cast:object")
+                          (.binop "-" (.name "bits") (.lit (.int 1)))))
                       (.seq
                         .skip
                         (.seq
-                          (.assign "neg" (.binop "!=" (.hole "op:and") (.lit (.int 0))))
+                          (.assign
+                            "neg"
+                            (.binop "!=" (.binop "&" (.name "min") (.name "d")) (.lit (.int 0))))
                           (.seq
                             .skip
                             (.seq
@@ -2764,7 +3027,10 @@ def f_SignedDivisionByConstant_MagicNumbersForDivision_T_ : Func :=
                                 (.seq
                                   (.assign
                                     "t"
-                                    (.binop "+" (.name "min") (.hole "op:arithmeticShiftRight")))
+                                    (.binop
+                                      "+"
+                                      (.name "min")
+                                      (.hole "op:shiftRight:unknown-signedness")))
                                   (.seq
                                     .skip
                                     (.seq
@@ -2852,15 +3118,20 @@ def f_v8_base_UnsignedDivisionByConstant_MagicNumbersForDivision_T_unsigned_ : F
                       (.seq
                         .skip
                         (.seq
-                          (.assign "ones" (.hole "op:arithmeticShiftRight"))
+                          (.assign "ones" (.hole "op:shiftRight:unknown-signedness"))
                           (.seq
                             .skip
                             (.seq
-                              (.assign "min" (.hole "op:shiftLeft"))
+                              (.assign
+                                "min"
+                                (.binop
+                                  "<<"
+                                  (.hole "op:cast:object")
+                                  (.binop "-" (.name "bits") (.lit (.int 1)))))
                               (.seq
                                 .skip
                                 (.seq
-                                  (.assign "max" (.hole "op:arithmeticShiftRight"))
+                                  (.assign "max" (.hole "op:shiftRight:unknown-signedness"))
                                   (.seq
                                     .skip
                                     (.seq
@@ -3059,7 +3330,63 @@ def f_v8_base_EmulatedVirtualAddressSubspace_AllocatePages_Address_v8_base_Addre
                         .skip
                         (.seq
                           (.assign "kMaxAttempts" (.lit (.int 10)))
-                          (.seq (.hole "control:FOR") (.ret (.name "kNullAddress"))))))))))) }
+                          (.seq
+                            (.seq
+                              (.assign "i" (.lit (.int 0)))
+                              (.loop
+                                (.binop "<" (.name "i") (.name "kMaxAttempts"))
+                                (.seq
+                                  (.seq
+                                    (.expr (.call "DCHECK_GE" [(.lit .unit)]))
+                                    (.seq
+                                      (.loop
+                                        (.unop
+                                        "!"
+                                        (.call
+                                        "UnmappedRegionContains"
+                                        [(.name "hint"), (.name "size")]))
+                                        (.assign
+                                        "hint"
+                                        (.call
+                                        "v8.base.EmulatedVirtualAddressSubspace.RandomPageAddress:ANY()"
+                                        [])))
+                                      (.seq
+                                        (.assign
+                                        "hint"
+                                        (.call "RoundDown" [(.name "hint"), (.name "alignment")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "result"
+                                        (.mcall
+                                        (.name "self")
+                                        "parent_space_"
+                                        [ (.name "hint")
+                                        , (.name "size")
+                                        , (.name "alignment")
+                                        , (.name "permissions") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.call
+                                        "UnmappedRegionContains"
+                                        [(.name "result"), (.name "size")])
+                                        (.ret (.name "result"))
+                                        (.ifte
+                                        (.binop "!=" (.name "result") (.lit (.int 0)))
+                                        (.expr
+                                        (.mcall
+                                        (.name "self")
+                                        "parent_space_"
+                                        [(.name "result"), (.name "size")]))
+                                        .skip))
+                                        (.assign
+                                        "hint"
+                                        (.call
+                                        "v8.base.EmulatedVirtualAddressSubspace.RandomPageAddress:ANY()"
+                                        []))))))))
+                                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                            (.ret (.name "kNullAddress"))))))))))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.FreePages:void(v8.base.Address,size_t)`  (from `emulated-virtual-address-subspace.cc`) -/
 def f_v8_base_EmulatedVirtualAddressSubspace_FreePages_void_v8_base_Address_size_t_ : Func :=
@@ -3100,7 +3427,58 @@ def f_v8_base_EmulatedVirtualAddressSubspace_AllocateSharedPages_Address_v8_base
                 .skip
                 (.seq
                   (.assign "kMaxAttempts" (.lit (.int 10)))
-                  (.seq (.hole "control:FOR") (.ret (.name "kNullAddress"))))))) }
+                  (.seq
+                    (.seq
+                      (.assign "i" (.lit (.int 0)))
+                      (.loop
+                        (.binop "<" (.name "i") (.name "kMaxAttempts"))
+                        (.seq
+                          (.seq
+                            (.expr (.call "DCHECK_GE" [(.lit .unit)]))
+                            (.seq
+                              (.loop
+                                (.unop
+                                  "!"
+                                  (.call "UnmappedRegionContains" [(.name "hint"), (.name "size")]))
+                                (.assign
+                                  "hint"
+                                  (.call
+                                    "v8.base.EmulatedVirtualAddressSubspace.RandomPageAddress:ANY()"
+                                    [])))
+                              (.seq
+                                .skip
+                                (.seq
+                                  (.assign
+                                    "region"
+                                    (.mcall
+                                      (.name "self")
+                                      "parent_space_"
+                                      [ (.name "hint")
+                                      , (.name "size")
+                                      , (.name "permissions")
+                                      , (.name "handle")
+                                      , (.name "offset") ]))
+                                  (.seq
+                                    (.ifte
+                                      (.call
+                                        "UnmappedRegionContains"
+                                        [(.name "region"), (.name "size")])
+                                      (.ret (.name "region"))
+                                      (.ifte
+                                        (.binop "!=" (.name "region") (.lit (.int 0)))
+                                        (.expr
+                                        (.mcall
+                                        (.name "self")
+                                        "parent_space_"
+                                        [(.name "region"), (.name "size")]))
+                                        .skip))
+                                    (.assign
+                                      "hint"
+                                      (.call
+                                        "v8.base.EmulatedVirtualAddressSubspace.RandomPageAddress:ANY()"
+                                        [])))))))
+                          (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                    (.ret (.name "kNullAddress"))))))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.FreeSharedPages:void(v8.base.Address,size_t)`  (from `emulated-virtual-address-subspace.cc`) -/
 def f_v8_base_EmulatedVirtualAddressSubspace_FreeSharedPages_void_v8_base_Address_size_t_ : Func :=
@@ -3335,7 +3713,13 @@ def f_v8_base_ieee754_acosh_double_double_ : Func :=
                                         (.call "v8.base.ieee754.log:double(double)" [(.name "x")])
                                         (.name "ln2"))))
                                   (.ifte
-                                    (.binop "==" (.hole "op:or") (.lit (.int 0)))
+                                    (.binop
+                                      "=="
+                                      (.binop
+                                        "|"
+                                        (.binop "-" (.name "hx") (.lit (.int 1072693248)))
+                                        (.name "lx"))
+                                      (.lit (.int 0)))
                                     (.ret (.hole "lit:float"))
                                     (.ifte
                                       (.binop ">" (.name "hx") (.lit (.int 1073741824)))
@@ -3411,7 +3795,9 @@ def f_v8_base_ieee754_asinh_double_double_ : Func :=
                                         , (.name "x")
                                         , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
-                                      (.assign "ix" (.hole "op:and"))
+                                      (.assign
+                                        "ix"
+                                        (.binop "&" (.name "hx") (.lit (.int 2147483647))))
                                       (.seq
                                         (.ifte
                                         (.binop ">=" (.name "ix") (.lit (.int 2146435072)))
@@ -3542,10 +3928,18 @@ def f_v8_base_ieee754_atanh_double_double_ : Func :=
                                         , (.name "x")
                                         , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
-                                      (.assign "ix" (.hole "op:and"))
+                                      (.assign
+                                        "ix"
+                                        (.binop "&" (.name "hx") (.lit (.int 2147483647))))
                                       (.seq
                                         (.ifte
-                                        (.binop ">" (.hole "op:or") (.lit (.int 1072693248)))
+                                        (.binop
+                                        ">"
+                                        (.binop
+                                        "|"
+                                        (.name "ix")
+                                        (.hole "op:shiftRight:unknown-signedness"))
+                                        (.lit (.int 1072693248)))
                                         (.ret (.call "signaling_NaN" []))
                                         .skip)
                                         (.seq
@@ -4076,7 +4470,7 @@ def f_FailureMessage__clinit__FailureMessage__ : Func :=
                           (.seq
                             (.assign "start_marker_" (.name "kStartMarker"))
                             (.seq
-                              (.expr (.hole "op:arrayInitializer"))
+                              (.expr (.hole "op:arrayDecl:size"))
                               (.assign "end_marker_" (.name "kEndMarker")))))))))))) }
 
 /-- `FailureMessage.__init__`  (from `logging.cc`) -/
@@ -4216,9 +4610,12 @@ def f_v8_base_NormalizedExponent_int_uint64_t_int_ : Func :=
               (.expr (.call "DCHECK_NE" [(.lit .unit)]))
               (.seq
                 (.loop
-                  (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                  (.binop
+                    "=="
+                    (.binop "&" (.name "significand") (.field (.name "Double") "kHiddenBit"))
+                    (.lit (.int 0)))
                   (.seq
-                    (.assign "significand" (.hole "op:shiftLeft"))
+                    (.assign "significand" (.binop "<<" (.name "significand") (.lit (.int 1))))
                     (.assign "exponent" (.binop "-" (.name "exponent") (.lit (.int 1))))))
                 (.ret (.name "exponent"))))) }
 
@@ -4253,7 +4650,10 @@ def f_v8_base_BignumDtoa_void_double_v8_base_BignumDtoaMode_int_Vector_int__int_
                                   (.seq
                                     (.assign
                                       "is_even"
-                                      (.binop "==" (.hole "op:and") (.lit (.int 0))))
+                                      (.binop
+                                        "=="
+                                        (.binop "&" (.name "significand") (.lit (.int 1)))
+                                        (.lit (.int 0))))
                                     (.seq
                                       .skip
                                       (.seq
@@ -4496,7 +4896,28 @@ def f_v8_base_GenerateCountedDigits_void_int_int__v8_base_Bignum__v8_base_Bignum
   , body := (.seq
             (.expr (.call "DCHECK_GE" [(.lit .unit)]))
             (.seq
-              (.hole "control:FOR")
+              (.seq
+                (.assign "i" (.lit (.int 0)))
+                (.loop
+                  (.binop "<" (.name "i") (.binop "-" (.name "count") (.lit (.int 1))))
+                  (.seq
+                    (.seq
+                      .skip
+                      (.seq
+                        (.assign
+                          "digit"
+                          (.call
+                            "v8.base.Bignum.DivideModuloIntBignum:ANY(v8.base.Bignum&)"
+                            [(.hole "op:indirection:pointer")]))
+                        (.seq
+                          (.expr (.call "DCHECK_LE" [(.lit .unit)]))
+                          (.seq
+                            (.setIndex
+                              (.name "buffer")
+                              (.name "i")
+                              (.binop "+" (.name "digit") (.lit (.int 0))))
+                            (.expr (.call "v8.base.Bignum.Times10:void()" []))))))
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
               (.seq
                 .skip
                 (.seq
@@ -4523,7 +4944,23 @@ def f_v8_base_GenerateCountedDigits_void_int_int__v8_base_Bignum__v8_base_Bignum
                         (.binop "-" (.name "count") (.lit (.int 1)))
                         (.binop "+" (.name "digit") (.lit (.int 0))))
                       (.seq
-                        (.hole "control:FOR")
+                        (.seq
+                          (.assign "i" (.binop "-" (.name "count") (.lit (.int 1))))
+                          (.loop
+                            (.binop ">" (.name "i") (.lit (.int 0)))
+                            (.seq
+                              (.seq
+                                (.ifte
+                                  (.binop
+                                    "!="
+                                    (.index (.name "buffer") (.name "i"))
+                                    (.binop "+" (.lit (.int 0)) (.lit (.int 10))))
+                                  .brk
+                                  .skip)
+                                (.seq
+                                  (.setIndex (.name "buffer") (.name "i") (.lit (.int 0)))
+                                  (.hole "op:postIncrement:impure-target")))
+                              (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
                         (.seq
                           (.ifte
                             (.binop
@@ -4658,7 +5095,13 @@ def f_v8_base_InitialScaledStartValuesPositiveExponent_void_double_int_bool_v8_b
                                     (.seq
                                       (.assign "v_bits" (.call "AsUint64" []))
                                       (.ifte
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "=="
+                                        (.binop
+                                        "&"
+                                        (.name "v_bits")
+                                        (.field (.name "Double") "kSignificandMask"))
+                                        (.lit (.int 0)))
                                         (.seq
                                         (.expr
                                         (.call
@@ -4716,7 +5159,13 @@ def f_v8_base_InitialScaledStartValuesNegativeExponentPositivePower_void_double_
                                       (.seq
                                         (.assign "v_bits" (.call "AsUint64" []))
                                         (.ifte
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "=="
+                                        (.binop
+                                        "&"
+                                        (.name "v_bits")
+                                        (.field (.name "Double") "kSignificandMask"))
+                                        (.lit (.int 0)))
                                         (.seq
                                         (.expr
                                         (.call
@@ -4804,10 +5253,19 @@ def f_v8_base_InitialScaledStartValuesNegativeExponentNegativePower_void_double_
                                         (.ifte
                                         (.binop
                                         "&&"
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "=="
+                                        (.binop
+                                        "&"
+                                        (.name "v_bits")
+                                        (.field (.name "Double") "kSignificandMask"))
+                                        (.lit (.int 0)))
                                         (.binop
                                         "!="
-                                        (.hole "op:and")
+                                        (.binop
+                                        "&"
+                                        (.name "v_bits")
+                                        (.field (.name "Double") "kExponentMask"))
                                         (.name "kMinimalNormalizedExponent")))
                                         (.seq
                                         (.expr
@@ -4922,7 +5380,13 @@ def f_v8_base_Bignum___init__ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.hole "control:FOR")
+              (.seq
+                (.assign "i" (.lit (.int 0)))
+                (.loop
+                  (.binop "<" (.name "i") (.name "kBigitCapacity"))
+                  (.seq
+                    (.setIndex (.field (.name "self") "bigits_") (.name "i") (.lit (.int 0)))
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
               (.seq
                 (.setField (.name "self") "bigits_" (.field (.name "self") "bigits_buffer_"))
                 (.seq
@@ -4985,7 +5449,22 @@ def f_v8_base_Bignum_AssignUInt64_void_uint64_t_ : Func :=
                                 "v8.base.Bignum.EnsureCapacity:void(int)"
                                 [(.name "needed_bigits")]))
                             (.seq
-                              (.hole "control:FOR")
+                              (.seq
+                                (.assign "i" (.lit (.int 0)))
+                                (.loop
+                                  (.binop "<" (.name "i") (.name "needed_bigits"))
+                                  (.seq
+                                    (.seq
+                                      (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop "&" (.name "value") (.name "kBigitMask"))))
+                                      (.assign
+                                        "value"
+                                        (.binop ">>>" (.name "value") (.name "kBigitSize"))))
+                                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                               (.seq
                                 (.setField (.name "self") "used_digits_" (.name "needed_bigits"))
                                 (.expr (.call "v8.base.Bignum.Clamp:void()" []))))))))))))) }
@@ -4997,9 +5476,24 @@ def f_v8_base_Bignum_AssignBignum_void_v8_base_Bignum__ : Func :=
   , body := (.seq
             (.setField (.name "self") "exponent_" (.field (.name "other") "exponent_"))
             (.seq
-              (.hole "control:FOR")
               (.seq
-                (.hole "control:FOR")
+                (.assign "i" (.lit (.int 0)))
+                (.loop
+                  (.binop "<" (.name "i") (.field (.name "other") "used_digits_"))
+                  (.seq
+                    (.setIndex
+                      (.field (.name "self") "bigits_")
+                      (.name "i")
+                      (.index (.field (.name "other") "bigits_") (.name "i")))
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+              (.seq
+                (.seq
+                  (.assign "i" (.field (.name "other") "used_digits_"))
+                  (.loop
+                    (.binop "<" (.name "i") (.field (.name "self") "used_digits_"))
+                    (.seq
+                      (.setIndex (.field (.name "self") "bigits_") (.name "i") (.lit (.int 0)))
+                      (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                 (.setField (.name "self") "used_digits_" (.field (.name "other") "used_digits_"))))) }
 
 /-- `v8.base.ReadUInt64:uint64_t(Vector,int,int)`  (from `numbers/bignum.cc`) -/
@@ -5014,7 +5508,28 @@ def f_v8_base_ReadUInt64_uint64_t_Vector_int_int_ : Func :=
                 .skip
                 (.seq
                   (.assign "to" (.binop "+" (.name "from") (.name "digits_to_read")))
-                  (.seq (.hole "control:FOR") (.ret (.name "result"))))))) }
+                  (.seq
+                    (.seq
+                      (.assign "i" (.name "from"))
+                      (.loop
+                        (.binop "<" (.name "i") (.name "to"))
+                        (.seq
+                          (.seq
+                            .skip
+                            (.seq
+                              (.assign
+                                "digit"
+                                (.binop "-" (.index (.name "buffer") (.name "i")) (.lit (.int 0))))
+                              (.seq
+                                (.expr (.call "DCHECK" [(.lit .unit)]))
+                                (.assign
+                                  "result"
+                                  (.binop
+                                    "+"
+                                    (.binop "*" (.name "result") (.lit (.int 10)))
+                                    (.name "digit"))))))
+                          (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                    (.ret (.name "result"))))))) }
 
 /-- `v8.base.Bignum.AssignDecimalString:void(Vector)`  (from `numbers/bignum.cc`) -/
 def f_v8_base_Bignum_AssignDecimalString_void_Vector_ : Func :=
@@ -5145,7 +5660,44 @@ def f_v8_base_Bignum_AssignHexString_void_Vector_ : Func :=
                           (.seq
                             (.assign "string_index" (.binop "-" (.name "length") (.lit (.int 1))))
                             (.seq
-                              (.hole "control:FOR")
+                              (.seq
+                                (.assign "i" (.lit (.int 0)))
+                                (.loop
+                                  (.binop
+                                    "<"
+                                    (.name "i")
+                                    (.binop "-" (.name "needed_bigits") (.lit (.int 1))))
+                                  (.seq
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        (.assign "current_bigit" (.lit (.int 0)))
+                                        (.seq
+                                        (.seq
+                                        (.assign "j" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "j")
+                                        (.binop "/" (.name "kBigitSize") (.lit (.int 4))))
+                                        (.seq
+                                        (.assign
+                                        "current_bigit"
+                                        (.binop
+                                        "+"
+                                        (.name "current_bigit")
+                                        (.binop
+                                        "<<"
+                                        (.call
+                                        "HexCharValue"
+                                        [(.index (.name "value") (.hole "op:postDecrement:value"))])
+                                        (.binop "*" (.name "j") (.lit (.int 4))))))
+                                        (.assign "j" (.binop "+" (.name "j") (.lit (.int 1)))))))
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.name "current_bigit")))))
+                                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                               (.seq
                                 (.setField
                                   (.name "self")
@@ -5156,7 +5708,25 @@ def f_v8_base_Bignum_AssignHexString_void_Vector_ : Func :=
                                   (.seq
                                     (.assign "most_significant_bigit" (.lit (.int 0)))
                                     (.seq
-                                      (.hole "control:FOR")
+                                      (.seq
+                                        (.assign "j" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<=" (.name "j") (.name "string_index"))
+                                        (.seq
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentShiftLeft"
+                                        [(.name "most_significant_bigit"), (.lit (.int 4))]))
+                                        (.assign
+                                        "most_significant_bigit"
+                                        (.binop
+                                        "+"
+                                        (.name "most_significant_bigit")
+                                        (.call
+                                        "HexCharValue"
+                                        [(.index (.name "value") (.name "j"))]))))
+                                        (.assign "j" (.binop "+" (.name "j") (.lit (.int 1)))))))
                                       (.seq
                                         (.ifte
                                         (.binop
@@ -5239,7 +5809,39 @@ def f_v8_base_Bignum_AddBignum_void_v8_base_Bignum__ : Func :=
                               (.seq
                                 (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                 (.seq
-                                  (.hole "control:FOR")
+                                  (.seq
+                                    (.assign "i" (.lit (.int 0)))
+                                    (.loop
+                                      (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.field (.name "other") "used_digits_"))
+                                      (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "sum"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.name "bigit_pos"))
+                                        (.index (.field (.name "other") "bigits_") (.name "i")))
+                                        (.name "carry")))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "bigit_pos")
+                                        (.binop "&" (.name "sum") (.name "kBigitMask")))
+                                        (.seq
+                                        (.assign "carry" (.hole "op:shiftRight:unknown-signedness"))
+                                        (.assign
+                                        "bigit_pos"
+                                        (.binop "+" (.name "bigit_pos") (.lit (.int 1))))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                   (.seq
                                     (.loop
                                       (.binop "!=" (.name "carry") (.lit (.int 0)))
@@ -5258,9 +5860,9 @@ def f_v8_base_Bignum_AddBignum_void_v8_base_Bignum__ : Func :=
                                         (.setIndex
                                         (.field (.name "self") "bigits_")
                                         (.name "bigit_pos")
-                                        (.hole "op:and"))
+                                        (.binop "&" (.name "sum") (.name "kBigitMask")))
                                         (.seq
-                                        (.assign "carry" (.hole "op:arithmeticShiftRight"))
+                                        (.assign "carry" (.hole "op:shiftRight:unknown-signedness"))
                                         (.assign
                                         "bigit_pos"
                                         (.binop "+" (.name "bigit_pos") (.lit (.int 1)))))))))
@@ -5306,7 +5908,39 @@ def f_v8_base_Bignum_SubtractBignum_void_v8_base_Bignum__ : Func :=
                               (.seq
                                 .skip
                                 (.seq
-                                  (.hole "control:FOR")
+                                  (.seq
+                                    (.assign "i" (.lit (.int 0)))
+                                    (.loop
+                                      (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.field (.name "other") "used_digits_"))
+                                      (.seq
+                                        (.seq
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "difference"
+                                        (.binop
+                                        "-"
+                                        (.binop
+                                        "-"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "i") (.name "offset")))
+                                        (.index (.field (.name "other") "bigits_") (.name "i")))
+                                        (.name "borrow")))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "i") (.name "offset"))
+                                        (.binop "&" (.name "difference") (.name "kBigitMask")))
+                                        (.assign
+                                        "borrow"
+                                        (.hole "op:shiftRight:unknown-signedness"))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                   (.seq
                                     (.loop
                                       (.binop "!=" (.name "borrow") (.lit (.int 0)))
@@ -5325,9 +5959,11 @@ def f_v8_base_Bignum_SubtractBignum_void_v8_base_Bignum__ : Func :=
                                         (.setIndex
                                         (.field (.name "self") "bigits_")
                                         (.binop "+" (.name "i") (.name "offset"))
-                                        (.hole "op:and"))
+                                        (.binop "&" (.name "difference") (.name "kBigitMask")))
                                         (.seq
-                                        (.assign "borrow" (.hole "op:arithmeticShiftRight"))
+                                        (.assign
+                                        "borrow"
+                                        (.hole "op:shiftRight:unknown-signedness"))
                                         (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))))
                                     (.expr (.call "v8.base.Bignum.Clamp:void()" []))))))))))))))) }
 
@@ -5389,7 +6025,32 @@ def f_v8_base_Bignum_MultiplyByUInt32_void_uint32_t_ : Func :=
                         (.seq
                           (.assign "carry" (.lit (.int 0)))
                           (.seq
-                            (.hole "control:FOR")
+                            (.seq
+                              (.assign "i" (.lit (.int 0)))
+                              (.loop
+                                (.binop "<" (.name "i") (.field (.name "self") "used_digits_"))
+                                (.seq
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      (.assign
+                                        "product"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "*"
+                                        (.unop "cast:u64" (.name "factor"))
+                                        (.index (.field (.name "self") "bigits_") (.name "i")))
+                                        (.name "carry")))
+                                      (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop "&" (.name "product") (.name "kBigitMask"))))
+                                        (.assign "carry" (.hole "op:shiftRight:unknown-signedness")))))
+                                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                             (.loop
                               (.binop "!=" (.name "carry") (.lit (.int 0)))
                               (.seq
@@ -5404,7 +6065,9 @@ def f_v8_base_Bignum_MultiplyByUInt32_void_uint32_t_ : Func :=
                                   (.setIndex
                                     (.field (.name "self") "bigits_")
                                     (.field (.name "self") "used_digits_")
-                                    (.unop "cast:u32" (.hole "op:and")))
+                                    (.unop
+                                      "cast:u32"
+                                      (.binop "&" (.name "carry") (.name "kBigitMask"))))
                                   (.seq
                                     (.setField
                                       (.name "self")
@@ -5442,13 +6105,67 @@ def f_v8_base_Bignum_MultiplyByUInt64_void_uint64_t_ : Func :=
                         (.seq
                           .skip
                           (.seq
-                            (.assign "low" (.hole "op:and"))
+                            (.assign "low" (.binop "&" (.name "factor") (.lit (.int 4294967295))))
                             (.seq
                               .skip
                               (.seq
-                                (.assign "high" (.hole "op:arithmeticShiftRight"))
+                                (.assign "high" (.binop ">>>" (.name "factor") (.lit (.int 32))))
                                 (.seq
-                                  (.hole "control:FOR")
+                                  (.seq
+                                    (.assign "i" (.lit (.int 0)))
+                                    (.loop
+                                      (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.field (.name "self") "used_digits_"))
+                                      (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "product_low"
+                                        (.binop
+                                        "*"
+                                        (.name "low")
+                                        (.index (.field (.name "self") "bigits_") (.name "i"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "product_high"
+                                        (.binop
+                                        "*"
+                                        (.name "high")
+                                        (.index (.field (.name "self") "bigits_") (.name "i"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "tmp"
+                                        (.binop
+                                        "+"
+                                        (.binop "&" (.name "carry") (.name "kBigitMask"))
+                                        (.name "product_low")))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop "&" (.name "tmp") (.name "kBigitMask"))))
+                                        (.assign
+                                        "carry"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.binop ">>>" (.name "carry") (.name "kBigitSize"))
+                                        (.binop ">>>" (.name "tmp") (.name "kBigitSize")))
+                                        (.binop
+                                        "<<"
+                                        (.name "product_high")
+                                        (.binop "-" (.lit (.int 32)) (.name "kBigitSize"))))))))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                   (.loop
                                     (.binop "!=" (.name "carry") (.lit (.int 0)))
                                     (.seq
@@ -5463,7 +6180,9 @@ def f_v8_base_Bignum_MultiplyByUInt64_void_uint64_t_ : Func :=
                                         (.setIndex
                                         (.field (.name "self") "bigits_")
                                         (.field (.name "self") "used_digits_")
-                                        (.unop "cast:u32" (.hole "op:and")))
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop "&" (.name "carry") (.name "kBigitMask"))))
                                         (.seq
                                         (.setField
                                         (.name "self")
@@ -5556,7 +6275,7 @@ def f_v8_base_Bignum_MultiplyByPowerOfTen_void_int_ : Func :=
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "kFive1_to_12" (.hole "op:arrayInitializer"))
+                                        (.assign "kFive1_to_12" (.hole "op:arrayDecl:size"))
                                         (.seq
                                         (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
@@ -5636,7 +6355,13 @@ def f_v8_base_Bignum_Square_void__ : Func :=
                             (.ifte
                               (.binop
                                 "<="
-                                (.hole "op:shiftLeft")
+                                (.binop
+                                  "<<"
+                                  (.lit (.int 1))
+                                  (.binop
+                                    "*"
+                                    (.lit (.int 2))
+                                    (.binop "-" (.name "kChunkSize") (.name "kBigitSize"))))
                                 (.field (.name "self") "used_digits_"))
                               (.expr
                                 (.call
@@ -5657,11 +6382,158 @@ def f_v8_base_Bignum_Square_void__ : Func :=
                                   (.seq
                                     (.assign "copy_offset" (.field (.name "self") "used_digits_"))
                                     (.seq
-                                      (.hole "control:FOR")
                                       (.seq
-                                        (.hole "control:FOR")
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.field (.name "self") "used_digits_"))
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "copy_offset") (.name "i"))
+                                        (.index (.field (.name "self") "bigits_") (.name "i")))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                                      (.seq
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.field (.name "self") "used_digits_"))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "bigit_index1" (.name "i"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "bigit_index2" (.lit (.int 0)))
+                                        (.seq
+                                        (.loop
+                                        (.binop ">=" (.name "bigit_index1") (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk1"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "copy_offset") (.name "bigit_index1"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk2"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "copy_offset") (.name "bigit_index2"))))
+                                        (.seq
+                                        (.assign
+                                        "accumulator"
+                                        (.binop
+                                        "+"
+                                        (.name "accumulator")
+                                        (.binop
+                                        "*"
+                                        (.unop "cast:u64" (.name "chunk1"))
+                                        (.name "chunk2"))))
+                                        (.seq
+                                        (.assign
+                                        "bigit_index1"
+                                        (.binop "-" (.name "bigit_index1") (.lit (.int 1))))
+                                        (.assign
+                                        "bigit_index2"
+                                        (.binop "+" (.name "bigit_index2") (.lit (.int 1)))))))))))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.binop
+                                        "&"
+                                        (.unop "cast:u32" (.name "accumulator"))
+                                        (.name "kBigitMask")))
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentArithmeticShiftRight"
+                                        [(.name "accumulator"), (.name "kBigitSize")]))))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                                        (.seq
+                                        (.seq
+                                        (.assign "i" (.field (.name "self") "used_digits_"))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "product_length"))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "bigit_index1"
+                                        (.binop
+                                        "-"
+                                        (.field (.name "self") "used_digits_")
+                                        (.lit (.int 1))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "bigit_index2"
+                                        (.binop "-" (.name "i") (.name "bigit_index1")))
+                                        (.seq
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "bigit_index2")
+                                        (.field (.name "self") "used_digits_"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk1"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "copy_offset") (.name "bigit_index1"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk2"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "copy_offset") (.name "bigit_index2"))))
+                                        (.seq
+                                        (.assign
+                                        "accumulator"
+                                        (.binop
+                                        "+"
+                                        (.name "accumulator")
+                                        (.binop
+                                        "*"
+                                        (.unop "cast:u64" (.name "chunk1"))
+                                        (.name "chunk2"))))
+                                        (.seq
+                                        (.assign
+                                        "bigit_index1"
+                                        (.binop "-" (.name "bigit_index1") (.lit (.int 1))))
+                                        (.assign
+                                        "bigit_index2"
+                                        (.binop "+" (.name "bigit_index2") (.lit (.int 1)))))))))))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.binop
+                                        "&"
+                                        (.unop "cast:u32" (.name "accumulator"))
+                                        (.name "kBigitMask")))
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentArithmeticShiftRight"
+                                        [(.name "accumulator"), (.name "kBigitSize")]))))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                         (.seq
                                         (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
@@ -5670,7 +6542,13 @@ def f_v8_base_Bignum_Square_void__ : Func :=
                                         "used_digits_"
                                         (.name "product_length"))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.setField
+                                        (.name "self")
+                                        "exponent_"
+                                        (.binop
+                                        "*"
+                                        (.field (.name "self") "exponent_")
+                                        (.lit (.int 2))))
                                         (.expr (.call "v8.base.Bignum.Clamp:void()" []))))))))))))))))))))) }
 
 /-- `v8.base.Bignum.AssignPowerUInt16:void(uint16_t,int)`  (from `numbers/bignum.cc`) -/
@@ -5696,7 +6574,10 @@ def f_v8_base_Bignum_AssignPowerUInt16_void_uint16_t_int_ : Func :=
                         (.assign "shifts" (.lit (.int 0)))
                         (.seq
                           (.loop
-                            (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                            (.binop
+                              "=="
+                              (.binop "&" (.name "base") (.lit (.int 1)))
+                              (.lit (.int 0)))
                             (.seq
                               (.expr
                                 (.call
@@ -5776,24 +6657,38 @@ def f_v8_base_Bignum_AssignPowerUInt16_void_uint16_t_int_ : Func :=
                                         (.binop "*" (.name "this_value") (.name "this_value")))
                                         (.seq
                                         (.ifte
-                                        (.binop "!=" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "!="
+                                        (.binop "&" (.name "power_exponent") (.name "mask"))
+                                        (.lit (.int 0)))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "base_bits_mask"
                                         (.unop
-                                        "!"
-                                        (.binop "-" (.hole "op:shiftLeft") (.lit (.int 1)))))
+                                        "~"
+                                        (.binop
+                                        "-"
+                                        (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.lit (.int 1)))
+                                        (.binop "-" (.lit (.int 64)) (.name "bit_size")))
+                                        (.lit (.int 1)))))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "high_bits_zero"
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0))))
+                                        (.binop
+                                        "=="
+                                        (.binop "&" (.name "this_value") (.name "base_bits_mask"))
+                                        (.lit (.int 0))))
                                         (.ifte
                                         (.binop "!=" (.name "high_bits_zero") (.lit (.int 0)))
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "this_value"
+                                        (.binop "*" (.name "this_value") (.name "base")))
                                         (.assign "delayed_multipliciation" (.lit (.bool true))))))))
                                         .skip)
                                         (.expr
@@ -5817,7 +6712,10 @@ def f_v8_base_Bignum_AssignPowerUInt16_void_uint16_t_int_ : Func :=
                                         (.expr (.call "v8.base.Bignum.Square:void()" []))
                                         (.seq
                                         (.ifte
-                                        (.binop "!=" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "!="
+                                        (.binop "&" (.name "power_exponent") (.name "mask"))
+                                        (.lit (.int 0)))
                                         (.expr (.call "MultiplyByUInt32" [(.name "base")]))
                                         .skip)
                                         (.expr
@@ -6070,9 +6968,58 @@ def f_v8_base_Bignum_ToHexString_bool_char__int__const_ : Func :=
                                     (.hole "op:postDecrement:value")
                                     (.lit (.str "\\0")))
                                   (.seq
-                                    (.hole "control:FOR")
                                     (.seq
-                                      (.hole "control:FOR")
+                                      (.assign "i" (.lit (.int 0)))
+                                      (.loop
+                                        (.binop "<" (.name "i") (.field (.name "self") "exponent_"))
+                                        (.seq
+                                        (.seq
+                                        (.assign "j" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "j") (.name "kHexCharsPerBigit"))
+                                        (.seq
+                                        (.setIndex
+                                        (.name "buffer")
+                                        (.hole "op:postDecrement:value")
+                                        (.lit (.int 0)))
+                                        (.assign "j" (.binop "+" (.name "j") (.lit (.int 1)))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                                    (.seq
+                                      (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop
+                                        "<"
+                                        (.name "i")
+                                        (.binop
+                                        "-"
+                                        (.field (.name "self") "used_digits_")
+                                        (.lit (.int 1))))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "current_bigit"
+                                        (.index (.field (.name "self") "bigits_") (.name "i")))
+                                        (.seq
+                                        (.assign "j" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "j") (.name "kHexCharsPerBigit"))
+                                        (.seq
+                                        (.seq
+                                        (.setIndex
+                                        (.name "buffer")
+                                        (.hole "op:postDecrement:value")
+                                        (.call
+                                        "HexCharOfValue"
+                                        [(.binop "&" (.name "current_bigit") (.lit (.int 15)))]))
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentArithmeticShiftRight"
+                                        [(.name "current_bigit"), (.lit (.int 4))])))
+                                        (.assign "j" (.binop "+" (.name "j") (.lit (.int 1)))))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                       (.seq
                                         .skip
                                         (.seq
@@ -6094,7 +7041,12 @@ def f_v8_base_Bignum_ToHexString_bool_char__int__const_ : Func :=
                                         (.setIndex
                                         (.name "buffer")
                                         (.hole "op:postDecrement:value")
-                                        (.call "HexCharOfValue" [(.hole "op:and")]))
+                                        (.call
+                                        "HexCharOfValue"
+                                        [ (.binop
+                                        "&"
+                                        (.name "most_significant_bigit")
+                                        (.lit (.int 15))) ]))
                                         (.expr
                                         (.call
                                         "<operators>.assignmentArithmeticShiftRight"
@@ -6148,7 +7100,46 @@ def f_v8_base_Bignum_Compare_int_v8_base_Bignum__v8_base_Bignum__ : Func :=
                             (.binop ">" (.name "bigit_length_a") (.name "bigit_length_b"))
                             (.ret (.hole "op:plus"))
                             .skip)
-                          (.seq (.hole "control:FOR") (.ret (.lit (.int 0)))))))))))) }
+                          (.seq
+                            (.seq
+                              (.assign "i" (.binop "-" (.name "bigit_length_a") (.lit (.int 1))))
+                              (.loop
+                                (.binop
+                                  ">="
+                                  (.name "i")
+                                  (.mcall
+                                    (.name "a")
+                                    "exponent_"
+                                    [ (.field (.name "a") "exponent_")
+                                    , (.field (.name "b") "exponent_") ]))
+                                (.seq
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      (.assign
+                                        "bigit_a"
+                                        (.call
+                                        "v8.base.Bignum.BigitAt:ANY(int)<const>"
+                                        [(.name "i")]))
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "bigit_b"
+                                        (.call
+                                        "v8.base.Bignum.BigitAt:ANY(int)<const>"
+                                        [(.name "i")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "<" (.name "bigit_a") (.name "bigit_b"))
+                                        (.ret (.unop "-" (.lit (.int 1))))
+                                        .skip)
+                                        (.ifte
+                                        (.binop ">" (.name "bigit_a") (.name "bigit_b"))
+                                        (.ret (.hole "op:plus"))
+                                        .skip))))))
+                                  (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
+                            (.ret (.lit (.int 0)))))))))))) }
 
 /-- `v8.base.Bignum.PlusCompare:int(v8.base.Bignum&,v8.base.Bignum&,v8.base.Bignum&)`  (from `numbers/bignum.cc`) -/
 def f_v8_base_Bignum_PlusCompare_int_v8_base_Bignum__v8_base_Bignum__v8_base_Bignum__ : Func :=
@@ -6215,9 +7206,71 @@ def f_v8_base_Bignum_PlusCompare_int_v8_base_Bignum__v8_base_Bignum__v8_base_Big
                                 (.seq
                                   (.assign
                                     "min_exponent"
-                                    (.call "min" [(.hole "op:arrayInitializer")]))
+                                    (.call "min" [(.hole "op:arrayDecl:size")]))
                                   (.seq
-                                    (.hole "control:FOR")
+                                    (.seq
+                                      (.assign
+                                        "i"
+                                        (.binop
+                                        "-"
+                                        (.call "v8.base.Bignum.BigitLength:int()<const>" [])
+                                        (.lit (.int 1))))
+                                      (.loop
+                                        (.binop ">=" (.name "i") (.name "min_exponent"))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk_a"
+                                        (.call
+                                        "v8.base.Bignum.BigitAt:ANY(int)<const>"
+                                        [(.name "i")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk_b"
+                                        (.call
+                                        "v8.base.Bignum.BigitAt:ANY(int)<const>"
+                                        [(.name "i")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "chunk_c"
+                                        (.call
+                                        "v8.base.Bignum.BigitAt:ANY(int)<const>"
+                                        [(.name "i")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "sum"
+                                        (.binop "+" (.name "chunk_a") (.name "chunk_b")))
+                                        (.ifte
+                                        (.binop
+                                        ">"
+                                        (.name "sum")
+                                        (.binop "+" (.name "chunk_c") (.name "borrow")))
+                                        (.ret (.hole "op:plus"))
+                                        (.seq
+                                        (.assign
+                                        "borrow"
+                                        (.binop
+                                        "-"
+                                        (.binop "+" (.name "chunk_c") (.name "borrow"))
+                                        (.name "sum")))
+                                        (.seq
+                                        (.ifte
+                                        (.binop ">" (.name "borrow") (.lit (.int 1)))
+                                        (.ret (.unop "-" (.lit (.int 1))))
+                                        .skip)
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentShiftLeft"
+                                        [(.name "borrow"), (.name "kBigitSize")])))))))))))))
+                                        (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
                                     (.seq
                                       (.ifte
                                         (.binop "==" (.name "borrow") (.lit (.int 0)))
@@ -6269,7 +7322,13 @@ def f_v8_base_Bignum_Zero_void__ : Func :=
   { name := "v8.base.Bignum.Zero:void()"
   , params := []
   , body := (.seq
-            (.hole "control:FOR")
+            (.seq
+              (.assign "i" (.lit (.int 0)))
+              (.loop
+                (.binop "<" (.name "i") (.field (.name "self") "used_digits_"))
+                (.seq
+                  (.setIndex (.field (.name "self") "bigits_") (.name "i") (.lit (.int 0)))
+                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
             (.seq
               (.setField (.name "self") "used_digits_" (.lit (.int 0)))
               (.setField (.name "self") "exponent_" (.lit (.int 0))))) }
@@ -6295,9 +7354,29 @@ def f_v8_base_Bignum_Align_void_v8_base_Bignum__ : Func :=
                       "v8.base.Bignum.EnsureCapacity:void(int)"
                       [(.binop "+" (.field (.name "self") "used_digits_") (.name "zero_digits"))]))
                   (.seq
-                    (.hole "control:FOR")
                     (.seq
-                      (.hole "control:FOR")
+                      (.assign
+                        "i"
+                        (.binop "-" (.field (.name "self") "used_digits_") (.lit (.int 1))))
+                      (.loop
+                        (.binop ">=" (.name "i") (.lit (.int 0)))
+                        (.seq
+                          (.setIndex
+                            (.field (.name "self") "bigits_")
+                            (.binop "+" (.name "i") (.name "zero_digits"))
+                            (.index (.field (.name "self") "bigits_") (.name "i")))
+                          (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
+                    (.seq
+                      (.seq
+                        (.assign "i" (.lit (.int 0)))
+                        (.loop
+                          (.binop "<" (.name "i") (.name "zero_digits"))
+                          (.seq
+                            (.setIndex
+                              (.field (.name "self") "bigits_")
+                              (.name "i")
+                              (.lit (.int 0)))
+                            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                       (.seq
                         (.setField
                           (.name "self")
@@ -6330,7 +7409,31 @@ def f_v8_base_Bignum_BigitsShiftLeft_void_int_ : Func :=
                     (.seq
                       (.assign "carry" (.lit (.int 0)))
                       (.seq
-                        (.hole "control:FOR")
+                        (.seq
+                          (.assign "i" (.lit (.int 0)))
+                          (.loop
+                            (.binop "<" (.name "i") (.field (.name "self") "used_digits_"))
+                            (.seq
+                              (.seq
+                                .skip
+                                (.seq
+                                  (.assign "new_carry" (.hole "op:shiftRight:unknown-signedness"))
+                                  (.seq
+                                    (.setIndex
+                                      (.field (.name "self") "bigits_")
+                                      (.name "i")
+                                      (.binop
+                                        "&"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "<<"
+                                        (.index (.field (.name "self") "bigits_") (.name "i"))
+                                        (.name "shift_amount"))
+                                        (.name "carry"))
+                                        (.name "kBigitMask")))
+                                    (.assign "carry" (.name "new_carry")))))
+                              (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                         (.ifte
                           (.binop "!=" (.name "carry") (.lit (.int 0)))
                           (.seq
@@ -6359,7 +7462,18 @@ def f_v8_base_Bignum_SubtractTimes_void_v8_base_Bignum__int_ : Func :=
                   (.seq
                     (.ifte
                       (.binop "<" (.name "factor") (.lit (.int 3)))
-                      (.seq (.hole "control:FOR") (.ret (.lit .unit)))
+                      (.seq
+                        (.seq
+                          (.assign "i" (.lit (.int 0)))
+                          (.loop
+                            (.binop "<" (.name "i") (.name "factor"))
+                            (.seq
+                              (.expr
+                                (.call
+                                  "v8.base.Bignum.SubtractBignum:void(v8.base.Bignum&)"
+                                  [(.name "other")]))
+                              (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                        (.ret (.lit .unit)))
                       .skip)
                     (.seq
                       .skip
@@ -6375,9 +7489,87 @@ def f_v8_base_Bignum_SubtractTimes_void_v8_base_Bignum__int_ : Func :=
                                 (.field (.name "other") "exponent_")
                                 (.field (.name "self") "exponent_")))
                             (.seq
-                              (.hole "control:FOR")
                               (.seq
-                                (.hole "control:FOR")
+                                (.assign "i" (.lit (.int 0)))
+                                (.loop
+                                  (.binop "<" (.name "i") (.field (.name "other") "used_digits_"))
+                                  (.seq
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        (.assign
+                                        "product"
+                                        (.binop
+                                        "*"
+                                        (.unop "cast:u64" (.name "factor"))
+                                        (.index (.field (.name "other") "bigits_") (.name "i"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "remove"
+                                        (.binop "+" (.name "borrow") (.name "product")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "difference"
+                                        (.binop
+                                        "-"
+                                        (.index
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "i") (.name "exponent_diff")))
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop "&" (.name "remove") (.name "kBigitMask")))))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.binop "+" (.name "i") (.name "exponent_diff"))
+                                        (.binop "&" (.name "difference") (.name "kBigitMask")))
+                                        (.assign
+                                        "borrow"
+                                        (.unop
+                                        "cast:u32"
+                                        (.binop
+                                        "+"
+                                        (.hole "op:shiftRight:unknown-signedness")
+                                        (.hole "op:shiftRight:unknown-signedness")))))))))))
+                                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                              (.seq
+                                (.seq
+                                  (.assign
+                                    "i"
+                                    (.binop
+                                      "+"
+                                      (.field (.name "other") "used_digits_")
+                                      (.name "exponent_diff")))
+                                  (.loop
+                                    (.binop "<" (.name "i") (.field (.name "self") "used_digits_"))
+                                    (.seq
+                                      (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "borrow") (.lit (.int 0)))
+                                        (.ret (.lit .unit))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "difference"
+                                        (.binop
+                                        "-"
+                                        (.index (.field (.name "self") "bigits_") (.name "i"))
+                                        (.name "borrow")))
+                                        (.seq
+                                        (.setIndex
+                                        (.field (.name "self") "bigits_")
+                                        (.name "i")
+                                        (.binop "&" (.name "difference") (.name "kBigitMask")))
+                                        (.assign
+                                        "borrow"
+                                        (.hole "op:shiftRight:unknown-signedness"))))))
+                                      (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                 (.seq
                                   (.expr (.call "v8.base.Bignum.Clamp:void()" []))
                                   (.expr (.call "DCHECK" [(.lit .unit)])))))))))))))) }
@@ -6698,7 +7890,23 @@ def f_v8_base_RoundWeedCounted_bool_Vector_int_uint64_t_uint64_t_uint64_t_int__ 
                       (.seq
                         (.hole "op:postIncrement:impure-target")
                         (.seq
-                          (.hole "control:FOR")
+                          (.seq
+                            (.assign "i" (.binop "-" (.name "length") (.lit (.int 1))))
+                            (.loop
+                              (.binop ">" (.name "i") (.lit (.int 0)))
+                              (.seq
+                                (.seq
+                                  (.ifte
+                                    (.binop
+                                      "!="
+                                      (.index (.name "buffer") (.name "i"))
+                                      (.binop "+" (.lit (.int 0)) (.lit (.int 10))))
+                                    .brk
+                                    .skip)
+                                  (.seq
+                                    (.setIndex (.name "buffer") (.name "i") (.lit (.int 0)))
+                                    (.hole "op:postIncrement:impure-target")))
+                                (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
                           (.seq
                             (.ifte
                               (.binop
@@ -6727,15 +7935,17 @@ def f_v8_base_fast_divmod_uint32_t_uint32_t__uint32_t_v8_base_DivMagic__ : Func 
             (.seq
               .skip
               (.seq
-                (.assign "q" (.hole "op:arithmeticShiftRight"))
+                (.assign "q" (.hole "op:shiftRight:unknown-signedness"))
                 (.seq
                   .skip
                   (.seq
-                    (.assign "t" (.binop "+" (.hole "op:arithmeticShiftRight") (.name "q")))
+                    (.assign
+                      "t"
+                      (.binop "+" (.hole "op:shiftRight:unknown-signedness") (.name "q")))
                     (.seq
                       .skip
                       (.seq
-                        (.assign "digit" (.hole "op:arithmeticShiftRight"))
+                        (.assign "digit" (.binop ">>>" (.name "t") (.field (.name "d") "shift")))
                         (.seq (.hole "assign:lhs:indirection") (.ret (.name "digit")))))))))) }
 
 /-- `v8.base.BiggestPowerTen:void(uint32_t,int,uint32_t*,unsigned*)`  (from `numbers/fast-dtoa.cc`) -/
@@ -6799,18 +8009,28 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         "one"
                                         (.call
                                         "DiyFp"
-                                        [ (.hole "op:shiftLeft")
+                                        [ (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.lit (.int 1)))
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
                                         , (.call "v8.base.DiyFp.e:int()<const>" []) ]))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "integrals"
-                                        (.unop "cast:u32" (.hole "op:arithmeticShiftRight")))
+                                        (.unop
+                                        "cast:u32"
+                                        (.hole "op:shiftRight:unknown-signedness")))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "fractionals" (.hole "op:and"))
+                                        (.assign
+                                        "fractionals"
+                                        (.binop
+                                        "&"
+                                        (.call "f" [])
+                                        (.binop "-" (.call "f" []) (.lit (.int 1)))))
                                         (.seq
                                         .skip
                                         (.seq
@@ -6855,7 +8075,13 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         (.seq
                                         (.assign
                                         "rest"
-                                        (.binop "+" (.hole "op:shiftLeft") (.name "fractionals")))
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.name "integrals"))
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
+                                        (.name "fractionals")))
                                         (.seq
                                         (.ifte
                                         (.binop "<" (.name "rest") (.call "f" []))
@@ -6866,7 +8092,10 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         , (.call "f" [])
                                         , (.call "f" [])
                                         , (.name "rest")
-                                        , (.hole "op:shiftLeft")
+                                        , (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.name "divisor"))
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
                                         , (.name "unit") ]))
                                         .skip)
                                         (.seq
@@ -6878,7 +8107,9 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         .brk
                                         .skip)
                                         (.seq
-                                        (.expr (.hole "op:assignmentDivision"))
+                                        (.assign
+                                        "divisor"
+                                        (.binop "/" (.name "divisor") (.lit (.int 10))))
                                         (.assign
                                         "divisor_exponent"
                                         (.binop "-" (.name "divisor_exponent") (.lit (.int 1)))))))))))))))
@@ -6891,9 +8122,13 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         (.loop
                                         (.lit (.bool true))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "fractionals"
+                                        (.binop "*" (.name "fractionals") (.lit (.int 10))))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "unit"
+                                        (.binop "*" (.name "unit") (.lit (.int 10))))
                                         (.seq
                                         (.expr
                                         (.call
@@ -6904,7 +8139,12 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         (.seq
                                         (.assign
                                         "digit"
-                                        (.unop "cast:i32" (.hole "op:arithmeticShiftRight")))
+                                        (.unop
+                                        "cast:i32"
+                                        (.binop
+                                        ">>>"
+                                        (.name "fractionals")
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))))
                                         (.seq
                                         (.hole "assign:lhs:indirection")
                                         (.seq
@@ -6955,17 +8195,26 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
                               "one"
                               (.call
                                 "DiyFp"
-                                [(.hole "op:shiftLeft"), (.call "v8.base.DiyFp.e:int()<const>" [])]))
+                                [ (.binop
+                                    "<<"
+                                    (.unop "cast:u64" (.lit (.int 1)))
+                                    (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
+                                , (.call "v8.base.DiyFp.e:int()<const>" []) ]))
                             (.seq
                               .skip
                               (.seq
                                 (.assign
                                   "integrals"
-                                  (.unop "cast:u32" (.hole "op:arithmeticShiftRight")))
+                                  (.unop "cast:u32" (.hole "op:shiftRight:unknown-signedness")))
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "fractionals" (.hole "op:and"))
+                                    (.assign
+                                      "fractionals"
+                                      (.binop
+                                        "&"
+                                        (.call "f" [])
+                                        (.binop "-" (.call "f" []) (.lit (.int 1)))))
                                     (.seq
                                       .skip
                                       (.seq
@@ -7020,7 +8269,9 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
                                         .brk
                                         .skip)
                                         (.seq
-                                        (.expr (.hole "op:assignmentDivision"))
+                                        (.assign
+                                        "divisor"
+                                        (.binop "/" (.name "divisor") (.lit (.int 10))))
                                         (.assign
                                         "divisor_exponent"
                                         (.binop "-" (.name "divisor_exponent") (.lit (.int 1)))))))))))))
@@ -7032,14 +8283,23 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
                                         (.seq
                                         (.assign
                                         "rest"
-                                        (.binop "+" (.hole "op:shiftLeft") (.name "fractionals")))
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.name "integrals"))
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
+                                        (.name "fractionals")))
                                         (.ret
                                         (.call
                                         "RoundWeedCounted"
                                         [ (.name "buffer")
                                         , (.hole "op:indirection:pointer")
                                         , (.name "rest")
-                                        , (.hole "op:shiftLeft")
+                                        , (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.name "divisor"))
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))
                                         , (.name "w_error")
                                         , (.name "kappa") ]))))
                                         .skip)
@@ -7056,15 +8316,24 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
                                         (.binop ">" (.name "requested_digits") (.lit (.int 0)))
                                         (.binop ">" (.name "fractionals") (.name "w_error")))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "fractionals"
+                                        (.binop "*" (.name "fractionals") (.lit (.int 10))))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "w_error"
+                                        (.binop "*" (.name "w_error") (.lit (.int 10))))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "digit"
-                                        (.unop "cast:i32" (.hole "op:arithmeticShiftRight")))
+                                        (.unop
+                                        "cast:i32"
+                                        (.binop
+                                        ">>>"
+                                        (.name "fractionals")
+                                        (.unop "-" (.call "v8.base.DiyFp.e:int()<const>" [])))))
                                         (.seq
                                         (.setIndex
                                         (.name "buffer")
@@ -7357,7 +8626,10 @@ def f_v8_base_UInt128___init__' : Func :=
 def f_v8_base_UInt128_Multiply_void_uint32_t_ : Func :=
   { name := "v8.base.UInt128.Multiply:void(uint32_t)"
   , params := ["multiplicand"]
-  , body := (.expr (.hole "op:assignmentMultiplication")) }
+  , body := (.setField
+            (.name "self")
+            "value_"
+            (.binop "*" (.field (.name "self") "value_") (.name "multiplicand"))) }
 
 /-- `v8.base.UInt128.Shift:void(int)`  (from `numbers/fixed-dtoa.cc`) -/
 def f_v8_base_UInt128_Shift_void_int_ : Func :=
@@ -7376,12 +8648,15 @@ def f_v8_base_UInt128_DivModPowerOf2_int_int_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "result" (.hole "op:arithmeticShiftRight"))
+              (.assign "result" (.hole "op:shiftRight:unknown-signedness"))
               (.seq
                 (.setField
                   (.name "self")
                   "value_"
-                  (.binop "-" (.field (.name "self") "value_") (.hole "op:shiftLeft")))
+                  (.binop
+                    "-"
+                    (.field (.name "self") "value_")
+                    (.binop "<<" (.name "result") (.name "power"))))
                 (.ret (.unop "cast:i32" (.name "result")))))) }
 
 /-- `v8.base.UInt128.IsZero:bool()<const>`  (from `numbers/fixed-dtoa.cc`) -/
@@ -7394,13 +8669,30 @@ def f_v8_base_UInt128_IsZero_bool___const_ : Func :=
 def f_v8_base_UInt128_BitAt_int_int_ : Func :=
   { name := "v8.base.UInt128.BitAt:int(int)"
   , params := ["position"]
-  , body := (.ret (.hole "op:and")) }
+  , body := (.ret
+            (.binop
+              "&"
+              (.unop "cast:i32" (.hole "op:shiftRight:unknown-signedness"))
+              (.lit (.int 1)))) }
 
 /-- `v8.base.FillDigits32FixedLength:void(uint32_t,int,Vector,int*)`  (from `numbers/fixed-dtoa.cc`) -/
 def f_v8_base_FillDigits32FixedLength_void_uint32_t_int_Vector_int__ : Func :=
   { name := "v8.base.FillDigits32FixedLength:void(uint32_t,int,Vector,int*)"
   , params := ["number", "requested_length", "buffer", "length"]
-  , body := (.seq (.hole "control:FOR") (.hole "assign:lhs:indirection")) }
+  , body := (.seq
+            (.seq
+              (.assign "i" (.binop "-" (.name "requested_length") (.lit (.int 1))))
+              (.loop
+                (.binop ">=" (.name "i") (.lit (.int 0)))
+                (.seq
+                  (.seq
+                    (.setIndex
+                      (.name "buffer")
+                      (.binop "+" (.hole "op:indirection:pointer") (.name "i"))
+                      (.binop "+" (.lit (.int 0)) (.binop "%" (.name "number") (.lit (.int 10)))))
+                    (.assign "number" (.binop "/" (.name "number") (.lit (.int 10)))))
+                  (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
+            (.hole "assign:lhs:indirection")) }
 
 /-- `v8.base.FillDigits32:void(uint32_t,Vector,int*)`  (from `numbers/fixed-dtoa.cc`) -/
 def f_v8_base_FillDigits32_void_uint32_t_Vector_int__ : Func :=
@@ -7418,7 +8710,7 @@ def f_v8_base_FillDigits32_void_uint32_t_Vector_int__ : Func :=
                     (.seq
                       (.assign "digit" (.binop "%" (.name "number") (.lit (.int 10))))
                       (.seq
-                        (.expr (.hole "op:assignmentDivision"))
+                        (.assign "number" (.binop "/" (.name "number") (.lit (.int 10))))
                         (.seq
                           (.setIndex
                             (.name "buffer")
@@ -7472,7 +8764,7 @@ def f_v8_base_FillDigits64FixedLength_void_uint64_t_int_Vector_int__ : Func :=
                 (.seq
                   (.assign "part2" (.unop "cast:u32" (.binop "%" (.name "number") (.name "kTen7"))))
                   (.seq
-                    (.expr (.hole "op:assignmentDivision"))
+                    (.assign "number" (.binop "/" (.name "number") (.name "kTen7")))
                     (.seq
                       .skip
                       (.seq
@@ -7522,7 +8814,7 @@ def f_v8_base_FillDigits64_void_uint64_t_Vector_int__ : Func :=
                 (.seq
                   (.assign "part2" (.unop "cast:u32" (.binop "%" (.name "number") (.name "kTen7"))))
                   (.seq
-                    (.expr (.hole "op:assignmentDivision"))
+                    (.assign "number" (.binop "/" (.name "number") (.name "kTen7")))
                     (.seq
                       .skip
                       (.seq
@@ -7592,7 +8884,23 @@ def f_v8_base_DtoaRoundUp_void_Vector_int__int__ : Func :=
             (.seq
               (.hole "op:postIncrement:impure-target")
               (.seq
-                (.hole "control:FOR")
+                (.seq
+                  (.assign "i" (.binop "-" (.hole "op:indirection:pointer") (.lit (.int 1))))
+                  (.loop
+                    (.binop ">" (.name "i") (.lit (.int 0)))
+                    (.seq
+                      (.seq
+                        (.ifte
+                          (.binop
+                            "!="
+                            (.index (.name "buffer") (.name "i"))
+                            (.binop "+" (.lit (.int 0)) (.lit (.int 10))))
+                          (.ret (.lit .unit))
+                          .skip)
+                        (.seq
+                          (.setIndex (.name "buffer") (.name "i") (.lit (.int 0)))
+                          (.hole "op:postIncrement:impure-target")))
+                      (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
                 (.ifte
                   (.binop
                     "=="
@@ -7618,12 +8926,58 @@ def f_v8_base_FillFractionals_void_uint64_t_int_int_Vector_int__int__ : Func :=
                   (.seq
                     (.assign "point" (.unop "-" (.name "exponent")))
                     (.seq
-                      (.hole "control:FOR")
+                      (.seq
+                        (.assign "i" (.lit (.int 0)))
+                        (.loop
+                          (.binop "<" (.name "i") (.name "fractional_count"))
+                          (.seq
+                            (.seq
+                              (.ifte (.binop "==" (.name "fractionals") (.lit (.int 0))) .brk .skip)
+                              (.seq
+                                (.assign
+                                  "fractionals"
+                                  (.binop "*" (.name "fractionals") (.lit (.int 5))))
+                                (.seq
+                                  (.assign "point" (.binop "-" (.name "point") (.lit (.int 1))))
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      (.assign
+                                        "digit"
+                                        (.unop
+                                        "cast:i32"
+                                        (.binop ">>>" (.name "fractionals") (.name "point"))))
+                                      (.seq
+                                        (.setIndex
+                                        (.name "buffer")
+                                        (.hole "op:indirection:pointer")
+                                        (.binop "+" (.lit (.int 0)) (.name "digit")))
+                                        (.seq
+                                        (.hole "op:postIncrement:unsupported-target")
+                                        (.assign
+                                        "fractionals"
+                                        (.binop
+                                        "-"
+                                        (.name "fractionals")
+                                        (.binop
+                                        "<<"
+                                        (.unop "cast:u64" (.name "digit"))
+                                        (.name "point")))))))))))
+                            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                       (.ifte
                         (.binop
                           "&&"
                           (.binop ">" (.name "point") (.lit (.int 0)))
-                          (.binop "==" (.hole "op:and") (.lit (.int 1))))
+                          (.binop
+                            "=="
+                            (.binop
+                              "&"
+                              (.binop
+                                ">>>"
+                                (.name "fractionals")
+                                (.binop "-" (.name "point") (.lit (.int 1))))
+                              (.lit (.int 1)))
+                            (.lit (.int 1))))
                         (.expr
                           (.call
                             "DtoaRoundUp"
@@ -7647,7 +9001,37 @@ def f_v8_base_FillFractionals_void_uint64_t_int_int_Vector_int__int__ : Func :=
                         (.seq
                           (.assign "point" (.lit (.int 128)))
                           (.seq
-                            (.hole "control:FOR")
+                            (.seq
+                              (.assign "i" (.lit (.int 0)))
+                              (.loop
+                                (.binop "<" (.name "i") (.name "fractional_count"))
+                                (.seq
+                                  (.seq
+                                    (.ifte
+                                      (.call "v8.base.UInt128.IsZero:bool()<const>" [])
+                                      .brk
+                                      .skip)
+                                    (.seq
+                                      (.expr (.call "Multiply" [(.lit (.int 5))]))
+                                      (.seq
+                                        (.assign
+                                        "point"
+                                        (.binop "-" (.name "point") (.lit (.int 1))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "digit"
+                                        (.call
+                                        "v8.base.UInt128.DivModPowerOf2:int(int)"
+                                        [(.name "point")]))
+                                        (.seq
+                                        (.setIndex
+                                        (.name "buffer")
+                                        (.hole "op:indirection:pointer")
+                                        (.binop "+" (.lit (.int 0)) (.name "digit")))
+                                        (.hole "op:postIncrement:unsupported-target")))))))
+                                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                             (.ifte
                               (.binop
                                 "=="
@@ -7694,7 +9078,16 @@ def f_v8_base_TrimZeros_void_Vector_int__int__ : Func :=
                   (.ifte
                     (.binop "!=" (.name "first_non_zero") (.lit (.int 0)))
                     (.seq
-                      (.hole "control:FOR")
+                      (.seq
+                        (.assign "i" (.name "first_non_zero"))
+                        (.loop
+                          (.binop "<" (.name "i") (.hole "op:indirection:pointer"))
+                          (.seq
+                            (.setIndex
+                              (.name "buffer")
+                              (.binop "-" (.name "i") (.name "first_non_zero"))
+                              (.index (.name "buffer") (.name "i")))
+                            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                       (.seq (.hole "assign:lhs:indirection") (.hole "assign:lhs:indirection")))
                     .skip))))) }
 
@@ -7769,7 +9162,12 @@ def f_v8_base_FastFixedDtoa_bool_double_int_Vector_int__int__ : Func :=
                                         (.unop
                                         "cast:u32"
                                         (.binop "/" (.name "dividend") (.name "divisor"))))
-                                        (.assign "remainder" (.hole "op:shiftLeft"))))
+                                        (.assign
+                                        "remainder"
+                                        (.binop
+                                        "<<"
+                                        (.binop "%" (.name "dividend") (.name "divisor"))
+                                        (.name "divisor_power")))))
                                         (.seq
                                         (.expr
                                         (.call
@@ -7782,7 +9180,12 @@ def f_v8_base_FastFixedDtoa_bool_double_int_Vector_int__int__ : Func :=
                                         (.unop
                                         "cast:u32"
                                         (.binop "/" (.name "dividend") (.name "divisor"))))
-                                        (.assign "remainder" (.hole "op:shiftLeft")))))
+                                        (.assign
+                                        "remainder"
+                                        (.binop
+                                        "<<"
+                                        (.binop "%" (.name "dividend") (.name "divisor"))
+                                        (.name "exponent"))))))
                                         (.seq
                                         (.expr
                                         (.call
@@ -7818,13 +9221,24 @@ def f_v8_base_FastFixedDtoa_bool_double_int_Vector_int__int__ : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                        (.assign "integrals" (.hole "op:arithmeticShiftRight"))
+                                        (.assign
+                                        "integrals"
+                                        (.binop
+                                        ">>>"
+                                        (.name "significand")
+                                        (.unop "-" (.name "exponent"))))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "fractionals"
-                                        (.binop "-" (.name "significand") (.hole "op:shiftLeft")))
+                                        (.binop
+                                        "-"
+                                        (.name "significand")
+                                        (.binop
+                                        "<<"
+                                        (.name "integrals")
+                                        (.unop "-" (.name "exponent")))))
                                         (.seq
                                         (.ifte
                                         (.binop ">" (.name "integrals") (.name "kMaxUInt32"))
@@ -7899,13 +9313,43 @@ def f_v8_base_FastFixedDtoa_bool_double_int_Vector_int__int__ : Func :=
 def f_v8_base_TrimLeadingZeros_v8_base_Vector_Vector_ : Func :=
   { name := "v8.base.TrimLeadingZeros:v8.base.Vector(Vector)"
   , params := ["buffer"]
-  , body := (.seq (.hole "control:FOR") (.ret (.call "Vector" [(.call "begin" []), (.lit (.int 0))]))) }
+  , body := (.seq
+            (.seq
+              (.assign "i" (.lit (.int 0)))
+              (.loop
+                (.binop "<" (.name "i") (.call "v8.base.Vector.length:int()<const>" []))
+                (.seq
+                  (.ifte
+                    (.binop "!=" (.index (.name "buffer") (.name "i")) (.lit (.int 0)))
+                    (.ret
+                      (.call
+                        "SubVector"
+                        [(.name "i"), (.call "v8.base.Vector.length:int()<const>" [])]))
+                    .skip)
+                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+            (.ret (.call "Vector" [(.call "begin" []), (.lit (.int 0))]))) }
 
 /-- `v8.base.TrimTrailingZeros:v8.base.Vector(Vector)`  (from `numbers/strtod.cc`) -/
 def f_v8_base_TrimTrailingZeros_v8_base_Vector_Vector_ : Func :=
   { name := "v8.base.TrimTrailingZeros:v8.base.Vector(Vector)"
   , params := ["buffer"]
-  , body := (.seq (.hole "control:FOR") (.ret (.call "Vector" [(.call "begin" []), (.lit (.int 0))]))) }
+  , body := (.seq
+            (.seq
+              (.assign
+                "i"
+                (.binop "-" (.call "v8.base.Vector.length:int()<const>" []) (.lit (.int 1))))
+              (.loop
+                (.binop ">=" (.name "i") (.lit (.int 0)))
+                (.seq
+                  (.ifte
+                    (.binop "!=" (.index (.name "buffer") (.name "i")) (.lit (.int 0)))
+                    (.ret
+                      (.call
+                        "SubVector"
+                        [(.lit (.int 0)), (.binop "+" (.name "i") (.lit (.int 1)))]))
+                    .skip)
+                  (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
+            (.ret (.call "Vector" [(.call "begin" []), (.lit (.int 0))]))) }
 
 /-- `v8.base.TrimToMaxSignificantDigits:void(Vector,int,char*,int*)`  (from `numbers/strtod.cc`) -/
 def f_v8_base_TrimToMaxSignificantDigits_void_Vector_int_char__int__ : Func :=
@@ -7914,7 +9358,19 @@ def f_v8_base_TrimToMaxSignificantDigits_void_Vector_int_char__int__ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.hole "control:FOR")
+              (.seq
+                (.assign "i" (.lit (.int 0)))
+                (.loop
+                  (.binop
+                    "<"
+                    (.name "i")
+                    (.binop "-" (.name "kMaxSignificantDecimalDigits") (.lit (.int 1))))
+                  (.seq
+                    (.setIndex
+                      (.name "significant_buffer")
+                      (.name "i")
+                      (.index (.name "buffer") (.name "i")))
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
               (.seq
                 (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                 (.seq
@@ -8029,9 +9485,7 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                             (.hole "assign:lhs:indirection")
                             (.seq
                               (.expr (.call "DCHECK" [(.lit .unit)]))
-                              (.seq
-                                (.expr (.hole "op:assignmentDivision"))
-                                (.ret (.lit (.bool true))))))
+                              (.seq (.hole "assign:lhs:indirection") (.ret (.lit (.bool true))))))
                           .skip)
                         (.seq
                           (.ifte
@@ -8043,9 +9497,7 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                               (.hole "assign:lhs:indirection")
                               (.seq
                                 (.expr (.call "DCHECK" [(.lit .unit)]))
-                                (.seq
-                                  (.expr (.hole "op:assignmentMultiplication"))
-                                  (.ret (.lit (.bool true))))))
+                                (.seq (.hole "assign:lhs:indirection") (.ret (.lit (.bool true))))))
                             .skip)
                           (.seq
                             .skip
@@ -8069,9 +9521,9 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                                   (.seq
                                     (.expr (.call "DCHECK" [(.lit .unit)]))
                                     (.seq
-                                      (.expr (.hole "op:assignmentMultiplication"))
+                                      (.hole "assign:lhs:indirection")
                                       (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.hole "assign:lhs:indirection")
                                         (.ret (.lit (.bool true)))))))
                                 .skip))))))
                     .skip)
@@ -8123,7 +9575,9 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                   (.seq
                                     .skip
                                     (.seq
-                                      (.assign "kDenominator" (.hole "op:shiftLeft"))
+                                      (.assign
+                                        "kDenominator"
+                                        (.binop "<<" (.lit (.int 1)) (.name "kDenominatorLog")))
                                       (.seq
                                         (.assign
                                         "exponent"
@@ -8321,7 +9775,8 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         (.field (.name "DiyFp") "kSignificandSize"))
                                         (.lit (.int 1))))
                                         (.seq
-                                        (.expr (.call "set_f" [(.hole "op:arithmeticShiftRight")]))
+                                        (.expr
+                                        (.call "set_f" [(.hole "op:shiftRight:unknown-signedness")]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -8337,7 +9792,7 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         "+"
                                         (.binop
                                         "+"
-                                        (.hole "op:arithmeticShiftRight")
+                                        (.binop ">>" (.name "error") (.name "shift_amount"))
                                         (.lit (.int 1)))
                                         (.name "kDenominator")))
                                         (.assign
@@ -8360,19 +9815,39 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         (.seq
                                         (.assign
                                         "precision_bits_mask"
-                                        (.binop "-" (.hole "op:shiftLeft") (.lit (.int 1))))
+                                        (.binop
+                                        "-"
+                                        (.binop
+                                        "<<"
+                                        (.name "one64")
+                                        (.name "precision_digits_count"))
+                                        (.lit (.int 1))))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "precision_bits" (.hole "op:and"))
+                                        (.assign
+                                        "precision_bits"
+                                        (.binop "&" (.call "f" []) (.name "precision_bits_mask")))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "half_way" (.hole "op:shiftLeft"))
+                                        (.assign
+                                        "half_way"
+                                        (.binop
+                                        "<<"
+                                        (.name "one64")
+                                        (.binop
+                                        "-"
+                                        (.name "precision_digits_count")
+                                        (.lit (.int 1)))))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "precision_bits"
+                                        (.binop "*" (.name "precision_bits") (.name "kDenominator")))
                                         (.seq
-                                        (.expr (.hole "op:assignmentMultiplication"))
+                                        (.assign
+                                        "half_way"
+                                        (.binop "*" (.name "half_way") (.name "kDenominator")))
                                         (.seq
                                         .skip
                                         (.seq
@@ -8380,7 +9855,7 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         "rounded_input"
                                         (.alloc
                                         "DiyFp"
-                                        [ (.hole "op:arithmeticShiftRight")
+                                        [ (.hole "op:shiftRight:unknown-signedness")
                                         , (.binop
                                         "+"
                                         (.call "v8.base.DiyFp.e:int()<const>" [])
@@ -8492,7 +9967,10 @@ def f_v8_base_BignumStrtod_double_Vector_int_double_ : Func :=
                                         (.ret
                                         (.call "v8.base.Double.NextDouble:double()<const>" []))
                                         (.ifte
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                        (.binop
+                                        "=="
+                                        (.binop "&" (.call "Significand" []) (.lit (.int 1)))
+                                        (.lit (.int 0)))
                                         (.ret (.name "guess"))
                                         (.ret
                                         (.call "v8.base.Double.NextDouble:double()<const>" [])))))))))))))))))))))))) }
@@ -9529,7 +11007,7 @@ def f_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func 
                                       (.name "access")
                                       (.field (.field (.name "OS") "MemoryPermission") "kNoAccess"))
                                     (.name "MEM_RESERVE")
-                                    (.hole "op:or")))
+                                    (.binop "|" (.name "MEM_RESERVE") (.name "MEM_COMMIT"))))
                                 (.seq
                                   .skip
                                   (.seq
@@ -9583,7 +11061,36 @@ def f_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func 
                                         (.seq
                                         (.assign "aligned_base" (.lit .unit))
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "kMaxAttempts"))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "base"
+                                        (.call
+                                        "RandomizedVirtualAlloc"
+                                        [ (.name "padded_size")
+                                        , (.name "flags")
+                                        , (.name "protect")
+                                        , (.name "hint") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "base") (.lit .unit))
+                                        (.ret (.lit .unit))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.call "Free" [(.name "base"), (.name "padded_size")]))
+                                        (.seq
+                                        (.assign
+                                        "aligned_base"
+                                        (.call "RoundUp" [(.name "base"), (.name "alignment")]))
+                                        (.seq
+                                        (.assign "base" (.hole "op:cast:pointer"))
+                                        (.ifte (.binop "!=" (.name "base") (.lit .unit)) .brk .skip))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                         (.seq
                                         (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
                                         (.ret (.hole "op:cast:pointer")))))))))))))))))))))))))))))) }
@@ -9988,7 +11495,70 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_1_vector__ : Func :=
                       .skip
                       (.seq
                         (.assign "images_count" (.call "_dyld_image_count" []))
-                        (.seq (.hole "control:FOR") (.ret (.name "result")))))))))) }
+                        (.seq
+                          (.seq
+                            (.assign "i" (.lit (.int 0)))
+                            (.loop
+                              (.binop "<" (.name "i") (.name "images_count"))
+                              (.seq
+                                (.seq
+                                  .skip
+                                  (.seq
+                                    (.assign
+                                      "header"
+                                      (.call "_dyld_get_image_header" [(.name "i")]))
+                                    (.seq
+                                      (.ifte
+                                        (.binop "==" (.name "header") (.lit .unit))
+                                        (.seq
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))
+                                        .cont)
+                                        .skip)
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "header64" (.hole "op:cast:pointer"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "code_ptr"
+                                        (.call
+                                        "getsectiondata"
+                                        [ (.name "header64")
+                                        , (.name "SEG_TEXT")
+                                        , (.name "SECT_TEXT")
+                                        , (.hole "op:addressOf:local:scalar") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "code_ptr") (.lit .unit))
+                                        (.seq
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))
+                                        .cont)
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "slide"
+                                        (.call "_dyld_get_image_vmaddr_slide" [(.name "i")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "start" (.unop "cast:u64" (.name "code_ptr")))
+                                        (.expr
+                                        (.call
+                                        "push_back"
+                                        [ (.call
+                                        "SharedLibraryAddress"
+                                        [ (.call "_dyld_get_image_name" [(.name "i")])
+                                        , (.name "start")
+                                        , (.binop "+" (.name "start") (.name "size"))
+                                        , (.name "slide") ]) ])))))))))))))))
+                                (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                          (.ret (.name "result")))))))))) }
 
 /-- `v8.base.OS.SignalCodeMovingGC<duplicate>1:void()`  (from `platform/platform-darwin.cc`) -/
 def f_v8_base_OS_SignalCodeMovingGC_duplicate_1_void__ : Func :=
@@ -10062,7 +11632,13 @@ def f_v8_base_OS_CreateSharedMemoryHandleForTesting_optional_size_t_ : Func :=
                                     [ (.call "mach_task_self" [])
                                     , (.hole "op:addressOf:local:opaque-type")
                                     , (.lit (.int 0))
-                                    , (.hole "op:or")
+                                    , (.binop
+                                        "|"
+                                        (.binop
+                                        "|"
+                                        (.name "MAP_MEM_NAMED_CREATE")
+                                        (.name "VM_PROT_READ"))
+                                        (.name "VM_PROT_WRITE"))
                                     , (.hole "op:addressOf:local:opaque-type")
                                     , (.name "MACH_PORT_NULL") ]))
                                 (.seq
@@ -10175,7 +11751,12 @@ def f_v8_base_OS_RemapPages_bool_void__size_t_void__v8_base_OS_MemoryPermission_
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "flags" (.hole "op:or"))
+                                    (.assign
+                                      "flags"
+                                      (.binop
+                                        "|"
+                                        (.name "VM_FLAGS_FIXED")
+                                        (.name "VM_FLAGS_OVERWRITE")))
                                     (.seq
                                       .skip
                                       (.seq
@@ -10243,7 +11824,10 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_bool_void__size_t_v8_base_O
                                       "mach_vm_map_wrapper"
                                       [ (.hole "op:addressOf:local:opaque-type")
                                       , (.name "size")
-                                      , (.hole "op:or")
+                                      , (.binop
+                                        "|"
+                                        (.name "VM_FLAGS_FIXED")
+                                        (.name "VM_FLAGS_OVERWRITE"))
                                       , (.name "shared_mem_port")
                                       , (.name "offset")
                                       , (.name "prot") ]))
@@ -10293,7 +11877,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_2_vector__ : Func :=
                                   (.seq
                                     (.assign "mib" (.hole "op:alloc:array-decl"))
                                     (.seq
-                                      (.assign "mib" (.hole "op:arrayInitializer"))
+                                      (.assign "mib" (.hole "op:arrayDecl:size"))
                                       (.seq
                                         .skip
                                         (.seq
@@ -10382,8 +11966,20 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_2_vector__ : Func :=
                                         "&&"
                                         (.binop
                                         "&&"
-                                        (.binop "!=" (.hole "op:and") (.lit (.int 0)))
-                                        (.binop "!=" (.hole "op:and") (.lit (.int 0))))
+                                        (.binop
+                                        "!="
+                                        (.binop
+                                        "&"
+                                        (.field (.name "map") "kve_protection")
+                                        (.name "KVME_PROT_READ"))
+                                        (.lit (.int 0)))
+                                        (.binop
+                                        "!="
+                                        (.binop
+                                        "&"
+                                        (.field (.name "map") "kve_protection")
+                                        (.name "KVME_PROT_EXEC"))
+                                        (.lit (.int 0))))
                                         (.binop
                                         "!="
                                         (.index (.name "path") (.lit (.int 0)))
@@ -10549,7 +12145,24 @@ def f_v8_base_GetAlignmentOptionFromAlignment_zx_vm_option_t_size_t_ : Func :=
                         .skip
                         (.seq
                           (.assign "alignment_log2" (.lit (.int 0)))
-                          (.seq (.hole "control:FOR") (.ret (.hole "op:shiftLeft"))))))))))) }
+                          (.seq
+                            (.seq
+                              (.assign "shift" (.lit (.int 10)))
+                              (.loop
+                                (.binop "<=" (.name "shift") (.lit (.int 32)))
+                                (.seq
+                                  (.ifte
+                                    (.binop
+                                      "=="
+                                      (.name "alignment")
+                                      (.binop
+                                        "<<"
+                                        (.alloc "size_t" [(.lit (.int 1))])
+                                        (.name "shift")))
+                                    (.seq (.assign "alignment_log2" (.name "shift")) .brk)
+                                    .skip)
+                                  (.assign "shift" (.binop "+" (.name "shift") (.lit (.int 1)))))))
+                            (.ret (.binop "<<" (.name "alignment_log2") (.name "ZX_VM_ALIGN_BASE")))))))))))) }
 
 /-- `v8.base.MapVmo:void*(zx.vmar&,void*,size_t,void*,zx.vmo&,uint64_t,v8.base.PlacementMode,size_t,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_MapVmo_void__zx_vmar__void__size_t_void__zx_vmo__uint64_t_v8_base_PlacementMode_size_t_size_t_v8_base_OS_Memor : Func :=
@@ -10678,7 +12291,12 @@ def f_v8_base_TrimMapping_void__zx_vmar__void__size_t_size_t_size_t_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.assign "new_base" (.hole "op:and"))
+                  (.assign
+                    "new_base"
+                    (.binop
+                      "&"
+                      (.binop "-" (.binop "+" (.name "base") (.name "alignment")) (.lit (.int 1)))
+                      (.unop "~" (.binop "-" (.name "alignment") (.lit (.int 1))))))
                   (.seq
                     (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                     (.seq
@@ -10981,7 +12599,18 @@ def f_v8_base_CreateAddressSpaceReservationInternal_zx_status_t_zx_vmar__void__s
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "options" (.hole "op:or"))
+                                    (.assign
+                                      "options"
+                                      (.binop
+                                        "|"
+                                        (.binop
+                                        "|"
+                                        (.binop
+                                        "|"
+                                        (.name "ZX_VM_CAN_MAP_READ")
+                                        (.name "ZX_VM_CAN_MAP_WRITE"))
+                                        (.name "ZX_VM_CAN_MAP_EXECUTE"))
+                                        (.name "ZX_VM_CAN_MAP_SPECIFIC")))
                                     (.seq
                                       .skip
                                       (.seq
@@ -11056,7 +12685,7 @@ def f_v8_base_CreateAddressSpaceReservationInternal_zx_status_t_zx_vmar__void__s
                                         (.expr
                                         (.call
                                         "<operators>.assignmentAnd"
-                                        [(.name "options"), (.unop "!" (.name "ZX_VM_SPECIFIC"))]))
+                                        [(.name "options"), (.unop "~" (.name "ZX_VM_SPECIFIC"))]))
                                         (.assign
                                         "status"
                                         (.call
@@ -11408,7 +13037,7 @@ def f_v8_base_OS_GetUserTime_int_uint32_t__uint32_t__ : Func :=
                       (.seq
                         .skip
                         (.seq
-                          (.assign "info" (.hole "op:arrayInitializer"))
+                          (.assign "info" (.hole "op:arrayInitializer:zero-init"))
                           (.seq
                             (.ifte
                               (.binop
@@ -11709,7 +13338,7 @@ def f_v8_base_OS_SignalCodeMovingGC_duplicate_4_void__ : Func :=
                                       "mmap"
                                       [ (.call "v8.base.OS.GetRandomMmapAddr:void*()" [])
                                       , (.name "size")
-                                      , (.hole "op:or")
+                                      , (.binop "|" (.name "PROT_READ") (.name "PROT_EXEC"))
                                       , (.name "MAP_PRIVATE")
                                       , (.call "fileno" [(.name "f")])
                                       , (.lit (.int 0)) ]))
@@ -11745,7 +13374,7 @@ def f_v8_base_OS_RemapShared_void__void__void__size_t_ : Func :=
                         [ (.name "old_address")
                         , (.lit (.int 0))
                         , (.name "size")
-                        , (.hole "op:or")
+                        , (.binop "|" (.name "MREMAP_FIXED") (.name "MREMAP_MAYMOVE"))
                         , (.name "new_address") ]))
                     (.seq
                       (.ifte
@@ -12025,7 +13654,10 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                                         [ (.hole "op:cast:pointer")
                                         , (.name "size")
                                         , (.name "size")
-                                        , (.hole "op:or")
+                                        , (.binop
+                                        "|"
+                                        (.binop "|" (.name "MREMAP_MAYMOVE") (.name "MREMAP_FIXED"))
+                                        (.call "MREMAP_DONTUNMAP" [(.lit (.int 4))]))
                                         , (.name "new_address") ]))
                                         (.ifte
                                         (.binop "!=" (.name "result") (.name "MAP_FAILED"))
@@ -12143,7 +13775,7 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                                         [ (.name "new_address")
                                         , (.name "size")
                                         , (.name "protection")
-                                        , (.hole "op:or")
+                                        , (.binop "|" (.name "MAP_FIXED") (.name "MAP_PRIVATE"))
                                         , (.name "fd")
                                         , (.name "offset_in_file") ]))
                                         (.seq
@@ -12246,7 +13878,20 @@ def f_v8_base_SignalSafeMapsParser_Next_optional__ : Func :=
                                     (.ret (.field (.name "std") "nullopt"))
                                     .skip)
                                   (.seq
-                                    (.hole "control:FOR")
+                                    (.seq
+                                      (.assign "i" (.lit (.int 0)))
+                                      (.loop
+                                        (.binop "<" (.name "i") (.lit (.int 4)))
+                                        (.seq
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.call
+                                        "v8.base.SignalSafeMapsParser.ReadChar:bool(char*)"
+                                        [(.hole "op:addressOf:element:unknown-type")]))
+                                        (.ret (.field (.name "std") "nullopt"))
+                                        .skip)
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                     (.seq
                                       (.setIndex
                                         (.field (.name "entry") "raw_permissions")
@@ -12750,7 +14395,7 @@ def f_v8_base_OS_SignalCodeMovingGC_duplicate_5_void__ : Func :=
                                         "mmap"
                                         [ (.name "NULL")
                                         , (.name "size")
-                                        , (.hole "op:or")
+                                        , (.binop "|" (.name "PROT_READ") (.name "PROT_EXEC"))
                                         , (.name "MAP_PRIVATE")
                                         , (.call "fileno" [(.name "f")])
                                         , (.lit (.int 0)) ]))
@@ -13040,7 +14685,15 @@ def f_v8_base_OS_EnsureAlternativeSignalStackIsAvailableForCurrentThread_void__ 
                                         , (.call "strerror" [(.name "errno")]) ]) ]))
                                 .skip)
                               (.seq
-                                (.ifte (.unop "!" (.hole "op:and")) (.ret (.lit .unit)) .skip)
+                                (.ifte
+                                  (.unop
+                                    "!"
+                                    (.binop
+                                      "&"
+                                      (.field (.name "old_ss") "ss_flags")
+                                      (.name "SS_DISABLE")))
+                                  (.ret (.lit .unit))
+                                  .skip)
                                 (.seq
                                   .skip
                                   (.seq
@@ -13542,7 +15195,10 @@ def f_v8_base_OS_DecommitPages_duplicate_1_bool_void__size_t_ : Func :=
                                     [ (.name "address")
                                     , (.name "size")
                                     , (.name "PROT_NONE")
-                                    , (.hole "op:or")
+                                    , (.binop
+                                        "|"
+                                        (.binop "|" (.name "MAP_FIXED") (.name "MAP_ANONYMOUS"))
+                                        (.name "MAP_PRIVATE"))
                                     , (.unop "-" (.lit (.int 1)))
                                     , (.lit (.int 0)) ]))
                                 (.seq
@@ -13878,7 +15534,7 @@ def f_v8_base_OS_MemoryMappedFile_create_v8_base_OS_MemoryMappedFile__char__size
                                         "mmap"
                                         [ (.call "v8.base.OS.GetRandomMmapAddr:void*()" [])
                                         , (.name "result")
-                                        , (.hole "op:or")
+                                        , (.binop "|" (.name "PROT_READ") (.name "PROT_WRITE"))
                                         , (.name "MAP_SHARED")
                                         , (.call "fileno" [(.name "file")])
                                         , (.lit (.int 0)) ]))
@@ -13921,7 +15577,7 @@ def f_v8_base_OS_GetCurrentProcessId_int__ : Func :=
 def f_v8_base_OS_GetCurrentThreadIdInternal_int__ : Func :=
   { name := "v8.base.OS.GetCurrentThreadIdInternal:int()"
   , params := []
-  , body := (.ret (.unop "cast:i32" (.hole "op:cast:scalar"))) }
+  , body := (.ret (.unop "cast:i32" (.unop "cast:i64" (.call "pthread_self" [])))) }
 
 /-- `v8.base.OS.ExitProcess:void(int)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_ExitProcess_void_int_ : Func :=
@@ -14037,7 +15693,12 @@ def f_v8_base_OS_FOpen_FILE_char__char__ : Func :=
                       (.seq
                         .skip
                         (.seq
-                          (.assign "is_regular_file" (.binop "!=" (.hole "op:and") (.lit (.int 0))))
+                          (.assign
+                            "is_regular_file"
+                            (.binop
+                              "!="
+                              (.binop "&" (.field (.name "file_stat") "st_mode") (.name "S_IFREG"))
+                              (.lit (.int 0))))
                           (.seq
                             (.ifte
                               (.binop "!=" (.name "is_regular_file") (.lit (.int 0)))
@@ -14258,7 +15919,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_1_bool_void__size
                                 [ (.name "address")
                                 , (.name "size")
                                 , (.name "prot")
-                                , (.hole "op:or")
+                                , (.binop "|" (.name "MAP_SHARED") (.name "MAP_FIXED"))
                                 , (.name "fd")
                                 , (.name "offset") ])
                               (.name "MAP_FAILED"))))))))))) }
@@ -14285,7 +15946,10 @@ def f_v8_base_AddressSpaceReservation_FreeShared_duplicate_0_bool_void__size_t_ 
                           [ (.name "address")
                           , (.name "size")
                           , (.name "PROT_NONE")
-                          , (.hole "op:or")
+                          , (.binop
+                              "|"
+                              (.binop "|" (.name "MAP_FIXED") (.name "MAP_ANONYMOUS"))
+                              (.name "MAP_PRIVATE"))
                           , (.unop "-" (.lit (.int 1)))
                           , (.lit (.int 0)) ])
                         (.name "address")))))))) }
@@ -14855,7 +16519,55 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_6_vector__ : Func :=
                                         (.ret (.name "result"))))
                                         .skip)
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "num"))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "mapinfo"
+                                        (.binop "+" (.name "mapinfos") (.name "i")))
+                                        (.ifte
+                                        (.binop
+                                        "&"
+                                        (.field (.name "mapinfo") "flags")
+                                        (.name "MAP_ELF"))
+                                        (.seq
+                                        (.setField
+                                        (.field (.name "map") "info")
+                                        "vaddr"
+                                        (.field (.name "mapinfo") "vaddr"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.call
+                                        "devctl"
+                                        [ (.name "proc_fd")
+                                        , (.name "DCMD_PROC_MAPDEBUG")
+                                        , (.name "map")
+                                        , (.hole "op:sizeOf")
+                                        , (.lit (.int 0)) ])
+                                        (.name "EOK"))
+                                        (.seq
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))
+                                        .cont)
+                                        .skip)
+                                        (.expr
+                                        (.call
+                                        "push_back"
+                                        [ (.mcall
+                                        (.field (.name "map") "info")
+                                        "path"
+                                        [ (.field (.field (.name "map") "info") "path")
+                                        , (.field (.name "mapinfo") "vaddr")
+                                        , (.binop
+                                        "+"
+                                        (.field (.name "mapinfo") "vaddr")
+                                        (.field (.name "mapinfo") "size")) ]) ]))))
+                                        .skip))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                         (.seq
                                         (.expr (.call "free" [(.name "mapinfos")]))
                                         (.seq
@@ -15100,7 +16812,7 @@ def f_v8_base_Allocate_void__void__size_t_v8_base_OS_MemoryPermission_ : Func :=
                                       [ (.lit .unit)
                                       , (.name "size")
                                       , (.name "prot_flags")
-                                      , (.hole "op:or")
+                                      , (.binop "|" (.name "MAP_PRIVATE") (.name "MAP_ANON"))
                                       , (.unop "-" (.lit (.int 1)))
                                       , (.lit (.int 0)) ]))
                                   (.seq
@@ -15673,7 +17385,7 @@ def f_v8_base_StarboardDefaultTimezoneCache_DaylightSavingsOffset_double_double_
                         (.seq
                           .skip
                           (.seq
-                            (.assign "value" (.hole "op:arrayInitializer"))
+                            (.assign "value" (.hole "op:arrayDecl:size"))
                             (.seq
                               .skip
                               (.seq
@@ -15809,7 +17521,7 @@ def f_v8_base_WindowsTimezoneCache__clinit__v8_base_WindowsTimezoneCache__ : Fun
             .skip
             (.seq
               (.assign "kTzNameSize" (.lit (.int 128)))
-              (.seq (.expr (.hole "op:arrayInitializer")) (.expr (.hole "op:arrayInitializer"))))) }
+              (.seq (.expr (.hole "op:arrayDecl:size")) (.expr (.hole "op:arrayDecl:size"))))) }
 
 /-- `v8.base.WindowsTimezoneCache.__init__`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_WindowsTimezoneCache___init__ : Func :=
@@ -16375,7 +18087,7 @@ def f_v8_base_OS_GetUserTime_duplicate_2_int_uint32_t__uint32_t__ : Func :=
                   (.ret (.unop "-" (.lit (.int 1))))
                   .skip)
                 (.seq
-                  (.expr (.hole "op:assignmentDivision"))
+                  (.assign "usertime" (.binop "/" (.name "usertime") (.lit (.int 10))))
                   (.seq
                     (.hole "assign:lhs:indirection")
                     (.seq (.hole "assign:lhs:indirection") (.ret (.lit (.int 0))))))))) }
@@ -17193,7 +18905,34 @@ def f_v8_base_AllocateInternal_void__void__size_t_size_t_size_t_DWORD_DWORD_ : F
                                     (.seq
                                       (.assign "aligned_base" (.lit .unit))
                                       (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "kMaxAttempts"))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "base"
+                                        (.call
+                                        "VirtualAllocWithHint"
+                                        [ (.name "padded_size")
+                                        , (.name "flags")
+                                        , (.name "protect")
+                                        , (.name "hint") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "base") (.lit .unit))
+                                        (.ret (.lit .unit))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
+                                        (.seq
+                                        (.assign "aligned_base" (.hole "op:cast:pointer"))
+                                        (.seq
+                                        (.assign "base" (.hole "op:cast:pointer"))
+                                        (.ifte (.binop "!=" (.name "base") (.lit .unit)) .brk .skip))))))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                         (.seq
                                         (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
                                         (.ret (.hole "op:cast:pointer")))))))))))))))))) }
@@ -17250,7 +18989,7 @@ def f_v8_base_OS_Allocate_duplicate_1_void__void__size_t_size_t_v8_base_OS_Memor
                                         (.field (.name "OS") "MemoryPermission")
                                         "kNoAccess"))
                                       (.name "MEM_RESERVE")
-                                      (.hole "op:or")))
+                                      (.binop "|" (.name "MEM_RESERVE") (.name "MEM_COMMIT"))))
                                   (.seq
                                     .skip
                                     (.seq
@@ -17299,11 +19038,13 @@ def f_v8_base_OS_AllocateShared_duplicate_2_void__void__size_t_v8_base_OS_Memory
                 (.seq
                   .skip
                   (.seq
-                    (.assign "off_hi" (.hole "op:cast:opaque-type"))
+                    (.assign
+                      "off_hi"
+                      (.unop "cast:u64" (.binop ">>>" (.name "offset") (.lit (.int 32)))))
                     (.seq
                       .skip
                       (.seq
-                        (.assign "off_lo" (.hole "op:cast:opaque-type"))
+                        (.assign "off_lo" (.unop "cast:u64" (.name "offset")))
                         (.seq
                           .skip
                           (.seq
@@ -17590,7 +19331,10 @@ def f_OS_CreateAddressSpaceReservation_optional_void__size_t_size_t_v8_base_OS_M
                                         , (.name "size")
                                         , (.name "alignment")
                                         , (.name "page_size")
-                                        , (.hole "op:or")
+                                        , (.binop
+                                        "|"
+                                        (.name "MEM_RESERVE")
+                                        (.name "MEM_RESERVE_PLACEHOLDER"))
                                         , (.name "PAGE_NOACCESS") ]))
                                     (.seq
                                       (.ifte
@@ -17665,7 +19409,10 @@ def f_v8_base_OS_HasLazyCommits_duplicate_3_bool__ : Func :=
 def f_v8_base_OS_Sleep_duplicate_1_void_v8_base_TimeDelta_ : Func :=
   { name := "v8.base.OS.Sleep<duplicate>1:void(v8.base.TimeDelta)"
   , params := ["interval"]
-  , body := (.expr (.call "Sleep" [(.hole "op:cast:opaque-type")])) }
+  , body := (.expr
+            (.call
+              "Sleep"
+              [(.unop "cast:u64" (.call "v8.base.TimeDelta.InMilliseconds:ANY()<const>" []))])) }
 
 /-- `v8.base.PreciseSleepTimer.__init__`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_PreciseSleepTimer___init__ : Func :=
@@ -17745,7 +19492,9 @@ def f_v8_base_PreciseSleepTimer_TryInit_void__ : Func :=
                         (.seq
                           .skip
                           (.seq
-                            (.assign "desired_access" (.hole "op:or"))
+                            (.assign
+                              "desired_access"
+                              (.binop "|" (.name "TIMER_MODIFY_STATE") (.name "SYNCHRONIZE")))
                             (.setField
                               (.name "self")
                               "timer_"
@@ -17912,7 +19661,10 @@ def f_v8_base_OS_MemoryMappedFile_open_duplicate_1_v8_base_OS_MemoryMappedFile__
                                         "CreateFileW"
                                         [ (.call "c_str" [])
                                         , (.name "access")
-                                        , (.hole "op:or")
+                                        , (.binop
+                                        "|"
+                                        (.name "FILE_SHARE_READ")
+                                        (.name "FILE_SHARE_WRITE"))
                                         , (.lit .unit)
                                         , (.name "OPEN_EXISTING")
                                         , (.lit (.int 0))
@@ -18025,8 +19777,11 @@ def f_v8_base_OS_MemoryMappedFile_create_duplicate_1_v8_base_OS_MemoryMappedFile
                                       (.call
                                         "CreateFileW"
                                         [ (.call "c_str" [])
-                                        , (.hole "op:or")
-                                        , (.hole "op:or")
+                                        , (.binop "|" (.name "GENERIC_READ") (.name "GENERIC_WRITE"))
+                                        , (.binop
+                                        "|"
+                                        (.name "FILE_SHARE_READ")
+                                        (.name "FILE_SHARE_WRITE"))
                                         , (.lit .unit)
                                         , (.name "OPEN_ALWAYS")
                                         , (.lit (.int 0))
@@ -18052,7 +19807,7 @@ def f_v8_base_OS_MemoryMappedFile_create_duplicate_1_v8_base_OS_MemoryMappedFile
                                         , (.lit .unit)
                                         , (.name "PAGE_READWRITE")
                                         , (.lit (.int 0))
-                                        , (.hole "op:cast:opaque-type")
+                                        , (.unop "cast:u64" (.name "size"))
                                         , (.lit .unit) ]))
                                         (.seq
                                         (.ifte
@@ -18126,7 +19881,12 @@ def f_AddressSpaceReservation_SplitPlaceholder_bool_void__size_t_ : Func :=
               .skip
               (.seq
                 (.expr (.call "DCHECK" [(.lit .unit)]))
-                (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
+                (.ret
+                  (.call
+                    "VirtualFree"
+                    [ (.name "address")
+                    , (.name "size")
+                    , (.binop "|" (.name "MEM_RELEASE") (.name "MEM_PRESERVE_PLACEHOLDER")) ]))))) }
 
 /-- `AddressSpaceReservation.MergePlaceholders:bool(void*,size_t)`  (from `platform/platform-win32.cc`) -/
 def f_AddressSpaceReservation_MergePlaceholders_bool_void__size_t_ : Func :=
@@ -18138,7 +19898,12 @@ def f_AddressSpaceReservation_MergePlaceholders_bool_void__size_t_ : Func :=
               .skip
               (.seq
                 (.expr (.call "DCHECK" [(.lit .unit)]))
-                (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
+                (.ret
+                  (.call
+                    "VirtualFree"
+                    [ (.name "address")
+                    , (.name "size")
+                    , (.binop "|" (.name "MEM_RELEASE") (.name "MEM_COALESCE_PLACEHOLDERS")) ]))))) }
 
 /-- `v8.base.AddressSpaceReservation.Allocate<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_AddressSpaceReservation_Allocate_duplicate_1_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -18168,8 +19933,11 @@ def f_v8_base_AddressSpaceReservation_Allocate_duplicate_1_bool_void__size_t_v8_
                                   "=="
                                   (.name "access")
                                   (.field (.field (.name "OS") "MemoryPermission") "kNoAccess"))
-                                (.hole "op:or")
-                                (.hole "op:or")))
+                                (.binop "|" (.name "MEM_RESERVE") (.name "MEM_REPLACE_PLACEHOLDER"))
+                                (.binop
+                                  "|"
+                                  (.binop "|" (.name "MEM_RESERVE") (.name "MEM_COMMIT"))
+                                  (.name "MEM_REPLACE_PLACEHOLDER"))))
                             (.seq
                               .skip
                               (.seq
@@ -18197,7 +19965,12 @@ def f_v8_base_AddressSpaceReservation_Free_duplicate_1_bool_void__size_t_ : Func
               .skip
               (.seq
                 (.expr (.call "DCHECK" [(.lit .unit)]))
-                (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
+                (.ret
+                  (.call
+                    "VirtualFree"
+                    [ (.name "address")
+                    , (.name "size")
+                    , (.binop "|" (.name "MEM_RELEASE") (.name "MEM_PRESERVE_PLACEHOLDER")) ]))))) }
 
 /-- `v8.base.AddressSpaceReservation.AllocateShared<duplicate>2:bool(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_2_bool_void__size_t_v8_base_OS_MemoryPermission_SharedMemoryH : Func :=
@@ -18519,7 +20292,7 @@ def f_v8_base_LoadSymbols_vector_HANDLE_ : Func :=
                                         (.seq
                                         (.assign "buf" (.hole "op:alloc:array-decl"))
                                         (.seq
-                                        (.assign "buf" (.hole "op:arrayInitializer"))
+                                        (.assign "buf" (.hole "op:arrayDecl:size"))
                                         (.seq
                                         (.assign
                                         "ok"
@@ -18827,7 +20600,7 @@ def f_v8_base_Thread_DeleteThreadLocalKey_duplicate_1_void_v8_base_Thread_LocalS
             (.seq
               .skip
               (.seq
-                (.assign "result" (.call "TlsFree" [(.hole "op:cast:opaque-type")]))
+                (.assign "result" (.call "TlsFree" [(.unop "cast:u64" (.name "key"))]))
                 (.seq
                   (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.expr (.call "DCHECK" [(.lit .unit)])))))) }
@@ -18836,7 +20609,7 @@ def f_v8_base_Thread_DeleteThreadLocalKey_duplicate_1_void_v8_base_Thread_LocalS
 def f_v8_base_Thread_GetThreadLocal_duplicate_1_void__v8_base_Thread_LocalStorageKey_ : Func :=
   { name := "v8.base.Thread.GetThreadLocal<duplicate>1:void*(v8.base.Thread.LocalStorageKey)"
   , params := ["key"]
-  , body := (.ret (.call "TlsGetValue" [(.hole "op:cast:opaque-type")])) }
+  , body := (.ret (.call "TlsGetValue" [(.unop "cast:u64" (.name "key"))])) }
 
 /-- `v8.base.Thread.SetThreadLocal<duplicate>1:void(v8.base.Thread.LocalStorageKey,void*)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_Thread_SetThreadLocal_duplicate_1_void_v8_base_Thread_LocalStorageKey_void__ : Func :=
@@ -18849,7 +20622,7 @@ def f_v8_base_Thread_SetThreadLocal_duplicate_1_void_v8_base_Thread_LocalStorage
               (.seq
                 (.assign
                   "result"
-                  (.call "TlsSetValue" [(.hole "op:cast:opaque-type"), (.name "value")]))
+                  (.call "TlsSetValue" [(.unop "cast:u64" (.name "key")), (.name "value")]))
                 (.seq
                   (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.expr (.call "DCHECK" [(.lit .unit)])))))) }
@@ -19197,7 +20970,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_3_bool_void__size
                                 [ (.name "address")
                                 , (.name "size")
                                 , (.name "prot")
-                                , (.hole "op:or")
+                                , (.binop "|" (.name "MAP_SHARED") (.name "MAP_FIXED"))
                                 , (.name "fd")
                                 , (.name "offset") ])
                               (.name "MAP_FAILED"))))))))))) }
@@ -19224,7 +20997,7 @@ def f_v8_base_AddressSpaceReservation_FreeShared_duplicate_2_bool_void__size_t_ 
                           [ (.name "address")
                           , (.name "size")
                           , (.name "PROT_NONE")
-                          , (.hole "op:or")
+                          , (.binop "|" (.name "MAP_FIXED") (.name "MAP_PRIVATE"))
                           , (.unop "-" (.lit (.int 1)))
                           , (.lit (.int 0)) ])
                         (.name "MAP_FAILED")))))))) }
@@ -19506,7 +21279,7 @@ def f_v8_base_OS_MemoryMappedFile_create_duplicate_2_v8_base_OS_MemoryMappedFile
                                         "mmap"
                                         [ (.call "v8.base.OS.GetRandomMmapAddr:void*()" [])
                                         , (.name "result")
-                                        , (.hole "op:or")
+                                        , (.binop "|" (.name "PROT_READ") (.name "PROT_WRITE"))
                                         , (.name "MAP_SHARED")
                                         , (.call "fileno" [(.name "file")])
                                         , (.lit (.int 0)) ]))
@@ -19829,7 +21602,7 @@ def f_v8_base_Time_ToJsTime_double___const_ : Func :=
 def f_v8_base____ostream_std_ostream__v8_base_Time__ : Func :=
   { name := "v8.base.<<:ostream(std.ostream&,v8.base.Time&)"
   , params := ["os", "time"]
-  , body := (.ret (.hole "op:shiftLeft")) }
+  , body := (.ret (.binop "<<" (.name "os") (.call "v8.base.Time.ToJsTime:double()<const>" []))) }
 
 /-- `v8.base.TimeTicks.Now:v8.base.TimeTicks()`  (from `platform/time.cc`) -/
 def f_v8_base_TimeTicks_Now_v8_base_TimeTicks__ : Func :=
@@ -20233,7 +22006,47 @@ def f_v8_base_RegionAllocator_AllocateRegion_Address_v8_base_RandomNumberGenerat
                     ">="
                     (.call "free_size" [])
                     (.field (.name "self") "max_load_for_randomization_"))
-                  (.seq .skip (.seq (.assign "random" (.lit (.int 0))) (.hole "control:FOR")))
+                  (.seq
+                    .skip
+                    (.seq
+                      (.assign "random" (.lit (.int 0)))
+                      (.seq
+                        (.assign "i" (.lit (.int 0)))
+                        (.loop
+                          (.binop "<" (.name "i") (.name "kMaxRandomizationAttempts"))
+                          (.seq
+                            (.seq
+                              (.expr
+                                (.call
+                                  "NextBytes"
+                                  [(.hole "op:addressOf:local:scalar"), (.hole "op:sizeOf")]))
+                              (.seq
+                                .skip
+                                (.seq
+                                  (.assign
+                                    "random_offset"
+                                    (.binop
+                                      "*"
+                                      (.field (.name "self") "page_size_")
+                                      (.binop
+                                        "%"
+                                        (.name "random")
+                                        (.field (.name "self") "region_size_in_pages_"))))
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      (.assign
+                                        "address"
+                                        (.binop "+" (.call "begin" []) (.name "random_offset")))
+                                      (.ifte
+                                        (.call
+                                        "AllocateRegionAt"
+                                        [ (.name "address")
+                                        , (.name "size")
+                                        , (.field (.name "RegionState") "kAllocated") ])
+                                        (.ret (.name "address"))
+                                        .skip))))))
+                            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))))
                   .skip)
                 (.ret (.call "AllocateRegion" [(.name "size")]))))) }
 
@@ -20688,10 +22501,39 @@ def f_v8_base_RegionAllocator_Region_Print_void_std_ostream___const_ : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "flags" (.call "flags" [(.hole "op:or")]))
+                (.assign
+                  "flags"
+                  (.call
+                    "flags"
+                    [ (.binop
+                        "|"
+                        (.field (.field (.name "std") "ios") "hex")
+                        (.field (.field (.name "std") "ios") "showbase")) ]))
                 (.seq
-                  (.expr (.hole "op:shiftLeft"))
-                  (.seq (.expr (.hole "op:shiftLeft")) (.expr (.call "flags" [(.name "flags")]))))))) }
+                  (.expr
+                    (.binop
+                      "<<"
+                      (.binop
+                        "<<"
+                        (.binop
+                          "<<"
+                          (.binop
+                            "<<"
+                            (.binop
+                              "<<"
+                              (.binop "<<" (.name "os") (.lit (.str "[")))
+                              (.call "begin" []))
+                            (.lit (.str ", ")))
+                          (.call "end" []))
+                        (.lit (.str "), size: ")))
+                      (.call "size" [])))
+                  (.seq
+                    (.expr
+                      (.binop
+                        "<<"
+                        (.binop "<<" (.name "os") (.lit (.str ", ")))
+                        (.mcall (.name "self") "state_" [(.field (.name "self") "state_")])))
+                    (.expr (.call "flags" [(.name "flags")]))))))) }
 
 /-- `v8.base.RegionAllocator.Print:void(std.ostream&)<const>`  (from `region-allocator.cc`) -/
 def f_v8_base_RegionAllocator_Print_void_std_ostream___const_ : Func :=
@@ -20706,17 +22548,49 @@ def f_v8_base_RegionAllocator_Print_void_std_ostream___const_ : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.assign "flags" (.call "flags" [(.hole "op:or")]))
+                    (.assign
+                      "flags"
+                      (.call
+                        "flags"
+                        [ (.binop
+                            "|"
+                            (.field (.field (.name "std") "ios") "hex")
+                            (.field (.field (.name "std") "ios") "showbase")) ]))
                     (.seq
-                      (.expr (.hole "op:shiftLeft"))
+                      (.expr
+                        (.binop
+                          "<<"
+                          (.binop
+                            "<<"
+                            (.binop
+                              "<<"
+                              (.binop
+                                "<<"
+                                (.binop "<<" (.name "os") (.lit (.str "RegionAllocator: [")))
+                                (.call "begin" []))
+                              (.lit (.str ", ")))
+                            (.call "end" []))
+                          (.lit (.str ")"))))
                       (.seq
-                        (.expr (.hole "op:shiftLeft"))
+                        (.expr
+                          (.binop
+                            "<<"
+                            (.binop "<<" (.name "os") (.lit (.str "\\nsize: ")))
+                            (.call "size" [])))
                         (.seq
-                          (.expr (.hole "op:shiftLeft"))
+                          (.expr
+                            (.binop
+                              "<<"
+                              (.binop "<<" (.name "os") (.lit (.str "\\nfree_size: ")))
+                              (.call "free_size" [])))
                           (.seq
-                            (.expr (.hole "op:shiftLeft"))
+                            (.expr
+                              (.binop
+                                "<<"
+                                (.binop "<<" (.name "os") (.lit (.str "\\npage_size: ")))
+                                (.field (.name "self") "page_size_")))
                             (.seq
-                              (.expr (.hole "op:shiftLeft"))
+                              (.expr (.binop "<<" (.name "os") (.lit (.str "\\nall regions: "))))
                               (.seq
                                 (.seq
                                   .skip
@@ -20731,10 +22605,11 @@ def f_v8_base_RegionAllocator_Print_void_std_ostream___const_ : Func :=
                                         (.seq
                                         (.assign "region" (.call "next" []))
                                         (.seq
-                                        (.expr (.hole "op:shiftLeft"))
+                                        (.expr (.binop "<<" (.name "os") (.lit (.str "\\n  "))))
                                         (.expr (.call "Print" [(.name "os")]))))))))
                                 (.seq
-                                  (.expr (.hole "op:shiftLeft"))
+                                  (.expr
+                                    (.binop "<<" (.name "os") (.lit (.str "\\nfree regions: "))))
                                   (.seq
                                     (.seq
                                       .skip
@@ -20749,10 +22624,10 @@ def f_v8_base_RegionAllocator_Print_void_std_ostream___const_ : Func :=
                                         (.seq
                                         (.assign "region" (.call "next" []))
                                         (.seq
-                                        (.expr (.hole "op:shiftLeft"))
+                                        (.expr (.binop "<<" (.name "os") (.lit (.str "\\n  "))))
                                         (.expr (.call "Print" [(.name "os")]))))))))
                                     (.seq
-                                      (.expr (.hole "op:shiftLeft"))
+                                      (.expr (.binop "<<" (.name "os") (.lit (.str "\\n"))))
                                       (.expr (.call "flags" [(.name "flags")])))))))))))))))) }
 
 /-- `v8.base.LsanPageAllocator.__init__`  (from `sanitizer/lsan-page-allocator.cc`) -/
@@ -20981,19 +22856,21 @@ def f___mulodi4 : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "a_low" (.hole "op:and"))
+              (.assign "a_low" (.binop "&" (.name "a") (.lit (.int 4294967295))))
               (.seq
                 .skip
                 (.seq
-                  (.assign "a_high" (.hole "op:arithmeticShiftRight"))
+                  (.assign "a_high" (.binop ">>>" (.unop "cast:u64" (.name "a")) (.lit (.int 32))))
                   (.seq
                     .skip
                     (.seq
-                      (.assign "b_low" (.hole "op:and"))
+                      (.assign "b_low" (.binop "&" (.name "b") (.lit (.int 4294967295))))
                       (.seq
                         .skip
                         (.seq
-                          (.assign "b_high" (.hole "op:arithmeticShiftRight"))
+                          (.assign
+                            "b_high"
+                            (.binop ">>>" (.unop "cast:u64" (.name "b")) (.lit (.int 32))))
                           (.seq
                             .skip
                             (.seq
@@ -21019,7 +22896,10 @@ def f___mulodi4 : Func :=
                                         (.seq
                                         (.assign
                                         "result1"
-                                        (.binop "+" (.name "r_low") (.hole "op:shiftLeft")))
+                                        (.binop
+                                        "+"
+                                        (.name "r_low")
+                                        (.binop "<<" (.name "r_mid1") (.lit (.int 32)))))
                                         (.seq
                                         (.ifte
                                         (.binop "<" (.name "result1") (.name "r_low"))
@@ -21032,7 +22912,10 @@ def f___mulodi4 : Func :=
                                         (.seq
                                         (.assign
                                         "result2"
-                                        (.binop "+" (.name "result1") (.hole "op:shiftLeft")))
+                                        (.binop
+                                        "+"
+                                        (.name "result1")
+                                        (.binop "<<" (.name "r_mid2") (.lit (.int 32)))))
                                         (.seq
                                         (.ifte
                                         (.binop "<" (.name "result2") (.name "result1"))
@@ -21048,8 +22931,8 @@ def f___mulodi4 : Func :=
                                         (.name "r_high")
                                         (.binop
                                         "+"
-                                        (.hole "op:arithmeticShiftRight")
-                                        (.hole "op:arithmeticShiftRight"))))
+                                        (.binop ">>>" (.name "r_mid1") (.lit (.int 32)))
+                                        (.binop ">>>" (.name "r_mid2") (.lit (.int 32))))))
                                         (.seq
                                         .skip
                                         (.seq
@@ -21057,11 +22940,18 @@ def f___mulodi4 : Func :=
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "result_sign" (.hole "op:arithmeticShiftRight"))
+                                        (.assign
+                                        "result_sign"
+                                        (.binop ">>" (.name "result") (.lit (.int 63))))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "expected_result_sign" (.hole "op:xor"))
+                                        (.assign
+                                        "expected_result_sign"
+                                        (.binop
+                                        "^"
+                                        (.binop ">>" (.name "a") (.lit (.int 63)))
+                                        (.binop ">>" (.name "b") (.lit (.int 63)))))
                                         (.seq
                                         (.hole "assign:lhs:indirection")
                                         (.ret (.name "result")))))))))))))))))))))))))))))))) }
@@ -21142,7 +23032,9 @@ def f_v8_base_RandomNumberGenerator___init__ : Func :=
                         (.seq
                           .skip
                           (.seq
-                            (.assign "seed" (.hole "op:shiftLeft"))
+                            (.assign
+                              "seed"
+                              (.binop "<<" (.call "ToInternalValue" []) (.lit (.int 24))))
                             (.seq
                               (.expr
                                 (.call
@@ -21159,7 +23051,7 @@ def f_v8_base_RandomNumberGenerator_NextInt_int_int_ : Func :=
             (.seq
               (.ifte
                 (.call "IsPowerOfTwo" [(.name "max")])
-                (.ret (.unop "cast:i32" (.hole "op:arithmeticShiftRight")))
+                (.ret (.unop "cast:i32" (.hole "op:shiftRight:unknown-signedness")))
                 .skip)
               (.loop
                 (.lit (.bool true))
@@ -21212,7 +23104,18 @@ def f_v8_base_RandomNumberGenerator_NextInt64_int64_t__ : Func :=
 def f_v8_base_RandomNumberGenerator_NextBytes_void_void__size_t_ : Func :=
   { name := "v8.base.RandomNumberGenerator.NextBytes:void(void*,size_t)"
   , params := ["buffer", "buflen"]
-  , body := (.hole "control:FOR") }
+  , body := (.seq
+            (.assign "n" (.lit (.int 0)))
+            (.loop
+              (.binop "<" (.name "n") (.name "buflen"))
+              (.seq
+                (.setIndex
+                  (.hole "op:cast:pointer")
+                  (.name "n")
+                  (.unop
+                    "cast:u8"
+                    (.call "v8.base.RandomNumberGenerator.Next:int(int)" [(.lit (.int 8))])))
+                (.assign "n" (.binop "+" (.name "n") (.lit (.int 1))))))) }
 
 /-- `v8.base.ComplementSample:vector(std.unordered_set&,uint64_t)`  (from `utils/random-number-generator.cc`) -/
 def f_v8_base_ComplementSample_vector_std_unordered_set__uint64_t_ : Func :=
@@ -21232,7 +23135,18 @@ def f_v8_base_ComplementSample_vector_std_unordered_set__uint64_t_ : Func :=
                       (.name "result")))
                   (.seq
                     (.expr (.call "reserve" [(.binop "-" (.name "max") (.call "size" []))]))
-                    (.seq (.hole "control:FOR") (.ret (.name "result")))))))) }
+                    (.seq
+                      (.seq
+                        (.assign "i" (.lit (.int 0)))
+                        (.loop
+                          (.binop "<" (.name "i") (.name "max"))
+                          (.seq
+                            (.ifte
+                              (.unop "!" (.call "count" [(.name "i")]))
+                              (.expr (.call "push_back" [(.name "i")]))
+                              .skip)
+                            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                      (.ret (.name "result")))))))) }
 
 /-- `v8.base.RandomNumberGenerator.NextSample:vector(uint64_t,size_t)`  (from `utils/random-number-generator.cc`) -/
 def f_v8_base_RandomNumberGenerator_NextSample_vector_uint64_t_size_t_ : Func :=
@@ -21355,7 +23269,16 @@ def f_v8_base_RandomNumberGenerator_NextSampleSlow_vector_uint64_t_size_t_std_un
                     (.seq
                       (.expr (.call "reserve" [(.binop "-" (.name "max") (.call "size" []))]))
                       (.seq
-                        (.hole "control:FOR")
+                        (.seq
+                          (.assign "i" (.lit (.int 0)))
+                          (.loop
+                            (.binop "<" (.name "i") (.name "max"))
+                            (.seq
+                              (.ifte
+                                (.unop "!" (.call "count" [(.name "i")]))
+                                (.expr (.call "push_back" [(.name "i")]))
+                                .skip)
+                              (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                         (.seq
                           .skip
                           (.seq
@@ -21432,7 +23355,10 @@ def f_v8_base_RandomNumberGenerator_Next_int_int_ : Func :=
                     (.call
                       "XorShift128"
                       [(.hole "op:addressOf:field:scalar"), (.hole "op:addressOf:field:scalar")]))
-                  (.ret (.unop "cast:i32" (.hole "op:arithmeticShiftRight"))))))) }
+                  (.ret
+                    (.unop
+                      "cast:i32"
+                      (.binop ">>>" (.name "random") (.binop "-" (.lit (.int 64)) (.name "bits"))))))))) }
 
 /-- `v8.base.RandomNumberGenerator.SetSeed:void(int64_t)`  (from `utils/random-number-generator.cc`) -/
 def f_v8_base_RandomNumberGenerator_SetSeed_void_int64_t_ : Func :=
@@ -21458,7 +23384,7 @@ def f_v8_base_RandomNumberGenerator_SetSeed_void_int64_t_ : Func :=
                     (.setField
                       (.name "self")
                       "state1_"
-                      (.call "MurmurHash3" [(.unop "!" (.field (.name "self") "state0_"))]))
+                      (.call "MurmurHash3" [(.unop "~" (.field (.name "self") "state0_"))]))
                     (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))) }
 
 /-- `v8.base.RandomNumberGenerator.MurmurHash3:uint64_t(uint64_t)`  (from `utils/random-number-generator.cc`) -/
@@ -21473,21 +23399,29 @@ def f_v8_base_RandomNumberGenerator_MurmurHash3_uint64_t_uint64_t_ : Func :=
                 (.expr
                   (.call
                     "<operators>.assignmentXor"
-                    [(.name "h"), (.hole "op:arithmeticShiftRight")]))
+                    [(.name "h"), (.binop ">>>" (.name "h") (.lit (.int 33)))]))
                 (.seq
-                  (.expr (.hole "op:assignmentMultiplication"))
+                  (.seq
+                    (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
+                    (.seq
+                      (.expr (.call "uint64_t" [(.lit (.int 18397679294719823053))]))
+                      (.assign "h" (.binop "*" (.name "h") (.name "<tmp>0")))))
                   (.seq
                     (.expr
                       (.call
                         "<operators>.assignmentXor"
-                        [(.name "h"), (.hole "op:arithmeticShiftRight")]))
+                        [(.name "h"), (.binop ">>>" (.name "h") (.lit (.int 33)))]))
                     (.seq
-                      (.expr (.hole "op:assignmentMultiplication"))
+                      (.seq
+                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
+                        (.seq
+                          (.expr (.call "uint64_t" [(.lit (.int 14181476777654086739))]))
+                          (.assign "h" (.binop "*" (.name "h") (.name "<tmp>1")))))
                       (.seq
                         (.expr
                           (.call
                             "<operators>.assignmentXor"
-                            [(.name "h"), (.hole "op:arithmeticShiftRight")]))
+                            [(.name "h"), (.binop ">>>" (.name "h") (.lit (.int 33)))]))
                         (.ret (.name "h"))))))))) }
 
 /-- `v8.base.ConvertPageAllocatorPermission:PagePermissions(v8.PageAllocator.Permission)`  (from `virtual-address-space-page-allocator.cc`) -/
@@ -21571,7 +23505,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_ReleasePages_bool_void__size_t_si
                           (.mcall
                             (.name "self")
                             "resized_allocations_"
-                            [(.hole "op:arrayInitializer")]))
+                            [(.hole "op:arrayDecl:size")]))
                         (.seq
                           (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.ret (.lit (.bool true))))))))))) }
@@ -22447,12 +24381,18 @@ def f_v8_base_VLQBase64Decode_int32_t_char__size_t_size_t__ : Func :=
                             (.seq
                               .skip
                               (.seq
-                                (.loop (.hole "expr:BLOCK-prelude") (.expr (.hole "op:and")))
+                                (.loop
+                                  (.hole "expr:BLOCK-prelude")
+                                  (.expr (.binop "&" (.name "digit") (.name "kContinueMask"))))
                                 (.ret
                                   (.cond
-                                    (.hole "op:and")
-                                    (.unop "-" (.unop "cast:i32" (.hole "op:arithmeticShiftRight")))
-                                    (.hole "op:arithmeticShiftRight")))))))))))))) }
+                                    (.binop "&" (.name "res") (.lit (.int 1)))
+                                    (.unop
+                                      "-"
+                                      (.unop
+                                        "cast:i32"
+                                        (.binop ">>>" (.name "res") (.lit (.int 1)))))
+                                    (.binop ">>>" (.name "res") (.lit (.int 1)))))))))))))))) }
 
 /-- `v8.base.ControlledCrashesAreHarmless:bool()`  (from `abort-mode.h`) -/
 def f_v8_base_ControlledCrashesAreHarmless_bool__ : Func :=
@@ -22662,7 +24602,20 @@ def f_v8_base_AddressRegionOf_ANY_Container___ : Func :=
 def f_v8_base____ostream_std_ostream__v8_base_AddressRegion_ : Func :=
   { name := "v8.base.<<:ostream(std.ostream&,v8.base.AddressRegion)"
   , params := ["out", "region"]
-  , body := (.ret (.hole "op:shiftLeft")) }
+  , body := (.ret
+            (.binop
+              "<<"
+              (.binop
+                "<<"
+                (.binop
+                  "<<"
+                  (.binop
+                    "<<"
+                    (.binop "<<" (.name "out") (.lit (.str "[")))
+                    (.hole "op:cast:pointer"))
+                  (.lit (.str "+")))
+                (.call "size" []))
+              (.lit (.str "]")))) }
 
 /-- `v8.base.bits.ReverseBits:T(T)`  (from `bits.h`) -/
 def f_v8_base_bits_ReverseBits_T_T_ : Func :=
@@ -22674,7 +24627,25 @@ def f_v8_base_bits_ReverseBits_T_T_ : Func :=
               .skip
               (.seq
                 (.assign "result" (.lit (.int 0)))
-                (.seq (.hole "control:FOR") (.ret (.name "result")))))) }
+                (.seq
+                  (.seq
+                    (.assign "i" (.lit (.int 0)))
+                    (.loop
+                      (.binop "<" (.name "i") (.binop "*" (.hole "op:sizeOf") (.lit (.int 8))))
+                      (.seq
+                        (.seq
+                          (.assign
+                            "result"
+                            (.binop
+                              "|"
+                              (.binop "<<" (.name "result") (.lit (.int 1)))
+                              (.binop "&" (.name "value") (.lit (.int 1)))))
+                          (.expr
+                            (.call
+                              "<operators>.assignmentArithmeticShiftRight"
+                              [(.name "value"), (.lit (.int 1))])))
+                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                  (.ret (.name "result")))))) }
 
 /-- `v8.base.bits.ReverseBytes:T(T)`  (from `bits.h`) -/
 def f_v8_base_bits_ReverseBytes_T_T_ : Func :=
@@ -22686,7 +24657,25 @@ def f_v8_base_bits_ReverseBytes_T_T_ : Func :=
               .skip
               (.seq
                 (.assign "result" (.lit (.int 0)))
-                (.seq (.hole "control:FOR") (.ret (.name "result")))))) }
+                (.seq
+                  (.seq
+                    (.assign "i" (.lit (.int 0)))
+                    (.loop
+                      (.binop "<" (.name "i") (.hole "op:sizeOf"))
+                      (.seq
+                        (.seq
+                          (.assign
+                            "result"
+                            (.binop
+                              "|"
+                              (.binop "<<" (.name "result") (.lit (.int 8)))
+                              (.binop "&" (.name "value") (.lit (.int 255)))))
+                          (.expr
+                            (.call
+                              "<operators>.assignmentArithmeticShiftRight"
+                              [(.name "value"), (.lit (.int 8))])))
+                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                  (.ret (.name "result")))))) }
 
 /-- `v8.base.bits.Unsigned:make_unsigned_t(T)`  (from `bits.h`) -/
 def f_v8_base_bits_Unsigned_make_unsigned_t_T_ : Func :=
@@ -22723,7 +24712,7 @@ def f_v8_base_bits_CountLeadingSignBits_unsigned_T_ : Func :=
               (.ret
                 (.cond
                   (.binop "<" (.name "value") (.lit (.int 0)))
-                  (.call "CountLeadingZeros" [(.unop "!" (.call "Unsigned" [(.name "value")]))])
+                  (.call "CountLeadingZeros" [(.unop "~" (.call "Unsigned" [(.name "value")]))])
                   (.call "CountLeadingZeros" [(.call "Unsigned" [(.name "value")])]))))) }
 
 /-- `v8.base.bits.CountTrailingZeros32:unsigned int(uint32_t)`  (from `bits.h`) -/
@@ -22753,27 +24742,27 @@ def f_v8_base_RoundUpToPowerOfTwo32_uint32_t_uint32_t_ : Func :=
                 (.expr
                   (.call
                     "<operators>.assignmentOr"
-                    [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                    [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 1)))]))
                 (.seq
                   (.expr
                     (.call
                       "<operators>.assignmentOr"
-                      [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                      [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 2)))]))
                   (.seq
                     (.expr
                       (.call
                         "<operators>.assignmentOr"
-                        [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                        [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 4)))]))
                     (.seq
                       (.expr
                         (.call
                           "<operators>.assignmentOr"
-                          [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                          [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 8)))]))
                       (.seq
                         (.expr
                           (.call
                             "<operators>.assignmentOr"
-                            [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                            [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 16)))]))
                         (.ret (.binop "+" (.name "value") (.lit (.int 1))))))))))) }
 
 /-- `v8.base.RoundUpToPowerOfTwo64:uint64_t(uint64_t)`  (from `bits.h`) -/
@@ -22791,32 +24780,32 @@ def f_v8_base_RoundUpToPowerOfTwo64_uint64_t_uint64_t_ : Func :=
                 (.expr
                   (.call
                     "<operators>.assignmentOr"
-                    [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                    [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 1)))]))
                 (.seq
                   (.expr
                     (.call
                       "<operators>.assignmentOr"
-                      [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                      [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 2)))]))
                   (.seq
                     (.expr
                       (.call
                         "<operators>.assignmentOr"
-                        [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                        [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 4)))]))
                     (.seq
                       (.expr
                         (.call
                           "<operators>.assignmentOr"
-                          [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                          [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 8)))]))
                       (.seq
                         (.expr
                           (.call
                             "<operators>.assignmentOr"
-                            [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                            [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 16)))]))
                         (.seq
                           (.expr
                             (.call
                               "<operators>.assignmentOr"
-                              [(.name "value"), (.hole "op:arithmeticShiftRight")]))
+                              [(.name "value"), (.binop ">>>" (.name "value") (.lit (.int 32)))]))
                           (.ret (.binop "+" (.name "value") (.lit (.int 1)))))))))))) }
 
 /-- `v8.base.RoundUpToPowerOfTwo:size_t(size_t)`  (from `bits.h`) -/
@@ -22859,25 +24848,53 @@ def f_v8_base_RoundDownToPowerOfTwo32_uint32_t_uint32_t_ : Func :=
 def f_v8_base_RotateRight32_uint32_t_uint32_t_uint32_t_ : Func :=
   { name := "v8.base.RotateRight32:uint32_t(uint32_t,uint32_t)"
   , params := ["value", "shift"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop ">>>" (.name "value") (.name "shift"))
+              (.binop
+                "<<"
+                (.name "value")
+                (.binop "&" (.binop "-" (.lit (.int 32)) (.name "shift")) (.lit (.int 31)))))) }
 
 /-- `v8.base.RotateLeft32:uint32_t(uint32_t,uint32_t)`  (from `bits.h`) -/
 def f_v8_base_RotateLeft32_uint32_t_uint32_t_uint32_t_ : Func :=
   { name := "v8.base.RotateLeft32:uint32_t(uint32_t,uint32_t)"
   , params := ["value", "shift"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop "<<" (.name "value") (.name "shift"))
+              (.binop
+                ">>>"
+                (.name "value")
+                (.binop "&" (.binop "-" (.lit (.int 32)) (.name "shift")) (.lit (.int 31)))))) }
 
 /-- `v8.base.RotateRight64:uint64_t(uint64_t,uint64_t)`  (from `bits.h`) -/
 def f_v8_base_RotateRight64_uint64_t_uint64_t_uint64_t_ : Func :=
   { name := "v8.base.RotateRight64:uint64_t(uint64_t,uint64_t)"
   , params := ["value", "shift"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop ">>>" (.name "value") (.name "shift"))
+              (.binop
+                "<<"
+                (.name "value")
+                (.binop "&" (.binop "-" (.lit (.int 64)) (.name "shift")) (.lit (.int 63)))))) }
 
 /-- `v8.base.RotateLeft64:uint64_t(uint64_t,uint64_t)`  (from `bits.h`) -/
 def f_v8_base_RotateLeft64_uint64_t_uint64_t_uint64_t_ : Func :=
   { name := "v8.base.RotateLeft64:uint64_t(uint64_t,uint64_t)"
   , params := ["value", "shift"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop "<<" (.name "value") (.name "shift"))
+              (.binop
+                ">>>"
+                (.name "value")
+                (.binop "&" (.binop "-" (.lit (.int 64)) (.name "shift")) (.lit (.int 63)))))) }
 
 /-- `v8.SignedAddOverflow32:bool(int32_t,int32_t,int32_t*)`  (from `bits.h`) -/
 def f_v8_SignedAddOverflow32_bool_int32_t_int32_t_int32_t__ : Func :=
@@ -22895,7 +24912,17 @@ def f_v8_SignedAddOverflow32_bool_int32_t_int32_t_int32_t__ : Func :=
                     (.binop "+" (.unop "cast:u32" (.name "lhs")) (.unop "cast:u32" (.name "rhs"))))
                   (.seq
                     (.hole "assign:lhs:indirection")
-                    (.ret (.binop "!=" (.hole "op:and") (.lit (.int 0))))))))) }
+                    (.ret
+                      (.binop
+                        "!="
+                        (.binop
+                          "&"
+                          (.binop
+                            "&"
+                            (.binop "^" (.name "res") (.name "lhs"))
+                            (.binop "^" (.name "res") (.name "rhs")))
+                          (.binop "<<" (.lit (.int 1)) (.lit (.int 31))))
+                        (.lit (.int 0))))))))) }
 
 /-- `v8.SignedSubOverflow32:bool(int32_t,int32_t,int32_t*)`  (from `bits.h`) -/
 def f_v8_SignedSubOverflow32_bool_int32_t_int32_t_int32_t__ : Func :=
@@ -22913,7 +24940,17 @@ def f_v8_SignedSubOverflow32_bool_int32_t_int32_t_int32_t__ : Func :=
                     (.binop "-" (.unop "cast:u32" (.name "lhs")) (.unop "cast:u32" (.name "rhs"))))
                   (.seq
                     (.hole "assign:lhs:indirection")
-                    (.ret (.binop "!=" (.hole "op:and") (.lit (.int 0))))))))) }
+                    (.ret
+                      (.binop
+                        "!="
+                        (.binop
+                          "&"
+                          (.binop
+                            "&"
+                            (.binop "^" (.name "res") (.name "lhs"))
+                            (.binop "^" (.name "res") (.unop "~" (.name "rhs"))))
+                          (.binop "<<" (.lit (.int 1)) (.lit (.int 31))))
+                        (.lit (.int 0))))))))) }
 
 /-- `v8.SignedMulOverflow32:bool(int32_t,int32_t,int32_t*)`  (from `bits.h`) -/
 def f_v8_SignedMulOverflow32_bool_int32_t_int32_t_int32_t__ : Func :=
@@ -22955,7 +24992,17 @@ def f_v8_SignedAddOverflow64_bool_int64_t_int64_t_int64_t__ : Func :=
                     (.binop "+" (.unop "cast:u64" (.name "lhs")) (.unop "cast:u64" (.name "rhs"))))
                   (.seq
                     (.hole "assign:lhs:indirection")
-                    (.ret (.binop "!=" (.hole "op:and") (.lit (.int 0))))))))) }
+                    (.ret
+                      (.binop
+                        "!="
+                        (.binop
+                          "&"
+                          (.binop
+                            "&"
+                            (.binop "^" (.name "res") (.name "lhs"))
+                            (.binop "^" (.name "res") (.name "rhs")))
+                          (.binop "<<" (.lit (.int 1)) (.lit (.int 63))))
+                        (.lit (.int 0))))))))) }
 
 /-- `v8.SignedSubOverflow64:bool(int64_t,int64_t,int64_t*)`  (from `bits.h`) -/
 def f_v8_SignedSubOverflow64_bool_int64_t_int64_t_int64_t__ : Func :=
@@ -22973,7 +25020,17 @@ def f_v8_SignedSubOverflow64_bool_int64_t_int64_t_int64_t__ : Func :=
                     (.binop "-" (.unop "cast:u64" (.name "lhs")) (.unop "cast:u64" (.name "rhs"))))
                   (.seq
                     (.hole "assign:lhs:indirection")
-                    (.ret (.binop "!=" (.hole "op:and") (.lit (.int 0))))))))) }
+                    (.ret
+                      (.binop
+                        "!="
+                        (.binop
+                          "&"
+                          (.binop
+                            "&"
+                            (.binop "^" (.name "res") (.name "lhs"))
+                            (.binop "^" (.name "res") (.unop "~" (.name "rhs"))))
+                          (.binop "<<" (.lit (.int 1)) (.lit (.int 63))))
+                        (.lit (.int 0))))))))) }
 
 /-- `v8.SignedMulOverflow64:bool(int64_t,int64_t,int64_t*)`  (from `bits.h`) -/
 def f_v8_SignedMulOverflow64_bool_int64_t_int64_t_int64_t__ : Func :=
@@ -23019,7 +25076,8 @@ def f_v8_UnsignedAddOverflow32_bool_uint32_t_uint32_t_uint32_t__ : Func :=
   , params := ["lhs", "rhs", "val"]
   , body := (.seq
             (.hole "assign:lhs:indirection")
-            (.ret (.binop "<" (.hole "op:indirection:pointer") (.hole "op:or")))) }
+            (.ret
+              (.binop "<" (.hole "op:indirection:pointer") (.binop "|" (.name "lhs") (.name "rhs"))))) }
 
 /-- `v8.UnsignedDiv32:uint32_t(uint32_t,uint32_t)`  (from `bits.h`) -/
 def f_v8_UnsignedDiv32_uint32_t_uint32_t_uint32_t_ : Func :=
@@ -23064,19 +25122,70 @@ def f_v8_WraparoundNeg32_int32_t_int32_t_ : Func :=
 def f_v8_ByteReverse16_uint16_t_uint16_t_ : Func :=
   { name := "v8.ByteReverse16:uint16_t(uint16_t)"
   , params := ["value"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop "<<" (.name "value") (.lit (.int 8)))
+              (.binop "&" (.binop ">>>" (.name "value") (.lit (.int 8))) (.lit (.int 255))))) }
 
 /-- `v8.ByteReverse32:uint32_t(uint32_t)`  (from `bits.h`) -/
 def f_v8_ByteReverse32_uint32_t_uint32_t_ : Func :=
   { name := "v8.ByteReverse32:uint32_t(uint32_t)"
   , params := ["value"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop
+                "|"
+                (.binop
+                  "|"
+                  (.binop "<<" (.name "value") (.lit (.int 24)))
+                  (.binop "&" (.binop "<<" (.name "value") (.lit (.int 8))) (.lit (.int 16711680))))
+                (.binop "&" (.binop ">>>" (.name "value") (.lit (.int 8))) (.lit (.int 65280))))
+              (.binop "&" (.binop ">>>" (.name "value") (.lit (.int 24))) (.lit (.int 255))))) }
 
 /-- `v8.ByteReverse64:uint64_t(uint64_t)`  (from `bits.h`) -/
 def f_v8_ByteReverse64_uint64_t_uint64_t_ : Func :=
   { name := "v8.ByteReverse64:uint64_t(uint64_t)"
   , params := ["value"]
-  , body := (.ret (.hole "op:or")) }
+  , body := (.ret
+            (.binop
+              "|"
+              (.binop
+                "|"
+                (.binop
+                  "|"
+                  (.binop
+                    "|"
+                    (.binop
+                      "|"
+                      (.binop
+                        "|"
+                        (.binop
+                          "|"
+                          (.binop "<<" (.name "value") (.lit (.int 56)))
+                          (.binop
+                            "&"
+                            (.binop "<<" (.name "value") (.lit (.int 40)))
+                            (.lit (.int 71776119061217280))))
+                        (.binop
+                          "&"
+                          (.binop "<<" (.name "value") (.lit (.int 24)))
+                          (.lit (.int 280375465082880))))
+                      (.binop
+                        "&"
+                        (.binop "<<" (.name "value") (.lit (.int 8)))
+                        (.lit (.int 1095216660480))))
+                    (.binop
+                      "&"
+                      (.binop ">>>" (.name "value") (.lit (.int 8)))
+                      (.lit (.int 4278190080))))
+                  (.binop
+                    "&"
+                    (.binop ">>>" (.name "value") (.lit (.int 24)))
+                    (.lit (.int 16711680))))
+                (.binop "&" (.binop ">>>" (.name "value") (.lit (.int 40))) (.lit (.int 65280))))
+              (.binop "&" (.binop ">>>" (.name "value") (.lit (.int 56))) (.lit (.int 255))))) }
 
 /-- `v8.BitWidth:int(T)`  (from `bits.h`) -/
 def f_v8_BitWidth_int_T_ : Func :=
@@ -23438,7 +25547,7 @@ def f_v8_base_CPU__clinit__v8_base_CPU__ : Func :=
                                         (.seq
                                         (.assign "kUnknownVlen" (.lit (.int 0)))
                                         (.seq
-                                        (.assign "vendor_" (.hole "op:arrayInitializer"))
+                                        (.assign "vendor_" (.hole "op:arrayInitializer:zero-init"))
                                         (.seq
                                         (.assign "stepping_" (.lit (.int 0)))
                                         (.seq
@@ -24063,7 +26172,7 @@ def f_v8_base_debug_StackTrace__clinit__v8_base_debug_StackTrace__ : Func :=
               .skip
               (.seq
                 (.assign "kMaxTraces" (.lit (.int 62)))
-                (.seq (.expr (.hole "op:arrayInitializer")) (.assign "count_" (.lit (.int 0))))))) }
+                (.seq (.expr (.hole "op:arrayDecl:size")) (.assign "count_" (.lit (.int 0))))))) }
 
 /-- `v8.base.MagicNumbersForDivision.<clinit>:v8.base.MagicNumbersForDivision()`  (from `division-by-constant.h`) -/
 def f_v8_base_MagicNumbersForDivision__clinit__v8_base_MagicNumbersForDivision__ : Func :=
@@ -24272,19 +26381,19 @@ def f_v8_base_hash_combine_size_t_size_t_size_t_ : Func :=
                   (.seq
                     (.assign "r" (.lit (.int 47)))
                     (.seq
-                      (.expr (.hole "op:assignmentMultiplication"))
+                      (.assign "hash" (.binop "*" (.name "hash") (.name "m")))
                       (.seq
                         (.expr
                           (.call
                             "<operators>.assignmentXor"
-                            [(.name "hash"), (.hole "op:arithmeticShiftRight")]))
+                            [(.name "hash"), (.binop ">>>" (.name "hash") (.name "r"))]))
                         (.seq
-                          (.expr (.hole "op:assignmentMultiplication"))
+                          (.assign "hash" (.binop "*" (.name "hash") (.name "m")))
                           (.seq
                             (.expr
                               (.call "<operators>.assignmentXor" [(.name "seed"), (.name "hash")]))
                             (.seq
-                              (.expr (.hole "op:assignmentMultiplication"))
+                              (.assign "seed" (.binop "*" (.name "seed") (.name "m")))
                               (.ret (.name "seed")))))))))))) }
 
 /-- `v8.base.Hasher.<clinit>:v8.base.Hasher()`  (from `hashing.h`) -/
@@ -24335,7 +26444,15 @@ def f_v8_base_Hasher_Add_Hasher_T__ : Func :=
 def f_v8_base_Hasher_AddRange_Hasher_Iterator_Iterator_ : Func :=
   { name := "v8.base.Hasher.AddRange:Hasher(Iterator,Iterator)"
   , params := ["first", "last"]
-  , body := (.seq (.hole "control:FOR") (.ret (.hole "op:indirection:pointer"))) }
+  , body := (.seq
+            (.seq
+              .skip
+              (.loop
+                (.binop "!=" (.name "first") (.name "last"))
+                (.seq
+                  (.expr (.call "Add" [(.hole "op:indirection:opaque-type")]))
+                  (.assign "first" (.binop "+" (.name "first") (.lit (.int 1)))))))
+            (.ret (.hole "op:indirection:pointer"))) }
 
 /-- `v8.base.Hasher.AddRange:ANY(C)`  (from `hashing.h`) -/
 def f_v8_base_Hasher_AddRange_ANY_C_ : Func :=
@@ -24368,16 +26485,34 @@ def f_v8_base_hash64_uint64_t_uint64_t_ : Func :=
             (.seq
               (.assign "hash" (.name "key"))
               (.seq
-                (.assign "hash" (.binop "+" (.unop "!" (.name "hash")) (.hole "op:shiftLeft")))
+                (.assign
+                  "hash"
+                  (.binop
+                    "+"
+                    (.unop "~" (.name "hash"))
+                    (.binop "<<" (.name "hash") (.lit (.int 18)))))
                 (.seq
-                  (.assign "hash" (.hole "op:xor"))
+                  (.assign
+                    "hash"
+                    (.binop "^" (.name "hash") (.binop ">>>" (.name "hash") (.lit (.int 31)))))
                   (.seq
                     (.assign "hash" (.binop "*" (.name "hash") (.lit (.int 21))))
                     (.seq
-                      (.assign "hash" (.hole "op:xor"))
+                      (.assign
+                        "hash"
+                        (.binop "^" (.name "hash") (.binop ">>>" (.name "hash") (.lit (.int 11)))))
                       (.seq
-                        (.assign "hash" (.binop "+" (.name "hash") (.hole "op:shiftLeft")))
-                        (.seq (.assign "hash" (.hole "op:xor")) (.ret (.name "hash")))))))))) }
+                        (.assign
+                          "hash"
+                          (.binop "+" (.name "hash") (.binop "<<" (.name "hash") (.lit (.int 6)))))
+                        (.seq
+                          (.assign
+                            "hash"
+                            (.binop
+                              "^"
+                              (.name "hash")
+                              (.binop ">>>" (.name "hash") (.lit (.int 22)))))
+                          (.ret (.name "hash")))))))))) }
 
 /-- `v8.base.hash32:uint32_t(uint32_t)`  (from `hashing.h`) -/
 def f_v8_base_hash32_uint32_t_uint32_t_ : Func :=
@@ -24388,16 +26523,34 @@ def f_v8_base_hash32_uint32_t_uint32_t_ : Func :=
             (.seq
               (.assign "hash" (.name "key"))
               (.seq
-                (.assign "hash" (.binop "+" (.unop "!" (.name "hash")) (.hole "op:shiftLeft")))
+                (.assign
+                  "hash"
+                  (.binop
+                    "+"
+                    (.unop "~" (.name "hash"))
+                    (.binop "<<" (.name "hash") (.lit (.int 15)))))
                 (.seq
-                  (.assign "hash" (.hole "op:xor"))
+                  (.assign
+                    "hash"
+                    (.binop "^" (.name "hash") (.binop ">>>" (.name "hash") (.lit (.int 12)))))
                   (.seq
-                    (.assign "hash" (.binop "+" (.name "hash") (.hole "op:shiftLeft")))
+                    (.assign
+                      "hash"
+                      (.binop "+" (.name "hash") (.binop "<<" (.name "hash") (.lit (.int 2)))))
                     (.seq
-                      (.assign "hash" (.hole "op:xor"))
+                      (.assign
+                        "hash"
+                        (.binop "^" (.name "hash") (.binop ">>>" (.name "hash") (.lit (.int 4)))))
                       (.seq
                         (.assign "hash" (.binop "*" (.name "hash") (.lit (.int 2057))))
-                        (.seq (.assign "hash" (.hole "op:xor")) (.ret (.name "hash")))))))))) }
+                        (.seq
+                          (.assign
+                            "hash"
+                            (.binop
+                              "^"
+                              (.name "hash")
+                              (.binop ">>>" (.name "hash") (.lit (.int 16)))))
+                          (.ret (.name "hash")))))))))) }
 
 /-- `hash32:uint32_t(uint64_t)`  (from `hashing.h`) -/
 def f_hash32_uint32_t_uint64_t_ : Func :=
@@ -24712,7 +26865,7 @@ def f_v8_base_LazyInstanceImpl_Get_ANY___const_ : Func :=
 def f_v8_base_LeakyObject__clinit__v8_base_LeakyObject__ : Func :=
   { name := "v8.base.LeakyObject.<clinit>:v8.base.LeakyObject()"
   , params := []
-  , body := (.seq .skip (.expr (.hole "op:arrayInitializer"))) }
+  , body := (.seq .skip (.expr (.hole "op:arrayDecl:size"))) }
 
 /-- `v8.base.LeakyObject.__init__`  (from `lazy-instance.h`) -/
 def f_v8_base_LeakyObject___init__ : Func :=
@@ -24983,7 +27136,10 @@ def f_v8_base_Use___init__ : Func :=
 def f_make_uint64_uint64_t_uint32_t_uint32_t_ : Func :=
   { name := "make_uint64:uint64_t(uint32_t,uint32_t)"
   , params := ["high", "low"]
-  , body := (.seq .skip (.ret (.binop "+" (.hole "op:shiftLeft") (.name "low")))) }
+  , body := (.seq
+            .skip
+            (.ret
+              (.binop "+" (.binop "<<" (.hole "expr:BLOCK-impure") (.lit (.int 32))) (.name "low")))) }
 
 /-- `RoundDown:T(T,intptr_t)`  (from `macros.h`) -/
 def f_RoundDown_T_T_intptr_t_ : Func :=
@@ -24993,7 +27149,9 @@ def f_RoundDown_T_T_intptr_t_ : Func :=
             .skip
             (.seq
               (.expr (.lit .unit))
-              (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.hole "op:and"))))) }
+              (.seq
+                (.expr (.call "DCHECK" [(.lit .unit)]))
+                (.ret (.binop "&" (.name "x") (.hole "op:cast:object")))))) }
 
 /-- `RoundDown:T(T)`  (from `macros.h`) -/
 def f_RoundDown_T_T_ : Func :=
@@ -25003,7 +27161,9 @@ def f_RoundDown_T_T_ : Func :=
             .skip
             (.seq
               .skip
-              (.seq (.expr (.lit .unit)) (.seq (.expr (.lit .unit)) (.ret (.hole "op:and")))))) }
+              (.seq
+                (.expr (.lit .unit))
+                (.seq (.expr (.lit .unit)) (.ret (.binop "&" (.name "x") (.hole "op:cast:object"))))))) }
 
 /-- `RoundUp:T(T,intptr_t)`  (from `macros.h`) -/
 def f_RoundUp_T_T_intptr_t_ : Func :=
@@ -25039,7 +27199,11 @@ def f_RoundUp_T_T_ : Func :=
 def f_IsAligned_bool_T_U_ : Func :=
   { name := "IsAligned:bool(T,U)"
   , params := ["value", "alignment"]
-  , body := (.ret (.binop "==" (.hole "op:and") (.lit (.int 0)))) }
+  , body := (.ret
+            (.binop
+              "=="
+              (.binop "&" (.name "value") (.binop "-" (.name "alignment") (.lit (.int 1))))
+              (.lit (.int 0)))) }
 
 /-- `IsAlignedAddress:bool(T*,size_t)`  (from `macros.h`) -/
 def f_IsAlignedAddress_bool_T__size_t_ : Func :=
@@ -25218,7 +27382,10 @@ def f_v8_base_Bignum__clinit__v8_base_Bignum__ : Func :=
                                       (.seq
                                         (.assign
                                         "kBigitMask"
-                                        (.binop "-" (.hole "op:shiftLeft") (.lit (.int 1))))
+                                        (.binop
+                                        "-"
+                                        (.binop "<<" (.lit (.int 1)) (.name "kBigitSize"))
+                                        (.lit (.int 1))))
                                         (.seq
                                         (.assign
                                         "kBigitCapacity"
@@ -25227,7 +27394,7 @@ def f_v8_base_Bignum__clinit__v8_base_Bignum__ : Func :=
                                         (.name "kMaxSignificantBits")
                                         (.name "kBigitSize")))
                                         (.seq
-                                        (.expr (.hole "op:arrayInitializer"))
+                                        (.expr (.hole "op:arrayDecl:size"))
                                         (.seq
                                         (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
@@ -25352,7 +27519,9 @@ def f_v8_base_DiyFp__clinit__v8_base_DiyFp__ : Func :=
               .skip
               (.seq
                 (.assign "kSignificandSize" (.lit (.int 64)))
-                (.assign "kUint64MSB" (.hole "op:shiftLeft"))))) }
+                (.assign
+                  "kUint64MSB"
+                  (.binop "<<" (.unop "cast:u64" (.lit (.int 1))) (.lit (.int 63))))))) }
 
 /-- `v8.base.DiyFp.__init__`  (from `numbers/diy-fp.h`) -/
 def f_v8_base_DiyFp___init__ : Func :=
@@ -25441,10 +27610,15 @@ def f_v8_base_DiyFp_Normalize_void__ : Func :=
                       (.seq
                         .skip
                         (.seq
-                          (.assign "k10MSBits" (.hole "op:shiftLeft"))
+                          (.assign
+                            "k10MSBits"
+                            (.binop "<<" (.unop "cast:u64" (.lit (.int 1023))) (.lit (.int 54))))
                           (.seq
                             (.loop
-                              (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                              (.binop
+                                "=="
+                                (.binop "&" (.name "f") (.name "k10MSBits"))
+                                (.lit (.int 0)))
                               (.seq
                                 (.expr
                                   (.call
@@ -25453,7 +27627,10 @@ def f_v8_base_DiyFp_Normalize_void__ : Func :=
                                 (.assign "e" (.binop "-" (.name "e") (.lit (.int 10))))))
                             (.seq
                               (.loop
-                                (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                (.binop
+                                  "=="
+                                  (.binop "&" (.name "f") (.name "kUint64MSB"))
+                                  (.lit (.int 0)))
                                 (.seq
                                   (.expr
                                     (.call
@@ -25630,7 +27807,10 @@ def f_v8_base_Double_AsNormalizedDiyFp_v8_base_DiyFp___const_ : Func :=
                           (.assign "e" (.call "Exponent" []))
                           (.seq
                             (.loop
-                              (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                              (.binop
+                                "=="
+                                (.binop "&" (.name "f") (.name "kHiddenBit"))
+                                (.lit (.int 0)))
                               (.seq
                                 (.expr
                                   (.call
@@ -25711,7 +27891,7 @@ def f_v8_base_Double_Exponent_int___const_ : Func :=
                           (.seq
                             (.assign
                               "biased_e"
-                              (.unop "cast:i32" (.hole "op:arithmeticShiftRight")))
+                              (.unop "cast:i32" (.hole "op:shiftRight:unknown-signedness")))
                             (.ret (.binop "-" (.name "biased_e") (.name "kExponentBias")))))))))))) }
 
 /-- `v8.base.Double.Significand:uint64_t()<const>`  (from `numbers/double.h`) -/
@@ -25729,7 +27909,7 @@ def f_v8_base_Double_Significand_uint64_t___const_ : Func :=
                   (.seq
                     .skip
                     (.seq
-                      (.assign "significand" (.hole "op:and"))
+                      (.assign "significand" (.binop "&" (.name "d64") (.name "kSignificandMask")))
                       (.ifte
                         (.unop "!" (.call "IsDenormal" []))
                         (.ret (.binop "+" (.name "significand") (.name "kHiddenBit")))
@@ -25745,7 +27925,8 @@ def f_v8_base_Double_IsDenormal_bool___const_ : Func :=
               .skip
               (.seq
                 (.assign "d64" (.call "AsUint64" []))
-                (.ret (.binop "==" (.hole "op:and") (.lit (.int 0))))))) }
+                (.ret
+                  (.binop "==" (.binop "&" (.name "d64") (.name "kExponentMask")) (.lit (.int 0))))))) }
 
 /-- `v8.base.Double.IsSpecial:bool()<const>`  (from `numbers/double.h`) -/
 def f_v8_base_Double_IsSpecial_bool___const_ : Func :=
@@ -25757,7 +27938,11 @@ def f_v8_base_Double_IsSpecial_bool___const_ : Func :=
               .skip
               (.seq
                 (.assign "d64" (.call "AsUint64" []))
-                (.ret (.binop "==" (.hole "op:and") (.name "kExponentMask")))))) }
+                (.ret
+                  (.binop
+                    "=="
+                    (.binop "&" (.name "d64") (.name "kExponentMask"))
+                    (.name "kExponentMask")))))) }
 
 /-- `v8.base.Double.IsInfinite:bool()<const>`  (from `numbers/double.h`) -/
 def f_v8_base_Double_IsInfinite_bool___const_ : Func :=
@@ -25774,8 +27959,14 @@ def f_v8_base_Double_IsInfinite_bool___const_ : Func :=
                   (.ret
                     (.binop
                       "&&"
-                      (.binop "==" (.hole "op:and") (.name "kExponentMask"))
-                      (.binop "==" (.hole "op:and") (.lit (.int 0))))))))) }
+                      (.binop
+                        "=="
+                        (.binop "&" (.name "d64") (.name "kExponentMask"))
+                        (.name "kExponentMask"))
+                      (.binop
+                        "=="
+                        (.binop "&" (.name "d64") (.name "kSignificandMask"))
+                        (.lit (.int 0))))))))) }
 
 /-- `v8.base.Double.Sign:int()<const>`  (from `numbers/double.h`) -/
 def f_v8_base_Double_Sign_int___const_ : Func :=
@@ -25789,7 +27980,7 @@ def f_v8_base_Double_Sign_int___const_ : Func :=
                 (.assign "d64" (.call "AsUint64" []))
                 (.ret
                   (.cond
-                    (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                    (.binop "==" (.binop "&" (.name "d64") (.name "kSignMask")) (.lit (.int 0)))
                     (.lit (.int 1))
                     (.unop "-" (.lit (.int 1)))))))) }
 
@@ -25830,7 +28021,10 @@ def f_v8_base_Double_NormalizedBoundaries_void_v8_base_DiyFp__v8_base_DiyFp___co
                               "v8.base.DiyFp.Normalize:v8.base.DiyFp(v8.base.DiyFp&)"
                               [ (.call
                                   "DiyFp"
-                                  [ (.binop "+" (.hole "op:shiftLeft") (.lit (.int 1)))
+                                  [ (.binop
+                                      "+"
+                                      (.binop "<<" (.call "f" []) (.lit (.int 1)))
+                                      (.lit (.int 1)))
                                   , (.binop
                                       "-"
                                       (.call "v8.base.DiyFp.e:int()<const>" [])
@@ -25843,7 +28037,10 @@ def f_v8_base_Double_NormalizedBoundaries_void_v8_base_DiyFp__v8_base_DiyFp___co
                                 (.ifte
                                   (.binop
                                     "&&"
-                                    (.binop "==" (.hole "op:and") (.lit (.int 0)))
+                                    (.binop
+                                      "=="
+                                      (.binop "&" (.call "AsUint64" []) (.name "kSignificandMask"))
+                                      (.lit (.int 0)))
                                     (.binop
                                       "!="
                                       (.call "v8.base.DiyFp.e:int()<const>" [])
@@ -25852,7 +28049,10 @@ def f_v8_base_Double_NormalizedBoundaries_void_v8_base_DiyFp__v8_base_DiyFp___co
                                     "m_minus"
                                     (.call
                                       "DiyFp"
-                                      [ (.binop "-" (.hole "op:shiftLeft") (.lit (.int 1)))
+                                      [ (.binop
+                                        "-"
+                                        (.binop "<<" (.call "f" []) (.lit (.int 2)))
+                                        (.lit (.int 1)))
                                       , (.binop
                                         "-"
                                         (.call "v8.base.DiyFp.e:int()<const>" [])
@@ -25861,13 +28061,25 @@ def f_v8_base_Double_NormalizedBoundaries_void_v8_base_DiyFp__v8_base_DiyFp___co
                                     "m_minus"
                                     (.call
                                       "DiyFp"
-                                      [ (.binop "-" (.hole "op:shiftLeft") (.lit (.int 1)))
+                                      [ (.binop
+                                        "-"
+                                        (.binop "<<" (.call "f" []) (.lit (.int 1)))
+                                        (.lit (.int 1)))
                                       , (.binop
                                         "-"
                                         (.call "v8.base.DiyFp.e:int()<const>" [])
                                         (.lit (.int 1))) ])))
                                 (.seq
-                                  (.expr (.call "set_f" [(.hole "op:shiftLeft")]))
+                                  (.expr
+                                    (.call
+                                      "set_f"
+                                      [ (.binop
+                                        "<<"
+                                        (.call "f" [])
+                                        (.binop
+                                        "-"
+                                        (.call "v8.base.DiyFp.e:int()<const>" [])
+                                        (.call "v8.base.DiyFp.e:int()<const>" []))) ]))
                                   (.seq
                                     (.expr
                                       (.call
@@ -25961,7 +28173,10 @@ def f_v8_base_Double_DiyFpToUint64_uint64_t_v8_base_DiyFp_ : Func :=
                                         (.binop
                                         "&&"
                                         (.binop ">" (.name "exponent") (.name "kDenormalExponent"))
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0))))
+                                        (.binop
+                                        "=="
+                                        (.binop "&" (.name "significand") (.name "kHiddenBit"))
+                                        (.lit (.int 0))))
                                         (.seq
                                         (.expr
                                         (.call
@@ -25977,14 +28192,27 @@ def f_v8_base_Double_DiyFpToUint64_uint64_t_v8_base_DiyFp_ : Func :=
                                         (.binop
                                         "&&"
                                         (.binop "==" (.name "exponent") (.name "kDenormalExponent"))
-                                        (.binop "==" (.hole "op:and") (.lit (.int 0))))
+                                        (.binop
+                                        "=="
+                                        (.binop "&" (.name "significand") (.name "kHiddenBit"))
+                                        (.lit (.int 0))))
                                         (.assign "biased_exponent" (.lit (.int 0)))
                                         (.assign
                                         "biased_exponent"
                                         (.unop
                                         "cast:u64"
                                         (.binop "+" (.name "exponent") (.name "kExponentBias")))))
-                                        (.ret (.hole "op:or"))))))))))))))))))) }
+                                        (.ret
+                                        (.binop
+                                        "|"
+                                        (.binop
+                                        "&"
+                                        (.name "significand")
+                                        (.name "kSignificandMask"))
+                                        (.binop
+                                        "<<"
+                                        (.name "biased_exponent")
+                                        (.name "kPhysicalSignificandSize"))))))))))))))))))))) }
 
 /-- `v8.base.ByteSwap:T(T)`  (from `numerics/byte_conversions.h`) -/
 def f_v8_base_ByteSwap_T_T_ : Func :=
@@ -27804,10 +30032,10 @@ def f_v8_base_MemoryRegion__clinit__v8_base_MemoryRegion__ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:arrayInitializer"))
+              (.expr (.hole "op:arrayDecl:size"))
               (.seq
                 (.assign "kMaxPathnameSize" (.lit (.int 128)))
-                (.expr (.hole "op:arrayInitializer"))))) }
+                (.expr (.hole "op:arrayDecl:size"))))) }
 
 /-- `v8.base.SignalSafeMapsParser.<clinit>:v8.base.SignalSafeMapsParser()`  (from `platform/platform-linux.h`) -/
 def f_v8_base_SignalSafeMapsParser__clinit__v8_base_SignalSafeMapsParser__ : Func :=
@@ -27825,7 +30053,7 @@ def f_v8_base_SignalSafeMapsParser__clinit__v8_base_SignalSafeMapsParser__ : Fun
                     (.seq (.expr (.call "ANY" [])) (.assign "Next" (.name "<tmp>0"))))
                   (.seq
                     (.assign "kBufferSize" (.lit (.int 1024)))
-                    (.expr (.hole "op:arrayInitializer"))))))) }
+                    (.expr (.hole "op:arrayDecl:size"))))))) }
 
 /-- `v8.base.SignalSafeMapsParser.IsValid:bool()<const>`  (from `platform/platform-linux.h`) -/
 def f_v8_base_SignalSafeMapsParser_IsValid_bool___const_ : Func :=
@@ -27885,7 +30113,7 @@ def f_v8_base_PreciseSleepTimer___v8_base_PreciseSleepTimer__v8_base_PreciseSlee
 def f_v8_base_OS_StackFrame__clinit__v8_base_OS_StackFrame__ : Func :=
   { name := "v8.base.OS.StackFrame.<clinit>:v8.base.OS.StackFrame()"
   , params := []
-  , body := (.seq .skip (.expr (.hole "op:arrayInitializer"))) }
+  , body := (.seq .skip (.expr (.hole "op:arrayDecl:size"))) }
 
 /-- `v8.base.OS.MemoryMappedFile.<clinit>:v8.base.OS.MemoryMappedFile()`  (from `platform/platform.h`) -/
 def f_v8_base_OS_MemoryMappedFile__clinit__v8_base_OS_MemoryMappedFile__ : Func :=
@@ -28183,7 +30411,7 @@ def f_v8_base_Thread__clinit__v8_base_Thread__ : Func :=
                           (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                           (.seq (.expr (.call "ANY" [])) (.assign "data_" (.name "<tmp>0"))))
                         (.seq
-                          (.expr (.hole "op:arrayInitializer"))
+                          (.expr (.hole "op:arrayDecl:size"))
                           (.seq
                             (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                             (.seq
@@ -28774,14 +31002,22 @@ def f_v8_base_TimeDelta____v8_base_TimeDelta__int64_t_ : Func :=
   { name := "v8.base.TimeDelta.*=:v8.base.TimeDelta&(int64_t)"
   , params := ["a"]
   , body := (.seq
-            (.expr (.hole "op:assignmentMultiplication"))
+            (.setField
+              (.name "self")
+              "delta_"
+              (.binop "*" (.field (.name "self") "delta_") (.name "a")))
             (.ret (.hole "op:indirection:pointer"))) }
 
 /-- `v8.base.TimeDelta./=:v8.base.TimeDelta&(int64_t)`  (from `platform/time.h`) -/
 def f_v8_base_TimeDelta____v8_base_TimeDelta__int64_t_' : Func :=
   { name := "v8.base.TimeDelta./=:v8.base.TimeDelta&(int64_t)"
   , params := ["a"]
-  , body := (.seq (.expr (.hole "op:assignmentDivision")) (.ret (.hole "op:indirection:pointer"))) }
+  , body := (.seq
+            (.setField
+              (.name "self")
+              "delta_"
+              (.binop "/" (.field (.name "self") "delta_") (.name "a")))
+            (.ret (.hole "op:indirection:pointer"))) }
 
 /-- `v8.base.TimeDelta./:int64_t(v8.base.TimeDelta&)<const>`  (from `platform/time.h`) -/
 def f_v8_base_TimeDelta___int64_t_v8_base_TimeDelta___const_ : Func :=
@@ -29649,7 +31885,10 @@ def f_v8_base_HexValue_int_v8_base_uc32_ : Func :=
               (.seq
                 (.assign
                   "c"
-                  (.binop "-" (.hole "op:or") (.binop "-" (.lit (.str "a")) (.lit (.int 0)))))
+                  (.binop
+                    "-"
+                    (.binop "|" (.name "c") (.lit (.int 32)))
+                    (.binop "-" (.lit (.str "a")) (.lit (.int 0)))))
                 (.seq
                   (.ifte
                     (.binop "<=" (.unop "cast:u32" (.name "c")) (.lit (.int 5)))
@@ -29970,7 +32209,7 @@ def f_v8_base_tuple_fold_ANY_T___Tuple___Function___ : Func :=
                             (.field (.name "detail") "tuple_fold_impl")
                             (.field (.name "std") "tuple_size_v"))
                           (.field (.name "std") "decay_t"))
-                        (.hole "op:arithmeticShiftRight"))
+                        (.hole "op:shiftRight:unknown-signedness"))
                       (.hole "expr:BLOCK-prelude"))))))) }
 
 /-- `v8.base.TimezoneCache.~TimezoneCache:ANY()`  (from `timezone-cache.h`) -/
@@ -30036,7 +32275,7 @@ def f_v8_base_RandomNumberGenerator_ToDouble_double_uint64_t_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.assign "k2_53" (.hole "op:arrayInitializer"))
+                  (.assign "k2_53" (.hole "op:arrayDecl:size"))
                   (.ret (.binop "/" (.name "random_0_to_2_53") (.name "k2_53"))))))) }
 
 /-- `v8.base.RandomNumberGenerator.XorShift128:uint64_t(uint64_t*,uint64_t*)`  (from `utils/random-number-generator.h`) -/
@@ -30055,19 +32294,21 @@ def f_v8_base_RandomNumberGenerator_XorShift128_uint64_t_uint64_t__uint64_t__ : 
                     (.hole "assign:lhs:indirection")
                     (.seq
                       (.expr
-                        (.call "<operators>.assignmentXor" [(.name "s1"), (.hole "op:shiftLeft")]))
+                        (.call
+                          "<operators>.assignmentXor"
+                          [(.name "s1"), (.binop "<<" (.name "s1") (.lit (.int 23)))]))
                       (.seq
                         (.expr
                           (.call
                             "<operators>.assignmentXor"
-                            [(.name "s1"), (.hole "op:arithmeticShiftRight")]))
+                            [(.name "s1"), (.binop ">>>" (.name "s1") (.lit (.int 17)))]))
                         (.seq
                           (.expr (.call "<operators>.assignmentXor" [(.name "s1"), (.name "s0")]))
                           (.seq
                             (.expr
                               (.call
                                 "<operators>.assignmentXor"
-                                [(.name "s1"), (.hole "op:arithmeticShiftRight")]))
+                                [(.name "s1"), (.binop ">>>" (.name "s0") (.lit (.int 26)))]))
                             (.seq
                               (.hole "assign:lhs:indirection")
                               (.ret (.binop "+" (.name "s0") (.name "s1"))))))))))))) }
@@ -30560,7 +32801,7 @@ def f_v8_base_EmbeddedVector__clinit__v8_base_EmbeddedVector__ : Func :=
                                     (.expr (.call "ANY" []))
                                     (.assign "operator +" (.name "<tmp>2"))))
                                 (.seq
-                                  (.expr (.hole "op:arrayInitializer"))
+                                  (.expr (.hole "op:arrayDecl:size"))
                                   (.assign "length_" (.name "kSize")))))))))))))) }
 
 /-- `v8.base.EmbeddedVector.__init__`  (from `vector.h`) -/
@@ -31905,7 +34146,9 @@ def f_build_config_h__global__cpp_ : Func :=
                       (.seq
                         .skip
                         (.seq
-                          (.setGlobal "kHugePageSize" (.hole "op:shiftLeft"))
+                          (.setGlobal
+                            "kHugePageSize"
+                            (.binop "<<" (.lit (.int 1)) (.name "kHugePageBits")))
                           (.seq
                             (.setGlobal "kPageSizeBits" (.name "kHugePageBits"))
                             (.seq
@@ -31913,7 +34156,9 @@ def f_build_config_h__global__cpp_ : Func :=
                               (.seq
                                 .skip
                                 (.seq
-                                  (.setGlobal "kRegularPageSize" (.hole "op:shiftLeft"))
+                                  (.setGlobal
+                                    "kRegularPageSize"
+                                    (.binop "<<" (.lit (.int 1)) (.name "kPageSizeBits")))
                                   (.seq
                                     .skip
                                     (.seq
@@ -32257,11 +34502,11 @@ def f_macros_h__global__cpp_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.expr (.hole "op:arrayInitializer"))
+                  (.expr (.hole "op:arrayDecl:size"))
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.hole "op:arrayInitializer"))
+                      (.expr (.hole "op:arrayDecl:size"))
                       (.seq
                         .skip
                         (.seq
