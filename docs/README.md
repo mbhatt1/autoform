@@ -9,6 +9,8 @@ is the design record — the reasoning behind everything here lives there.
 | [`core-language.md`](core-language.md) | Reference for the Core language: every `Val`/`Expr`/`Stmt` constructor, the heap/env/context model, the four evaluation outcomes, dialects, and the hole taxonomy. |
 | [`trust-model.md`](trust-model.md) | What is claimed and on what basis: the four independent oracles, the G1–G5 assurance goals, the status lattice, and an explicit list of what the system does *not* establish. |
 | [`running.md`](running.md) | Installation (Lean/`elan`, Joern, Python), the two entry points, how to read the ledger, and troubleshooting. |
+| [`fuel.md`](fuel.md) | The fuel-indexed interpreter: why `outOfFuel` is not divergence, fuel monotonicity across all seven interpreter functions, the `tryFinally` counterexample that bounds it, and how the 72 fuel obligations were discharged. |
+| [`integrity.md`](integrity.md) | Checking that we measured the program we think we measured. Each check named after the incident that motivated it — including a mutant that survived four commits with every proof passing. |
 | [`contracts.md`](contracts.md) | Boundary contracts for code outside the verified core. |
 | [`boxed-containers.md`](boxed-containers.md) | The design for mutable containers — the gap behind `setIndex:immutable-containers`. |
 | [`languages.md`](languages.md) | Per-language support, and what each front end does and does not give us. |
