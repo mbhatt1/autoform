@@ -61,11 +61,28 @@ MAX_ELEMS = 512            # value-encoding breadth limit (a resource
 # --------------------------------------------------------------------------- AST
 
 def has_hole(n):
-    """Tolerant of unknown node kinds: we only look for the hole markers."""
-    if isinstance(n, dict):
-        if n.get("k") in ("hole", "holeS"): return True
-        return any(has_hole(v) for v in n.values())
-    if isinstance(n, list): return any(has_hole(v) for v in n)
+    """Tolerant of unknown node kinds: we only look for the hole markers.
+
+    Iterative on purpose. The recursive version blew Python's 1000-frame default on
+    Linux `lib/` and raised RecursionError *before any backend ran*, so the largest C
+    corpus could not be measured at all — and the failure looked like "the harness broke"
+    rather than "this function is deeply nested". Raising the recursion limit is not the
+    fix: the limit guards the C stack, and lifting it without a bigger stack turns a clean
+    exception into a segfault. An explicit stack has no such ceiling.
+
+    This is the same defect `cartographer/render_lean.py` had (it never set a limit at all
+    and died at 247 consecutive statements). Any AST walker here should be assumed to meet
+    a 20,000-deep term eventually, because real code nests.
+    """
+    stack = [n]
+    while stack:
+        x = stack.pop()
+        if isinstance(x, dict):
+            if x.get("k") in ("hole", "holeS"):
+                return True
+            stack.extend(x.values())
+        elif isinstance(x, list):
+            stack.extend(x)
     return False
 
 
