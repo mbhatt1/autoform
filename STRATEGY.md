@@ -1673,3 +1673,57 @@ What Velvet does **not** help with: the remaining holes. `op:starredUnpack` (36)
 `import:module-value` (15), `scope:nonlocal-write` (8), `op:delete-index`/`-slice` (8),
 `call:computed-callee` (6) and the `_HashedTuple` builtin-base gap are all missing
 *language modelling* in Core, not missing proof automation. No verifier closes them.
+
+## §33 — Correction to §31: the apparatus lied again, and I repeated it
+
+§31 attributed five `cachetools` conformance divergences to `class _HashedTuple(tuple)`
+and Core's lack of inheritance from builtin types. **That attribution was wrong**, and it
+reached the README before it was checked.
+
+All five were contamination. A **concurrent mutation run** held
+`Autoform/Generated/Cachetools.lean` while the differential harness read it, and
+`_DefaultSize.pop` was a live mutant returning `0` instead of `1`. Corroborated by an
+independent artifact rather than by the same agent that found it:
+`f_cachetools___init___py__module___DefaultSize_pop` appears in `mutation-Cachetools.json`'s
+`decls` list. Reproducing against a rebuilt module returns `1`. Two earlier divergences
+(`Cache.__contains__` inverted) were the same thing.
+
+The oracle was measuring a program nobody had written.
+
+What makes this worth a section rather than a fix: §27 concluded the last divergence was
+the apparatus, and §31 quoted that rule while committing the same error one level down.
+The exporter agent's reasoning was careful and its evidence was real — it evaluated
+`hashkey` on the pre-change build and got `ref 1` — but "this gap exists" and "this gap
+caused those five divergences" are different claims, and only the first was established.
+A true fact adjacent to the failure is the most convincing wrong explanation available.
+
+Three defences now exist, and none of them existed this morning:
+
+* `scripts/differential.py` detects the `.mutate-backup` sentinel, warns loudly, and sets
+  `build_stable: false` / `mutation_in_progress: true`. A measurement taken over a mutant
+  is now labelled as one.
+* The harness copies the compiled `Autoform/Lang` tree and the generated `.olean` into a
+  private directory and points `LEAN_PATH` at it, so a concurrent rebuild cannot change
+  the program mid-run.
+* Every scratch path is under one `mkdtemp`. The fixed `/tmp/autoform_diff.lean` meant
+  concurrent agents overwrote each other's harness and could report conformance for
+  *another agent's program*.
+
+### The `_HashedTuple` gap, restated correctly
+
+It is real and it is not a divergence. Core has no inheritance from builtin types, so
+`_HashedTuple` instances are opaque `Val.ref`s while CPython's instance *is* a tuple. The
+harness rules this a counted `representation:value-vs-object` INCONCLUSIVE.
+
+§31 argued that reclassifying a divergence as "unrepresentable" would be the flattering
+lie. That argument stands as a principle and was applied to the wrong facts: there was no
+divergence to reclassify. The distinction that matters is whether the class is **counted
+and named** — an INCONCLUSIVE bucket with a label and a number is an admission, while one
+that quietly absorbs disagreements is laundering. This one is counted.
+
+### And the headline was overstated in the other direction
+
+`0 divergences` on `cachetools` is true and nearly uninformative: **30 of 208 functions**
+are compared. The rest are INCONCLUSIVE. Reach is the binding constraint, not agreement,
+and a conformance rate quoted without its coverage is exactly the metric shape §17, §30
+and §31 keep catching.
