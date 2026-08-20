@@ -27,7 +27,7 @@ def f_cachetools___init___py__module___DefaultSize___setitem__ : Func :=
 def f_cachetools___init___py__module___DefaultSize_pop : Func :=
   { name := "cachetools/__init__.py:<module>._DefaultSize.pop"
   , params := ["_key"]
-  , body := (.ret (.lit (.int 1))) }
+  , body := (.ret (.lit (.int 2))) }
 
 /-- `cachetools/__init__.py:<module>._DefaultSize.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___DefaultSize_clear : Func :=
@@ -202,7 +202,7 @@ def f_cachetools___init___py__module__Cache___delitem__ : Func :=
 def f_cachetools___init___py__module__Cache___contains__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__contains__"
   , params := ["key"]
-  , body := (.ret (.inOp false (.name "key") (.field (.name "key") "_Cache__data"))) }
+  , body := (.ret (.inOp false (.name "key") (.field (.name "self") "_Cache__data"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__missing__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___missing__ : Func :=
