@@ -401,9 +401,19 @@ resolution becomes a hole rather than a guess. -/
 def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
   match ctx.table.find? (·.1 == n) with
   | some (_, f) => some f
-  | none        => match ctx.table.filter (fun p => p.1.endsWith ("." ++ n)) with
-                   | [(_, f)] => some f
-                   | _        => none
+  | none        =>
+    -- Scan for a *unique* suffix match, stopping as soon as a second one is seen.
+    -- The previous form built the full match list with `filter`, so every miss
+    -- allocated across the whole table — on Django's 10,623 functions that made the
+    -- ledger run 363s, 55x the cost of a corpus 5x smaller. This is still linear per
+    -- lookup (the asymptotic fix is an index on `Ctx`, recorded as an open item), but
+    -- it no longer allocates and it exits early on the ambiguous case.
+    let suffix := "." ++ n
+    let rec go : FuncTable → Option Func → Option Func
+      | [],           acc      => acc
+      | (k, f) :: ps, none     => if k.endsWith suffix then go ps (some f) else go ps none
+      | (k, _) :: ps, some f   => if k.endsWith suffix then none else go ps (some f)
+    go ctx.table none
 
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
