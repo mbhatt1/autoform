@@ -391,14 +391,26 @@ def run_build(root, module, timeout):
         return 1, out, True
 
 
+# Lean/lake has emitted diagnostics in two shapes across toolchain versions:
+#     <path>:<line>:<col>: error: <msg>          (leading position)
+#     error: <path>:<line>:<col>: <msg>          (leading severity, Lean 4.30)
+# Matching only the first silently returns "no attributable errors" on a modern
+# toolchain, which collapses every mutant onto the coarse whole-build fallback and makes
+# per-theorem attribution meaningless while still printing a plausible score. Both are
+# matched, and `error_lines_sanity` below refuses to let the failure be silent.
+_ERR_POS_FIRST = re.compile(r'^(.*?):(\d+):(\d+):\s*error', re.M)
+_ERR_SEV_FIRST = re.compile(r'^error:\s*(\S.*?):(\d+):(\d+):', re.M)
+
+
 def error_lines(output, target_basename):
-    """Line numbers carrying an error, restricted to the file under mutation."""
+    """Line numbers carrying an error, restricted to the named file."""
     out = []
-    for m in re.finditer(r'^(.*?):(\d+):(\d+):\s*error', output, re.M):
-        path = m.group(1).strip()
-        if target_basename in path or path in ("", "."):
-            out.append(int(m.group(2)))
-    return out
+    for pat in (_ERR_POS_FIRST, _ERR_SEV_FIRST):
+        for m in pat.finditer(output):
+            path = m.group(1).strip()
+            if target_basename in path or path in ("", "."):
+                out.append(int(m.group(2)))
+    return sorted(set(out))
 
 
 # ---------------------------------------------------------------------------
@@ -516,7 +528,7 @@ def main():
     print("baseline ok\n")
 
     stats = {t: {"killed": 0, "survived": 0, "survivors": []} for t in targets}
-    invalid, records = 0, []
+    invalid, records, coarse = 0, [], 0
 
     try:
         for i, mut in enumerate(mutants, 1):
@@ -547,6 +559,9 @@ def main():
             else:
                 rec["verdict"] = {}
                 rec["timeout"] = timed_out
+                if rc != 0 and not errs and not spec_errs:
+                    coarse += 1
+                    rec["attribution"] = "coarse"
                 for t in targets:
                     # A build failure with no attributable line is counted as a kill for
                     # every theorem — coarse, but it must not fire merely because the
@@ -599,6 +614,11 @@ def main():
             exit_code = 1
     if invalid:
         print(f"({invalid} mutants discarded: they broke the definition's own typechecking)")
+    if coarse:
+        print(f"WARNING: {coarse} mutant(s) failed the build with no line attributable to "
+              f"either file. Those were credited to EVERY theorem, so the per-theorem "
+              f"breakdown for them is not trustworthy — see STRATEGY.md 14's caveat.")
+    report["coarse_attributions"] = coarse
 
     with open(args.json_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)

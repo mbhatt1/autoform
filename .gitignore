@@ -10,3 +10,7 @@ audit.json
 fvspec-report.json
 __pycache__/
 *.pyc
+
+# never commit credentials
+.env
+*.key

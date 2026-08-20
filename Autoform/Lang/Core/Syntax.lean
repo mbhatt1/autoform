@@ -1,4 +1,5 @@
 import Specimen
+import Autoform.Lang.Core.Float
 
 /-!
 # Core — a universal deep-embedded imperative language
@@ -29,6 +30,15 @@ inductive Dialect where
   | cLike
   deriving Repr, Inhabited, DecidableEq
 
+/-- Float configuration implied by a `Core.Dialect`. `cLike` gets `cDouble`, matching what
+the oracle measures on x86-64 (SSE2, `FLT_EVAL_METHOD = 0`); switch it to
+`FConfig.cDoubleExcess` to *surface* excess-precision dependence instead of assuming it
+away. As with `NumConfig`, the ledger must record which one a result was obtained under —
+`1.0 / 0.0` is `ZeroDivisionError` under one and `inf` under the other. -/
+def Dialect.toFConfig : Dialect → FConfig
+  | .python => FConfig.python
+  | .cLike  => FConfig.cDouble
+
 /-- A heap address. Objects are boxed and mutable; everything else is a value. -/
 abbrev Ref := Nat
 
@@ -37,6 +47,14 @@ inductive Val where
   | int   : Int → Val
   | str   : String → Val
   | bool  : Bool → Val
+  /-- An IEEE 754 float, as a bit pattern plus its format (`Autoform/Lang/Core/Float.lean`).
+
+  **`Val.beq` must not compare these structurally.** `Fl` derives `DecidableEq`, so
+  `.float a == .float b` on the bit patterns is available and is *wrong* in both
+  directions: NaN would equal itself and `-0.0` would differ from `+0.0`. Both are proved
+  in `Float.lean` (`float_beq_is_not_bit_equality`, `float_bit_equality_is_not_beq`), and
+  `Val.beq` below routes floats through `Fl.eqv` for exactly this reason. -/
+  | float : Fl → Val
   | unit  : Val
   | list  : List Val → Val
   | tuple : List Val → Val
@@ -94,6 +112,11 @@ inductive Lit where
   | int   : Int → Lit
   | str   : String → Lit
   | bool  : Bool → Lit
+  /-- A float literal. The transpiler should emit the *bit pattern*
+  (`Fl.ofBits 4591870180066957722` for `0.1`), not decimal text: `Format.ofDecimal` can
+  correctly round a decimal literal, but going back out to decimal is not modelled, so
+  bits are the only spelling that round-trips through the differential harness. -/
+  | float : Fl → Lit
   | unit  : Lit
   deriving Repr, Inhabited, DecidableEq
 
@@ -315,6 +338,13 @@ def Val.beq : Val → Val → Bool
   | .int a,   .int b   => a == b
   | .str a,   .str b   => a == b
   | .bool a,  .bool b  => a == b
+  -- Floats compare by *value*, never by bit pattern: `nan != nan`, `+0.0 == -0.0`.
+  | .float a, .float b => Fl.eqv a b
+  -- Python's numeric tower: `1 == 1.0`, and `{1: 'a'}[1.0]` succeeds because the two also
+  -- hash equal. The comparison is *exact* — `10**23 == 1e23` is `False` in CPython —
+  -- which is why it goes through `Fl.cmpIntv` rather than converting either side.
+  | .int a,   .float b => Fl.cmpIntv a b == some .eq
+  | .float a, .int b   => Fl.cmpIntv b a == some .eq
   | .unit,    .unit    => true
   | .ref a,   .ref b   => a == b
   | .fn a,    .fn b    => a == b
@@ -343,6 +373,8 @@ def Val.truthy : Val → Bool
   | .bool b   => b
   | .int i    => i != 0
   | .str s    => s != ""
+  -- `bool(0.0) == bool(-0.0) == False`; `bool(nan)` is `True`.
+  | .float f  => Fl.truthy f
   | .unit     => false
   | .list vs  => !vs.isEmpty
   | .tuple vs => !vs.isEmpty

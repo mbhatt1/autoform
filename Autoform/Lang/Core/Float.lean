@@ -248,6 +248,51 @@ def describe (x : Fl) : String :=
 
 end Fl
 
+namespace Fl
+
+/-- Comparison, without a configuration — see the note on `FConfig.cmp`. This is the form
+`Val.beq` needs, since `Val` carries no dialect. -/
+def cmpv (x y : Fl) : Option Ordering :=
+  if x.isNaN || y.isNaN then none
+  else if x.isZero && y.isZero then some .eq        -- +0.0 == -0.0
+  else if x.isInf || y.isInf then
+    if x.isInf && y.isInf then
+      if x.signBit == y.signBit then some .eq
+      else some (if x.signBit then .lt else .gt)
+    else if x.isInf then some (if x.signBit then .lt else .gt)
+    else some (if y.signBit then .gt else .lt)
+  else match x.toExact, y.toExact with
+    | some (sa, ma, ea), some (sb, mb, eb) =>
+        if sa != sb then some (if sa then .lt else .gt)
+        else
+          let e := min ea eb
+          let A := ma * 2 ^ (ea - e).toNat
+          let B := mb * 2 ^ (eb - e).toNat
+          some (if sa then compare B A else compare A B)
+    | _, _ => none
+
+/-- Python `==` on two floats: NaN is not equal to itself, `+0.0 == -0.0`. -/
+def eqv (x y : Fl) : Bool := Fl.cmpv x y == some .eq
+
+/-- Truthiness: `bool(0.0) == bool(-0.0) == False`, everything else — including `nan` —
+is `True`. -/
+def truthy (x : Fl) : Bool := !x.isZero
+
+/-- Exact `Int` vs float comparison, configuration-free. -/
+def cmpIntv (n : Int) (x : Fl) : Option Ordering :=
+  if x.isNaN then none
+  else if x.isInf then some (if x.signBit then .gt else .lt)
+  else match x.toExact with
+    | some (s, m, e) =>
+        -- compare `n` with `±m·2^e` by clearing the denominator
+        let (nn, dd) : Int × Int :=
+          if 0 ≤ e then (n, (m : Int) * 2 ^ e.toNat)
+          else (n * 2 ^ (-e).toNat, (m : Int))
+        some (compare nn (if s then -dd else dd))
+    | none => none
+
+end Fl
+
 /-! ## Rounding
 
 One function. Every arithmetic operation in this file reduces to it, which is what makes
@@ -511,38 +556,6 @@ def cmp (_c : FConfig) (x y : Fl) : Option Ordering := Fl.cmpv x y
 
 end FConfig
 
-namespace Fl
-
-/-- Comparison, without a configuration — see the note on `FConfig.cmp`. This is the form
-`Val.beq` needs, since `Val` carries no dialect. -/
-def cmpv (x y : Fl) : Option Ordering :=
-  if x.isNaN || y.isNaN then none
-  else if x.isZero && y.isZero then some .eq        -- +0.0 == -0.0
-  else if x.isInf || y.isInf then
-    if x.isInf && y.isInf then
-      if x.signBit == y.signBit then some .eq
-      else some (if x.signBit then .lt else .gt)
-    else if x.isInf then some (if x.signBit then .lt else .gt)
-    else some (if y.signBit then .gt else .lt)
-  else match x.toExact, y.toExact with
-    | some (sa, ma, ea), some (sb, mb, eb) =>
-        if sa != sb then some (if sa then .lt else .gt)
-        else
-          let e := min ea eb
-          let A := ma * 2 ^ (ea - e).toNat
-          let B := mb * 2 ^ (eb - e).toNat
-          some (if sa then compare B A else compare A B)
-    | _, _ => none
-
-/-- Python `==` on two floats: NaN is not equal to itself, `+0.0 == -0.0`. -/
-def eqv (x y : Fl) : Bool := Fl.cmpv x y == some .eq
-
-/-- Truthiness: `bool(0.0) == bool(-0.0) == False`, everything else — including `nan` —
-is `True`. -/
-def truthy (x : Fl) : Bool := !x.isZero
-
-end Fl
-
 namespace FConfig
 
 def eq (c : FConfig) (x y : Fl) : Bool := c.cmp x y == some .eq
@@ -582,23 +595,6 @@ either direction, so `10^23 == 1e23` comes out `False`, matching CPython. -/
 def cmpInt (_c : FConfig) (n : Int) (x : Fl) : Option Ordering := Fl.cmpIntv n x
 
 end FConfig
-
-namespace Fl
-
-/-- Exact `Int` vs float comparison, configuration-free. -/
-def cmpIntv (n : Int) (x : Fl) : Option Ordering :=
-  if x.isNaN then none
-  else if x.isInf then some (if x.signBit then .gt else .lt)
-  else match x.toExact with
-    | some (s, m, e) =>
-        -- compare `n` with `±m·2^e` by clearing the denominator
-        let (nn, dd) : Int × Int :=
-          if 0 ≤ e then (n, (m : Int) * 2 ^ e.toNat)
-          else (n * 2 ^ (-e).toNat, (m : Int))
-        some (compare nn (if s then -dd else dd))
-    | none => none
-
-end Fl
 
 namespace FConfig
 
@@ -666,7 +662,7 @@ theorem nan_ne_self :
 /-- NaN is *unordered*, not merely unequal: `<`, `>` and `==` are all false, which a
 model based on `Ordering` alone cannot express. -/
 theorem nan_unordered (x : Fl) : FConfig.python.cmp (Fl.nan Format.binary64) x = none := by
-  simp [FConfig.cmp, Fl.nan, Fl.isNaN, Fl.expField, Fl.mantField, Fl.ofParts,
+  simp [FConfig.cmp, Fl.cmpv, Fl.nan, Fl.isNaN, Fl.expField, Fl.mantField, Fl.ofParts,
         Format.binary64, Format.expAllOnes, Format.mantBits]
 
 /-- **`float_beq_is_not_bit_equality`.** Stated as a theorem so that a future `Val.beq`

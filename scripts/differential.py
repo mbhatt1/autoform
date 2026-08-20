@@ -101,10 +101,19 @@ class Encoder:
         if isinstance(v, int): return ("int", v)
         if isinstance(v, str): return ("str", v)
         if isinstance(v, (list, tuple)):
+            # A *subclass* of a builtin container is not a Core container: the
+            # transpiler emits `Expr.alloc "_HashedTuple" [...]`, i.e. a heap object
+            # whose fields do not carry the elements at all. A Python value and a Core
+            # object are then two different things and comparing them would be the
+            # apparatus inventing a disagreement, so refuse.
+            if type(v) is not list and type(v) is not tuple:
+                raise Unencodable("container-subclass:" + type(v).__name__)
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             k = "tuple" if isinstance(v, tuple) else "list"
             return (k, [self.enc(x, depth + 1, in_key) for x in v])
         if isinstance(v, dict):
+            if type(v) is not dict:
+                raise Unencodable("container-subclass:" + type(v).__name__)
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             # Keys are the subtle case: CPython looks them up by `__hash__`/`__eq__`,
             # which user classes override (cachetools' own tests define a
@@ -185,10 +194,12 @@ def lean_val(v):
 
 
 def lean_heap(heap):
+    # named fields, not `⟨…⟩`: `Obj` has grown a field before (`captured`) and
+    # anonymous-constructor literals fail the whole run when it happens again
     return "[%s]" % ", ".join(
-        '⟨%s, [%s]⟩' % (json.dumps(cls),
-                        ", ".join("(%s, %s)" % (json.dumps(k), lean_val(val))
-                                  for k, val in fields))
+        "{ cls := %s, fields := [%s] }"
+        % (json.dumps(cls), ", ".join("(%s, %s)" % (json.dumps(k), lean_val(val))
+                                      for k, val in fields))
         for cls, fields in heap)
 
 

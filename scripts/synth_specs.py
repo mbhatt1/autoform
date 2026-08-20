@@ -636,16 +636,17 @@ PROOF_CONST = """theorem %(id)s :
 """
 
 PROOF_PROJ = """theorem %(id)s :
-    MRefines P %(name)s 10
+    MRefines P %(name)s 3
       (fun _ self _ => ∃ r, self = .ref r)
       (fun h self _ => (h, match self with
-                           | .ref r => .ret (h.getField r %(field)s)
+                           | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
   rintro h _ args ⟨r, rfl⟩
-  refine forall_ge_of_forall_add (N := 10) ?_
+  refine forall_ge_of_forall_add (N := 3) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, %(fdef)s, ctxOf, P]
+  simpa [Nat.add_comm, Nat.add_left_comm] using
+    applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl r args
 """
 
 DOC = '''

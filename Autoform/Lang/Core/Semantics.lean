@@ -92,6 +92,105 @@ def numToE : NumResult → EResult
   | .trap r    => .exn (.str r)
   | .ub r      => .hole s!"ub:{r}"
 
+/-! ### Floating point
+
+`Autoform/Lang/Core/Float.lean` supplies the value domain and the arithmetic; this section
+is only the wiring. Three decisions are recorded here because they are the ones that can
+be silently wrong.
+
+**Promotion.** In mixed `int`/`float` *arithmetic* both Python and C convert the integer
+to a double and compute in binary64, so `flOfVal` promotes. Python raises `OverflowError`
+if the integer is too large to convert (reachable only under `.python`, since `.cLike`
+integers are 32-bit and always convertible), and `FConfig.ofInt` reproduces that.
+
+**Comparison does *not* promote — under Python.** CPython compares an `int` and a `float`
+*exactly*: `10**23 == 1e23` is `False`, because `1e23` is really
+`99999999999999991611392`. C has no bignums and its `==` promotes, so the two dialects
+genuinely differ here and `flCmp` splits on the dialect. Promoting under `.python` would
+be a silent wrong answer of the `floorDiv` family.
+
+**NaN is unordered.** `flCmp` returns `none`, and `ordToE` turns that into `false` for
+`<`, `<=`, `>`, `>=` and `==`, and `true` for `!=`. That is CPython's behaviour and it is
+not expressible by an `Ordering` alone. -/
+
+/-- Lift a float outcome into an evaluation outcome. `ub` and `unmodelled` both become
+holes — the first because the language does not define the result, the second because we
+have not modelled it — and they keep distinct labels so the ledger can tell them apart. -/
+def fresToE : FResult → EResult
+  | .ok v         => .val (.float v)
+  | .exn r        => .exn (.str r)
+  | .ub r         => .hole s!"ub:{r}"
+  | .unmodelled r => .hole r
+
+/-- Promote a numeric value to the dialect's float format, as mixed arithmetic requires.
+`none` means "not a number", not "failed". -/
+def flOfVal (d : Dialect) : Val → Option FResult
+  | .float f => some (if f.fmt == (d.toFConfig).fmt then .ok f
+                      else .unmodelled "float:format-mismatch")
+  | .int n   => some ((d.toFConfig).ofInt n)
+  | _        => none
+
+/-- Compare two numeric values, at least one a float. `none` is *unordered* (NaN, or a
+non-numeric operand), which is not the same as "equal" or "less". -/
+def flCmp (d : Dialect) : Val → Val → Option Ordering
+  | .float x, .float y => Fl.cmpv x y
+  | .int n,   .float y =>
+      match d with
+      | .python => Fl.cmpIntv n y                     -- exact, no conversion
+      | .cLike  => match (d.toFConfig).ofInt n with   -- C promotes, and may round
+                   | .ok x => Fl.cmpv x y
+                   | _     => none
+  | .float x, .int n   =>
+      (match d with
+       | .python => Fl.cmpIntv n x
+       | .cLike  => match (d.toFConfig).ofInt n with
+                    | .ok y => Fl.cmpv y x
+                    | _     => none).map Ordering.swap
+  | _,        _        => none
+
+/-- Turn a comparison outcome into the answer for a relational operator. Unordered is
+`false` everywhere except `!=`. -/
+def ordToE (op : String) (o : Option Ordering) : EResult :=
+  match op with
+  | "<"  => .val (.bool (o == some .lt))
+  | "<=" => .val (.bool (o == some .lt || o == some .eq))
+  | ">"  => .val (.bool (o == some .gt))
+  | ">=" => .val (.bool (o == some .gt || o == some .eq))
+  | "==" => .val (.bool (o == some .eq))
+  | "!=" => .val (.bool (!(o == some .eq)))
+  | _    => .hole s!"binop:{op}"
+
+/-- Binary operators where at least one operand is a float. -/
+def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match op with
+  | "&&" => .val (.bool (a.truthy && b.truthy))
+  | "||" => .val (.bool (a.truthy || b.truthy))
+  | "<" | "<=" | ">" | ">=" | "==" | "!=" => ordToE op (flCmp d a b)
+  | "+" | "-" | "*" | "/" | "%" =>
+      match flOfVal d a, flOfVal d b with
+      | some (.ok x), some (.ok y) =>
+          let fc := d.toFConfig
+          fresToE (match op with
+                   | "+" => fc.add x y
+                   | "-" => fc.sub x y
+                   | "*" => fc.mul x y
+                   | "/" => fc.div x y
+                   | _   => fc.pyMod x y)
+        -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
+      | some r, some (.ok _) => fresToE r
+      | some (.ok _), some r => fresToE r
+      | some r, some _       => fresToE r
+      | _, _                 => .hole s!"binop:{op}:non-numeric"
+  -- CPython's `float.__floordiv__` is a multi-step rounding sequence (`fmod`, then a
+  -- rounded subtraction, then `floor`, then a half-ulp correction). Modelling it
+  -- approximately would produce divergences on the boundary cases it exists to get
+  -- right, so it is a hole until it is modelled properly.
+  | "//" => .hole "binop://:float-floordiv"
+  -- `x ** y` on floats is `pow`, which IEEE does define, but which this model does not
+  -- implement. See `Float.lean`'s "what is deliberately NOT modelled".
+  | "**" => .hole "float:pow"
+  | _    => .hole s!"binop:{op}"
+
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
@@ -136,6 +235,16 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
       match d with
       | .python => .val (.bool (!Val.beq a b))
       | .cLike  => .hole "str:pointer-equality-not-modelled"
+  -- Floats, including mixed `int`/`float`. Placed before the generic `==`/`!=` so that
+  -- the dialect split on comparison (see `flCmp`) is not bypassed by `Val.beq`.
+  | op, .float _, .float _ => flBinop d op a b
+  | op, .float _, .int _   => flBinop d op a b
+  | op, .int _,   .float _ => flBinop d op a b
+  -- Floor division. Distinct from `/` on purpose: Python's `/` is *true* division and
+  -- `//` floors. The transpiler currently maps `//` onto `"/"` (see the note on
+  -- `applyBinop_py_div`), so `"//"` is unreachable from the present corpora and exists so
+  -- that the transpiler can start emitting the two separately.
+  | "//", .int x, .int y => numToE (nc.div x y)
   | "==", x, y           => .val (.bool (Val.beq x y))
   | "!=", x, y           => .val (.bool (!Val.beq x y))
   | "&&", x, y           => .val (.bool (x.truthy && y.truthy))
@@ -200,6 +309,9 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- or become a hole — never the unrepresentable number. This path was left unchecked
   -- when `Numeric` was first wired in, and `Autoform/Refine.lean` caught it.
   | "-", .int x => numToE ((d.toNumConfig).neg x)
+  -- Float negation is a sign-bit flip: exact, no rounding, and correct on `-0.0` and NaN
+  -- where "subtract from zero" would not be (`0.0 - 0.0 = 0.0`, but `-(0.0) = -0.0`).
+  | "-", .float f => .val (.float f.neg)
   | "!", x      => .val (.bool (!x.truthy))
   | _, _        => .hole s!"unop:{op}"
 
@@ -265,6 +377,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .lit (.int i)  => (h, .val (.int i))
   | _+1, h, _, .lit (.str s)  => (h, .val (.str s))
   | _+1, h, _, .lit (.bool b) => (h, .val (.bool b))
+  | _+1, h, _, .lit (.float f) => (h, .val (.float f))
   | _+1, h, _, .lit .unit     => (h, .val .unit)
   | _+1, h, ρ, .name x        =>
       match ρ.find? (·.1 == x) with

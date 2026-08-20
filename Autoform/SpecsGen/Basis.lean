@@ -252,6 +252,43 @@ theorem mrefines_terminates {p name N dom spec} (hm : MRefines p name N dom spec
   rw [hm h self args hd fuel hf]
   exact Autoform.Refine.Outcome.toEResult_ne_outOfFuel _
 
+/-! ### Accessors
+
+The single most common shape in a real library's call-closed core is `return self.x`, so
+it gets a lemma of its own rather than a generated proof script per instance.
+
+`fieldOf` mirrors the *interpreter's* lookup order for `Expr.field` — own fields first,
+then bindings captured by the class — rather than `Heap.getField`, which only looks at
+`fields`. The two agree on every object whose field is present, and stating the spec in
+terms of the wrong one would produce a theorem that is false exactly on the objects a
+closure-defined class produces. -/
+
+/-- Field lookup in the order `Expr.field` uses. -/
+def fieldOf (h : Heap) (r : Ref) (f : String) : Val :=
+  match h.get r with
+  | some o => match o.fields.find? (·.1 == f) with
+              | some (_, v) => v
+              | none        => match o.captured.find? (·.1 == f) with
+                               | some (_, v) => v
+                               | none        => .unit
+  | none => .unit
+
+/-- **An accessor returns the field it names**, for every heap, every receiver and every
+argument list, at every fuel budget of at least three. Stated for an arbitrary `Func`
+whose body has the accessor shape, so a generated theorem discharges its hypothesis by
+`rfl` against the *generated* definition: change the field name in
+`Autoform/Generated/…` and the `rfl` fails. -/
+theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
+    (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
+    (r : Ref) (args : List Val) :
+    applyFunc ctx (n + 3) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
+  unfold applyFunc
+  rw [hb]
+  simp [execStmt, evalExpr, Env.set, Env.get, fieldOf]
+  split <;> simp_all
+  split <;> simp_all
+  split <;> simp_all
+
 /-! ## 4. Open obligations
 
 What the generator could state but not prove. Recorded as *data* plus a `Prop`-valued

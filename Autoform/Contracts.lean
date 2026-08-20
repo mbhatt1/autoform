@@ -413,7 +413,7 @@ def pureValueContract (l : String) : Contract :=
 behaviour, not ignorance (`Refine`'s `Outcome.raise`), so this is a genuine specification
 of a hole rather than a way of hiding it. -/
 def raisesContract (l : String) (payload : Val) : Contract :=
-  { label := l, fuel := 1
+  { label := l, fuel := 2
   , stmt  := s!"`{l}` raises, with no heap effect"
   , post  := fun h _ st => st = (h, .exn payload) }
 
@@ -502,13 +502,12 @@ namespace Demo
 
 open Autoform.Generated
 
+set_option maxRecDepth 40000
+
 /-- `methodkey` together with the `hashkey` it calls, verbatim from the generated module. -/
 def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
-
-/-- The entry point, spelled as the CPG names it. -/
-def methodkeyName : String := "cachetools/keys.py:<module>.methodkey"
 
 /-! ### Satisfiability first
 
@@ -527,7 +526,7 @@ theorem satisfiable_pureValue :
   · intro c hc e' he' k hk h ρ
     simp [pureValueContract] at hc
     subst hc
-    simp only [pureValueContract] at he' ⊢
+    simp only [pureValueContract] at he' hk ⊢
     simp at he'
     subst he'
     obtain ⟨m, rfl⟩ : ∃ m, k = m + 1 := ⟨k - 1, by omega⟩
@@ -551,7 +550,7 @@ theorem satisfiable_raises_zeroDiv :
   · intro c hc e' he' k hk h ρ
     simp [raisesContract] at hc
     subst hc
-    simp only [raisesContract] at he' ⊢
+    simp only [raisesContract] at he' hk ⊢
     simp at he'
     subst he'
     obtain ⟨m, rfl⟩ : ∃ m, k = m + 2 := ⟨k - 2, by omega⟩
@@ -565,7 +564,6 @@ theorem satisfiable_raises_zeroDiv :
 Both are `RefinesUnder`, at the concrete fuel bound 14, on the unrestricted domain. -/
 
 set_option maxHeartbeats 2000000 in
-set_option maxRecDepth 8000 in
 /-- **`methodkey` refines a total Lean specification, under one contract.**
 
 Assuming only that the starred-unpack construct returns *some* value without touching the
@@ -579,7 +577,7 @@ mechanism can deliver — and here it happens to be available, because `_HashedT
 `__init__` in the translated program, so the unpacked arguments are not observable in the
 result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
 theorem methodkey_refinesUnder_value :
-    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram methodkeyName 14
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .ret (.ref 0)) := by
   intro σ hc ht
   have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
@@ -604,14 +602,13 @@ theorem methodkey_refinesUnder_value :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, methodkeyName, Impl.onProgram, Impl.onFunc, keysProgram,
+  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, substEP, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
+    substS, substE, substEL, substEP, he, Ctx.resolve, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, String.endsWith, Env.set, Env.get,
     Val.truthy, Heap.alloc, hvf]
 
 set_option maxHeartbeats 2000000 in
-set_option maxRecDepth 8000 in
 /-- **A different contract proves a different theorem.**
 
 Under the assumption that the same hole *raises*, `methodkey` refines `raise payload`
@@ -623,7 +620,7 @@ Taken with `methodkey_refinesUnder_value` this is also the sharpest illustration
 because they are relative to different `Γ`s. Reading either one without its `Γ` is reading
 it wrong. -/
 theorem methodkey_refinesUnder_raise (payload : Val) :
-    RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgram methodkeyName 14
+    RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgram "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .raise payload) := by
   intro σ hc ht
   have hmem : raisesContract "op:starredUnpack" payload ∈
@@ -639,7 +636,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, methodkeyName, Impl.onProgram, Impl.onFunc, keysProgram,
+  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, substEP, he, Ctx.resolve, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
@@ -648,7 +645,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
 theorem methodkey_value_result :
     Satisfiable [pureValueContract "op:starredUnpack"] keysProgram ∧
-    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram methodkeyName 14
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .ret (.ref 0)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
 
@@ -664,12 +661,11 @@ theorem idImpl_onProgram : idImpl.onProgram keysProgram = keysProgram := by
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
 
 set_option maxHeartbeats 1000000 in
-set_option maxRecDepth 8000 in
 /-- Untouched, `methodkey` reports the hole, at any adequate fuel — the situation this
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
-    runFunc keysProgram (k + 14) methodkeyName args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, methodkeyName, keysProgram, f_cachetools_keys_py__module__hashkey,
+    runFunc keysProgram (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
+  simp +decide [runFunc, keysProgram, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy]
 
@@ -685,7 +681,7 @@ that say something. A `Γ` full of `topContract`s is detectably worthless rather
 quietly worthless. -/
 theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
     (spec : List Val → Outcome) (args : List Val) (hd : dom args) :
-    ¬ RefinesUnder [topContract "op:starredUnpack"] keysProgram methodkeyName N dom spec := by
+    ¬ RefinesUnder [topContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" N dom spec := by
   intro h
   have hcons : Consistent [topContract "op:starredUnpack"] keysProgram idImpl := by
     refine ⟨?_, ?_⟩
@@ -709,12 +705,12 @@ oracle-not-sharing-the-artifact's-assumptions discipline as §17. They are `#eva
 are evidence for a reader, not part of any proof. -/
 
 -- The untouched full program holes, exactly as the slice does.
-#eval reprStr (runFunc Autoform.Generated.program 40 methodkeyName [.int 1])
+#eval reprStr (runFunc Autoform.Generated.program 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
 
 -- With the hole implemented, the full program returns `_HashedTuple` at address 0 —
 -- agreeing with `methodkey_refinesUnder_value`.
 #eval reprStr (runFunc (Impl.onProgram [("op:starredUnpack", Expr.lit (.int 0))]
-  Autoform.Generated.program) 40 methodkeyName [.int 1])
+  Autoform.Generated.program) 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
 
 /-! ### The assumption record this theorem exports -/
 

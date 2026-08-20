@@ -27,7 +27,7 @@ def f_cachetools___init___py__module___DefaultSize___setitem__ : Func :=
 def f_cachetools___init___py__module___DefaultSize_pop : Func :=
   { name := "cachetools/__init__.py:<module>._DefaultSize.pop"
   , params := ["_key"]
-  , body := (.ret (.lit (.int 0))) }
+  , body := (.ret (.lit (.int 1))) }
 
 /-- `cachetools/__init__.py:<module>._DefaultSize.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___DefaultSize_clear : Func :=
@@ -3290,7 +3290,7 @@ def f_cachetools__cachedmethod_py__module___warn_instance_dict : Func :=
 def f_cachetools__cachedmethod_py__module___none : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._none"
   , params := ["_"]
-  , body := (.ret (.lit .unit)) }
+  , body := (.expr (.lit .unit)) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.__init__`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
