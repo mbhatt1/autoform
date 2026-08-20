@@ -26,6 +26,17 @@ def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
 def FUEL : Nat := 400
 open Autoform.Generated
 
+/-- Every function body reachable in this program is `tryFinally`-free, so
+`Autoform/FuelMono.lean`'s monotonicity theorems apply to this context. Checked by
+computation over the whole function table, not assumed. `Stmt.tryFinally` is the single
+construct that breaks fuel monotonicity (`FuelMono.tryFinally_breaks_fuel_mono` exhibits a
+program answering 1 at fuel 4 and 2 at fuel 5), so this is the hypothesis that decides
+whether a law checked at one budget holds at every larger one. -/
+theorem C_tfFree : TFFreeCtx C := by
+  refine tfFree_of_table ?_
+  have h : (C.table.all fun p => tfFreeS p.2.body) = true := by rfl
+  exact fun p hp => (List.all_eq_true.mp h) p hp
+
 
 /-!
 # Synthesized specifications — `Cachetools`
@@ -56,10 +67,18 @@ What each family claims, in the order of `STRATEGY.md` §4:
 
 Domains are finite and explicit, and the theorems about them are proved by computation.
 That is deliberate: a kernel-checked test is a test whose axiom basis is auditable and
-whose subject a mutation gate can attack. Where the honest generalization (over *all*
-fuel budgets, or all inputs) could not be proved, it is recorded in `obligations` below
-as a `Prop`-valued `def` — a statement, not an admission. There is no `sorry` in this
-file.
+whose subject a mutation gate can attack.
+
+**Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
+stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
+transport needs two side conditions, both discharged rather than assumed — the context is
+`tryFinally`-free (`C_tfFree`, by computation over the function table) and the run did not
+end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
+either fails, the theorem stays at `FUEL` and its generalization is recorded in
+`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+
+There is no `sorry` in this file.
 
 Counts for this run are in `Autoform/SpecsGen/report.json`.
 -/
@@ -68,56 +87,91 @@ def dom_conform_cachetools___init___py__module___DefaultSize___getitem : List Ob
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (1)) }]
 
-theorem conform_cachetools___init___py__module___DefaultSize___getitem : ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___DefaultSize___getitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_nonneg_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-235540094956740018176)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3886508654602009088)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-679)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2147483648)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-theorem nonneg_cachetools___init___py__module___DefaultSize___getitem : ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_nonneg_cachetools___init___py__module___DefaultSize___getitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
+    (fun c hgc hlc =>
+      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-235540094956740018176)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3886508654602009088)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-679)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2147483648)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-theorem idempotent_cachetools___init___py__module___DefaultSize___getitem : ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module___DefaultSize___getitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-235540094956740018176)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3886508654602009088)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-679)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2147483648)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-theorem const_cachetools___init___py__module___DefaultSize___getitem : ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module___DefaultSize___getitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module___DefaultSize___getitem :
     Refines P "cachetools/__init__.py:<module>._DefaultSize.__getitem__" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
@@ -134,59 +188,91 @@ def dom_conform_cachetools___init___py__module___DefaultSize___setitem : List Ob
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4), Val.int (1)] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (5), Val.int (1)] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module___DefaultSize___setitem : ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___DefaultSize___setitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7), Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4748239721400258560), Val.int (402698)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-37043761881), Val.int (197454)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-774763746660), Val.int (-1970)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (0)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-14866029014)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-theorem idempotent_cachetools___init___py__module___DefaultSize___setitem : ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module___DefaultSize___setitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7), Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4748239721400258560), Val.int (402698)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-37043761881), Val.int (197454)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-774763746660), Val.int (-1970)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (0)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-14866029014)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-theorem commutes_cachetools___init___py__module___DefaultSize___setitem : ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module___DefaultSize___setitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawCommutes C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7), Val.int (-7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4748239721400258560), Val.int (402698)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-37043761881), Val.int (197454)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-774763746660), Val.int (-1970)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.int (0)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (-14866029014)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-theorem const_cachetools___init___py__module___DefaultSize___setitem : ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module___DefaultSize___setitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module___DefaultSize_pop : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.int (1)) },
@@ -194,59 +280,91 @@ def dom_conform_cachetools___init___py__module___DefaultSize_pop : List Obs :=
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4)] }, expected := EResult.val (Val.int (1)) }]
 
-theorem conform_cachetools___init___py__module___DefaultSize_pop : ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___DefaultSize_pop : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_nonneg_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000000000000000)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (429596520181756461056)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-17848)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2581636531972334839398400)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-theorem nonneg_cachetools___init___py__module___DefaultSize_pop : ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_nonneg_cachetools___init___py__module___DefaultSize_pop : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)
+    (fun c hgc hlc =>
+      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000000000000000)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (429596520181756461056)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-17848)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2581636531972334839398400)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-theorem idempotent_cachetools___init___py__module___DefaultSize_pop : ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module___DefaultSize_pop : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000000000000000)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (429596520181756461056)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-17848)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] }]
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-2581636531972334839398400)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-theorem const_cachetools___init___py__module___DefaultSize_pop : ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module___DefaultSize_pop : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize_pop (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module___DefaultSize_pop :
     Refines P "cachetools/__init__.py:<module>._DefaultSize.pop" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
@@ -259,11 +377,19 @@ theorem uconst_cachetools___init___py__module___DefaultSize_pop :
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module___DefaultSize_clear : ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_clear)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___DefaultSize_clear : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize_clear : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_clear) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_clear) (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_clear.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__Cache___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] }, expected := EResult.val (Val.unit) },
@@ -273,75 +399,115 @@ def dom_conform_cachetools___init___py__module__Cache___init : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.fn "CacheTestMixin.test_getsizeof_negative.<locals>.<lambda>"] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module__Cache___init : ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C fuel f_cachetools___init___py__module__Cache___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___init__) (lawConform C FUEL f_cachetools___init___py__module__Cache___init__) (lawConform C fuel f_cachetools___init___py__module__Cache___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (115817512), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.unit] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.unit] }]
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4316), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-theorem runs_cachetools___init___py__module__Cache___init : ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__Cache___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawRuns C FUEL f_cachetools___init___py__module__Cache___init__) (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (115817512), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.unit] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.unit] }]
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4316), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-theorem returns_cachetools___init___py__module__Cache___init : ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__Cache___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawReturns C FUEL f_cachetools___init___py__module__Cache___init__) (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (115817512), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.unit] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.unit] }]
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4316), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-theorem commutes_cachetools___init___py__module__Cache___init : ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module__Cache___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__Cache___init__) (lawCommutes C FUEL f_cachetools___init___py__module__Cache___init__) (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (115817512), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.unit] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (0)] },
-   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.unit] }]
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4316), Val.unit] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
+   { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-theorem const_cachetools___init___py__module__Cache___init : ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C FUEL f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__Cache___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawConst C FUEL f_cachetools___init___py__module__Cache___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__Cache___getitem : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (3), Val.int (3)), (Val.int (4), Val.int (4))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.int (3)) },
@@ -353,43 +519,89 @@ def dom_conform_cachetools___init___py__module__Cache___getitem : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (3)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (2)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (2), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (2)) }]
 
-theorem conform_cachetools___init___py__module__Cache___getitem : ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C FUEL f_cachetools___init___py__module__Cache___getitem__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache___getitem : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___getitem__) (lawConform C FUEL f_cachetools___init___py__module__Cache___getitem__) (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___getitem__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+def dom_conform_cachetools___init___py__module__Cache___contains : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
+   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.bool false) },
+   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }, expected := EResult.val (Val.bool true) },
+   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1))]), ("_Cache__currsize", Val.int (1)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.bool false) },
+   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.bool false) },
+   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (3)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) }]
+
+/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___contains).all (lawConform C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___contains__) (lawConform C FUEL f_cachetools___init___py__module__Cache___contains__) (lawConform C fuel f_cachetools___init___py__module__Cache___contains__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__Cache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (7)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1174)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (858737101)] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (86899))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (699))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
 
-theorem runs_cachetools___init___py__module__Cache___contains : ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C FUEL f_cachetools___init___py__module__Cache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__Cache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) (lawRuns C FUEL f_cachetools___init___py__module__Cache___contains__) (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__Cache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (7)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1174)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (858737101)] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (86899))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (699))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
 
-theorem returns_cachetools___init___py__module__Cache___contains : ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C FUEL f_cachetools___init___py__module__Cache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__Cache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) (lawReturns C FUEL f_cachetools___init___py__module__Cache___contains__) (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__Cache_maxsize : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (1)) },
@@ -401,59 +613,91 @@ def dom_conform_cachetools___init___py__module__Cache_maxsize : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.tuple [Val.int (0)], Val.int (0))]), ("_Cache__currsize", Val.int (1)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.tuple [Val.int (0)], Val.int (0)), (Val.tuple [Val.int (1)], Val.int (1))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) }]
 
-theorem conform_cachetools___init___py__module__Cache_maxsize : ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache_maxsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawConform C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (4748239721400258560)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (384)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1828)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module__Cache_maxsize : ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__Cache_maxsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawRuns C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (4748239721400258560)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (384)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1828)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module__Cache_maxsize : ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__Cache_maxsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawReturns C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (4748239721400258560)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (384)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1828)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C FUEL f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawProjects C FUEL f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize") (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")
+    (fun c hgc hlc =>
+      lawProjects_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uproj_cachetools___init___py__module__Cache_maxsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.maxsize" 5
@@ -478,59 +722,91 @@ def dom_conform_cachetools___init___py__module__Cache_currsize : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_negative.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) }]
 
-theorem conform_cachetools___init___py__module__Cache_currsize : ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_currsize) (lawConform C FUEL f_cachetools___init___py__module__Cache_currsize) (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (917)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (858737101))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-270)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1155374496019109078525542400))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module__Cache_currsize : ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawRuns C FUEL f_cachetools___init___py__module__Cache_currsize) (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (917)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (858737101))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-270)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1155374496019109078525542400))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module__Cache_currsize : ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawReturns C FUEL f_cachetools___init___py__module__Cache_currsize) (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (917)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (858737101))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-270)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1155374496019109078525542400))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C FUEL f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawProjects C FUEL f_cachetools___init___py__module__Cache_currsize "_Cache__currsize") (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")
+    (fun c hgc hlc =>
+      lawProjects_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uproj_cachetools___init___py__module__Cache_currsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.currsize" 5
@@ -555,59 +831,91 @@ def dom_conform_cachetools___init___py__module__Cache_getsizeof : List Obs :=
    { case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.int (1)) }]
 
-theorem conform_cachetools___init___py__module__Cache_getsizeof : ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache_getsizeof : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConform C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_nonneg_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (1000000)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-1)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-806)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775807)] },
    { heap := h0 ++ [], self := none, args := [Val.int (2)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-7)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (0)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-281227)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-1330123152)] },
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (4)] }]
+   { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-theorem nonneg_cachetools___init___py__module__Cache_getsizeof : ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_nonneg_cachetools___init___py__module__Cache_getsizeof : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem nonneg_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawNonneg C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)
+    (fun c hgc hlc =>
+      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (1000000)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-1)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-806)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775807)] },
    { heap := h0 ++ [], self := none, args := [Val.int (2)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-7)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (0)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-281227)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-1330123152)] },
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (4)] }]
+   { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-theorem idempotent_cachetools___init___py__module__Cache_getsizeof : ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module__Cache_getsizeof : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawIdempotent C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (1000000)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-1)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-806)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-9223372036854775807)] },
    { heap := h0 ++ [], self := none, args := [Val.int (2)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (-7)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (0)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-281227)] },
+   { heap := h0 ++ [], self := none, args := [Val.int (-1330123152)] },
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
-   { heap := h0 ++ [], self := none, args := [Val.int (4)] }]
+   { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-theorem const_cachetools___init___py__module__Cache_getsizeof : ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C FUEL f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__Cache_getsizeof : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConst C FUEL f_cachetools___init___py__module__Cache_getsizeof (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module__Cache_getsizeof :
     Refines P "cachetools/__init__.py:<module>.Cache.getsizeof" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
@@ -622,117 +930,181 @@ def dom_conform_cachetools___init___py__module___TimedCache__Timer___init : List
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.fn "datetime.now"] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module___TimedCache__Timer___init : ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___TimedCache__Timer___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__) (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__) (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module___TimedCache__Timer___exit : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (4)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module___TimedCache__Timer___exit : ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___TimedCache__Timer___exit : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-1330123152))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.int (0)]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.int (0), Val.unit]] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (100)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-683)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-theorem runs_cachetools___init___py__module___TimedCache__Timer___exit : ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module___TimedCache__Timer___exit : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-1330123152))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.int (0)]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.int (0), Val.unit]] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (100)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-683)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-theorem returns_cachetools___init___py__module___TimedCache__Timer___exit : ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module___TimedCache__Timer___exit : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-1330123152))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.int (0)]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.int (0), Val.unit]] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (100)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-683)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-theorem idempotent_cachetools___init___py__module___TimedCache__Timer___exit : ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module___TimedCache__Timer___exit : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawIdempotent C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-1330123152))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.int (0)]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-7))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.int (0), Val.unit]] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (100)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (402698))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-683)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-theorem const_cachetools___init___py__module___TimedCache__Timer___exit : ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module___TimedCache__Timer___exit : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConst C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (8869))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-128593)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-13850146)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-738))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (99089))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (2196))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-713))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module___TimedCache__Timer___reduce : ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module___TimedCache__Timer___reduce : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___reduce__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (8869))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-128593)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-13850146)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-738))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (99089))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (2196))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-713))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module___TimedCache__Timer___reduce : ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module___TimedCache__Timer___reduce : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___reduce__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module___TimedCache_timer : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) },
@@ -744,59 +1116,91 @@ def dom_conform_cachetools___init___py__module___TimedCache_timer : List Obs :=
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) },
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_replace_grow.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (10)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) }]
 
-theorem conform_cachetools___init___py__module___TimedCache_timer : ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module___TimedCache_timer : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConform C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (7)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (2))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-7))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (130)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2900)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-436))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (-231))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (621))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module___TimedCache_timer : ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module___TimedCache_timer : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (7)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (2))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-7))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (130)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2900)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-436))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (-231))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (621))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module___TimedCache_timer : ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module___TimedCache_timer : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (7)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (2))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-7))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (130)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2900)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (-436))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (-231))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (621))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem const_cachetools___init___py__module___TimedCache_timer : ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C FUEL f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module___TimedCache_timer : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConst C FUEL f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1))) (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 theorem uproj_cachetools___init___py__module___TimedCache_timer :
     MRefines P "cachetools/__init__.py:<module>._TimedCache.timer" 5
@@ -817,67 +1221,105 @@ def dom_conform_cachetools___init___py__module__TTLCache__Link___init : List Obs
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [] }, { cls := "RecursiveEquals", fields := [("_use_cache", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.ref (base + 1)], Val.unit] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [] }, { cls := "RecursiveEquals", fields := [("_use_cache", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.ref (base + 1)], Val.unit] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module__TTLCache__Link___init : ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__TTLCache__Link___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module__TTLCache__Link___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1)], Val.unit] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1000000)], Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1359130)], Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (-14866029014)], Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [], Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (7)], Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (384)], Val.unit] }]
 
-theorem commutes_cachetools___init___py__module__TTLCache__Link___init : ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C FUEL f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module__TTLCache__Link___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawCommutes C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__TTLCache__Link___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.unit] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1)], Val.unit] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1000000)], Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (1359130)], Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (-14866029014)], Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [], Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (7)], Val.int (0)] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (0)] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (384)], Val.unit] }]
 
-theorem const_cachetools___init___py__module__TTLCache__Link___init : ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__TTLCache__Link___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__TTLCache__Link___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module__TTLCache__Link___reduce : ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__TTLCache__Link___reduce : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___reduce__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__TTLCache__Link___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module__TTLCache__Link___reduce : ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__TTLCache__Link___reduce : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___reduce__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__TTLCache__Link_unlink : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) },
@@ -889,59 +1331,91 @@ def dom_conform_cachetools___init___py__module__TTLCache__Link_unlink : List Obs
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (9)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module__TTLCache__Link_unlink : ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__TTLCache__Link_unlink : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (7)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (-12292074318590688)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4169)), ("key", Val.int (539970565584)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (309042969009)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (114)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (-1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem runs_cachetools___init___py__module__TTLCache__Link_unlink : ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__TTLCache__Link_unlink : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (7)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (-12292074318590688)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4169)), ("key", Val.int (539970565584)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (309042969009)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (114)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (-1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem returns_cachetools___init___py__module__TTLCache__Link_unlink : ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__TTLCache__Link_unlink : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (7)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (-12292074318590688)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4169)), ("key", Val.int (539970565584)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (1000000)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (309042969009)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (114)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (7)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (-1)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
+   { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-theorem const_cachetools___init___py__module__TTLCache__Link_unlink : ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__TTLCache__Link_unlink : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__TLRUCache__Item___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] }, expected := EResult.val (Val.unit) },
@@ -953,43 +1427,67 @@ def dom_conform_cachetools___init___py__module__TLRUCache__Item___init : List Ob
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (42), Val.int (2)] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (4)] }, expected := EResult.val (Val.unit) }]
 
-theorem conform_cachetools___init___py__module__TLRUCache__Item___init : ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__TLRUCache__Item___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module__TLRUCache__Item___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7), Val.int (7)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-862), Val.int (-281227)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (8869), Val.int (205)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (111)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (2)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (858737101), Val.int (86899)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (180645), Val.int (239)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (2)] }]
 
-theorem commutes_cachetools___init___py__module__TLRUCache__Item___init : ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module__TLRUCache__Item___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawCommutes C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__TLRUCache__Item___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (7)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7), Val.int (7)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-862), Val.int (-281227)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (8869), Val.int (205)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (111)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000), Val.int (2)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1), Val.int (1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0), Val.int (2)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (858737101), Val.int (86899)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (180645), Val.int (239)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (2)] }]
 
-theorem const_cachetools___init___py__module__TLRUCache__Item___init : ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__TLRUCache__Item___init : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConst C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__TLRUCache__Item___lt : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool false) },
@@ -1001,43 +1499,67 @@ def dom_conform_cachetools___init___py__module__TLRUCache__Item___lt : List Obs 
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (5)), ("key", Val.int (1)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (4)), ("key", Val.int (2)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool false) },
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (5)), ("key", Val.int (1)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (6)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool true) }]
 
-theorem conform_cachetools___init___py__module__TLRUCache__Item___lt : ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__TLRUCache__Item___lt : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__TLRUCache__Item___lt : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1000000)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (-1)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-1)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-30285)), ("key", Val.int (16542201)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-1330123152)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-12292074318590688)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (-1)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (7)), ("key", Val.int (-7)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (3577)), ("key", Val.int (3)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-16678)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (6788849)), ("key", Val.int (-40216)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
 
-theorem runs_cachetools___init___py__module__TLRUCache__Item___lt : ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__TLRUCache__Item___lt : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__TLRUCache__Item___lt : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1000000)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (-1)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-1)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-30285)), ("key", Val.int (16542201)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-1330123152)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (-12292074318590688)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (-1)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (7)), ("key", Val.int (-7)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
-   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (3577)), ("key", Val.int (3)), ("removed", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-16678)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
+   { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (6788849)), ("key", Val.int (-40216)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
 
-theorem returns_cachetools___init___py__module__TLRUCache__Item___lt : ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__TLRUCache__Item___lt : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_conform_cachetools___init___py__module__TLRUCache___contains : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
@@ -1046,248 +1568,264 @@ def dom_conform_cachetools___init___py__module__TLRUCache___contains : List Obs 
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] }, expected := EResult.val (Val.bool false) }]
 
-theorem conform_cachetools___init___py__module__TLRUCache___contains : ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__TLRUCache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_runs_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (130)), ("_Timer__time", Val.int (-412))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (385524252))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (100)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-207063756041))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-130111087180410928))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-673918)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (309059131601)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1705)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (384)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (3577)), ("_Timer__time", Val.int (1000000000000000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-14866029014))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1804883)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-theorem runs_cachetools___init___py__module__TLRUCache___contains : ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_runs_cachetools___init___py__module__TLRUCache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem runs_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_returns_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (130)), ("_Timer__time", Val.int (-412))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (385524252))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (100)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-207063756041))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-130111087180410928))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-673918)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (309059131601)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1705)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (384)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (3577)), ("_Timer__time", Val.int (1000000000000000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-14866029014))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1804883)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-theorem returns_cachetools___init___py__module__TLRUCache___contains : ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_returns_cachetools___init___py__module__TLRUCache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem returns_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (130)), ("_Timer__time", Val.int (-412))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (385524252))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (100)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-207063756041))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-130111087180410928))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-673918)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (309059131601)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1705)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (384)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (3577)), ("_Timer__time", Val.int (1000000000000000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-14866029014))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1804883)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-theorem idempotent_cachetools___init___py__module__TLRUCache___contains : ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module__TLRUCache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawIdempotent C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_const_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (1))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (-1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (130)), ("_Timer__time", Val.int (-412))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (385524252))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (100)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-207063756041))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-130111087180410928))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-673918)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (309059131601)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1705)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (2)), ("_Timer__time", Val.int (-7))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (2))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
-   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1000000)), ("_Timer__time", Val.int (7))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (384)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (3577)), ("_Timer__time", Val.int (1000000000000000000))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (-14866029014))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1804883)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-theorem const_cachetools___init___py__module__TLRUCache___contains : ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C FUEL f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_const_cachetools___init___py__module__TLRUCache___contains : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem const_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConst C FUEL f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false)) (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))
+    (fun c hgc hlc =>
+      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module__cached : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool true] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool true] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (7)), ("_Cache__maxsize", Val.int (1000000))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-206)), ("_Cache__maxsize", Val.int (30198701656))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (115817512)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool true] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (699)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1436)), ("_Cache__maxsize", Val.int (-4272))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }, { cls := "CountedCondition", fields := [("count", Val.int (0)), ("wait_count", Val.int (0)), ("notify_count", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.ref (base + 1), Val.bool false] }]
 
-theorem idempotent_cachetools___init___py__module__cached : ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C FUEL f_cachetools___init___py__module__cached)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module__cached : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C fuel f_cachetools___init___py__module__cached)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module__cached : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C fuel f_cachetools___init___py__module__cached)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__cached) (lawIdempotent C FUEL f_cachetools___init___py__module__cached) (lawIdempotent C fuel f_cachetools___init___py__module__cached)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cached.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module__cached : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool true] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool true] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool false] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (7)), ("_Cache__maxsize", Val.int (1000000))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-206)), ("_Cache__maxsize", Val.int (30198701656))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (115817512)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.unit, Val.bool true] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (699)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.int (0), Val.int (0), Val.bool false] },
+   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1436)), ("_Cache__maxsize", Val.int (-4272))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }, { cls := "CountedCondition", fields := [("count", Val.int (0)), ("wait_count", Val.int (0)), ("notify_count", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.ref (base + 1), Val.bool false] }]
 
-theorem commutes_cachetools___init___py__module__cached : ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C FUEL f_cachetools___init___py__module__cached)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module__cached : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C fuel f_cachetools___init___py__module__cached)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module__cached : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C fuel f_cachetools___init___py__module__cached)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__cached) (lawCommutes C FUEL f_cachetools___init___py__module__cached) (lawCommutes C fuel f_cachetools___init___py__module__cached)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cached.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools___init___py__module__cachedmethod : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.int (0), Val.bool true] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.int (0), Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.unit, Val.unit, Val.bool false] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.int (0), Val.int (0), Val.bool true] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.unit, Val.int (0), Val.bool true] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.int (0), Val.unit, Val.bool true] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool true] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.unit, Val.bool false] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] }]
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.int (0), Val.bool true] }]
 
-theorem idempotent_cachetools___init___py__module__cachedmethod : ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools___init___py__module__cachedmethod : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools___init___py__module__cachedmethod : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__cachedmethod) (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod) (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cachedmethod.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools___init___py__module__cachedmethod : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.int (0), Val.bool true] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.int (0), Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.unit, Val.unit, Val.bool false] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.int (0), Val.int (0), Val.bool true] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.unit, Val.int (0), Val.bool true] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "typedmethodkey", Val.int (0), Val.unit, Val.bool true] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool true] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.int (0), Val.unit, Val.bool false] },
-   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] }]
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] },
+   { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.int (0), Val.bool true] }]
 
-theorem commutes_cachetools___init___py__module__cachedmethod : ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C FUEL f_cachetools___init___py__module__cachedmethod)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools___init___py__module__cachedmethod : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools___init___py__module__cachedmethod : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__cachedmethod) (lawCommutes C FUEL f_cachetools___init___py__module__cachedmethod) (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cachedmethod.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_idempotent_cachetools_func_py__module___cache : List Case :=
   [{ heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1000000)), ("_Cache__maxsize", Val.int (0)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-7), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-1), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (1), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (1), Val.bool true] }]
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-12292074318590688), Val.bool false] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (124), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-16678)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-1970), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1125)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (3546), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2900), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-562949953421311)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (122769988322284790909354065310777344), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] }]
 
-theorem idempotent_cachetools_func_py__module___cache : ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C FUEL f_cachetools_func_py__module___cache)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_idempotent_cachetools_func_py__module___cache : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C fuel f_cachetools_func_py__module___cache)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem idempotent_cachetools_func_py__module___cache : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C fuel f_cachetools_func_py__module___cache)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_cachetools_func_py__module___cache) (lawIdempotent C FUEL f_cachetools_func_py__module___cache) (lawIdempotent C fuel f_cachetools_func_py__module___cache)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools_func_py__module___cache.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 def dom_commutes_cachetools_func_py__module___cache : List Case :=
   [{ heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (1000000)), ("_Cache__maxsize", Val.int (0)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (0), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-7), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-1), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (1), Val.bool true] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] },
-   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (1), Val.bool true] }]
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-7)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-12292074318590688), Val.bool false] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (124), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-16678)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (-1970), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1125)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (3546), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2900), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-562949953421311)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (122769988322284790909354065310777344), Val.bool true] },
+   { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] }]
 
-theorem commutes_cachetools_func_py__module___cache : ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C FUEL f_cachetools_func_py__module___cache)) = true := by rfl
+/-- Holds at **every** fuel budget at or above `FUEL`.
 
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_commutes_cachetools_func_py__module___cache : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C fuel f_cachetools_func_py__module___cache)) = true
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem commutes_cachetools_func_py__module___cache : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C fuel f_cachetools_func_py__module___cache)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_cachetools_func_py__module___cache) (lawCommutes C FUEL f_cachetools_func_py__module___cache) (lawCommutes C fuel f_cachetools_func_py__module___cache)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools_func_py__module___cache.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
 def obligations : List OpenObligation :=
-  [{ name := "ob_conform_cachetools___init___py__module___DefaultSize___getitem", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.__getitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_nonneg_cachetools___init___py__module___DefaultSize___getitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__getitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module___DefaultSize___getitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__getitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module___DefaultSize___getitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__getitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___DefaultSize___setitem", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___DefaultSize_pop", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_nonneg_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___DefaultSize_clear", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.clear", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache___init", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__Cache___init", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__Cache___init", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module__Cache___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__Cache___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache___getitem", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.__getitem__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__Cache___contains", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__Cache___contains", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache_maxsize", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__Cache_maxsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__Cache_maxsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache_currsize", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__Cache_currsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__Cache_currsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache_getsizeof", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_nonneg_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___TimedCache__Timer___init", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___TimedCache__Timer___exit", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module___TimedCache__Timer___exit", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module___TimedCache__Timer___exit", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module___TimedCache__Timer___exit", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module___TimedCache__Timer___exit", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module___TimedCache__Timer___reduce", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module___TimedCache__Timer___reduce", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module___TimedCache_timer", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._TimedCache.timer", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module___TimedCache_timer", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache.timer", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module___TimedCache_timer", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._TimedCache.timer", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module___TimedCache_timer", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._TimedCache.timer", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__TTLCache__Link___init", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module__TTLCache__Link___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__TTLCache__Link___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__TTLCache__Link___reduce", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__reduce__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__TTLCache__Link___reduce", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__reduce__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__TTLCache__Link_unlink", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.unlink", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__TTLCache__Link_unlink", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.unlink", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__TTLCache__Link_unlink", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.unlink", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__TTLCache__Link_unlink", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.unlink", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__TLRUCache__Item___init", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__TLRUCache__Item___lt", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__TLRUCache__Item___lt", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__TLRUCache__Item___lt", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__TLRUCache___contains", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.TLRUCache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_runs_cachetools___init___py__module__TLRUCache___contains", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TLRUCache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_returns_cachetools___init___py__module__TLRUCache___contains", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.TLRUCache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module__TLRUCache___contains", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_const_cachetools___init___py__module__TLRUCache___contains", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache.__contains__", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module__cached", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.cached", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module__cached", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.cached", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools___init___py__module__cachedmethod", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.cachedmethod", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools___init___py__module__cachedmethod", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.cachedmethod", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_idempotent_cachetools_func_py__module___cache", source := "algebraic (\u00a74.3)", subject := "cachetools/func.py:<module>._cache", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_commutes_cachetools_func_py__module___cache", source := "algebraic (\u00a74.3)", subject := "cachetools/func.py:<module>._cache", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "stmt_idempotent_cachetools___init___py__module__Cache___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
+  [{ name := "stmt_idempotent_cachetools___init___py__module__Cache___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_runs_cachetools___init___py__module__Cache___getitem", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__getitem__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_conform_cachetools___init___py__module__Cache___contains", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.__contains__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_conform_cachetools___init___py__module__Cache___missing", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.__missing__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_runs_cachetools___init___py__module__Cache___missing", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__missing__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_raises_cachetools___init___py__module__Cache___missing", source := "artifact (\u00a74.1)", subject := "cachetools/__init__.py:<module>.Cache.__missing__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
@@ -1325,6 +1863,7 @@ def obligations : List OpenObligation :=
 #audit_depends commutes_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
 #audit_depends const_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
 #audit_depends conform_cachetools___init___py__module__Cache___getitem on f_cachetools___init___py__module__Cache___getitem__
+#audit_depends conform_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
 #audit_depends runs_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
 #audit_depends returns_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
 #audit_depends conform_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
@@ -1381,5 +1920,88 @@ def obligations : List OpenObligation :=
 #audit_depends commutes_cachetools___init___py__module__cachedmethod on f_cachetools___init___py__module__cachedmethod
 #audit_depends idempotent_cachetools_func_py__module___cache on f_cachetools_func_py__module___cache
 #audit_depends commutes_cachetools_func_py__module___cache on f_cachetools_func_py__module___cache
+
+/-! ## Axiom basis
+
+`#audit_axioms` fails the build on `sorryAx`, `ofReduceBool` or `ofReduceNat`, so "no admitted step, no `native_decide`" is checked here rather than asserted in prose. -/
+
+#audit_axioms conform_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms nonneg_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms const_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms uconst_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms conform_cachetools___init___py__module___DefaultSize___setitem
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___setitem
+#audit_axioms commutes_cachetools___init___py__module___DefaultSize___setitem
+#audit_axioms const_cachetools___init___py__module___DefaultSize___setitem
+#audit_axioms conform_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms nonneg_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms const_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms uconst_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms conform_cachetools___init___py__module___DefaultSize_clear
+#audit_axioms conform_cachetools___init___py__module__Cache___init
+#audit_axioms runs_cachetools___init___py__module__Cache___init
+#audit_axioms returns_cachetools___init___py__module__Cache___init
+#audit_axioms commutes_cachetools___init___py__module__Cache___init
+#audit_axioms const_cachetools___init___py__module__Cache___init
+#audit_axioms conform_cachetools___init___py__module__Cache___getitem
+#audit_axioms conform_cachetools___init___py__module__Cache___contains
+#audit_axioms runs_cachetools___init___py__module__Cache___contains
+#audit_axioms returns_cachetools___init___py__module__Cache___contains
+#audit_axioms conform_cachetools___init___py__module__Cache_maxsize
+#audit_axioms runs_cachetools___init___py__module__Cache_maxsize
+#audit_axioms returns_cachetools___init___py__module__Cache_maxsize
+#audit_axioms projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize
+#audit_axioms uproj_cachetools___init___py__module__Cache_maxsize
+#audit_axioms conform_cachetools___init___py__module__Cache_currsize
+#audit_axioms runs_cachetools___init___py__module__Cache_currsize
+#audit_axioms returns_cachetools___init___py__module__Cache_currsize
+#audit_axioms projects__Cache__currsize_cachetools___init___py__module__Cache_currsize
+#audit_axioms uproj_cachetools___init___py__module__Cache_currsize
+#audit_axioms conform_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms nonneg_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms idempotent_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms const_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms uconst_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___init
+#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___exit
+#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___exit
+#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___exit
+#audit_axioms idempotent_cachetools___init___py__module___TimedCache__Timer___exit
+#audit_axioms const_cachetools___init___py__module___TimedCache__Timer___exit
+#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___reduce
+#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___reduce
+#audit_axioms conform_cachetools___init___py__module___TimedCache_timer
+#audit_axioms runs_cachetools___init___py__module___TimedCache_timer
+#audit_axioms returns_cachetools___init___py__module___TimedCache_timer
+#audit_axioms const_cachetools___init___py__module___TimedCache_timer
+#audit_axioms uproj_cachetools___init___py__module___TimedCache_timer
+#audit_axioms conform_cachetools___init___py__module__TTLCache__Link___init
+#audit_axioms commutes_cachetools___init___py__module__TTLCache__Link___init
+#audit_axioms const_cachetools___init___py__module__TTLCache__Link___init
+#audit_axioms runs_cachetools___init___py__module__TTLCache__Link___reduce
+#audit_axioms returns_cachetools___init___py__module__TTLCache__Link___reduce
+#audit_axioms conform_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_axioms runs_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_axioms returns_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_axioms const_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___init
+#audit_axioms commutes_cachetools___init___py__module__TLRUCache__Item___init
+#audit_axioms const_cachetools___init___py__module__TLRUCache__Item___init
+#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___lt
+#audit_axioms runs_cachetools___init___py__module__TLRUCache__Item___lt
+#audit_axioms returns_cachetools___init___py__module__TLRUCache__Item___lt
+#audit_axioms conform_cachetools___init___py__module__TLRUCache___contains
+#audit_axioms runs_cachetools___init___py__module__TLRUCache___contains
+#audit_axioms returns_cachetools___init___py__module__TLRUCache___contains
+#audit_axioms idempotent_cachetools___init___py__module__TLRUCache___contains
+#audit_axioms const_cachetools___init___py__module__TLRUCache___contains
+#audit_axioms idempotent_cachetools___init___py__module__cached
+#audit_axioms commutes_cachetools___init___py__module__cached
+#audit_axioms idempotent_cachetools___init___py__module__cachedmethod
+#audit_axioms commutes_cachetools___init___py__module__cachedmethod
+#audit_axioms idempotent_cachetools_func_py__module___cache
+#audit_axioms commutes_cachetools_func_py__module___cache
 
 end Autoform.SpecsGen.Cachetools
