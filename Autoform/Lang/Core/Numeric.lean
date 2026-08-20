@@ -662,4 +662,75 @@ example : NumConfig.c32Wrapv.mul 100000 100000 = .ok 1410065408 := by decide
 
 end Evidence
 
+
+/-! ## Languages, and the approximation each one is currently under
+
+`Dialect` has two constructors, and §29 records that two are not enough: Java, Go and
+JavaScript are all run as `.cLike`, which is right about `and`/`or` for Java and Go and
+**wrong** for JavaScript, where `0 || 5` is `5`. Collapsing them was invisible because
+nothing in the build ever named a language.
+
+`Lang` names it. It does not fix the approximation — it makes the approximation a
+statement you can read, and `Lang.approximated` lists exactly which languages are
+currently sharing semantics with a language they do not agree with.
+
+Why this is additive rather than the constructor-per-language split §29 actually calls
+for: about 110 sites still `match` on `Dialect` directly, so adding constructors makes
+every one of them non-exhaustive at once. That split is the right end state and is
+blocked only on those sites, not on this type. -/
+inductive Lang where
+  | python | c | java | go | javascript | typescript | kotlin
+  deriving Repr, Inhabited, DecidableEq
+
+namespace Lang
+
+/-- File extensions Joern's front ends produce for each language. `render_lean.py`'s
+`infer_dialect` refuses on an unknown extension rather than defaulting to Python; this is
+the table it should be refusing against. -/
+def extensions : Lang → List String
+  | .python     => [".py"]
+  | .c          => [".c", ".h", ".cpp", ".hpp", ".cc"]
+  | .java       => [".java"]
+  | .go         => [".go"]
+  | .javascript => [".js", ".mjs", ".cjs"]
+  | .typescript => [".ts", ".tsx"]
+  | .kotlin     => [".kt", ".kts"]
+
+/-- The dialect this language is evaluated under **today**. Several of these are
+approximations; `approximated` says which. -/
+def dialect : Lang → Dialect
+  | .python     => .python
+  -- Correct for `and`/`or`: Java and Go really do yield a bool.
+  | .java | .go | .c => .cLike
+  -- WRONG for `and`/`or`: JS and TS yield an operand, like Python, not a bool.
+  -- Mapped to `.cLike` because their *strings* and *numerics* are further from Python
+  -- than their boolean operators are — a two-constructor type cannot get both right.
+  | .javascript | .typescript => .cLike
+  -- Kotlin's `&&`/`||` are bool-valued, like Java's.
+  | .kotlin     => .cLike
+
+/-- Does this language's real behaviour disagree with the dialect it is run under, in a
+way the semantics can currently express? Each `true` is a known-wrong answer, not an
+unknown one. -/
+def approximated : Lang → Bool
+  | .javascript | .typescript => true   -- bool ops yield an operand; `.cLike` says bool
+  | _ => false
+
+/-- The integer model. `java64` and `go64` were written months ago and never wired to
+anything, because nothing named a language. -/
+def numConfig : Lang → NumConfig
+  | .python                   => NumConfig.python
+  | .c                        => NumConfig.c32
+  | .java | .kotlin           => NumConfig.java64
+  | .go                       => NumConfig.go64
+  -- JS/TS numbers are IEEE doubles, not integers at all. `python`'s unbounded integers
+  -- are the wrong answer too; this is recorded as wrong rather than dressed up.
+  | .javascript | .typescript => NumConfig.python
+
+/-- Languages whose semantics are currently known to be wrong. -/
+def known_wrong : List Lang :=
+  [.python, .c, .java, .go, .javascript, .typescript, .kotlin].filter approximated
+
+end Lang
+
 end Autoform.Core

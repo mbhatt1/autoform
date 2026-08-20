@@ -1515,3 +1515,43 @@ into fake INCONCLUSIVEs; and a synthetic receiver with no fields makes every att
 access hole for reasons that are ours, not the program's, so `harness:` holes are
 excluded from the evidence entirely. §27 said the last divergence was the apparatus. It
 keeps being the apparatus.
+
+## 20. Fuel monotonicity (`Autoform/FuelMono.lean`)
+
+Open obligation #1 of `Refine.lean` §5 is closed, with one exclusion that is not a proof
+artefact. All seven mutually recursive interpreter functions (`evalExpr`, `applyFunc`,
+`applyClosure`, `evalList`, `evalPairs`, `execStmt`, `execFor`) satisfy
+`f k … = (h', r) → r ≠ outOfFuel → f (k+1) … = (h', r)`, and the `k ≤ k'` form follows;
+the proof is one induction on fuel over a seven-way conjunction, since every recursive
+call in the interpreter is at `k`.
+
+The exclusion is `Stmt.tryFinally`, the only construct that does **not** propagate an
+out-of-fuel sub-result: when the body exhausts fuel and the finalizer exits abnormally,
+the finalizer's outcome discards the body's, so the statement returns an ordinary result
+computed from a partially-mutated heap, and more fuel mutates that heap further.
+`tryFinally_breaks_fuel_mono` is a machine-checked counterexample (`return 1` at fuel 4,
+`return 2` at fuel 5, neither `outOfFuel`). The theorems therefore carry `tfFreeS`
+side conditions; `tfFree_of_table` discharges them from a table-wide check, and
+`(Generated.program.table.all fun p => tfFreeS p.2.body) = true` holds by `rfl`, so the
+cachetools corpus is inside the covered fragment.
+
+### §30.1 — Naming the language, so the approximation can be read
+
+Four of six supported languages have no conformance oracle, and commissioning one
+surfaced a prerequisite: nothing in the build ever named a language. `Dialect` has two
+constructors, so Java, Go, JavaScript, TypeScript and Kotlin were all run as `.cLike`.
+That is right about `and`/`or` for Java, Go and Kotlin — they yield a bool — and **wrong**
+for JavaScript and TypeScript, where `0 || 5` is `5`, exactly as in Python.
+
+`Lang` (in `Numeric.lean`) names the language and states, per language, the dialect it is
+evaluated under, its `NumConfig`, its file extensions, and whether that pairing is
+`approximated` — known-wrong rather than unknown. `Lang.known_wrong` currently evaluates
+to `[javascript, typescript]`. This also wires `java64` and `go64`, written months ago
+and never connected to anything, because nothing named a language.
+
+This is deliberately *not* the constructor-per-language split §29 calls for. About 110
+sites still `match` on `Dialect` directly, so adding constructors makes all of them
+non-exhaustive simultaneously — and four agents are mid-build. The split is the right end
+state; it is blocked on those sites, not on this type. What `Lang` buys now is that a
+divergence found by the new oracle can be attributed: caused by the transpiler, or caused
+by an approximation the build already admits to.
