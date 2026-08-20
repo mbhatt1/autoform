@@ -2273,10 +2273,10 @@
       ]
     },
     "Cache_size_fields_distinct": {
-      "killed": 0,
-      "survived": 55,
-      "score": 0.0,
-      "verdict": "VACUOUS",
+      "killed": 6,
+      "survived": 49,
+      "score": 0.10909090909090909,
+      "verdict": "WEAK",
       "survivors": [
         {
           "op": "ast-field:expires->expires__mutated",
@@ -2314,13 +2314,6 @@
           "after": "            (.binop \"-\" (.field (.name \"exc\") \"_Timer__nesting\") (.lit (.int 1)))) }"
         },
         {
-          "op": "ast-expr->ret",
-          "line": 294,
-          "decl": "f_cachetools___init___py__module__Cache_currsize",
-          "before": "            (.expr (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))",
-          "after": "            (.ret (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))"
-        },
-        {
           "op": "ast-int:1->0",
           "line": 303,
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
@@ -2340,13 +2333,6 @@
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
           "before": "            (.ret (.lit (.int 1)))) }",
           "after": "            (.ret (.lit (.int 2)))) }"
-        },
-        {
-          "op": "ast-field:_Cache__maxsize->_Cache__maxsize__mutated",
-          "line": 287,
-          "decl": "f_cachetools___init___py__module__Cache_maxsize",
-          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
-          "after": "            (.ret (.field (.name \"self\") \"_Cache__maxsize__mutated\"))) }"
         },
         {
           "op": "ast-seq-delete",
@@ -2426,25 +2412,11 @@
           "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires__mutated\"))) }"
         },
         {
-          "op": "ast-ret->expr",
-          "line": 287,
-          "decl": "f_cachetools___init___py__module__Cache_maxsize",
-          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
-          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
-        },
-        {
           "op": "ast-binop:-->+",
           "line": 1047,
           "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
           "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
           "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
-        },
-        {
-          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
-          "line": 295,
-          "decl": "f_cachetools___init___py__module__Cache_currsize",
-          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
-          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
         },
         {
           "op": "ast-name:key->expires",
@@ -2538,13 +2510,6 @@
           "after": "  , body := (.ret (.lit (.int 0))) }"
         },
         {
-          "op": "ast-ret->expr",
-          "line": 295,
-          "decl": "f_cachetools___init___py__module__Cache_currsize",
-          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
-          "after": "            (.expr (.field (.name \"self\") \"_Cache__currsize\"))) }"
-        },
-        {
           "op": "ast-expr->ret",
           "line": 302,
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
@@ -2592,13 +2557,6 @@
           "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
           "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
           "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.name \"timer\"))"
-        },
-        {
-          "op": "ast-expr->ret",
-          "line": 286,
-          "decl": "f_cachetools___init___py__module__Cache_maxsize",
-          "before": "            (.expr (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))",
-          "after": "            (.ret (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))"
         },
         {
           "op": "ast-name:self->key",
@@ -7945,7 +7903,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "survived",
         "Cache_currsize_mrefines": "killed",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",
@@ -8069,7 +8027,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "killed",
         "Cache_currsize_mrefines": "survived",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",
@@ -8449,7 +8407,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "killed",
         "Cache_currsize_mrefines": "survived",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",
@@ -8511,7 +8469,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "survived",
         "Cache_currsize_mrefines": "killed",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",
@@ -8953,7 +8911,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "survived",
         "Cache_currsize_mrefines": "killed",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",
@@ -9201,7 +9159,7 @@
         "DefaultSize_setitem_mrefines": "survived",
         "Cache_maxsize_mrefines": "killed",
         "Cache_currsize_mrefines": "survived",
-        "Cache_size_fields_distinct": "survived",
+        "Cache_size_fields_distinct": "killed",
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "survived",

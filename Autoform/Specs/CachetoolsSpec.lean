@@ -510,7 +510,57 @@ theorem cache_clear_not_refinable (N : Nat)
   rw [cache_clear_reaches_hole N h self] at h1
   exact Outcome.toEResult_ne_hole _ _ h1.symm
 
-/-! ## 4. Open obligations
+/-! ## 4. What the mutation gate actually said
+
+Run: `scripts/mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools
+--spec-file Autoform/Specs/CachetoolsSpec.lean --spec-module Autoform.Specs.CachetoolsSpec
+--decls <the 15 functions above> --subject <theorem→function map>`. 57 mutants of the
+*generated* module, 2 rejected as not type-correct, 0 inconclusive, 0 coarse.
+
+**On-subject score: 78 / 88 = 88.6%.** Thirteen of the twenty-one theorems are
+`HAS TEETH` (100%). Every one of the ten survivors was examined; none is a case of a
+theorem failing to notice a behavioural change:
+
+* **4 × `ast-seq-delete` of a docstring** (`getsizeof`, `maxsize`, `currsize`, and the
+  latter two again under `Cache_size_fields_distinct`). The deleted statement is
+  `Stmt.expr (Expr.lit (Lit.str "..."))` — Python's docstring, translated as
+  evaluate-and-discard. Deleting a discarded pure literal is a **provably equivalent
+  mutant**; no specification of observable behaviour can, or should, kill it.
+* **1 × `ast-ret->expr` in `_cachedmethod._none`.** The body is `.ret (.lit .unit)`;
+  under `.expr` the body falls through to `Ctl.normal`, which `applyFunc` maps to
+  `EResult.val Val.unit` — the same observable. Equivalent mutant, and a real property of
+  the semantics: a Python function that falls off the end returns `None`.
+* **2 × `ast-name` swaps under `TLRUItem_lt_irrefl`.** That witness compares an item with
+  *itself*, so `self` and `other` denote the same reference and swapping them cannot
+  change the answer. The parent `TLRUItem_lt_mrefines` kills both (6/6).
+* **2 × `ast-int` in `_uncached_info.cache_clear`.** The only mutable point in that
+  function sits *after* `Stmt.hole "scope:nonlocal-write"`, so it is unreachable: the
+  interpreter stops at the hole. Dead-code mutant.
+* **1 theorem with no mutants at all**: `_DefaultSize.__setitem__` has body `.skip`.
+  There is nothing to perturb, so `DefaultSize_setitem_mrefines` is reported `UNTESTED`
+  rather than given a score. That is the honest verdict, not a pass.
+
+Two findings the gate produced about *this file*, both recorded because they generalise:
+
+1. **Witness corollaries proved by rewriting their parent theorem are invisible to the
+   gate.** The five `_discriminates` / `_irrefl` / `_decrements` / `_sets_both` /
+   `_distinct` witnesses originally scored **0/32**. When a mutant breaks the parent,
+   Lean reports the error at the parent and still admits its *statement* downstream, so
+   the corollary re-derives from an unchanged statement and never fails. They were
+   rewritten to evaluate the interpreter directly, and went to 28/32. This is the same
+   shape as STRATEGY.md 14: a theorem stated in terms of the thing being mutated moves
+   with it.
+2. **An inequality between two functions tests neither.** `Cache_size_fields_distinct`
+   originally claimed only `maxsize ≠ currsize` and scored **0/8** — mutating one
+   accessor leaves the other alone, so the two still differ. Pinning both values took it
+   to 6/8 (the remaining two being the docstring-deletion equivalents).
+
+The score over the *whole* mutant population is 1.8%–12.7% per theorem. That number is
+not a vacuity measurement, it is a **coverage** measurement: these theorems describe 15
+of 233 translated functions, so most mutants are in code they never mention. The two must
+not be conflated, which is why `mutate.py --subject` reports them separately.
+
+## 5. Open obligations
 
 Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
 `native_decide`.

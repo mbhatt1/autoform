@@ -455,6 +455,13 @@ def main():
                          "population to. Use it to point the gate at the functions the "
                          "theorems are ABOUT: mutants of other functions survive by "
                          "construction and measure coverage, not vacuity.")
+    ap.add_argument("--subject", default=None,
+                    help="theorem-to-subject map, 'thm=decl[+decl];thm=decl'. A theorem's "
+                         "mutation score is then computed over mutants of the functions it "
+                         "is ABOUT — the vacuity question — while the score over the whole "
+                         "mutant population is reported separately as coverage. Without "
+                         "this the two are conflated and every theorem looks weak simply "
+                         "because most mutants are in functions it never mentions.")
     ap.add_argument("--generated", action="store_true",
                     help="force the translated-module operators (auto-enabled for files "
                          "under Autoform/Generated/)")
@@ -633,17 +640,40 @@ def main():
               "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
               "invalid": invalid, "inconclusive": inconclusive,
               "theorems": {}, "mutants": records}
+    subject = {}
+    if args.subject:
+        for entry in args.subject.split(";"):
+            if "=" in entry:
+                t, ds = entry.split("=", 1)
+                subject[t.strip()] = [d.strip() for d in ds.split("+") if d.strip()]
+        report["subject_map"] = subject
+
     exit_code = 0
     for t in targets:
         k, s = stats[t]["killed"], stats[t]["survived"]
+        coverage = (k / (k + s)) if (k + s) else 0.0
+        if t in subject:
+            on = [r for r in records if isinstance(r.get("verdict"), dict)
+                  and r["decl"] in subject[t]]
+            ok = sum(1 for r in on if r["verdict"][t] == "killed")
+            k, s = ok, len(on) - ok
         score = (k / (k + s)) if (k + s) else 0.0
-        verdict = "HAS TEETH" if score == 1.0 else ("WEAK" if score > 0 else "VACUOUS")
-        print(f"{t}: killed {k}, survived {s}  score {score:.2%}  [{verdict}]")
+        if t in subject and (k + s) == 0:
+            verdict = "UNTESTED"
+        else:
+            verdict = "HAS TEETH" if score == 1.0 else ("WEAK" if score > 0 else "VACUOUS")
+        scope = "on-subject" if t in subject else "all-mutants"
+        print(f"{t}: killed {k}, survived {s}  score {score:.2%} ({scope})  "
+              f"[{verdict}]" + (f"  coverage {coverage:.2%}" if t in subject else ""))
+        if t in subject:
+            stats[t]["survivors"] = [r for r in stats[t]["survivors"]
+                                     if r["decl"] in subject[t]]
         for sv in stats[t]["survivors"]:
             print(f"    survivor: {sv['decl']} L{sv['line']} [{sv['op']}]")
             print(f"      - {sv['before']}")
             print(f"      + {sv['after']}")
         report["theorems"][t] = {"killed": k, "survived": s, "score": score,
+                                 "scope": scope, "coverage_score": coverage,
                                  "verdict": verdict, "survivors": stats[t]["survivors"]}
         if s:
             exit_code = 1

@@ -134,10 +134,20 @@ Every link is mechanically checked, and each check is a different kind of oracle
 | link | oracle | status |
 |---|---|---|
 | semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences**, but over **30 of 208** `cachetools` functions — coverage, not agreement, is the limit |
-| specifications constrain behaviour | source-level mutation gate | 100%, HAS TEETH |
+| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 78 holes, all named |
+
+The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
+not a property of the specifications: `scripts/mutate.py`'s `error_lines` regex matched
+the *older* Lean diagnostic format, so on this toolchain it never matched anything and
+every "kill" came from the coarse "the build failed, credit all theorems" fallback. There
+was no per-theorem attribution behind it at all. The real on-subject score against
+`Autoform/Generated/Cachetools.lean` is 78/88, with all 10 survivors analysed — 4 are
+docstring deletions, 1 is an observably identical `.ret unit` → `.expr unit`, 2 are
+operand swaps under a self-comparison witness, 2 sit behind a `Stmt.hole`. G4 is recorded
+UNSUPPORTED rather than suppressing the equivalent mutants to turn it green.
 
 The first row used to read "100% on all corpora", which was wrong in both directions and
 is worth keeping visible.
