@@ -133,20 +133,33 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | **5 divergences on `cachetools`**, one root cause (see below); 100% on the smaller corpora |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences**, but over **30 of 208** `cachetools` functions — coverage, not agreement, is the limit |
 | specifications constrain behaviour | source-level mutation gate | 100%, HAS TEETH |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 78 holes, all named |
 
-The first row used to read "100% on all corpora". It stopped being true when the
-differential harness stopped skipping varargs functions and reached `hashkey` for the
-first time: `class _HashedTuple(tuple)` translates to an ordinary class, so its instances
-are opaque `Val.ref`s, while CPython's instance *is* a tuple. Core has no inheritance
-from builtin types. The divergence is pre-existing — the same `ref 1` comes out of the
-pre-change build — and it is recorded as a divergence rather than reclassified as
-"unrepresentable", because the semantics really does compute a different answer and
-calling that not-measured would be the more flattering lie. See STRATEGY.md §31.
+The first row used to read "100% on all corpora", which was wrong in both directions and
+is worth keeping visible.
+
+It was wrong to say 100%, because the denominator is small: only 30 of 208 `cachetools`
+functions are actually compared. Everything else is INCONCLUSIVE — a value the harness
+cannot encode, a receiver it cannot build, or a hole. **The limit is reach, not
+agreement.** A conformance rate quoted without its coverage is the same self-flattering
+metric this project keeps finding.
+
+It was then briefly wrong in the other direction: an intermediate run reported 5
+divergences, and this file attributed them to `class _HashedTuple(tuple)`. That
+attribution was false. All five were an artifact of a **concurrent mutation run** holding
+`Autoform/Generated/Cachetools.lean` — `_DefaultSize.pop` was a live mutant returning 0
+instead of 1, and it is in that run's `decls` list. The harness now detects the
+`.mutate-backup` sentinel, sets `build_stable: false`, and refuses to let a mutated module
+be read as a divergence. See STRATEGY.md §33.
+
+The `_HashedTuple` gap is real but separate: Core has no inheritance from builtin types,
+so instances are opaque `Val.ref`s while CPython's instance *is* a tuple. It surfaces as
+a counted `representation:value-vs-object` INCONCLUSIVE, not as a divergence, because the
+oracle genuinely cannot compare the two encodings.
 
 `leanchecker` ships with the Lean toolchain (v4.28.0+) — `lean4checker` is deprecated and
 there is no Homebrew formula. **Use `--fresh`**: without it the checker can silently pass

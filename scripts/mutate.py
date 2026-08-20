@@ -548,6 +548,14 @@ def main():
                 f.write("".join(new_lines))
 
             rc, out, timed_out = run_build(root, build_module, args.timeout)
+            # A failure that names no source position is not a verdict: it is lock
+            # contention, a half-written dependency, or a missing `.olean` from a
+            # concurrent build. Retry before believing it — otherwise the gate reports a
+            # kill for a theorem that was never even elaborated.
+            for _ in range(2):
+                if rc == 0 or timed_out or all_error_lines(out):
+                    break
+                rc, out, timed_out = run_build(root, build_module, args.timeout)
             # Errors in the *mutated* file mean the mutant is not well-typed; errors in
             # the *spec* file mean a theorem noticed. When the two are the same file
             # these collapse to the original behaviour.
@@ -587,6 +595,7 @@ def main():
                 if rc != 0 and not errs and not spec_errs:
                     coarse += 1
                     rec["attribution"] = "coarse"
+                    rec["build_tail"] = out[-600:]
                 for t in targets:
                     # A build failure with no attributable line is counted as a kill for
                     # every theorem — coarse, but it must not fire merely because the

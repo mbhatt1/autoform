@@ -406,6 +406,27 @@ class Cand:
                 "checked": self.checked, "note": self.note}
 
 
+GUARD = {"conform": "gRunObs", "runs": "gRun", "returns": "gRun",
+         "heappure": "gRun", "const": "gRun", "projects": "gRun",
+         "identity": "gRun", "nonneg": "gRun", "raises": "gRun",
+         "idempotent": "gIdem", "involutive": "gInvol", "commutes": "gComm"}
+
+MONO = {"conform": "lawConform_fuel_mono", "runs": "lawRuns_fuel_mono",
+        "returns": "lawReturns_fuel_mono", "heappure": "lawHeapPreserved_fuel_mono",
+        "const": "lawConst_fuel_mono", "projects": "lawProjects_fuel_mono",
+        "identity": "lawIdentity_fuel_mono", "nonneg": "lawNonneg_fuel_mono",
+        "raises": "lawRaises_fuel_mono", "idempotent": "lawIdempotent_fuel_mono",
+        "involutive": "lawInvolutive_fuel_mono", "commutes": "lawCommutes_fuel_mono"}
+
+
+def has_try_finally(body):
+    """`Stmt.tryFinally` is the one construct fuel monotonicity excludes, and the
+    exclusion is real: `FuelMono.tryFinally_breaks_fuel_mono` exhibits a program that
+    answers 1 at fuel 4 and 2 at fuel 5. A law about such a subject stays an open
+    obligation."""
+    return '"tryFinally"' in json.dumps(body)
+
+
 def writes_heap(body):
     blob = json.dumps(body)
     return any(k in blob for k in ('"setField"', '"setIndex"', '"alloc"'))
@@ -436,6 +457,7 @@ def gen_candidates(core, byname, recs, rng):
         obs = by_fn.get(name, [])
         sid = re.sub(r'[^A-Za-z0-9]', '_', name)[-70:].strip("_")
         doc, core_body = strip_doc(f["body"])
+        tf = has_try_finally(f["body"])
 
         # ---- §4 source 4: cross-implementation equivalence, one theorem per function.
         if obs:
@@ -446,11 +468,13 @@ def gen_candidates(core, byname, recs, rng):
                     continue
                 seen.add(k)
                 uniq.append(r)
-            cands.append(Cand("conform_" + sid, "conform", "cross-runtime (§4.4)", name,
-                              fdef, "lawConform C FUEL %s" % fdef,
-                              [obs_lit(r) for r in uniq[:MAX_DOMAIN]], dom_kind="obs",
-                              note="expected outcomes recorded from CPython by "
-                                   "scripts/differential.py"))
+            cf = Cand("conform_" + sid, "conform", "cross-runtime (§4.4)", name,
+                      fdef, "lawConform C FUEL %s" % fdef,
+                      [obs_lit(r) for r in uniq[:MAX_DOMAIN]], dom_kind="obs",
+                      note="expected outcomes recorded from CPython by "
+                           "scripts/differential.py")
+            cf.extra["try_finally"] = has_try_finally(f["body"])
+            cands.append(cf)
 
         # ---- the fuzz domain every behavioural law is refuted against
         base = []
@@ -474,6 +498,7 @@ def gen_candidates(core, byname, recs, rng):
         def add(fam, source, law, note="", trivial=False, extra=None, tag=""):
             c = Cand("%s%s_%s" % (fam, tag, sid), fam, source, name, fdef, law, lits,
                      note=note, extra=extra)
+            c.extra["try_finally"] = tf
             if trivial:
                 c.extra["structurally_trivial"] = True
             cands.append(c)
@@ -594,6 +619,17 @@ def base : Nat := h0.length
 def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
 def FUEL : Nat := %d
 open Autoform.Generated
+
+/-- Every function body reachable in this program is `tryFinally`-free, so
+`Autoform/FuelMono.lean`'s monotonicity theorems apply to this context. Checked by
+computation over the whole function table, not assumed. `Stmt.tryFinally` is the single
+construct that breaks fuel monotonicity (`FuelMono.tryFinally_breaks_fuel_mono` exhibits a
+program answering 1 at fuel 4 and 2 at fuel 5), so this is the hypothesis that decides
+whether a law checked at one budget holds at every larger one. -/
+theorem C_tfFree : TFFreeCtx C := by
+  refine tfFree_of_table ?_
+  have h : (C.table.all fun p => tfFreeS p.2.body) = true := by rfl
+  exact fun p hp => (List.all_eq_true.mp h) p hp
 """
 
 
@@ -654,6 +690,70 @@ def refute(cands, module, chunk=120):
                 c.status, c.reason = "refuted", "counterexample in the fuzzed domain"
         if rc != 0 and not got:
             print("  refutation chunk %d: lean failed (%s)" % (i, path))
+    return cands
+
+
+def guard_pass(cands, module, chunk=120):
+    """Evaluate the `≠ outOfFuel` guard of each surviving law over its own domain.
+
+    This is what decides whether a law checked at one fuel budget can be lifted to every
+    larger one. It is *evaluated*, never assumed: `lawCommutes` compares two results with
+    `EResult.beq`, and `beq .outOfFuel .outOfFuel` is `true`, so a "commuting" function
+    that simply never ran would sail through the law and fail here — which is the whole
+    point of checking. The pass also counts, per candidate, how many cases actually hit
+    `outOfFuel`, so the answer to "did the guard ever matter?" is a measurement.
+    """
+    live = [c for c in cands if c.kind == "law" and c.status == "candidate"]
+    for c in live:
+        if c.extra.get("try_finally"):
+            c.extra["fuel_mono"] = False
+            c.extra["fuel_mono_reason"] = (
+                "subject reaches Stmt.tryFinally, which FuelMono excludes by "
+                "counterexample (1 at fuel 4, 2 at fuel 5)")
+    todo = [c for c in live if "fuel_mono" not in c.extra]
+    for i in range(0, len(todo), chunk):
+        part = todo[i:i + chunk]
+        src = [HEADER % (module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL)]
+        for c in part:
+            g = GUARD[c.family]
+            arg = "x.case" if c.dom_kind == "obs" else "x"
+            oof = ("(fun x => !(defined (runCase C FUEL %s %s).2))" % (c.fdef, arg))
+            swapped = ("(fun x => match x.args with"
+                       " | a :: b :: rest =>"
+                       " !(defined (runCase C FUEL %s"
+                       " { x with args := b :: a :: rest }).2)"
+                       " | _ => false)" % c.fdef)
+            src.append(domain_defs(c))
+            src.append('#eval IO.println ("@@%s@@" ++ toString '
+                       '((dom_%s).all (%s C FUEL %s)) ++ " " ++ toString '
+                       '((dom_%s).countP %s) ++ " " ++ toString '
+                       '((dom_%s).countP %s))\n'
+                       % (c.id, c.id, g, c.fdef, c.id, oof, c.id,
+                          swapped if c.family == "commutes" else oof))
+        src.append("end Autoform.SpecsGen.%s\n" % module)
+        got = {}
+        for _ in range(2):
+            rc, out, err, path = lean_run("\n".join(src), "guard%d" % i)
+            for line in out.splitlines():
+                m = re.match(r'@@([A-Za-z0-9_]+)@@(true|false) (\d+) (\d+)', line)
+                if m:
+                    got[m.group(1)] = (m.group(2) == "true", int(m.group(3)),
+                                       int(m.group(4)))
+            if got:
+                break
+        for c in part:
+            if c.id not in got:
+                c.extra["fuel_mono"] = False
+                c.extra["fuel_mono_reason"] = "guard could not be evaluated"
+                continue
+            ok, n_oof, n_second = got[c.id]
+            c.extra["fuel_mono"] = ok
+            c.extra["outOfFuel_cases"] = n_oof
+            c.extra["outOfFuel_second_run"] = n_second
+            if not ok:
+                c.extra["fuel_mono_reason"] = (
+                    "guard false: %d of %d cases reach outOfFuel at FUEL, so the law's "
+                    "truth at FUEL does not transport" % (n_oof, len(c.dom)))
     return cands
 
 
@@ -734,6 +834,21 @@ PROOF_PROJ_DOC = """theorem %(id)s :
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl r args
 """
 
+FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.
+
+Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
+The `%(guard)s` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
+domain rather than assumed: without it a law could hold at `FUEL` for the reason that
+nothing ran. -/
+theorem %(id)s : ∀ fuel, FUEL ≤ fuel → ((dom_%(id)s).all (%(lawfuel)s)) = true := by
+  intro fuel hf
+  exact all_transfer _ (%(guard)s C FUEL %(fdef)s) (%(law)s) (%(lawfuel)s)
+    (fun c hgc hlc =>
+      %(mono)s (hctx := C_tfFree) (hfn := (by rfl : tfFreeS %(fdef)s.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+"""
+
 DOC = '''
 /-!
 # Synthesized specifications — `%(module)s`
@@ -764,10 +879,18 @@ What each family claims, in the order of `STRATEGY.md` §4:
 
 Domains are finite and explicit, and the theorems about them are proved by computation.
 That is deliberate: a kernel-checked test is a test whose axiom basis is auditable and
-whose subject a mutation gate can attack. Where the honest generalization (over *all*
-fuel budgets, or all inputs) could not be proved, it is recorded in `obligations` below
-as a `Prop`-valued `def` — a statement, not an admission. There is no `sorry` in this
-file.
+whose subject a mutation gate can attack.
+
+**Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
+stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
+computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
+transport needs two side conditions, both discharged rather than assumed — the context is
+`tryFinally`-free (`C_tfFree`, by computation over the function table) and the run did not
+end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
+either fails, the theorem stays at `FUEL` and its generalization is recorded in
+`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+
+There is no `sorry` in this file.
 
 Counts for this run are in `Autoform/SpecsGen/report.json`.
 -/
@@ -783,16 +906,25 @@ def emit(cands, module, obligations_extra):
     for c in survivors:
         if c.kind == "law":
             out.append(domain_defs(c))
-            out.append("theorem %s : ((dom_%s).all (%s)) = true := by rfl\n"
-                       % (c.id, c.id, c.law))
+            lawfuel = c.law.replace("C FUEL", "C fuel")
+            if c.extra.get("fuel_mono"):
+                # the general statement, proved: FuelMono transports it off FUEL
+                out.append(FUEL_THM % {"id": c.id, "law": c.law, "lawfuel": lawfuel,
+                                       "guard": GUARD[c.family], "fdef": c.fdef,
+                                       "mono": MONO[c.family]})
+            else:
+                out.append("theorem %s : ((dom_%s).all (%s)) = true := by rfl\n"
+                           % (c.id, c.id, c.law))
+                # the honest generalization: stated, and not proved
+                out.append("/-- Open: the same statement at **every** fuel budget ≥ "
+                           "`FUEL`. Proved only at `FUEL`; %s -/\ndef ob_%s : Prop :=\n"
+                           "  ∀ fuel, FUEL ≤ fuel → ((dom_%s).all (%s)) = true\n"
+                           % (c.extra.get("fuel_mono_reason", "not transportable"),
+                              c.id, c.id, lawfuel))
+                obs.append((("ob_" + c.id), c.source, c.subject,
+                            "proved at FUEL only; fuel-independence unproved (%s)"
+                            % c.extra.get("fuel_mono_reason", "unknown")))
             thms.append((c.id, c.fdef))
-            # the honest generalization: fuel-independence, stated and not proved
-            out.append("/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. "
-                       "Proved only at `FUEL`. -/\ndef ob_%s : Prop :=\n"
-                       "  ∀ fuel, FUEL ≤ fuel → ((dom_%s).all (%s)) = true\n"
-                       % (c.id, c.id, c.law.replace("C FUEL", "C fuel")))
-            obs.append((("ob_" + c.id), c.source, c.subject,
-                        "proved at FUEL only; fuel-independence unproved"))
         elif c.kind == "universal":
             d = {"id": c.id, "name": json.dumps(c.subject), "fdef": c.fdef,
                  "lit": c.extra.get("lit", ""),
@@ -820,6 +952,11 @@ def emit(cands, module, obligations_extra):
                "`scripts/mutate.py`, run against this file. -/\n")
     for tid, fdef in thms:
         out.append("#audit_depends %s on %s" % (tid, fdef))
+    out.append("\n/-! ## Axiom basis\n\n`#audit_axioms` fails the build on `sorryAx`, "
+               "`ofReduceBool` or `ofReduceNat`, so \"no admitted step, no "
+               "`native_decide`\" is checked here rather than asserted in prose. -/\n")
+    for tid, _fdef in thms:
+        out.append("#audit_axioms %s" % tid)
     out.append("\nend Autoform.SpecsGen.%s\n" % module)
     return "\n".join(out), thms, obs
 
@@ -877,6 +1014,9 @@ def main():
     ap.add_argument("--tests", default=None)
     ap.add_argument("--cases", type=int, default=10,
                     help="traced calls to keep per function")
+    ap.add_argument("--allow-dirty-subject", action="store_true",
+                    help="run even if Autoform/Generated/<M>.lean looks mutated. Only "
+                         "for debugging: the resulting theorems are about a mutant")
     ap.add_argument("--refute-cache", default=None,
                     help="cache the refutation verdicts here, keyed by candidate id. "
                          "Refuting 500 candidates means elaborating half a megabyte of "
@@ -893,6 +1033,27 @@ def main():
     rng = random.Random(20260819)
 
     print("== 0. the analysable core")
+    gen_path = os.path.join(REPO, "Autoform", "Generated", "%s.lean" % args.module)
+    if not args.allow_dirty_subject:
+        # §19's trap in a new costume: another agent may be running `scripts/mutate.py`
+        # over the very module these theorems are about. A proof against a mutant is
+        # worse than no proof, and the mutation gate's own backup file is the reliable
+        # in-flight marker.
+        blockers = []
+        if os.path.exists(gen_path + ".mutate-backup"):
+            blockers.append("a mutation run is in flight (%s.mutate-backup exists)"
+                            % os.path.basename(gen_path))
+        try:
+            if "__mutated" in open(gen_path, encoding="utf-8").read():
+                blockers.append("the module contains mutation markers (`__mutated`)")
+        except OSError as e:
+            blockers.append("could not read the subject: %r" % e)
+        if blockers:
+            print("REFUSING TO RUN: the subject is not pristine — %s. Every theorem "
+                  "below would be about a mutant. Re-run when the gate finishes, or "
+                  "pass --allow-dirty-subject if you know what you are doing."
+                  % "; ".join(blockers))
+            return 3
     b = subprocess.run(["lake", "build", "Autoform.Generated.%s" % args.module,
                         "Autoform.SpecsGen.Basis"],
                        capture_output=True, text=True, env=ENV, cwd=REPO)
@@ -979,6 +1140,20 @@ def main():
     survivors = [c for c in cands if c.status == "candidate"]
     print("   %d flagged vacuous, %d emitted" % (len(vac), len(survivors)))
 
+    print("== 5b. fuel-independence guards (FuelMono side condition, evaluated)")
+    guard_pass(cands, args.module)
+    live = [c for c in cands if c.kind == "law" and c.status == "candidate"]
+    liftable = [c for c in live if c.extra.get("fuel_mono")]
+    tf = [c for c in live if c.extra.get("try_finally")]
+    oof = [c for c in live if c.extra.get("outOfFuel_cases")]
+    print("   %d of %d laws transportable to all fuel ≥ FUEL; %d blocked by "
+          "tryFinally; %d have a case that reaches outOfFuel at FUEL"
+          % (len(liftable), len(live), len(tf), len(oof)))
+    for c in oof:
+        print("      outOfFuel at FUEL: %s (%d/%d cases, %d on the second run)"
+              % (c.id, c.extra["outOfFuel_cases"], len(c.dom),
+                 c.extra.get("outOfFuel_second_run", 0)))
+
     print("== 6. emission + proof")
     path = os.path.join(OUTDIR, "%s.lean" % args.module)
     ok, demoted, log = compile_repair(cands, args.module, path)
@@ -1006,8 +1181,23 @@ def main():
         "vacuity_rate_pct": round(vac_rate, 1),
         "emitted": len(survivors),
         "proved": len(proved),
-        "open_obligations": len(unproved) + len(proved),
+        "open_obligations": len(unproved) + len([c for c in cands
+                                                 if c.proved and c.kind == "law"
+                                                 and not c.extra.get("fuel_mono")]),
         "build_clean": ok,
+        "fuel_independent": len([c for c in cands
+                                 if c.proved and c.extra.get("fuel_mono")]),
+        "fuel_obligations_remaining": len([c for c in cands
+                                           if c.proved
+                                           and not c.extra.get("fuel_mono")
+                                           and c.kind == "law"]),
+        "fuel_blocked_reasons": {c.id: c.extra.get("fuel_mono_reason")
+                                 for c in cands
+                                 if c.kind == "law" and c.status in ("candidate",
+                                                                     "proved")
+                                 and not c.extra.get("fuel_mono")},
+        "outOfFuel_cases": {c.id: c.extra["outOfFuel_cases"] for c in cands
+                            if c.extra.get("outOfFuel_cases")},
         "by_family": {},
         "specs": [c.as_json() for c in cands],
         "not_checked_gates": [
@@ -1031,6 +1221,8 @@ def main():
           "41.0%%)" % (len(vac), vac_rate, len(considered)))
     print("   emitted + proved     : %d" % len(proved))
     print("   open obligations     : %d" % report["open_obligations"])
+    print("   fuel-independent     : %d proved for ALL fuel ≥ FUEL (%d still FUEL-only)"
+          % (report["fuel_independent"], report["fuel_obligations_remaining"]))
     print("   report               : %s" % args.json_path)
     return 0 if ok else 1
 

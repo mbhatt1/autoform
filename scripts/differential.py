@@ -32,6 +32,15 @@ import contextlib, inspect, functools
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
+# Every scratch artefact lives under one private directory. A fixed `/tmp` path is a
+# phantom-result generator: several agents run this harness at once, and a shared
+# `/tmp/autoform_diff.lean` means one run can report conformance computed from another
+# run's program. Nothing here may be a constant path.
+import atexit as _atexit
+import tempfile as _tempfile
+WORK = _tempfile.mkdtemp(prefix="autoform_diff_%d_" % os.getpid())
+_atexit.register(lambda: __import__("shutil").rmtree(WORK, ignore_errors=True))
+
 # Test-suite-derived cases must be reproducible too. Set-iteration and dict-key hashing
 # feed which calls the suite makes and in which order, so an unseeded interpreter gives
 # a different sample of cases (and a different set of divergences) on every run.
@@ -773,7 +782,8 @@ def c_runtime(src_root):
     import ctypes
     srcs = glob.glob(os.path.join(src_root, "**", "*.c"), recursive=True)
     if not srcs: return None
-    lib = "/tmp/autoform_diff_c.dylib" if sys.platform == "darwin" else "/tmp/autoform_diff_c.so"
+    lib = os.path.join(WORK, "libautoform_diff_c" +
+                       (".dylib" if sys.platform == "darwin" else ".so"))
     r = subprocess.run(["cc", "-shared", "-fPIC", "-O0", "-o", lib] + srcs,
                        capture_output=True, text=True)
     if r.returncode != 0:
@@ -789,6 +799,37 @@ def c_runtime(src_root):
     return get
 
 
+def call_in_child(fn, args):
+    """Run one native call in a forked child; None if it crashed or hung."""
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:                                    # child
+        try:
+            os.close(r)
+            v = fn(*args)
+            os.write(w, ("%d" % v).encode())
+            os.close(w)
+        except BaseException:                       # noqa: BLE001
+            pass
+        os._exit(0)
+    os.close(w)
+    out = b""
+    try:
+        while True:
+            chunk = os.read(r, 64)
+            if not chunk: break
+            out += chunk
+    finally:
+        os.close(r)
+        _, status = os.waitpid(pid, 0)
+    if not os.WIFEXITED(status) or not out:
+        return None
+    try:
+        return int(out)
+    except ValueError:
+        return None
+
+
 def load_module(path, root):
     name = re.sub(r'[^A-Za-z0-9_]', '_', os.path.relpath(path, root))
     spec = importlib.util.spec_from_file_location(name, path)
@@ -801,6 +842,398 @@ def load_module(path, root):
         return None
 
 
+# ------------------------------------------------------------------ language dispatch
+#
+# The corpus decides which real runtime the oracle must talk to. Getting this wrong is
+# not a missing feature but a *false* result: `cartographer/render_lean.py`'s
+# `infer_dialect` used to default an unrecognised language to Python, and the oracle
+# then cheerfully reported agreement. So the mapping is explicit, and an extension that
+# is not in it is REFUSED rather than defaulted.
+
+LANG_BY_EXT = {".py": "python", ".pyi": "python",
+               ".c": "c", ".h": "c",
+               ".java": "java", ".go": "go",
+               ".js": "js", ".mjs": "js", ".cjs": "js",
+               ".ts": "ts", ".tsx": "ts", ".mts": "ts",
+               ".kt": "kotlin", ".kts": "kotlin"}
+
+# The Core dialect each language *should* have. There are only two constructors
+# (`.python`, `.cLike`), so some languages necessarily run under an approximation:
+# JS/TS `&&`/`||` yield an operand (Python-like) while `/` is float division and all
+# numbers are doubles (neither dialect). Where the run is approximate it says so, and a
+# divergence traceable to that is reported as a dialect gap, not a transpiler bug.
+DIALECT_FOR = {"python": ("python", True), "c": ("cLike", True),
+               "java": ("cLike", False),      # java64 NumConfig exists but is unused
+               "go": ("cLike", False),        # go64 likewise
+               "js": ("python", False),       # operand-valued &&/||, but float `/`
+               "ts": ("python", False),
+               "kotlin": ("cLike", False)}
+
+TOOLCHAIN = {"python": [], "c": ["cc"], "java": ["javac", "java"], "go": ["go"],
+             "js": ["node"], "ts": ["node"], "kotlin": ["kotlinc"]}
+
+
+def detect_language(funcs):
+    """(language, extension histogram). Returns None rather than guessing."""
+    exts = {}
+    for f in funcs:
+        ext = os.path.splitext(f.get("file", ""))[1].lower()
+        if ext:
+            exts[ext] = exts.get(ext, 0) + 1
+    if not exts:
+        return None, exts
+    langs = {}
+    for e, n in exts.items():
+        k = LANG_BY_EXT.get(e)
+        langs[k] = langs.get(k, 0) + n
+    if None in langs and langs[None] > sum(v for k, v in langs.items() if k):
+        return None, exts
+    langs.pop(None, None)
+    if not langs:
+        return None, exts
+    return max(langs, key=lambda k: langs[k]), exts
+
+
+def have(cmd):
+    for d in os.environ.get("PATH", "").split(":"):
+        p = os.path.join(d, cmd)
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def missing_tools(lang):
+    return [c for c in TOOLCHAIN.get(lang, []) if not have(c)]
+
+
+# ------------------------------------------------------------------------ JVM backend
+
+JAVA_PRIM = ("int", "long", "short", "byte", "boolean", "java.lang.String")
+STRING_POOL = ["", "0", "11", "1.8.0_281", "17.0.1", "java.lang.String",
+               "android.os.Bundle", "com.example.Foo"]
+JAVA_SIG = re.compile(r'^(?P<cls>[\w.$]+)\.(?P<meth>[\w$<>]+):(?P<ret>[\w.$\[\]]+)'
+                      r'\((?P<args>.*)\)$')
+
+JAVA_DRIVER = r"""import java.lang.reflect.*;
+import java.util.*;
+
+public class AutoformDriver {
+  static String enc(Object o) {
+    if (o == null) return "null|";
+    if (o instanceof String)
+      return "str|" + Base64.getEncoder().encodeToString(((String) o).getBytes());
+    if (o instanceof Boolean) return "bool|" + o;
+    if (o instanceof Character) return "int|" + (int) (Character) o;
+    return "int|" + o;
+  }
+  public static void main(String[] a) throws Exception {
+    Scanner sc = new Scanner(System.in);
+    while (sc.hasNextLine()) {
+      String line = sc.nextLine();
+      if (line.isEmpty()) continue;
+      String[] p = line.split("\\|", -1);
+      String idx = p[0], cn = p[1], mn = p[2];
+      int n = Integer.parseInt(p[3]);
+      Class<?>[] ts = new Class<?>[n];
+      Object[] vs = new Object[n];
+      for (int i = 0; i < n; i++) {
+        String t = p[4 + 2 * i], v = p[5 + 2 * i];
+        if (t.equals("int"))          { ts[i] = int.class;     vs[i] = Integer.parseInt(v); }
+        else if (t.equals("long"))    { ts[i] = long.class;    vs[i] = Long.parseLong(v); }
+        else if (t.equals("short"))   { ts[i] = short.class;   vs[i] = Short.parseShort(v); }
+        else if (t.equals("byte"))    { ts[i] = byte.class;    vs[i] = Byte.parseByte(v); }
+        else if (t.equals("boolean")) { ts[i] = boolean.class; vs[i] = Boolean.parseBoolean(v); }
+        else { ts[i] = String.class; vs[i] = new String(Base64.getDecoder().decode(v)); }
+      }
+      try {
+        Method m = Class.forName(cn).getDeclaredMethod(mn, ts);
+        m.setAccessible(true);
+        Object r = m.invoke(null, vs);
+        System.out.println(idx + "|OK|" + enc(r));
+      } catch (InvocationTargetException e) {
+        System.out.println(idx + "|EXN|" + e.getCause().getClass().getSimpleName());
+      } catch (Throwable t) {
+        System.out.println(idx + "|ERR|" + t.getClass().getSimpleName());
+      }
+    }
+  }
+}
+"""
+
+
+def java_backend(src_root, holefree, ncases):
+    """Compile each candidate's own file, then call it reflectively.
+
+    The corpus (a gson subset) does not compile as a whole — most of gson is absent —
+    so compilation is per file, and a file that will not build becomes a *reported*
+    skip rather than a silent one. Only `static` methods whose whole signature is
+    primitive-or-String are callable without building a receiver."""
+    import base64
+    work = os.path.join(WORK, "java")
+    classes = os.path.join(work, "classes")
+    os.makedirs(classes, exist_ok=True)
+    info, skipped, cands = {}, {}, []
+    for f in holefree:
+        m = JAVA_SIG.match(f["name"])
+        if not m:
+            continue
+        if "this" in f["params"]:
+            skipped[f["name"]] = "instance method: needs a receiver"
+            continue
+        args = [a for a in m.group("args").split(",") if a]
+        if len(args) != len(f["params"]):
+            skipped[f["name"]] = "signature/parameter count disagree"
+            continue
+        if any(a not in JAVA_PRIM for a in args) or m.group("ret") not in JAVA_PRIM:
+            skipped[f["name"]] = "non-primitive signature"
+            continue
+        src = os.path.join(src_root, f.get("file", ""))
+        if not os.path.exists(src):
+            skipped[f["name"]] = "source file not found under the corpus root"
+            continue
+        cands.append((f, m, args, src))
+    info["primitive_static_candidates"] = len(cands)
+    if not cands:
+        return [], info, skipped
+    compiled = set()
+    for src in sorted({c[3] for c in cands}):
+        r = subprocess.run(["javac", "-nowarn", "-d", classes, src],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            compiled.add(src)
+        else:
+            last = (r.stderr.strip().splitlines() or ["?"])[-1]
+            for f, _, _, s2 in cands:
+                if s2 == src:
+                    skipped[f["name"]] = "javac failed: " + last[:70]
+    info["files_compiled"] = len(compiled)
+    cands = [c for c in cands if c[3] in compiled]
+    if not cands:
+        return [], info, skipped
+    open(os.path.join(work, "AutoformDriver.java"), "w").write(JAVA_DRIVER)
+    r = subprocess.run(["javac", "-nowarn", "-d", classes,
+                        os.path.join(work, "AutoformDriver.java")],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        info["driver"] = "failed to compile: " + r.stderr[:200]
+        return [], info, skipped
+    calls, plan = [], []
+    for f, m, argtypes, _ in cands:
+        for _ in range(ncases):
+            vals, enc = [], []
+            for t in argtypes:
+                if t == "java.lang.String":
+                    v = random.choice(STRING_POOL)
+                    vals.append(("str", v))
+                    enc += [t, base64.b64encode(v.encode()).decode()]
+                elif t == "boolean":
+                    v = random.choice([True, False])
+                    vals.append(("bool", v))
+                    enc += [t, "true" if v else "false"]
+                else:
+                    v = random.randint(-20, 20)
+                    vals.append(("int", v))
+                    enc += [t, str(v)]
+            calls.append("|".join([str(len(calls)), m.group("cls"), m.group("meth"),
+                                   str(len(argtypes))] + enc))
+            plan.append((f["name"], vals))
+    out = subprocess.run(["java", "-cp", classes, "AutoformDriver"],
+                         input="\n".join(calls) + "\n",
+                         capture_output=True, text=True, timeout=300)
+    got = {}
+    for line in out.stdout.splitlines():
+        p = line.split("|")
+        if len(p) >= 2 and p[0].isdigit():
+            got[int(p[0])] = p[1:]
+    cases, unusable = [], {}
+    for i, (name, vals) in enumerate(plan):
+        r = got.get(i)
+        if r is None:
+            unusable[name] = "no answer from the JVM driver"
+            continue
+        if r[0] == "OK":
+            kind = r[1]
+            payload = r[2] if len(r) > 2 else ""
+            if kind == "str":
+                outcome = ("val", ("str", base64.b64decode(payload).decode()))
+            elif kind == "bool":
+                outcome = ("val", ("bool", payload == "true"))
+            elif kind == "int":
+                outcome = ("val", ("int", int(payload)))
+            else:
+                unusable[name] = "returned null: no faithful Core counterpart"
+                continue
+        elif r[0] == "EXN":
+            outcome = ("exn", r[1])
+        else:
+            unusable[name] = "JVM driver error: " + (r[1] if len(r) > 1 else "?")
+            continue
+        cases.append({"name": name, "heap": [], "self": None,
+                      "args": list(vals), "outcome": outcome, "origin": "random"})
+    skipped.update(unusable)
+    info["cases_built"] = len(cases)
+    return cases, info, skipped
+
+
+# ------------------------------------------------------------------------- Go backend
+
+GO_FUNC = re.compile(r'^func\s+(?P<name>[A-Za-z_]\w*)\s*\((?P<args>[^)]*)\)\s*'
+                     r'(?P<ret>[\w]*)\s*\{')
+
+GO_MAIN = """package %s
+
+import (
+\t"encoding/json"
+\t"fmt"
+\t"os"
+)
+
+func AutoformDriverMain() {
+\tvar calls [][]interface{}
+\tjson.NewDecoder(os.Stdin).Decode(&calls)
+\tout := [][]interface{}{}
+%s
+\tb, _ := json.Marshal(out)
+\tfmt.Println(string(b))
+}
+"""
+
+
+def go_backend(src_root, holefree, ncases):
+    """Package-level int→int functions, executed from a generated file placed in a copy
+    of the package so that unexported functions are reachable."""
+    by_short = {}
+    for f in holefree:
+        by_short.setdefault(f["name"].split(".")[-1], f)
+    cands = []
+    for path in sorted(glob.glob(os.path.join(src_root, "*.go"))):
+        if path.endswith("_test.go"):
+            continue
+        for line in open(path, encoding="utf-8", errors="replace"):
+            m = GO_FUNC.match(line)
+            if not m:
+                continue
+            args = [a.strip() for a in m.group("args").split(",") if a.strip()]
+            if not args or not all(a.split()[-1] == "int" for a in args):
+                continue
+            if m.group("ret") != "int":
+                continue
+            f = by_short.get(m.group("name"))
+            if f is not None:
+                cands.append((f, m.group("name"), len(args)))
+    info = {"int_to_int_package_functions": len(cands)}
+    if not cands:
+        info["note"] = ("no package-level int→int function in this corpus: every "
+                        "exported entry point takes a struct, an interface or a "
+                        "reflect.Value, none of which Core models")
+    return [], info, {}
+
+
+# ----------------------------------------------------------------------- Node backend
+
+NODE_DRIVER = """const path = process.argv[2];
+const calls = JSON.parse(process.argv[3]);
+const out = [];
+const mod = await import(path);
+for (const c of calls) {
+  const [i, name, args] = c;
+  let fn = mod[name];
+  if (typeof fn !== 'function' && typeof mod.default === 'function'
+      && (name === 'default' || mod.default.name === name)) fn = mod.default;
+  if (typeof fn !== 'function') { out.push([i, 'MISSING']); continue; }
+  try {
+    const r = fn(...args);
+    if (r && typeof r.then === 'function') { out.push([i, 'ASYNC']); continue; }
+    out.push([i, 'OK', r === undefined ? null : r, typeof r]);
+  } catch (e) { out.push([i, 'EXN', e && e.constructor ? e.constructor.name : 'Error']); }
+}
+console.log('@@RESULT@@' + JSON.stringify(out));
+"""
+
+
+def node_backend(src_root, holefree, ncases, lang):
+    """JS/TS through node. TypeScript runs via `--experimental-strip-types`, which
+    handles type annotations only; anything needing real transpilation is refused
+    rather than approximated."""
+    work = os.path.join(WORK, "node")
+    os.makedirs(work, exist_ok=True)
+    cands, skipped = [], {}
+    for f in holefree:
+        tail = f["name"].split(":")[-1]
+        params = [p for p in f["params"] if p != "this"]
+        if "<" in tail or "#" in tail:
+            skipped[f["name"]] = "closure or private member: not reachable from outside"
+            continue
+        if "this" in f["params"]:
+            skipped[f["name"]] = "method: needs a receiver"
+            continue
+        if not params:
+            skipped[f["name"]] = "no parameters: nothing to vary"
+            continue
+        cands.append((f, tail, params))
+    info = {"exported_candidates": len(cands)}
+    if not cands:
+        info["note"] = ("no top-level exported function with parameters: this corpus is "
+                        "classes, closures and async entry points")
+        return [], info, skipped
+    calls, plan = [], []
+    for f, tail, params in cands:
+        rel = f.get("file", "")
+        for _ in range(ncases):
+            args = [random.randint(-20, 20) for _ in params]
+            calls.append([len(calls), tail, args])
+            plan.append((f["name"], rel, args))
+    by_file = {}
+    for i, (_, rel, _) in enumerate(plan):
+        by_file.setdefault(rel, []).append(i)
+    drv = os.path.join(work, "driver.mjs")
+    open(drv, "w").write(NODE_DRIVER)
+    cases = []
+    for rel, idxs in by_file.items():
+        target = os.path.abspath(os.path.join(src_root, rel))
+        if not os.path.exists(target):
+            for i in idxs:
+                skipped[plan[i][0]] = "source file not found under the corpus root"
+            continue
+        cmd = [have("node")]
+        if lang == "ts":
+            cmd.append("--experimental-strip-types")
+        cmd += [drv, target, json.dumps([calls[i] for i in idxs])]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        line = [l for l in r.stdout.splitlines() if l.startswith("@@RESULT@@")]
+        if not line:
+            for i in idxs:
+                skipped[plan[i][0]] = ("node could not load the module: "
+                                       + r.stderr.strip().splitlines()[-1][:80]
+                                       if r.stderr.strip() else "node produced no result")
+            continue
+        for rec in json.loads(line[0][len("@@RESULT@@"):]):
+            i, kind = rec[0], rec[1]
+            name, _, args = plan[i]
+            if kind == "OK":
+                v, t = rec[2], rec[3]
+                if t == "number" and isinstance(v, int):
+                    outcome = ("val", ("int", v))
+                elif t == "boolean":
+                    outcome = ("val", ("bool", v))
+                elif t == "string":
+                    outcome = ("val", ("str", v))
+                else:
+                    skipped[name] = "returned %s: no faithful Core counterpart" % t
+                    continue
+            elif kind == "EXN":
+                outcome = ("exn", rec[2])
+            else:
+                skipped[name] = {"MISSING": "not exported at module scope",
+                                 "ASYNC": "async: Core has no promises"}.get(kind, kind)
+                continue
+            cases.append({"name": name, "heap": [], "self": None,
+                          "args": [("int", a) for a in args],
+                          "outcome": outcome, "origin": "random"})
+    info["cases_built"] = len(cases)
+    return cases, info, skipped
+
+
 # ---------------------------------------------------------------------------- main
 
 def main():
@@ -811,18 +1244,80 @@ def main():
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
     funcs = json.load(open(ast_path))
-    is_c = any(f.get("file", "").endswith((".c", ".h")) for f in funcs)
-    runtime = "cc" if is_c else "cpython"
     module_tag = lean_mod
 
+    # ---- which real runtime does this corpus need?
+    lang, exts = detect_language(funcs)
+    RUNTIME = {"python": "cpython", "c": "cc", "java": "jvm", "go": "go",
+               "js": "node", "ts": "node", "kotlin": "kotlin"}
+    if lang is None:
+        print("REFUSING to run: cannot identify the corpus language from its file "
+              "extensions %s. Defaulting to CPython would report agreement between the "
+              "Lean semantics and a runtime that never ran this code." % sorted(exts))
+        json.dump({"module": module_tag, "ast": os.path.abspath(ast_path),
+                   "status": "REFUSED: unknown source language",
+                   "extensions": exts, "agree": 0, "total": 0, "divergences": 0,
+                   "inconclusive": 0, "rate": "n/a",
+                   "coverage": {"population": len(funcs), "compared": 0,
+                                "covered_metric": "compared",
+                                "compared_fraction": 0.0}},
+                  open("conformance.json", "w"), indent=1)
+        return 2
+    runtime = RUNTIME[lang]
+    is_c = (lang == "c")
+    want_dialect, exact = DIALECT_FOR[lang]
+    missing = missing_tools(lang)
+    print("language: %s (%s) -> runtime %s%s"
+          % (lang, ", ".join("%s x%d" % (e, n) for e, n in sorted(exts.items())),
+             runtime, "" if not missing else "  [MISSING: %s]" % ", ".join(missing)))
+    if not exact:
+        print("  dialect note: Core has only .python and .cLike, so %s runs under an "
+              "approximation (wants a %s-specific dialect; java64/go64 NumConfigs "
+              "exist but are unwired)." % (lang, lang))
+
     holefree = [f for f in funcs if not has_hole(f["body"])]
-    stats = {"skip_varargs": 0, "skip_unencodable_args": 0, "skip_unencodable_ret": 0,
+    # NOTE ON MEASUREMENT BASIS. `skip_varargs` used to exist here and was removed
+    # deliberately: a `*args`/`**kwargs` callee binds a tuple and a dict, which Core
+    # models exactly, so those calls are now *attempted* (bound positionally against
+    # the AST's own parameter list) instead of skipped. That attempts far more and
+    # lands more cases INCONCLUSIVE, so the conclusive denominator is not the same
+    # denominator as before. Rates across the two bases are NOT comparable, and the
+    # output says which basis produced it rather than leaving a reader to assume.
+    stats = {"skip_unencodable_args": 0, "skip_unencodable_ret": 0,
              "skip_no_instance": 0, "test_runs": []}
+    BASIS = "varargs-attempted-v2"
+    BASIS_NOTE = ("Basis %s: `*args`/`**kwargs` callees are bound (tuple/dict) and "
+                  "attempted rather than skipped; container subclasses and object dict "
+                  "keys are refused; only adjudicated cases count in the denominator. "
+                  "Rates from the earlier `varargs-skipped-v1` basis (e.g. 104/104) are "
+                  "a different measurement and must not be compared." % "v2")
 
     # cases: dict(name, heap, self, args, outcome, origin)
     cases = []
 
-    if is_c:
+    backend_info, backend_skipped, backend_status = {}, {}, "available"
+    if missing:
+        backend_status = "UNSUPPORTED: toolchain absent (%s)" % ", ".join(missing)
+        print("  backend UNSUPPORTED: %s not on PATH — this language has NO runtime "
+              "check, which is a gap in the evidence, not a pass." % ", ".join(missing))
+    elif lang in ("java", "go", "js", "ts"):
+        if lang == "java":
+            cases, backend_info, backend_skipped = java_backend(src_root, holefree,
+                                                                ncases)
+        elif lang == "go":
+            cases, backend_info, backend_skipped = go_backend(src_root, holefree,
+                                                              ncases)
+        else:
+            cases, backend_info, backend_skipped = node_backend(src_root, holefree,
+                                                                ncases, lang)
+        if not cases:
+            backend_status = ("UNSUPPORTED: no testable surface — "
+                              + str(backend_info.get("note", backend_info)))
+        print("  backend %s: %s; %d cases built"
+              % (runtime, json.dumps(backend_info)[:160], len(cases)))
+    elif lang == "kotlin":
+        backend_status = "UNSUPPORTED: no kotlinc"
+    elif is_c:
         cget = c_runtime(src_root)
         cands = [f for f in holefree
                  if f["params"] and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', f["name"])]
@@ -831,15 +1326,19 @@ def main():
             if fn is None: continue
             for _ in range(ncases):
                 args = [random.randint(-20, 20) for _ in f["params"]]
-                try:
-                    got = fn(*args)
-                except Exception:
+                # The AST carries no C types, so an `int` we pass may be a pointer
+                # parameter. On a real corpus (`sds`) that segfaults and takes the whole
+                # harness with it, so each call runs in a forked child: a crash costs
+                # one case, not the run.
+                got = call_in_child(fn, args)
+                if got is None:
+                    stats["skip_c_crash"] = stats.get("skip_c_crash", 0) + 1
                     continue
                 cases.append({"name": f["name"], "heap": [], "self": None,
                               "args": [("int", a) for a in args],
                               "outcome": ("val", ("int", got)), "origin": "random",
                               "objs": {}})
-    else:
+    elif lang == "python":
         wanted, methods, modlevel = set(), [], []
         for f in holefree:
             c = classify(f)
@@ -912,11 +1411,27 @@ def main():
     result = {"module": module_tag, "source_root": os.path.abspath(src_root),
               "ast": os.path.abspath(ast_path), "runtime": runtime,
               "runtime_version": sys.version.split()[0],
+              "measurement_basis": BASIS, "measurement_basis_note": BASIS_NOTE,
+              "language": lang, "extensions": exts,
+              "backend": runtime, "backend_status": backend_status,
+              "backend_info": backend_info,
+              "backend_skipped": dict(list(backend_skipped.items())[:40]),
+              "backend_skipped_total": len(backend_skipped),
+              "dialect_expected": want_dialect,
+              "dialect_is_exact": exact,
+              "dialect_note": (None if exact else
+                               "Core has only .python and .cLike; %s is run under an "
+                               "approximation. A divergence may be a dialect gap rather "
+                               "than a transpiler fault." % lang),
               "functions_total": len(funcs), "functions_hole_free": len(holefree),
               "functions_covered": len(set(c["name"] for c in cases)),
               "cases": len(cases), "agree": 0, "total": 0, "divergences": 0,
               "inconclusive": 0, "rate": "n/a", "by_origin": {},
               "skipped": {k: v for k, v in stats.items() if k.startswith("skip")},
+              "skipped_note": "call-event counts, not function counts: a function whose "
+                              "case quota is already full still logs skips for every "
+                              "further call. Bound coverage with `coverage`, never with "
+                              "these.",
               "test_runs": stats["test_runs"], "divergence_detail": [],
               "unencodable_reasons": stats.get("unencodable_reasons", {}),
               "no_instance_detail": stats.get("no_instance_detail", {}),
@@ -939,7 +1454,10 @@ def main():
                   "by_status": {}, "status_counts": {}}}
 
     if not cases:
-        print("no comparable cases in this corpus")
+        print("module %s (%s, %s): NO COMPARABLE CASES — %s"
+              % (module_tag, lang, runtime, backend_status))
+        print("functions: %d total, %d hole-free, 0 exercised, 0 COMPARED (0%%). This "
+              "language has no positive runtime evidence." % (len(funcs), len(holefree)))
         json.dump(result, open("conformance.json", "w"), indent=1)
         return 0
 
@@ -960,6 +1478,15 @@ def main():
         print("WARNING: `lake build Autoform.Generated.%s` failed; results below are "
               "against a possibly stale build:\n%s" % (lean_mod, b.stderr[:300]))
     gen = os.path.join(repo, "Autoform", "Generated", lean_mod + ".lean")
+    # `scripts/mutate.py` edits the generated module in place and keeps the pristine
+    # copy beside it. If that backup exists, the module under test is currently a
+    # MUTANT: its divergences are injected faults, not evidence about the semantics.
+    mutating = os.path.exists(gen + ".mutate-backup")
+    result["mutation_in_progress"] = mutating
+    if mutating:
+        print("WARNING: %s.mutate-backup exists — a mutation run owns this module right "
+              "now, so it is a MUTANT. Any divergence below is an injected fault; this "
+              "run is not conformance evidence." % os.path.basename(gen))
     has_inits = (os.path.exists(gen)
                  and "def moduleInits" in open(gen, encoding="utf-8").read())
     inits = "moduleInits" if has_inits else "([] : List Func)"
@@ -971,6 +1498,34 @@ def main():
     # literals below are emitted relative to `base`. `drun` re-checks that arithmetic
     # against the class name Python recorded — an off-by-one that aliased the globals
     # frame would otherwise be silently wrong rather than loudly wrong.
+    # Isolate the run from the rest of the project: copy the compiled `Autoform`
+    # artifacts to a private directory and resolve imports from there first. Other
+    # agents build — and `scripts/mutate.py` deliberately *mutates* — the same generated
+    # module while this runs, and evaluating against a moving target produced phantom
+    # divergences that reproduced nowhere (`Cache.__contains__` inverted,
+    # `_DefaultSize.pop` returning 0: both were live mutants).
+    snap_dir = os.path.join(WORK, "lean-snapshot")
+    lean_env = dict(env)
+    try:
+        import shutil
+        shutil.rmtree(snap_dir, ignore_errors=True)
+        os.makedirs(snap_dir, exist_ok=True)
+        blib = os.path.join(repo, ".lake/build/lib/lean")
+        shutil.copytree(os.path.join(blib, "Autoform/Lang"),
+                        os.path.join(snap_dir, "Autoform/Lang"))
+        os.makedirs(os.path.join(snap_dir, "Autoform/Generated"), exist_ok=True)
+        for ext in (".olean", ".ilean"):
+            src_f = os.path.join(blib, "Autoform/Generated", lean_mod + ext)
+            if os.path.exists(src_f):
+                shutil.copy(src_f, os.path.join(snap_dir, "Autoform/Generated"))
+        base = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
+                              capture_output=True, text=True, env=env, cwd=repo)
+        lean_env["LEAN_PATH"] = snap_dir + ":" + base.stdout.strip()
+        isolated = True
+    except (OSError, shutil.Error) as e:                    # noqa: BLE001
+        print("could not isolate the build (%s); evaluating against the live tree" % e)
+        isolated = False
+
     header = ["import Autoform.Generated.%s" % lean_mod,
               "open Autoform.Core Autoform.Generated", "",
               "private def gp : Heap × Ref := initGlobals program %d %s" % (FUEL, inits),
@@ -1017,7 +1572,7 @@ def main():
     meta = {"base": 0, "gref": 0}
     # per-process scratch file: two harness runs (or two agents) sharing /tmp would
     # otherwise clobber each other's generated file mid-bisection
-    scratch = "/tmp/autoform_diff_%d.lean" % os.getpid()
+    scratch = os.path.join(WORK, "harness.lean")
 
     def lean_eval(idxs, depth=0, retried=False):
         """idxs -> {idx: repr line}. Missing keys are cases Lean could not answer."""
@@ -1025,8 +1580,12 @@ def main():
         src = header + ["private def cases : List DCase := ["] \
             + [",\n".join(case_lit(i, cases[i]) for i in idxs)] + footer
         open(scratch, "w").write("\n".join(src) + "\n")
-        out = subprocess.run(["lake", "env", "lean", scratch],
-                             capture_output=True, text=True, env=env, cwd=repo)
+        if isolated:
+            out = subprocess.run([os.path.expanduser("~/.elan/bin/lean"), scratch],
+                                 capture_output=True, text=True, env=lean_env, cwd=repo)
+        else:
+            out = subprocess.run(["lake", "env", "lean", scratch],
+                                 capture_output=True, text=True, env=env, cwd=repo)
         got = {}
         saw_meta = False
         for l in out.stdout.splitlines():
@@ -1044,6 +1603,18 @@ def main():
             # rebuild and try once more before giving up on the whole chunk.
             subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod],
                            capture_output=True, text=True, env=env, cwd=repo)
+            if isolated:
+                import shutil
+                blib = os.path.join(repo, ".lake/build/lib/lean")
+                shutil.rmtree(os.path.join(snap_dir, "Autoform"), ignore_errors=True)
+                shutil.copytree(os.path.join(blib, "Autoform/Lang"),
+                                os.path.join(snap_dir, "Autoform/Lang"))
+                os.makedirs(os.path.join(snap_dir, "Autoform/Generated"),
+                            exist_ok=True)
+                for ext in (".olean", ".ilean"):
+                    f2 = os.path.join(blib, "Autoform/Generated", lean_mod + ext)
+                    if os.path.exists(f2):
+                        shutil.copy(f2, os.path.join(snap_dir, "Autoform/Generated"))
             return lean_eval(idxs, depth, retried=True)
         if not saw_meta:
             # Bisecting an environment failure costs one lake invocation per case and
@@ -1057,7 +1628,9 @@ def main():
                 "AUTOFORM_DIFF_KEEP"):
             # debugging aid: keep the exact file the interpreter choked on
             import shutil
-            shutil.copy(scratch, "/tmp/autoform_diff_fail_%d.lean" % idxs[0])
+            keep = os.environ["AUTOFORM_DIFF_KEEP"]
+            os.makedirs(keep, exist_ok=True)
+            shutil.copy(scratch, os.path.join(keep, "fail_%d.lean" % idxs[0]))
         if len(got) < len(idxs) and len(idxs) > 1:
             mid = len(idxs) // 2
             got.update(lean_eval(idxs[:mid], depth + 1))
@@ -1077,10 +1650,9 @@ def main():
         afterwards. So fingerprint the artifacts and re-run if they moved."""
         import hashlib
         h = hashlib.sha256()
-        for p in (os.path.join(repo, ".lake/build/lib/lean/Autoform/Lang/Core",
-                               "Semantics.olean"),
-                  os.path.join(repo, ".lake/build/lib/lean/Autoform/Generated",
-                               lean_mod + ".olean")):
+        root = snap_dir if isolated else os.path.join(repo, ".lake/build/lib/lean")
+        for p in (os.path.join(root, "Autoform/Lang/Core/Semantics.olean"),
+                  os.path.join(root, "Autoform/Generated", lean_mod + ".olean")):
             try:
                 h.update(open(p, "rb").read())
             except OSError:
@@ -1090,7 +1662,7 @@ def main():
     CHUNK = 20
     order = list(range(len(cases)))
     got, stable = {}, False
-    for attempt in range(2):
+    for attempt in range(3):
         before = olean_fingerprint()
         got = {}
         for i in range(0, len(order), CHUNK):
@@ -1099,10 +1671,10 @@ def main():
             stable = True; break
         print("WARNING: the compiled Lean artifacts changed while the cases were being "
               "evaluated (a concurrent build). Discarding and re-running.")
-    result["build_stable"] = stable
-    if not stable:
-        print("WARNING: results below were produced against a moving build and must "
-              "not be treated as conformance evidence (build_stable=false).")
+    result["build_stable"] = stable and not mutating
+    if not stable or mutating:
+        print("WARNING: results below were produced against a moving or mutated build "
+              "and must not be treated as conformance evidence (build_stable=false).")
     if len(got) < len(cases):
         print("lean answered %d/%d cases; the rest are INCONCLUSIVE"
               % (len(got), len(cases)))
@@ -1200,6 +1772,30 @@ def main():
             if f["name"].endswith("." + n) and status.get(f["name"], "").startswith(
                     "hole-free"):
                 status[f["name"]] = "hole-free, no case built: " + why
+    # why each un-compared function is un-compared, split into the two categories that
+    # matter for a coverage-bounded claim: gaps the project intends to close, and gaps
+    # in the oracle's own value model that no amount of semantics work removes.
+    VALUE_MODEL = ("float", "set", "opaque", "complex", "bytes", "frozenset",
+                   "container-subclass", "object-as-dict-key", "wide",
+                   "self-not-object", "representation")
+    labels = {}
+    for k, v in incon_detail.items():
+        fn, lab = k.split(": ", 1)
+        labels.setdefault(fn, set()).add(lab.split(":")[0])
+    for f in funcs:
+        n = f["name"]
+        if n in compared_fns or has_hole(f["body"]): continue
+        labs = labels.get(n, set())
+        if labs and labs <= {"representation", "exception-payload-unmodelled"}:
+            status[n] = "blocked (value model): " + ", ".join(sorted(labs))
+        elif labs:
+            status[n] = "blocked (semantics/transpiler): runtime holes " + \
+                        ", ".join(sorted(labs))
+        else:
+            why = status.get(n, "")
+            hit = [w for w in VALUE_MODEL if w in why]
+            status[n] = ("blocked (value model): " + hit[0] if hit
+                         else "blocked (unexercised): " + why.split(": ", 1)[-1])
     counts = {}
     for v in status.values():
         k = v.split(":")[0]
@@ -1211,10 +1807,21 @@ def main():
                                              if holefree else 0.0)
     cov["by_status"] = status
     cov["status_counts"] = counts
+    perm = sum(v for k, v in counts.items() if k.startswith("blocked (value model)"))
+    cov["ceiling"] = {
+        "compared_now": len(compared_fns),
+        "blocked_by_value_model": perm,
+        "reachable_in_principle": len(funcs) - perm,
+        "reachable_fraction": (len(funcs) - perm) / len(funcs) if funcs else 0.0,
+        "note": "Blocked-by-value-model functions need a Core value the interpreter "
+                "does not have (floats, sets, opaque C objects) — no transpiler work "
+                "reaches them. Everything else is blocked by holes, either in the AST "
+                "or hit at runtime, and becomes reachable as those close."}
     result["inconclusive_detail"] = incon_detail
     result.update(agree=agree, total=total, divergences=diverge, inconclusive=incon,
                   rate=rate, by_origin=per_origin)
     print("\nmodule %s (%s, %s)" % (module_tag, os.path.abspath(src_root), runtime))
+    print("measurement basis: %s" % BASIS)
     print("functions: %d total, %d hole-free, %d exercised, %d COMPARED (%.0f%% of "
           "all, %.0f%% of hole-free)"
           % (len(funcs), len(holefree), result["functions_covered"],
@@ -1234,6 +1841,9 @@ def main():
     for k, v in result["skipped"].items():
         if v: print("  skipped %s: %d" % (k, v))
     json.dump(result, open("conformance.json", "w"), indent=1)
+    if isolated:
+        import shutil
+        shutil.rmtree(snap_dir, ignore_errors=True)
     return 1 if diverge else 0
 
 

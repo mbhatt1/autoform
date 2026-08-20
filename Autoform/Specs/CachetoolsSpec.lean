@@ -244,9 +244,12 @@ def sampleCache : Heap :=
 theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
     (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
       ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
-  rw [Cache_maxsize_mrefines sampleCache (.ref 0) [] ⟨0, .int 128, rfl, _, rfl, rfl⟩ fuel hf,
-      Cache_currsize_mrefines sampleCache (.ref 0) [] ⟨0, .int 3, rfl, _, rfl, rfl⟩ fuel hf]
-  simp [sampleCache, readField, Heap.get]
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
+  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
+      runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
+  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
+        f_cachetools___init___py__module__Cache_maxsize,
+        f_cachetools___init___py__module__Cache_currsize]
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
 
@@ -281,11 +284,11 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 1]).2 = .val (.bool true)
   ∧ (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 2]).2 = .val (.bool false) := by
-  constructor
-  · rw [Cache_contains_mrefines _ (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, _, rfl, rfl⟩ fuel hf]
-    simp [Val.beq, readField, Heap.get]
-  · rw [Cache_contains_mrefines _ (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, _, rfl, rfl⟩ fuel hf]
-    simp [Val.beq, readField, Heap.get]
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
+  refine ⟨?_, ?_⟩ <;>
+    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
+    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
+          f_cachetools___init___py__module__Cache___contains__]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
 
@@ -317,8 +320,10 @@ theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
     (runMethod fuel [{ cls := "_Item", fields := [("expires", .int 7)] }]
         "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" (.ref 0) [.ref 0]).2
       = .val (.bool false) := by
-  rw [TLRUItem_lt_mrefines _ (.ref 0) [.ref 0] ⟨0, 0, 7, 7, rfl, rfl, ⟨_, rfl, rfl⟩, ⟨_, rfl, rfl⟩⟩ fuel hf]
-  simp [readField, Heap.get]
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
+  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
+  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
+        f_cachetools___init___py__module__TLRUCache__Item___lt__]
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
 
@@ -349,8 +354,10 @@ theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
     readField ((runMethod fuel [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1) 0
         "_Timer__nesting" = .int 0 := by
-  rw [Timer_exit_mrefines _ (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, _, rfl, rfl⟩ fuel hf]
-  rfl
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
+  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
+  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
+        f_cachetools___init___py__module___TimedCache__Timer___exit__]
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
 
@@ -381,8 +388,11 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   ∧ readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__nesting" = .int 0 := by
-  rw [Timer_init_mrefines _ (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl⟩ fuel hf]
-  exact ⟨rfl, rfl⟩
+  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
+  refine ⟨?_, ?_⟩ <;>
+    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
+    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
+          f_cachetools___init___py__module___TimedCache__Timer___init__]
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
 
