@@ -1048,6 +1048,17 @@ def main():
                 blockers.append("the module contains mutation markers (`__mutated`)")
         except OSError as e:
             blockers.append("could not read the subject: %r" % e)
+        # The marker check is necessary but not sufficient: `scripts/mutate.py` also
+        # mutates *values* (`.int 0` -> `.int 1`), which leave no marker, and it removes
+        # its `.mutate-backup` between mutants. For a tracked module the reliable test is
+        # that it matches the commit — observed in practice: a gate was mid-cycle with no
+        # backup file present and a live one-line numeric mutation in the tree.
+        r = subprocess.run(["git", "diff", "--quiet", "--", gen_path],
+                           capture_output=True, cwd=REPO)
+        if r.returncode == 1:
+            blockers.append("the subject differs from its committed version (a mutation "
+                            "may be live, or the module was regenerated and not "
+                            "committed)")
         if blockers:
             print("REFUSING TO RUN: the subject is not pristine — %s. Every theorem "
                   "below would be about a mutant. Re-run when the gate finishes, or "

@@ -239,17 +239,29 @@ def sampleCache : Heap :=
   [{ cls := "Cache"
    , fields := [("_Cache__maxsize", .int 128), ("_Cache__currsize", .int 3)] }]
 
-/-- The two accessors are observably different functions. A mutation that makes
-`maxsize` read the occupancy field (or vice versa) is refuted by this witness. -/
+/-- The two accessors read the two fields, and are therefore observably different
+functions on a cache whose capacity and occupancy differ.
+
+**This statement was strengthened because the mutation gate said so.** It first read only
+`maxsize ≠ currsize`, and scored **0/8** — every single-function mutant preserves a
+*difference* (breaking one accessor leaves the other alone, so the two still disagree),
+so an inequality between two functions is not evidence about either of them. Pinning both
+values is what gives it teeth. The lesson generalises: a witness that asserts a relation
+between two computations tests neither unless the relation is pinned on both sides. -/
 theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
     (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
+        = .val (.int 128)
+  ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
+        = .val (.int 3)
+  ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
       ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
       runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
-        f_cachetools___init___py__module__Cache_maxsize,
-        f_cachetools___init___py__module__Cache_currsize]
+  refine ⟨?_, ?_, ?_⟩ <;>
+    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
+          f_cachetools___init___py__module__Cache_maxsize,
+          f_cachetools___init___py__module__Cache_currsize]
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
 

@@ -15,7 +15,7 @@ open Autoform.Core
 def f_cachetools___init___py__module___DefaultSize___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>._DefaultSize.__getitem__"
   , params := ["_key"]
-  , body := (.ret (.lit (.int 0))) }
+  , body := (.ret (.lit (.int 1))) }
 
 /-- `cachetools/__init__.py:<module>._DefaultSize.__setitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___DefaultSize___setitem__ : Func :=
@@ -1533,7 +1533,7 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
 def f_cachetools___init___py__module__TTLCache___setstate____lambda_0 : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0"
   , params := ["obj"]
-  , body := (.ret (.field (.name "obj") "expires")) }
+  , body := (.expr (.field (.name "obj") "expires")) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.ttl`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache_ttl : Func :=

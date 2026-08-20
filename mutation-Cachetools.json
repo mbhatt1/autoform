@@ -3024,10 +3024,10 @@
       ]
     },
     "Cache_contains_discriminates": {
-      "killed": 0,
-      "survived": 55,
-      "score": 0.0,
-      "verdict": "VACUOUS",
+      "killed": 5,
+      "survived": 50,
+      "score": 0.09090909090909091,
+      "verdict": "WEAK",
       "survivors": [
         {
           "op": "ast-field:expires->expires__mutated",
@@ -3049,13 +3049,6 @@
           "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
           "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
           "after": "            .skip"
-        },
-        {
-          "op": "ast-polarity:false->true",
-          "line": 205,
-          "decl": "f_cachetools___init___py__module__Cache___contains__",
-          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
-          "after": "  , body := (.ret (.inOp true (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }"
         },
         {
           "op": "ast-name:self->exc",
@@ -3154,13 +3147,6 @@
           "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
           "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
           "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
-        },
-        {
-          "op": "ast-field:_Cache__data->_Cache__data__mutated",
-          "line": 205,
-          "decl": "f_cachetools___init___py__module__Cache___contains__",
-          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
-          "after": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data__mutated\"))) }"
         },
         {
           "op": "ast-name:self->key",
@@ -3310,20 +3296,6 @@
           "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 0)))) }"
         },
         {
-          "op": "ast-name:self->key",
-          "line": 205,
-          "decl": "f_cachetools___init___py__module__Cache___contains__",
-          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
-          "after": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"key\") \"_Cache__data\"))) }"
-        },
-        {
-          "op": "ast-ret->expr",
-          "line": 205,
-          "decl": "f_cachetools___init___py__module__Cache___contains__",
-          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
-          "after": "  , body := (.expr (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }"
-        },
-        {
           "op": "ast-int:1->2",
           "line": 18,
           "decl": "f_cachetools___init___py__module___DefaultSize___getitem__",
@@ -3378,13 +3350,6 @@
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
           "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
           "after": "            .skip"
-        },
-        {
-          "op": "ast-name:key->self",
-          "line": 205,
-          "decl": "f_cachetools___init___py__module__Cache___contains__",
-          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
-          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
         },
         {
           "op": "ast-setfield:key->expires",
@@ -3768,10 +3733,10 @@
       ]
     },
     "TLRUItem_lt_irrefl": {
-      "killed": 0,
-      "survived": 55,
-      "score": 0.0,
-      "verdict": "VACUOUS",
+      "killed": 4,
+      "survived": 51,
+      "score": 0.07272727272727272,
+      "verdict": "WEAK",
       "survivors": [
         {
           "op": "ast-field:expires->expires__mutated",
@@ -3865,13 +3830,6 @@
           "after": "  , body := (.ret (.lit (.int 0))) }"
         },
         {
-          "op": "ast-field:expires->expires__mutated",
-          "line": 1725,
-          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
-          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
-          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires__mutated\") (.field (.name \"other\") \"expires\"))) }"
-        },
-        {
           "op": "ast-name:NotImplementedError->time",
           "line": 1197,
           "decl": "f_cachetools___init___py__module___TimedCache_expire",
@@ -3912,13 +3870,6 @@
           "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
           "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
           "after": "            (.setField (.name \"key\") \"key\" (.name \"key\"))"
-        },
-        {
-          "op": "ast-field:expires->expires__mutated",
-          "line": 1725,
-          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
-          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
-          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires__mutated\"))) }"
         },
         {
           "op": "ast-ret->expr",
@@ -3991,13 +3942,6 @@
           "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting__mutated\") (.lit (.int 1)))) }"
         },
         {
-          "op": "ast-ret->expr",
-          "line": 1725,
-          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
-          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
-          "after": "  , body := (.expr (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
-        },
-        {
           "op": "ast-name:expires->key",
           "line": 1215,
           "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
@@ -4017,13 +3961,6 @@
           "decl": "f_cachetools___init___py__module__Cache_maxsize",
           "before": "            (.expr (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))",
           "after": "            .skip"
-        },
-        {
-          "op": "ast-binop:<-><=",
-          "line": 1725,
-          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
-          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
-          "after": "  , body := (.ret (.binop \"<=\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
         },
         {
           "op": "ast-int:1->0",
@@ -4512,10 +4449,10 @@
       ]
     },
     "Timer_exit_decrements": {
-      "killed": 0,
-      "survived": 55,
-      "score": 0.0,
-      "verdict": "VACUOUS",
+      "killed": 6,
+      "survived": 49,
+      "score": 0.10909090909090909,
+      "verdict": "WEAK",
       "survivors": [
         {
           "op": "ast-field:expires->expires__mutated",
@@ -4544,13 +4481,6 @@
           "decl": "f_cachetools___init___py__module__Cache___contains__",
           "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
           "after": "  , body := (.ret (.inOp true (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }"
-        },
-        {
-          "op": "ast-name:self->exc",
-          "line": 1047,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
-          "after": "            (.binop \"-\" (.field (.name \"exc\") \"_Timer__nesting\") (.lit (.int 1)))) }"
         },
         {
           "op": "ast-expr->ret",
@@ -4623,13 +4553,6 @@
           "after": "  , body := (.seq (.raise (.name \"time\")) .skip) }"
         },
         {
-          "op": "ast-name:self->exc",
-          "line": 1045,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.name \"self\")",
-          "after": "            (.name \"exc\")"
-        },
-        {
           "op": "ast-ret->expr",
           "line": 3293,
           "decl": "f_cachetools__cachedmethod_py__module___none",
@@ -4670,13 +4593,6 @@
           "decl": "f_cachetools___init___py__module__Cache_maxsize",
           "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
           "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
-        },
-        {
-          "op": "ast-binop:-->+",
-          "line": 1047,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
-          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
         },
         {
           "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
@@ -4726,13 +4642,6 @@
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
           "before": "            (.ret (.lit (.int 1)))) }",
           "after": "            (.expr (.lit (.int 1)))) }"
-        },
-        {
-          "op": "ast-field:_Timer__nesting->_Timer__nesting__mutated",
-          "line": 1047,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
-          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting__mutated\") (.lit (.int 1)))) }"
         },
         {
           "op": "ast-ret->expr",
@@ -4789,13 +4698,6 @@
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
           "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
           "after": "            (.ret (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))"
-        },
-        {
-          "op": "ast-int:1->0",
-          "line": 1047,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
-          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 0)))) }"
         },
         {
           "op": "ast-name:self->key",
@@ -4880,13 +4782,6 @@
           "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
           "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
           "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
-        },
-        {
-          "op": "ast-int:1->2",
-          "line": 1047,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
-          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
-          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
         },
         {
           "op": "ast-seq-delete",
@@ -5249,10 +5144,10 @@
       ]
     },
     "Timer_init_sets_both": {
-      "killed": 0,
-      "survived": 55,
-      "score": 0.0,
-      "verdict": "VACUOUS",
+      "killed": 7,
+      "survived": 48,
+      "score": 0.12727272727272726,
+      "verdict": "WEAK",
       "survivors": [
         {
           "op": "ast-field:expires->expires__mutated",
@@ -5304,13 +5199,6 @@
           "after": "            (.ret (.lit (.int 0)))) }"
         },
         {
-          "op": "ast-setfield:_Timer__nesting->_Timer__timer",
-          "line": 1007,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
-          "after": "            (.setField (.name \"self\") \"_Timer__timer\" (.lit (.int 0)))) }"
-        },
-        {
           "op": "ast-int:1->2",
           "line": 303,
           "decl": "f_cachetools___init___py__module__Cache_getsizeof",
@@ -5330,13 +5218,6 @@
           "decl": "f_cachetools___init___py__module__Cache_currsize",
           "before": "            (.expr (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))",
           "after": "            .skip"
-        },
-        {
-          "op": "ast-int:0->1",
-          "line": 1007,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
-          "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 1)))) }"
         },
         {
           "op": "ast-int:1->0",
@@ -5435,13 +5316,6 @@
           "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
           "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
           "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
-        },
-        {
-          "op": "ast-name:self->timer",
-          "line": 1006,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
-          "after": "            (.setField (.name \"timer\") \"_Timer__timer\" (.name \"timer\"))"
         },
         {
           "op": "ast-ret->expr",
@@ -5563,13 +5437,6 @@
           "after": "  , body := (.ret (.lit (.int 2))) }"
         },
         {
-          "op": "ast-setfield:_Timer__timer->_Timer__nesting",
-          "line": 1006,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
-          "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.name \"timer\"))"
-        },
-        {
           "op": "ast-expr->ret",
           "line": 286,
           "decl": "f_cachetools___init___py__module__Cache_maxsize",
@@ -5582,13 +5449,6 @@
           "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
           "before": "            (.setField (.name \"self\") \"expires\" (.name \"expires\"))) }",
           "after": "            (.setField (.name \"key\") \"expires\" (.name \"expires\"))) }"
-        },
-        {
-          "op": "ast-name:timer->self",
-          "line": 1006,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
-          "after": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"self\"))"
         },
         {
           "op": "ast-setfield:expires->key",
@@ -5624,20 +5484,6 @@
           "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
           "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
           "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
-        },
-        {
-          "op": "ast-seq-delete",
-          "line": 1006,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
-          "after": "            .skip"
-        },
-        {
-          "op": "ast-name:self->timer",
-          "line": 1007,
-          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
-          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
-          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
         }
       ]
     },
@@ -8039,7 +7885,7 @@
         "Cache_currsize_mrefines": "survived",
         "Cache_size_fields_distinct": "survived",
         "Cache_contains_mrefines": "killed",
-        "Cache_contains_discriminates": "survived",
+        "Cache_contains_discriminates": "killed",
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "survived",
@@ -8074,7 +7920,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -8169,7 +8015,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -8293,7 +8139,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -8359,7 +8205,7 @@
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "killed",
-        "TLRUItem_lt_irrefl": "survived",
+        "TLRUItem_lt_irrefl": "killed",
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "survived",
@@ -8423,7 +8269,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -8512,7 +8358,7 @@
         "Cache_currsize_mrefines": "survived",
         "Cache_size_fields_distinct": "survived",
         "Cache_contains_mrefines": "killed",
-        "Cache_contains_discriminates": "survived",
+        "Cache_contains_discriminates": "killed",
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "survived",
@@ -8576,7 +8422,7 @@
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "killed",
-        "TLRUItem_lt_irrefl": "survived",
+        "TLRUItem_lt_irrefl": "killed",
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "survived",
@@ -8640,7 +8486,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -8774,7 +8620,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -8896,7 +8742,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -8925,7 +8771,7 @@
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "killed",
-        "TLRUItem_lt_irrefl": "survived",
+        "TLRUItem_lt_irrefl": "killed",
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "survived",
@@ -9049,7 +8895,7 @@
         "Cache_contains_mrefines": "survived",
         "Cache_contains_discriminates": "survived",
         "TLRUItem_lt_mrefines": "killed",
-        "TLRUItem_lt_irrefl": "survived",
+        "TLRUItem_lt_irrefl": "killed",
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "survived",
@@ -9175,7 +9021,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -9202,7 +9048,7 @@
         "Cache_currsize_mrefines": "survived",
         "Cache_size_fields_distinct": "survived",
         "Cache_contains_mrefines": "killed",
-        "Cache_contains_discriminates": "survived",
+        "Cache_contains_discriminates": "killed",
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "survived",
@@ -9233,7 +9079,7 @@
         "Cache_currsize_mrefines": "survived",
         "Cache_size_fields_distinct": "survived",
         "Cache_contains_mrefines": "killed",
-        "Cache_contains_discriminates": "survived",
+        "Cache_contains_discriminates": "killed",
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "survived",
@@ -9332,7 +9178,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -9425,7 +9271,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -9512,7 +9358,7 @@
         "Cache_currsize_mrefines": "survived",
         "Cache_size_fields_distinct": "survived",
         "Cache_contains_mrefines": "killed",
-        "Cache_contains_discriminates": "survived",
+        "Cache_contains_discriminates": "killed",
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "survived",
@@ -9578,7 +9424,7 @@
         "TLRUItem_lt_mrefines": "survived",
         "TLRUItem_lt_irrefl": "survived",
         "Timer_exit_mrefines": "killed",
-        "Timer_exit_decrements": "survived",
+        "Timer_exit_decrements": "killed",
         "Timer_init_mrefines": "survived",
         "Timer_init_sets_both": "survived",
         "TTLLink_init_mrefines": "survived",
@@ -9611,7 +9457,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
@@ -9642,7 +9488,7 @@
         "Timer_exit_mrefines": "survived",
         "Timer_exit_decrements": "survived",
         "Timer_init_mrefines": "killed",
-        "Timer_init_sets_both": "survived",
+        "Timer_init_sets_both": "killed",
         "TTLLink_init_mrefines": "survived",
         "TTLSetstate_lambda_mrefines": "survived",
         "TimedCache_expire_raises": "survived",
