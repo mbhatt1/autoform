@@ -349,7 +349,60 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- where "subtract from zero" would not be (`0.0 - 0.0 = 0.0`, but `-(0.0) = -0.0`).
   | "-", .float f => .val (.float f.neg)
   | "!", x      => .val (.bool (!x.truthy))
+  -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
+  -- meaning is completely determined: since C++20, conversion to any integer type is
+  -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
+  -- gets an operator here rather than a constructor in `Syntax.lean` — a cast *is* a
+  -- unary operator, and spelling it as one means `Expr.hole`-freedom, fuel monotonicity,
+  -- rendering and the ledger all keep working without a single new case anywhere.
+  --
+  -- What is deliberately **not** here:
+  --
+  -- * a cast to `char`, whose signedness is implementation-defined, so
+  --   `static_cast<char>(200)` has no standard-mandated value;
+  -- * a cast to `double`, which rounds rather than truncates and belongs to `Fl`;
+  -- * a cast between *pointer* types, which reinterprets an address — and Core has no
+  --   addresses. The exporter keeps that one as an `op:cast:pointer` hole. Collapsing the
+  --   two would be the `<operator>.and` mistake again: same syntax, different operation.
+  --
+  -- A non-integer operand falls through to the hole below, labelled `unop:cast:u8` and
+  -- so on, which is the honest answer for `static_cast<int>(someDouble)`.
+  | "cast:i8",  .int x => .val (.int (IntType.wrap (.signed .w8) x))
+  | "cast:u8",  .int x => .val (.int (IntType.wrap (.unsigned .w8) x))
+  | "cast:i16", .int x => .val (.int (IntType.wrap (.signed .w16) x))
+  | "cast:u16", .int x => .val (.int (IntType.wrap (.unsigned .w16) x))
+  | "cast:i32", .int x => .val (.int (IntType.wrap (.signed .w32) x))
+  | "cast:u32", .int x => .val (.int (IntType.wrap (.unsigned .w32) x))
+  | "cast:i64", .int x => .val (.int (IntType.wrap (.signed .w64) x))
+  | "cast:u64", .int x => .val (.int (IntType.wrap (.unsigned .w64) x))
+  -- A `bool` converts to 1/0 at any width, in every dialect.
+  | "cast:i8",  .bool b => .val (.int (if b then 1 else 0))
+  | "cast:u8",  .bool b => .val (.int (if b then 1 else 0))
+  | "cast:i16", .bool b => .val (.int (if b then 1 else 0))
+  | "cast:u16", .bool b => .val (.int (if b then 1 else 0))
+  | "cast:i32", .bool b => .val (.int (if b then 1 else 0))
+  | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
+  | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
+  | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
   | _, _        => .hole s!"unop:{op}"
+
+/-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
+than against `applyUnop`'s own definition. -/
+@[simp] theorem applyUnop_cast_u8 (d : Dialect) (x : Int) :
+    applyUnop d "cast:u8" (.int x) = .val (.int (x % 256)) := by
+  cases d <;> rfl
+
+/-- The narrowing is real: `static_cast<uint8_t>(300)` is `44`, not `300`. A cast that
+returned its argument — or a hole — would make every downstream theorem about a
+converting program vacuously true, so this is checked by evaluation. -/
+example : applyUnop .cLike "cast:u8" (.int 300) = .val (.int 44) := by rfl
+
+/-- And it is not the identity on the signed side either: `static_cast<int8_t>(200)` is
+`-56`. -/
+example : applyUnop .cLike "cast:i8" (.int 200) = .val (.int (-56)) := by rfl
+
+/-- A cast of something that is not a number is a hole, not a guess. -/
+example : applyUnop .cLike "cast:u8" (.str "x") = .hole "unop:cast:u8" := by rfl
 
 /-- Negation is definitional under the unbounded (Python) config. -/
 @[simp] theorem applyUnop_py_neg (x : Int) :
@@ -1118,5 +1171,91 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     match ctx.resolve name with
     | none    => .hole s!"entry:{name}"
     | some fn => (applyFunc ctx fuel h₁ fn none args []).2
+
+/-! ## C and C++ pointers, end to end
+
+The exporter now maps `p->f` to `Expr.field`, `p[i]` to `Expr.index`, C++ stack
+construction to `Expr.alloc`, and `&x` on an aggregate to `x` itself. Each of those is a
+*mapping* decision, and a mapping decision is exactly the kind that can be wrong while
+every downstream theorem still passes: an `Expr.field` that resolved to nothing would
+return `unit`, a program full of them would type-check, and the ledger would count it as
+translated. So the mappings are checked here by running them.
+
+`boxProg` is what the exporter emits for
+
+    struct Box { int v; Box(int x) { this->v = x; } };
+    static int bump(Box *p) { p->v = p->v + 1; return p->v; }
+    int run() { Box b(41); return bump(&b); }
+
+with every one of the new decisions visible in the term: the constructor is named
+`__init__` (so `Expr.alloc` runs it), its body writes through `self` (not `this`),
+`bump` reads and writes `p->v` as `Expr.field` / `Stmt.setField`, and `&b` is just `b`. -/
+private def boxProg : Program :=
+  { dialect := .cLike
+  , funcs :=
+    [ { name   := "ns.Box.__init__"
+      , params := ["x"]
+      , body   := .setField (.name "self") "v" (.name "x") }
+    , { name   := "ns.bump"
+      , params := ["p"]
+      , body   := .seq (.setField (.name "p") "v"
+                          (.binop "+" (.field (.name "p") "v") (.lit (.int 1))))
+                       (.ret (.field (.name "p") "v")) }
+    , { name   := "ns.run"
+      , params := []
+      , body   := .seq (.assign "b" (.alloc "Box" [.lit (.int 41)]))
+                       (.ret (.call "ns.bump" [.name "b"])) }
+      -- `static_cast<uint8_t>(300 + 44)` — a real narrowing, in a real program.
+    , { name   := "ns.narrow"
+      , params := []
+      , body   := .ret (.unop "cast:u8" (.binop "+" (.lit (.int 300)) (.lit (.int 44)))) }
+      -- `int a[3] = {7,8,9}; return a[1];` as Core spells an indexable value.
+    , { name   := "ns.pick"
+      , params := []
+      , body   := .ret (.index (.listE [.lit (.int 7), .lit (.int 8), .lit (.int 9)])
+                               (.lit (.int 1))) }
+      -- The negative control: an object whose field was never written.
+    , { name   := "ns.unset"
+      , params := []
+      , body   := .ret (.field (.alloc "Empty" []) "v") } ] }
+
+/-! The whole chain works: `Box b(41)` allocates and runs the constructor, `&b` is `b`,
+`p->v = p->v + 1` mutates *that* object, and the caller sees `42`.
+
+`42` is the load-bearing number. `41` would mean the constructor ran but the write
+through the pointer did not reach the same object; `unit` would mean the field read
+missed; a hole would mean one of the four mappings is unreachable. Only a correct
+pointer round-trip produces `42`.
+
+These are pinned with `#guard_msgs`, not `rfl`: `runFunc` on a heap-allocating program
+does not reduce by `whnf` (the `.alloc` case threads a heap through `applyFunc`), so
+`rfl` cannot see the answer even though the evaluator computes it immediately.
+`#guard_msgs` checks the evaluated result at build time and fails the build if it
+changes, which is the property wanted here — and unlike `native_decide` it introduces no
+axiom. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 42) -/
+#guard_msgs in #eval runFunc boxProg 200 "ns.run" []
+
+/-- The cast narrows: `static_cast<uint8_t>(344)` is `88`, matching `cc`. This one does
+reduce, so it is stated as a theorem as well. -/
+example : runFunc boxProg 200 "ns.narrow" [] = .val (.int 88) := by rfl
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 88) -/
+#guard_msgs in #eval runFunc boxProg 200 "ns.narrow" []
+
+/-- Subscripting reads the element, not the container. -/
+example : runFunc boxProg 200 "ns.pick" [] = .val (.int 8) := by rfl
+
+/-! **The known hazard, stated rather than hidden.** `Expr.field` on an object that has
+no such field returns `unit`, not a hole — see the `.field` case above. So a C++ class
+whose constructor the exporter could not find translates to an object every one of whose
+fields reads `unit`, and nothing downstream will say so.
+
+That is why `emit` renames C++ constructors to `__init__` instead of leaving `Expr.alloc`
+to allocate an empty object, and why `alloc:builtin-base:*` refuses construction it cannot
+model. This check exists so the behaviour is a recorded fact with a test attached, and so
+that changing it is a deliberate act rather than an accident. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.unit) -/
+#guard_msgs in #eval runFunc boxProg 200 "ns.unset" []
 
 end Autoform.Core

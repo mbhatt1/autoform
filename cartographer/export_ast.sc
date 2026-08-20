@@ -84,8 +84,16 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     cands.find(p => os.exists(p) && os.isFile(p)).map(os.read(_))
   })
 
-  /** How many `*`s immediately precede this parameter's name in the source. */
+  /** How many `*`s immediately precede this parameter's name in the source.
+    *
+    * Python only. `*args`/`**kwargs` is a Python calling convention; in C and C++ a `*`
+    * before a parameter name is a POINTER, and reading it as a splat would be a
+    * mistranslation rather than a hole. Worse, the source-read below is a hard error by
+    * design, so running this on C++ aborted the whole export -- every non-Python corpus
+    * (V8, Linux) stopped exporting the moment the varargs work merged. Gate first, fail
+    * loudly second. */
   def paramStars(p: MethodParameterIn, file: String): Int =
+    if (!file.toLowerCase.endsWith(".py")) 0 else
     (for {
        off <- p.offset
        txt <- fileText(file)
@@ -100,6 +108,16 @@ import io.shiftleft.codepropertygraph.generated.nodes._
                + s"whether parameter '${p.name}' is `*args` or `**kwargs`. Run the "
                + "exporter against the tree the CPG was built from.")
      }
+
+/** `++`/`--`, and which way they go. In *statement* position all four are `x = x ± 1`
+    * and nothing distinguishes prefix from postfix — the value is discarded. In
+    * *expression* position they differ and neither is expressible, so `callExpr` holes
+    * them under a `:value` label. Keeping the two positions apart is the whole point:
+    * `for (i = 0; i < n; i++)` is translatable, `a[i++]` is not. */
+  val incrOps = Map(
+    "<operator>.preIncrement" -> "+", "<operator>.postIncrement" -> "+",
+    "<operator>.preDecrement" -> "-", "<operator>.postDecrement" -> "-"
+  )
 
   def hole(label: String): ujson.Obj  = ujson.Obj("k" -> "hole", "label" -> label)
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
@@ -174,11 +192,29 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * receiver's. */
   var currentClass: Option[String] = None
 
+  /** The two CPG spellings of "select a field of something".
+    *
+    * C and C++ distinguish `o.f` (`fieldAccess`) from `p->f` (`indirectFieldAccess`), and
+    * Joern keeps the distinction. **Core does not need it.** A `Val.ref` *is* the object,
+    * so `Expr.field` on a ref already looks the field up in the heap object it names;
+    * `p->f` and `(*p).f` are the same expression, and both are `Expr.field`. The C++
+    * frontend gives `indirectFieldAccess` exactly the shape `fieldAccess` has —
+    * `[pointerExpr, FIELD_IDENTIFIER]` — so this is a *mapping* gap, not a semantics gap,
+    * and closing it is one line here rather than a constructor in `Syntax.lean`.
+    *
+    * Same story for `p[i]`: `indirectIndexAccess` has `indexAccess`'s shape and
+    * `Expr.index`'s meaning. (What `Expr.index` then *does* with a C array is a separate
+    * question, and the answer is an honest `index:unsupported` hole at run time — the
+    * array itself has no Core value. The mapping is still the right one: it puts the
+    * ignorance on the array, where it belongs, instead of on the subscript syntax.) */
+  val fieldOps = Set("<operator>.fieldAccess", "<operator>.indirectFieldAccess")
+  val indexOps = Set("<operator>.indexAccess", "<operator>.indirectIndexAccess")
+
   /** `e.f` — a fieldAccess is [receiver, FIELD_IDENTIFIER], except that when the Python
     * frontend has *resolved* the attribute it prepends the resolved METHOD_REF/TYPE_REF,
     * giving [METHOD_REF, receiver, FIELD_IDENTIFIER]. */
   def asField(n: AstNode): Option[(AstNode, String)] = n match {
-    case c: Call if c.methodFullName == "<operator>.fieldAccess" =>
+    case c: Call if fieldOps.contains(c.methodFullName) =>
       val k = kidsOf(c)
       k.lastOption match {
         // The attribute name is mangled here, once, so every consumer — `field`,
@@ -193,7 +229,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   /** A resolved attribute reference: `Cls.meth` where Joern already knows the target. */
   def resolvedRef(n: AstNode): Option[AstNode] = n match {
-    case c: Call if c.methodFullName == "<operator>.fieldAccess" =>
+    case c: Call if fieldOps.contains(c.methodFullName) =>
       kidsOf(c) match {
         case (m: MethodRef) :: _ :: _ :: Nil => Some(m)
         case (t: TypeRef) :: _ :: _ :: Nil   => Some(t)
@@ -204,7 +240,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   /** `e[i]`. */
   def asIndex(n: AstNode): Option[(AstNode, AstNode)] = n match {
-    case c: Call if c.methodFullName == "<operator>.indexAccess" =>
+    case c: Call if indexOps.contains(c.methodFullName) =>
       kidsOf(c) match {
         case a :: b :: Nil => Some((a, b))
         case _             => None
@@ -217,9 +253,9 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * evaluating it twice is the same as evaluating it once. */
   def pureNode(n: AstNode): Boolean = n match {
     case _: Identifier | _: Literal | _: MethodParameterIn | _: TypeRef | _: MethodRef => true
-    case c: Call if c.methodFullName == "<operator>.fieldAccess" =>
+    case c: Call if fieldOps.contains(c.methodFullName) =>
       asField(c).exists(p => pureNode(p._1))
-    case c: Call if c.methodFullName == "<operator>.indexAccess" =>
+    case c: Call if indexOps.contains(c.methodFullName) =>
       asIndex(c).exists(p => pureNode(p._1) && pureNode(p._2))
     case _ => false
   }
@@ -452,6 +488,10 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // Set while translating a method from a C-family file, where a `char*` is an address,
   // not a string value.
   var cLikeFile       = false
+  /** C and C++ specifically, as opposed to the whole `cLike` *dialect* family (which
+    * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
+    * implicit `this`, and stack object construction are C++ facts, not `cLike` facts. */
+  var cppFile         = false
   // The source file of the method being translated. `import` is resolved relative to it.
   var currentFile     = ""
   // Serial number for the flag variable `try/except/else` needs; nested `try`s in one
@@ -468,16 +508,212 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   /** Static evidence that an operand is a C string/array-of-char. Joern's C frontend
     * types both `char *s` and `"abc"` as `char*`, including on literals. */
-  def isCString(n: AstNode): Boolean = {
-    def t(x: AstNode): String = x match {
-      case c: Call              => c.typeFullName
-      case i: Identifier        => i.typeFullName
-      case l: Literal           => l.typeFullName
-      case p: MethodParameterIn => p.typeFullName
-      case _                    => ""
+  /** The type Joern *wrote on the node*, which for C is very often `ANY`. */
+  def nodeType(x: AstNode): String = x match {
+    case c: Call              => c.typeFullName
+    case i: Identifier        => i.typeFullName
+    case l: Literal           => l.typeFullName
+    case p: MethodParameterIn => p.typeFullName
+    case t: TypeRef           => t.typeFullName
+    case _                    => ""
+  }
+
+  /** Declared types of the locals and parameters of the method being translated. */
+  var localTypes = Map.empty[String, String]
+
+  /** Names this method selects a field off with `.`, and names it selects one off with
+    * `->`. C's two spellings are a *syntactic* proof of what the name holds: `x.f`
+    * cannot be written unless `x` is an aggregate, and `p->f` cannot be written unless
+    * `p` is a pointer. Nothing else in the CPG says this as reliably — Joern's C frontend
+    * leaves 2,848 of `lib/`'s address-taken identifiers typed `ANY` and absent from the
+    * LOCAL table — and it is derived from the code rather than from type recovery, so it
+    * cannot be defeated by a missing header. */
+  var valueReceivers = Set.empty[String]
+  var ptrReceivers   = Set.empty[String]
+
+  /** `(owning type, member name) -> member type`, for the whole program. */
+  lazy val memberTypes: Map[(String, String), String] =
+    cpg.typeDecl.l.flatMap { td =>
+      td.member.l.map(mm => (bareType(td.fullName), mm.name) -> mm.typeFullName)
+    }.toMap
+
+  /** The static type of an expression, **recovered from declarations when the node does
+    * not carry one**.
+    *
+    * This is not a nicety. Measured on Linux `lib/`, 2,849 of 3,145 `&x` sites had
+    * operand type `ANY` on the node — the C frontend simply does not propagate types onto
+    * IDENTIFIER nodes — and `ANY` is the one answer that decides nothing: it cannot say
+    * whether `&x` is the address of a struct (which Core represents, because a `Val.ref`
+    * *is* an address) or the address of an `int` (which it does not). The declaration is
+    * right there in the same method, on the LOCAL node, and the field's type is right
+    * there on the owning TypeDecl's MEMBER.
+    *
+    * So the ledger's largest label was in large part a *type-recovery* gap masquerading
+    * as a semantics gap. That is worth stating precisely, because the two have completely
+    * different remedies and only one of them is expensive. */
+  def staticTypeOf(x: AstNode): String = {
+    val direct = nodeType(x)
+    if (direct.nonEmpty && direct != "ANY") direct
+    else x match {
+      case i: Identifier => localTypes.getOrElse(i.name, direct)
+      case c: Call if fieldOps.contains(c.methodFullName) =>
+        asField(c).flatMap { case (r, f) =>
+          // `p->f` and `o.f` are one node kind here, so strip any pointer depth off the
+          // receiver's type before looking the member up on the owning declaration.
+          val owner = bareType(staticTypeOf(r)).reverse.dropWhile(_ == '*').reverse
+          memberTypes.get((owner, f))
+        }.getOrElse(direct)
+      // `*p` has the type `p` points to.
+      case c: Call if c.methodFullName == "<operator>.indirection" =>
+        kidsOf(c) match {
+          case k :: Nil =>
+            val t = bareType(staticTypeOf(k))
+            if (t.endsWith("*")) t.dropRight(1) else direct
+          case _ => direct
+        }
+      case _ => direct
     }
-    val ty = t(n).replace(" ", "")
+  }
+
+  def isCString(n: AstNode): Boolean = {
+    val ty = staticTypeOf(n).replace(" ", "")
     ty.matches("""(const|volatile|signed|unsigned)*char(\*|\[.*\]).*""")
+  }
+
+  // ---- C and C++ types ------------------------------------------------------
+  //
+  // Everything below is about telling apart three things that C spells with much the same
+  // syntax: a **number**, a **pointer**, and an **object**. Core models the first and the
+  // third; it has no model of an address at all. So each pointer-shaped construct is
+  // routed by what its operand's static type says, and the ones that land on "address"
+  // keep a hole whose label says *which* address shape it was.
+
+  /** Strip cv-qualifiers and whitespace, so `const unsigned char *` compares equal to
+    * `unsigned char*`. */
+  def bareType(ty: String): String =
+    ty.replace("const ", "").replace("volatile ", "")
+      .replace("struct ", "").replace("union ", "").replace("enum ", "")
+      .replace(" ", "")
+
+  /** A pointer or an array — a value Core cannot represent, because it is an address.
+    * `char[311]` is one of these: an array decays to a pointer. */
+  def isPointerType(ty: String): Boolean = {
+    val b = bareType(ty)
+    b.endsWith("*") || b.matches(""".*\[.*\]""") || b == "std.nullptr_t"
+  }
+
+  /** The fixed-width integer types, mapped to the width tag `applyUnop` understands.
+    * `size_t`/`uintptr_t` are here because they are integers on the platform the oracle
+    * measures, not because they are portable. */
+  val intTypeNames: Map[String, String] = Map(
+    "int8_t" -> "i8", "signedchar" -> "i8",
+    "uint8_t" -> "u8", "unsignedchar" -> "u8",
+    "int16_t" -> "i16", "short" -> "i16", "shortint" -> "i16",
+    "uint16_t" -> "u16", "unsignedshort" -> "u16",
+    "int32_t" -> "i32", "int" -> "i32", "signedint" -> "i32", "long" -> "i32",
+    "uint32_t" -> "u32", "unsignedint" -> "u32", "unsigned" -> "u32",
+    "int64_t" -> "i64", "longlong" -> "i64", "ptrdiff_t" -> "i64",
+    "uint64_t" -> "u64", "unsignedlonglong" -> "u64", "size_t" -> "u64",
+    "uintptr_t" -> "u64"
+  )
+
+  /** `char` is deliberately absent from `intTypeNames`: its signedness is
+    * implementation-defined, so `static_cast<char>(300)` has no standard-mandated value.
+    * Naming it separately keeps the hole label specific instead of guessing a sign. */
+  def isArithType(ty: String): Boolean = intTypeNames.contains(bareType(ty))
+
+  /** Aggregates — struct, union, class — for which the CPG carries **positive
+    * evidence**: a TypeDecl that has members, or (C++) one that has methods.
+    *
+    * The test has to be positive. The tempting rule is "not a pointer and not a number,
+    * therefore a struct", and it is wrong in the dangerous direction: `loff_t`, `s64` and
+    * every other kernel scalar typedef would pass it, and `&some_s64` would then
+    * translate to the identity — a well-typed program silently aliasing a number as an
+    * object. That is the exact failure mode this ledger exists to prevent, so a type we
+    * merely *cannot classify* gets its own hole label (`opaque-type`) rather than the
+    * benefit of the doubt. */
+  lazy val aggregateNames: Set[String] = {
+    val ds = cpg.typeDecl.l.filter(td => td.member.nonEmpty || td.method.nonEmpty)
+    (ds.map(_.fullName) ++ ds.map(_.name)).map(bareType).toSet ++ fieldOwnerTypes
+  }
+
+  /** Types the *program itself* selects a field off. `x.f` or `p->f` is a proof that `x`
+    * is an aggregate that no type table is needed to supply, and on the kernel it is the
+    * evidence that actually exists: Joern records 4,892 TypeDecls for `lib/` but members
+    * for only 753 of them, so a members-only test calls most real structs unknown.
+    * Field selection is derived from the code, not from the frontend's type recovery,
+    * which is exactly why it survives where the type table does not. */
+  lazy val fieldOwnerTypes: Set[String] =
+    cpg.call.l.filter(c => fieldOps.contains(c.methodFullName)).flatMap { c =>
+      val ks = c.astChildren.collect { case a: AstNode => a }.l
+      if (ks.size < 2) None
+      else {
+        val t = bareType(nodeType(ks(ks.size - 2)))
+        val bare = t.reverse.dropWhile(_ == '*').reverse
+        if (bare.isEmpty || bare == "ANY") None else Some(bare)
+      }
+    }.toSet
+
+  val nonClassScalars = Set("ANY", "void", "bool", "char", "float", "double", "")
+
+  /** Kernel and C scalar typedefs beyond `intTypeNames`, named so that `&x` on one of
+    * them is reported as `scalar` (a location model would fix it) rather than as
+    * `opaque-type` (better types would fix it). */
+  val scalarTypedefs = Set(
+    "s8", "s16", "s32", "s64", "u8", "u16", "u32", "u64", "loff_t", "ssize_t",
+    "off_t", "gfp_t", "pid_t", "uid_t", "gid_t", "dev_t", "sector_t", "phys_addr_t",
+    "dma_addr_t", "resource_size_t", "cycles_t", "ktime_t", "wchar_t", "intptr_t",
+    "longdouble", "signedlong", "unsignedlong", "longunsigned", "int128_t", "__u8",
+    "__u16", "__u32", "__u64", "__s8", "__s16", "__s32", "__s64", "__be16", "__be32",
+    "__be64", "__le16", "__le32", "__le64", "bool_t", "size_type"
+  )
+
+  /** The type is an aggregate, so `&it` is the identity: a Core class instance already
+    * *is* a heap address, and taking its address changes nothing. */
+  def isClassType(ty: String): Boolean = {
+    val raw = ty.replace("const ", "").replace("volatile ", "").trim
+    val b   = bareType(ty)
+    if (isPointerType(b) || isArithType(b) || nonClassScalars.contains(b) ||
+        scalarTypedefs.contains(b)) false
+    // Joern's C frontend spells the tag in the type name (`unioncodetag_ref`), which is
+    // conclusive evidence on its own.
+    else raw.startsWith("struct") || raw.startsWith("union") || raw.startsWith("class") ||
+         aggregateNames.contains(b)
+  }
+
+  /** A hole label naming what kind of address defeated us, so the ledger separates
+    * "pointer to a number" (which needs a location model) from "we could not tell"
+    * (which needs better types). */
+  /** What *shape* of thing had its address taken. The kind (below) says what Core would
+    * need in order to represent the pointee; the shape says which of four distinct pieces
+    * of work would close the case, and they are not the same piece of work:
+    *
+    *   * `local`   — the address of a variable. Needs a model of a variable's *location*.
+    *   * `field`   — `&p->f`. Free for an object-typed field (a `Val.ref` already is its
+    *                 own address); needs a location for a scalar one.
+    *   * `element` — `&a[i]`. Needs arrays as heap objects, and then interior pointers.
+    *   * `call`    — `&f(...)`, or an address taken of something computed. Rare.
+    *
+    * Reporting them merged is what made `op:addressOf` look like one problem. */
+  def addrShape(n: AstNode): String = n match {
+    case _: Identifier | _: MethodParameterIn => "local"
+    case c: Call if fieldOps.contains(c.methodFullName) => "field"
+    case c: Call if indexOps.contains(c.methodFullName) => "element"
+    case _: Call => "call"
+    case other   => other.label.toLowerCase
+  }
+
+  def addrKind(ty: String): String = {
+    val b = bareType(ty)
+    if (b.isEmpty || b == "ANY")   "unknown-type"
+    else if (isPointerType(b))     "pointer"
+    else if (isClassType(ty))      "object"
+    else if (isArithType(b) || scalarTypedefs.contains(b) ||
+             nonClassScalars.contains(b))  "scalar"
+    // A name, but no evidence for what is behind it. This is a *type* gap, not a
+    // semantics gap, and it is closed by a better frontend rather than by a location
+    // model — which is why it must not be filed under either of the other two.
+    else                           "opaque-type"
   }
 
   /** `import p.q` / `from <prefix> import <name>`.
@@ -524,6 +760,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       }
     }
   }
+
+  /** C++'s receiver is spelled `this`; Core's — the name `applyFunc` binds a method's
+    * receiver to — is `self`. Without this rename `this->f` translated to a read of an
+    * unbound name, which is the vacuous outcome: an `Expr.field` on `unit`, holing at run
+    * time for a reason that had nothing to do with pointers. The rename is what makes the
+    * `indirectFieldAccess` mapping actually reach a heap object. */
+  def localName(n: String): String = if (cppFile && n == "this") "self" else n
 
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
@@ -586,7 +829,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         case None =>
           if (c == "True" || c == "true")        ujson.Obj("k" -> "bool", "v" -> true)
           else if (c == "False" || c == "false") ujson.Obj("k" -> "bool", "v" -> false)
-          else if (c == "None" || c == "null" || c == "nil") ujson.Obj("k" -> "unit")
+          // `nullptr` is not a number and not a string: it is the absence of an object,
+          // and `Val.unit` is the one value Core has that no `Val.ref` is equal to. That
+          // makes `p == nullptr` answer `false` for every allocated object, which is the
+          // right answer, and `Val.unit` for a *dereferenced* null is not reachable
+          // because dereference is itself a hole.
+          else if (c == "None" || c == "null" || c == "nil" || c == "nullptr")
+            ujson.Obj("k" -> "unit")
           // A float is not a string. Core has no floats, so this is a hole, not a lie.
           // Float forms, including the C/C++ `f`/`F`/`l`/`L` suffix and exponent-only
           // spellings (`1e300`). These were falling through to `lit:unquoted`, which
@@ -617,7 +866,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           // be inventing a value.
           else hole("lit:unquoted")
       }
-    case i: Identifier        => ujson.Obj("k" -> "name", "v" -> i.name)
+    case i: Identifier        => ujson.Obj("k" -> "name", "v" -> localName(i.name))
     case p: MethodParameterIn => ujson.Obj("k" -> "name", "v" -> p.name)
     // A function/method or a class used as a value. Whether it needs to carry the
     // enclosing environment is decided by `capturesEnv`, above.
@@ -690,6 +939,57 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case other        => other
   }
 
+  /** The class a C++ constructor call names, if it names one.
+    *
+    * Joern spells a constructor's `methodFullName` as `<qualified class>.<name>:<sig>`,
+    * so `v8.internal.NumberParseIntHelper.NumberParseIntHelper:void(ANY,int)` is a
+    * constructor exactly when the last two dotted segments agree. `ANY.ANY:void()` agrees
+    * too and names nothing, and `int64_t.int64_t:void(int)` — the frontend's spelling of
+    * `int64_t{1}` — names a *number*, not a class; both are rejected, because an
+    * `Expr.alloc` of either would be a heap object standing in for something that is not
+    * one. */
+  def ctorClassOf(c: Call): Option[String] = {
+    val segs = c.methodFullName.takeWhile(_ != ':').split('.').filter(_.nonEmpty).toList
+    segs.reverse match {
+      case n :: p :: _ if n == p && n != "ANY" && !intTypeNames.contains(bareType(n)) &&
+                          !nonClassScalars.contains(n) => Some(n)
+      case _ => None
+    }
+  }
+
+  /** C++ stack object construction: `Foo x(a, b);`.
+    *
+    * The frontend lowers it to three siblings —
+    *
+    *     <tmp>0 = <operator>.alloc
+    *     Foo.Foo(a, b)
+    *     <tmp>0
+    *
+    * — which is `Expr.alloc "Foo" [a, b]` and nothing else. Reading it as three
+    * independent statements produced an `op:alloc` hole for a construct Core has had a
+    * constructor for since the beginning; this is the second-largest purely-exporter gap
+    * in the C++ ledger after `p->f`.
+    *
+    * The constructor *body* is reached because `emit` exports a C++ constructor under the
+    * name `__init__`, which is the name `evalExpr`'s `.alloc` case looks for. Without that
+    * the object would be allocated with no fields and every later `p->f` would read
+    * `unit` — allocated, well-typed, and silently empty. */
+  def ctorAlloc(ks: List[AstNode]): Option[ujson.Obj] = ks match {
+    case (asg: Call) :: (ctor: Call) :: (last: Identifier) :: Nil
+        if asg.methodFullName == "<operator>.assignment" =>
+      for {
+        (tgt, rhs) <- kidsOf(asg) match {
+                        case (i: Identifier) :: r :: Nil => Some((i, r))
+                        case _                           => None
+                      }
+        if tgt.name == last.name
+        if isOp(rhs, "<operator>.alloc") && kidsOf(rhs).isEmpty
+        cls <- ctorClassOf(ctor)
+      } yield ujson.Obj("k" -> "alloc", "cls" -> cls,
+                        "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1)))
+    case _ => None
+  }
+
   /** A BLOCK in *expression* position.
     *
     * pysrc2cpg lowers several expressions into a statement sequence ending in its value —
@@ -709,6 +1009,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def blockExpr(b: Block): ujson.Obj = {
     val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
     if (ks.isEmpty) hole("expr:empty-block")
+    else if (ctorAlloc(ks).isDefined) ctorAlloc(ks).get
     else {
       var subst = Map.empty[String, ujson.Value]
       var bad   = ""
@@ -791,9 +1092,9 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
-    else if (mfn == "<operator>.indexAccess" && kids.size == 2)
+    else if (indexOps.contains(mfn) && kids.size == 2)
       ujson.Obj("k" -> "index", "a" -> expr(kids(0)), "b" -> expr(kids(1)))
-    else if (mfn == "<operator>.fieldAccess")
+    else if (fieldOps.contains(mfn))
       resolvedRef(c).map(expr) getOrElse (asField(c) match {
         case Some((r, f)) => ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)
         case None         => hole("op:fieldAccess-shape")
@@ -815,6 +1116,85 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       // dictLiteral with children would be a shape we have not seen and must not guess at.
       (if (kids.isEmpty) ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
        else hole("op:dictLiteral-nonempty"))
+    // `static_cast<uint8_t>(e)` — a **width conversion**, which Core does model.
+    //
+    // `Autoform/Lang/Core/Numeric.lean` already has `Width`/`IntType`/`IntType.wrap`, and
+    // C++20 fixed the one thing that used to make this implementation-defined: conversion
+    // to a narrower integer type is two's-complement truncation, which is exactly
+    // `IntType.wrap`. So the cast becomes a unary operator `cast:u8` (see `applyUnop`),
+    // and `static_cast<uint8_t>(300)` is `44` in Core as it is under `cc`.
+    //
+    // A **pointer** cast is a different thing wearing the same syntax and is not
+    // collapsed into it: reinterpreting an address has no meaning in a language with no
+    // addresses. `char` is excluded too — its signedness is implementation-defined — and
+    // so is `double`, which is a rounding conversion rather than a truncation.
+    else if (mfn == "<operator>.cast" && kids.size == 2)
+      intTypeNames.get(bareType(staticTypeOf(kids(0)))) match {
+        case Some(w) => ujson.Obj("k" -> "unop", "op" -> ("cast:" + w),
+                                  "a" -> expr(kids(1)))
+        case None    => hole("op:cast:" + addrKind(staticTypeOf(kids(0))))
+      }
+    // `&x`.
+    //
+    // This is the one place where the honest answer depends on what is being addressed,
+    // because Core's object model already *is* a pointer model for objects and is not one
+    // for anything else:
+    //
+    //   * `&obj` where `obj` has class type is the identity. A Core class instance is a
+    //     `Val.ref` — a heap address — so the address of an object is the object's own
+    //     value, and writing through the result mutates the same heap cell. Nothing is
+    //     invented and nothing is lost. (What is *not* modelled, and was not before, is
+    //     C++ value semantics for such an object: `Foo a = b;` copies in C++ and aliases
+    //     in Core. That is a pre-existing Core gap, recorded here rather than introduced.)
+    //
+    //   * `&n` where `n` is a local number, or `&p` where `p` is a local pointer, needs a
+    //     model of *the location of a variable*, which Core does not have. The standard
+    //     fix is to box address-taken locals into heap cells, and it is implementable
+    //     entirely in this file — but see `docs/pointers.md`: measured on this corpus,
+    //     every such local holds a `char*`, so the box would be faithful and its
+    //     *contents* would still be an address Core cannot represent. Boxing would buy a
+    //     well-typed program that computes nothing. It stays a hole, with the kind of
+    //     address named.
+    else if (mfn == "<operator>.addressOf" && kids.size == 1) {
+      val ty   = staticTypeOf(kids(0))
+      val kind = addrKind(ty)
+      val nm   = kids(0) match { case i: Identifier => Some(i.name); case _ => None }
+      // `&x` on an aggregate is the identity — see the long note below. When the type is
+      // unrecovered, `x.f` elsewhere in the same method is proof of the same thing, and
+      // `x->f` is proof of the opposite.
+      val aggregate =
+        isClassType(ty) ||
+        (kind == "unknown-type" &&
+         nm.exists(n => valueReceivers.contains(n) && !ptrReceivers.contains(n)))
+      if (aggregate) expr(kids(0))
+      else {
+        val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
+                else kind
+        hole("op:addressOf:" + addrShape(kids(0)) + ":" + k)
+      }
+    }
+    // `*p`. The dual of the above, and the same split — but the *identity* half is
+    // already covered, because Joern spells `(*p).f` as `indirectFieldAccess` and `p[i]`
+    // as `indirectIndexAccess`, both of which are now mapped. What reaches here is a
+    // dereference whose result is a *number* (or another pointer), which is exactly the
+    // location model Core lacks.
+    else if (mfn == "<operator>.indirection" && kids.size == 1)
+      hole("op:indirection:" + addrKind(staticTypeOf(kids(0))))
+    // `++x` / `x++` in **expression** position. In statement position these are
+    // `x = x ± 1` and are translated as such (see `stmt`); as an expression they also
+    // have a value, and for the postfix forms that value is the *old* one. Core has no
+    // way to sequence a write before a read inside an expression, so this is a hole —
+    // and it is a different hole from the statement form, which is why the label says
+    // `:value`.
+    else if (incrOps.contains(mfn))
+      hole("op:" + mfn.stripPrefix("<operator>.") + ":value")
+    // `<operator>.alloc` with children is a **stack array declaration** (`char b[N]`),
+    // not a `new`. Core has no arrays and no sizes, so it stays a hole — but under a
+    // label that says which of the two it was, because they are not the same problem.
+    // The childless form is C++ stack object construction and is handled as a whole
+    // block by `ctorAlloc`; reaching it here means the block did not have that shape.
+    else if (mfn == "<operator>.alloc")
+      hole(if (kids.isEmpty) "op:alloc:ctor-shape" else "op:alloc:array-decl")
     else if (mfn.startsWith("<operator>"))
       hole("op:" + mfn.stripPrefix("<operator>."))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
@@ -904,9 +1284,18 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * the value expression rather than losing it to a hole. */
   def valueOf(n: AstNode): (List[ujson.Obj], ujson.Obj) = n match {
     case b: Block =>
-      kidsOf(b) match {
-        case Nil  => (Nil, hole("expr:empty-block"))
-        case ks   => (ks.init.map(stmt), expr(ks.last))
+      val all = kidsOf(b)
+      // C++ stack construction reaches here whenever the constructed object is the value
+      // of an assignment, an argument or a `return`, which is most of the time. Splitting
+      // it into "two statements and an identifier" is what made `Expr.alloc` unreachable:
+      // the pieces are individually meaningless and the middle one is the constructor.
+      ctorAlloc(all) match {
+        case Some(a) => (Nil, a)
+        case None =>
+          all match {
+            case Nil  => (Nil, hole("expr:empty-block"))
+            case ks   => (stmts(ks.init), expr(ks.last))
+          }
       }
     case other => (Nil, expr(other))
   }
@@ -978,8 +1367,8 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         // At module scope, and for a name a `global` statement rebound, an assignment
         // writes the module-level frame rather than creating a local.
         val k = if (moduleScope || declaredGlobals.contains(i.name)) "setGlobal" else "assign"
-        ujson.Obj("k" -> k, "x" -> i.name,
-                  "e" -> combine(ujson.Obj("k" -> "name", "v" -> i.name)))
+        ujson.Obj("k" -> k, "x" -> localName(i.name),
+                  "e" -> combine(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (aug.isDefined && !pureNode(r)) holeS("assign:aug-impure-receiver")
@@ -1001,10 +1390,75 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def globalDeclNames(u: Unknown): List[String] =
     u.code.trim.stripPrefix("global").split(",").map(_.trim).filter(_.nonEmpty).toList
 
+  /** `++x` / `x++` / `--x` / `x--` as a **statement**.
+    *
+    * With the value discarded, all four are `x = x ± 1`, and prefix and postfix are
+    * indistinguishable — this is the ordinary desugaring, not an approximation.
+    *
+    * Two things it refuses. A **pointer** target is not `p = p + 1`: C scales by
+    * `sizeof(*p)`, Core has no sizes, and `p + 1` on a `char*` is only accidentally right
+    * (`sizeof(char) == 1`). Writing the accidental case and holing the rest would put a
+    * silent type dependency into the translation, so every pointer target holes — the
+    * same rule `cstr:pointer-arith` already applies to `p += n`. And an **impure**
+    * target holes, because the desugaring evaluates the target twice; that is
+    * `assign:aug-impure-*`'s rule, applied here for the same reason. */
+  def incrStmt(tgt: AstNode, op: String, opName: String): ujson.Obj = {
+    val one = ujson.Obj("k" -> "int", "v" -> ujson.Num(1.0))
+    def bump(cur: ujson.Obj): ujson.Obj =
+      ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> one)
+    if (isPointerType(staticTypeOf(tgt)) || isCString(tgt)) holeS("op:" + opName + ":pointer")
+    else tgt match {
+      case i: Identifier =>
+        val k = if (moduleScope || declaredGlobals.contains(i.name)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> localName(i.name),
+                  "e" -> bump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+      case fa if asField(fa).isDefined =>
+        val (r, f) = asField(fa).get
+        if (!pureNode(r)) holeS("op:" + opName + ":impure-receiver")
+        else ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
+                       "v" -> bump(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
+      case ia if asIndex(ia).isDefined =>
+        val (a, b) = asIndex(ia).get
+        if (!(pureNode(a) && pureNode(b))) holeS("op:" + opName + ":impure-target")
+        else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
+                       "v" -> bump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
+      // `++*p` — the target is a dereference, which is the location model Core lacks.
+      case _ => holeS("op:" + opName + ":unsupported-target")
+    }
+  }
+
+  /** Translate a statement list, merging the two-statement C++ stack-construction shape
+    * (`x = <operator>.alloc` followed by `Cls.Cls(args)`) into one `Expr.alloc`. See
+    * `ctorAlloc` for the expression-position form of the same pattern. */
+  def stmts(ks: List[AstNode]): List[ujson.Obj] = ks match {
+    case (asg: Call) :: (ctor: Call) :: rest if asg.methodFullName == "<operator>.assignment" =>
+      val merged =
+        for {
+          tr  <- kidsOf(asg) match {
+                   case (i: Identifier) :: r :: Nil => Some((i, r))
+                   case _                           => None
+                 }
+          if isOp(tr._2, "<operator>.alloc") && kidsOf(tr._2).isEmpty
+          cls <- ctorClassOf(ctor)
+        } yield {
+          val k = if (moduleScope || declaredGlobals.contains(tr._1.name)) "setGlobal"
+                  else "assign"
+          ujson.Obj("k" -> k, "x" -> localName(tr._1.name),
+                    "e" -> ujson.Obj("k" -> "alloc", "cls" -> cls,
+                                     "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1))))
+        }
+      merged match {
+        case Some(m) => m :: stmts(rest)
+        case None    => stmt(asg) :: stmts(ctor :: rest)
+      }
+    case k :: rest => stmt(k) :: stmts(rest)
+    case Nil       => Nil
+  }
+
   def stmt(n: AstNode): ujson.Obj = n match {
     case b: Block =>
       val kids = kidsOf(b)
-      forPattern(kids).getOrElse(seqOf(kids.map(stmt)))
+      forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case r: Return =>
       kidsOf(r).headOption match {
@@ -1024,6 +1478,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       kidsOf(c) match {
         case lhs :: rhs :: Nil => assignTo(lhs, rhs, Some(op))
         case _                 => holeS("assign:arity")
+      }
+    case c: Call if incrOps.contains(c.methodFullName) =>
+      kidsOf(c) match {
+        case tgt :: Nil =>
+          incrStmt(tgt, incrOps(c.methodFullName),
+                   c.methodFullName.stripPrefix("<operator>."))
+        case _ => holeS("op:" + c.methodFullName.stripPrefix("<operator>.") + ":arity")
       }
     case c: Call if c.methodFullName == "<operator>.pass" => skip
     case c: Call if c.methodFullName == "<operator>.raise" =>
@@ -1084,6 +1545,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
       holeS("scope:nonlocal-write")
     case u: Unknown    => holeS("stmt:UNKNOWN:" + u.code.trim.takeWhile(_ != ' '))
+    // A `namespace v8 { ... }` is a *naming* construct: it has no runtime effect at all,
+    // and the functions and classes inside it are exported as their own entries with
+    // their qualified names already on them. Nothing is dropped by skipping it — the
+    // block itself never had behaviour to drop. This is the same call `case m: MethodRef`
+    // and `case t: TypeRef` already make one line below.
+    case nb: NamespaceBlock => skip
     case other         => holeS("stmt:" + other.label)
   }
 
@@ -1164,6 +1631,33 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // `<module>`/`<global>` pseudo-methods are excluded from *this* list too, and re-added
   // below as initializers, so they never inflate the function count either.
   val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
+  val cppExts   = List(".c", ".h", ".cpp", ".cc", ".hpp")
+
+  /** The name a method is exported under.
+    *
+    * For C++ this rewrites a **constructor** — whose `fullName` repeats the class, as in
+    * `v8.internal.SimpleStringBuilder.SimpleStringBuilder:void(char*,int)` — to
+    * `v8.internal.SimpleStringBuilder.__init__`. That is not cosmetic: `evalExpr`'s
+    * `.alloc` case runs `ctx.resolveMethod cls "__init__"` and nothing else, so without
+    * the rewrite every `Expr.alloc` produced by `ctorAlloc` would allocate an object with
+    * no fields, and every subsequent `p->f` would read `unit`. Core's constructor
+    * convention is Python's spelling of a universal idea; this is the C++ spelling of the
+    * same one, and naming them alike is what makes the two frontends share a semantics.
+    *
+    * Java's `<init>` and Kotlin's are *not* caught by this rule (their last two segments
+    * differ), which is deliberate — they have their own conventions and no evidence here. */
+  def exportName(m: Method): String = {
+    val fn = mangledFullName(m.fullName)
+    if (!cppFile) fn
+    else {
+      val base = fn.takeWhile(_ != ':')
+      val segs = base.split('.').filter(_.nonEmpty).toList
+      segs.reverse match {
+        case n :: p :: _ if n == p && n != "ANY" => segs.dropRight(1).mkString(".") + ".__init__"
+        case _                                   => fn
+      }
+    }
+  }
 
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
     * the file-level pseudo-method, where every identifier assignment is a global write. */
@@ -1171,6 +1665,17 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     moduleScope  = isModule
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    def fieldReceiverNames(op: String): Set[String] =
+      m.body.ast.isCall.filter(_.methodFullName == op).l.flatMap { c =>
+        val ks = kidsOf(c)
+        if (ks.size < 2) None else Some(ks(ks.size - 2))
+      }.collect { case i: Identifier => i.name }.toSet
+    valueReceivers = fieldReceiverNames("<operator>.fieldAccess")
+    ptrReceivers   = fieldReceiverNames("<operator>.indirectFieldAccess")
+    localTypes   = (m.local.l.map(l => l.name -> l.typeFullName) ++
+                    m.parameter.l.map(pp => pp.name -> pp.typeFullName))
+                   .filter(_._2 != "ANY").toMap
     currentFile  = m.filename
     declaredGlobals =
       m.body.ast.collect { case u: Unknown if u.code.trim.startsWith("global ") => u }
@@ -1189,11 +1694,14 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       }
       .groupBy(_._1).collect { case (k, List(one)) => k -> one._2 }.toMap
     attrsOf = m.body.ast.isCall
-      .filter(_.methodFullName == "<operator>.fieldAccess").l
+      .filter(c => fieldOps.contains(c.methodFullName)).l
       .flatMap(fa => asField(fa).collect { case (r: Identifier, f) => r.name -> f })
       .groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
     val body = stmt(m.body)
     moduleScope = false
+    localTypes = Map.empty
+    valueReceivers = Set.empty
+    ptrReceivers = Set.empty
     currentClass = None
     declaredGlobals = Set.empty
     boundMethods = Map.empty
@@ -1201,9 +1709,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     val ps = m.parameter.l.sortBy(_.index).filterNot(_.name == "self")
     val stars = ps.map(p => p.name -> paramStars(p, m.filename)).toMap
     val obj = ujson.Obj(
-      "name"   -> mangledFullName(m.fullName),
+      "name"   -> exportName(m),
       "file"   -> m.filename,
-      "params" -> ujson.Arr.from(ps.map(_.name)),
+      // `ps` is already sorted and self-filtered (needed for `*args`/`**kwargs`
+      // detection). `this` leaves the list for the same reason `self` does: `applyFunc`
+      // binds the receiver itself, under the name the body now uses.
+      "params" -> ujson.Arr.from(ps.map(_.name).filterNot(x => cppFile && x == "this")),
       "body"   -> body
     )
     // Builtin bases ride on the module *initializer* entry — the function that runs the
