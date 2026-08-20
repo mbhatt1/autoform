@@ -139,7 +139,7 @@ class Case:
         return ident
 
     def claim(self, ident, description, status=UNDEVELOPED, expression=None,
-              assumed=False, notes=None):
+              assumed=False, notes=None, evidence_kind=None, scope=None):
         node = {
             "id": self._new(ident),
             "sacmClass": "Claim",
@@ -152,6 +152,14 @@ class Case:
             # Isabelle/SACM: SACM claims admit structured expressions, so a formal
             # statement embeds directly rather than living only in prose.
             node["structuredExpression"] = expression
+        if evidence_kind:
+            # R9: what discharged this claim — PROOF | TEST | STATIC. A claim
+            # discharged by TEST is never a proved claim, however green it is.
+            node["evidenceKind"] = evidence_kind
+            node["proved"] = evidence_kind == PROOF
+        if scope:
+            # R8: the subject this claim is quantified over, stated on the node.
+            node["scope"] = scope
         if notes:
             node["notes"] = notes
         self.claims.append(node)
@@ -166,9 +174,13 @@ class Case:
         return node["id"]
 
     def evid(self, ident, description, artifact=None, value=None, status=None,
-             metric=None):
+             metric=None, evidence_kind=None, scope=None):
         node = {"id": self._new(ident), "sacmClass": "ArtifactReference",
                 "description": description, "artifact": artifact}
+        if evidence_kind:
+            node["evidenceKind"] = evidence_kind
+        if scope:
+            node["scope"] = scope
         if value is not None:
             node["value"] = value
         if metric:
@@ -260,6 +272,9 @@ def build_case(module, root):
         "graph": os.path.join(root, "formalization-graph.json"),
         "conformance": os.path.join(root, "conformance.json"),
         "mutation": os.path.join(root, "mutation.json"),
+        # The Lean-side trust ledger: call closure and dynamic-hole risk, which the
+        # AST alone cannot report (STRATEGY.md §17).
+        "ledger": os.path.join(root, f"ledger-{module}.json"),
         "axioms": os.path.join(root, "axioms.json"),
         # Fallback: the repo-wide audit sweep, if the per-module axiom dump is absent.
         "audit": os.path.join(root, "audit.json"),
@@ -275,6 +290,16 @@ def build_case(module, root):
                               "behaviour the semantics determines unconditionally.")
     c.term("conformance rate", "Fraction of differential test cases on which the Lean "
                                "Core interpreter and the real runtime agree.")
+    c.term("tested, not proved", "A claim discharged by sampled execution against an "
+                                 "independent oracle. It is real evidence — it is how "
+                                 "floored modulo, short-circuit evaluation and name "
+                                 "mangling were caught — but it quantifies over the "
+                                 "sample, not over all inputs. The trust ledger prints "
+                                 "this as `NOT PROVED : transpiler faithfulness`.")
+    c.term("coverage of a claim", "The fraction of the subject a claim is quantified over "
+                                  "that its evidence actually touched. A claim's status "
+                                  "is bounded by it (rule R8): 104 agreeing cases over 92 "
+                                  "of 238 functions say nothing about the other 146.")
     c.term("axiom basis", "The axioms the kernel-checked proofs actually depend on; "
                           "`sorryAx` in the basis defeats proof validity outright.")
 
@@ -295,8 +320,16 @@ def build_case(module, root):
     sub_status = {}
 
     # ---- G2 faithfulness ---------------------------------------------------
+    # R1 + R8 + R9. Three separate questions, previously collapsed into one tick:
+    #   (a) did the compared cases agree?            -> case-level result
+    #   (b) how much of the subject was compared?    -> coverage (R8)
+    #   (c) what kind of evidence is that?           -> TEST, not PROOF (R9)
+    # The old rule answered only (a) and emitted SUPPORTED for a claim quantified
+    # over "the translated functions" on evidence touching 39% of them, which also
+    # contradicted the trust ledger's `NOT PROVED : transpiler faithfulness`.
     g2 = "G2"
     conf = art["conformance"]
+    faith_children = []
     if conf is None:
         st = UNDEVELOPED
         notes = "conformance.json absent — no differential run for this module."
@@ -308,40 +341,107 @@ def build_case(module, root):
         div = conf.get("divergences", 0) or 0
         rate = (agree / total) if total else 0.0
         tag = conf.get("module")
+        covered = conf.get("functions_covered")
+        population = conf.get("functions_total") or 0
         notes = []
+        # (a) case-level result on the cases that were actually compared.
         if total == 0:
-            st = UNSUPPORTED
-            notes.append("zero comparable cases: the harness only compares module-level "
-                         "int→int functions, and this module yielded none. A vacuous "
-                         "oracle is not evidence.")
+            case_st = UNSUPPORTED
+            notes.append("zero comparable cases: a vacuous oracle is not evidence, it is "
+                         "an untested claim wearing a green tick.")
         elif div > 0:
-            st = DEFEATED
+            case_st = DEFEATED
             notes.append(f"{div} divergence(s) — the semantics is refuted on this corpus.")
         elif rate >= 1.0:
-            st = SUPPORTED
+            case_st = SUPPORTED
         else:
-            st = UNSUPPORTED
+            case_st = UNSUPPORTED
+        # Provenance (unchanged rule): unattributable evidence cannot support a claim
+        # about this subject.
         if tag is None:
-            # Honest provenance: the harness does not stamp the module it ran against,
-            # so this artifact cannot be attributed. Never silently assume it is ours.
-            if ORDER[st] >= ORDER[WEAK]:
-                st = WEAK
-            notes.append("conformance.json carries no module tag; provenance unconfirmed "
-                         "(it may be from another module's run).")
+            if ORDER[case_st] >= ORDER[WEAK]:
+                case_st = WEAK
+            notes.append("conformance.json carries no module tag; provenance unconfirmed.")
         elif tag != module:
-            st = UNDEVELOPED
+            case_st = UNDEVELOPED
             notes.append(f"conformance.json is tagged module={tag!r}, not {module!r}.")
+
+        e = c.evid("E1", f"Differential conformance vs {conf.get('runtime', '?')}: "
+                         f"{agree}/{total} agree, {div} divergence(s), over "
+                         f"{covered if covered is not None else '?'}/"
+                         f"{population or '?'} functions.",
+                   artifact="conformance.json", value=conf, metric="conformance-rate",
+                   evidence_kind=TEST,
+                   scope={"functionsExercised": covered, "functionsTotal": population})
+
+        off_subject = tag is not None and tag != module
+        # (b) narrow the claim to what the evidence covers. Narrowing keeps the claim
+        # *true*; weakening the status of an over-broad claim leaves a false claim on
+        # the page with a hedge attached.
+        n_cov = 0 if off_subject else (covered if covered is not None else 0)
+        population = 0 if off_subject else population
+        remainder = max((population or 0) - n_cov, 0)
+        exercised = None if off_subject else c.claim(
+            "G2.1",
+            f"On the {n_cov} function(s) the differential harness actually exercised, "
+            f"the Lean Core semantics + transpiler agree with the real runtime "
+            f"({agree}/{total} cases, {div} divergence(s)).",
+            case_st, evidence_kind=TEST,
+            scope={"functionsExercised": n_cov, "functionsTotal": population,
+                   "quantifiedOver": "exercised subset"},
+            notes="TESTED, NOT PROVED: this is sampled execution against CPython, not a "
+                  "theorem. It is the same fact the trust ledger reports as "
+                  "`NOT PROVED : transpiler faithfulness — see conformance.json`. "
+                  "The sample is what caught floored modulo, short-circuit evaluation, "
+                  "-INT_MIN and private name mangling (STRATEGY.md §19, §26).")
+        faith_children.append(case_st)
+
+        if exercised is not None:
+            c.link(e, exercised,
+                   "SUPPORTS" if case_st in (SUPPORTED, WEAK) else "COUNTERS")
+        if remainder > 0:
+            rest_st = UNDEVELOPED
+            c.claim("G2.2",
+                    f"On the remaining {remainder} translated function(s), never reached "
+                    f"by any differential case, the semantics agrees with the runtime.",
+                    rest_st, evidence_kind=None,
+                    scope={"functionsExercised": 0, "functionsTotal": remainder},
+                    notes="No evidence of any kind. Untouched by the oracle is not the "
+                          "same as correct; the structural ceilings on oracle reach "
+                          "(skip_unencodable_args, skip_varargs, skip_self_not_object — "
+                          "STRATEGY.md §27) bound this independently of translation "
+                          "coverage.")
+            faith_children.append(rest_st)
+
+        # (c) the population-level claim is the conjunction of the two, and separately
+        # capped by coverage so the number is on the node even when a leg is missing.
+        pop_st, frac = coverage_cap(weakest(faith_children), n_cov, population)
+        st = pop_st
+        if frac is not None:
+            notes.append(f"coverage {n_cov}/{population} = {frac:.1%} of the quantified "
+                         f"subject; R8 caps a population claim at its coverage.")
         cid = c.claim(g2, "The Lean Core semantics + transpiler agree with the real "
                           "runtime on the translated functions.", st,
+                      evidence_kind=TEST,
+                      scope={"functionsExercised": n_cov, "functionsTotal": population,
+                             "coverage": frac},
                       notes=" ".join(notes) or None)
-        e = c.evid("E1", f"Differential conformance vs {conf.get('runtime', '?')}: "
-                         f"{agree}/{total} agree, {div} divergence(s).",
-                   artifact="conformance.json", value=conf, metric="conformance-rate")
-        c.link(e, cid, "SUPPORTS" if st in (SUPPORTED, WEAK) else "COUNTERS")
+        if exercised is None:
+            c.link(e, cid, "COUNTERS")
+        for child in ("G2.1", "G2.2"):
+            if any(n["id"] == child for n in c.claims):
+                c.link(child, cid, "SUPPORTS")
         if total == 0:
             d = c.claim("D1", "Differential coverage is empty for this module, so "
                               "faithfulness is untested rather than confirmed "
                               "(STRATEGY.md §13 Tier 2.3).", UNSUPPORTED)
+            c.link(d, cid, "COUNTERS")
+        elif frac is not None and frac < COVERAGE_FULL:
+            # A defeater with teeth: it is not decorative, it is what holds G2 down.
+            d = c.claim("D2",
+                        f"Coverage defeater: {population - n_cov} of {population} "
+                        f"functions are unexercised, so no differential result can speak "
+                        f"for them. Undefeated.", UNSUPPORTED)
             c.link(d, cid, "COUNTERS")
     sub_status[g2] = st
     c.link(cid, strat, "SUPPORTS")
@@ -386,12 +486,80 @@ def build_case(module, root):
                 count=n, sites=sites.get(label))
             c.link(aid, cov, "SUPPORTS")
             c.link(aid, top, "SUPPORTS")
-        # Sub-claim on the restricted core, which *can* be supported.
-        core_st = SUPPORTED if holefree > 0 else UNSUPPORTED
-        core = c.claim("G3.1", f"The {holefree}-function verifiable core of {module} is "
-                               "hole-free and therefore analysable unconditionally.",
-                       core_st)
+        # ---- The restricted core -------------------------------------------
+        # §17: static hole-freedom is an UPPER BOUND, not a guarantee — the
+        # interpreter introduces holes at runtime that the AST cannot show. So the
+        # honest restricted claim is the call-closed core from the Lean ledger, and
+        # even that is a *static* claim; runtime hole-freedom is a separate goal.
+        led = art["ledger"]
+        led_ok = isinstance(led, dict) and (led.get("module") == module)
+        closed = led.get("verifiableCore") if led_ok else None
+        risk = led.get("dynamicHoleRisk") if led_ok else None
+        if led_ok:
+            led_fns = led.get("functions") or fn_total
+            c.evid("E6", f"Trust ledger: {closed}/{led_fns} functions hole-free AND "
+                         f"call-closed; dynamic-hole risk {risk} constructs may hole at "
+                         f"runtime.",
+                   artifact=f"ledger-{module}.json",
+                   value={"verifiableCore": closed, "functions": led_fns,
+                          "holeFree": led.get("holeFree"),
+                          "dynamicHoleRisk": risk},
+                   metric="call-closed-core", evidence_kind=STATIC,
+                   status=None)
+
+        core_n = closed if closed is not None else holefree
+        core_st = SUPPORTED if core_n else UNSUPPORTED
+        core_notes = None
+        if closed is None:
+            # Without call closure, "hole-free" counts functions whose behaviour is
+            # entirely unknown (a call to an untranslated function is indistinguishable
+            # in the AST from a call to a translated one — §17). Cap accordingly.
+            core_st = weakest([core_st, WEAK])
+            core_notes = (f"ledger-{module}.json absent or off-subject: call closure "
+                          f"unverified, so {holefree} is the static upper bound, not the "
+                          f"verifiable core (STRATEGY.md §17).")
+        core = c.claim(
+            "G3.1",
+            f"The {core_n}-function core of {module} is hole-free and call-closed in the "
+            f"AST — i.e. statically free of untranslated constructs.",
+            core_st, evidence_kind=STATIC,
+            scope={"functions": core_n, "functionsTotal": fn_total,
+                   "quantifiedOver": "call-closed core"},
+            notes=core_notes)
         c.link(core, cov, "SUPPORTS")
+        if led_ok:
+            c.link("E6", core, "SUPPORTS")
+
+        # G3.2 — the claim people actually read G3.1 as making. Static analysis cannot
+        # discharge it; only execution can, and execution has covered 39% of the module.
+        exec_cov = (art["conformance"] or {}).get("functions_covered") \
+            if isinstance(art["conformance"], dict) else None
+        if risk == 0:
+            dyn_st, dyn_frac = SUPPORTED, None
+            dyn_note = "no construct in the module can hole at runtime."
+        else:
+            dyn_st, dyn_frac = coverage_cap(WEAK, exec_cov or 0, fn_total)
+            dyn_note = (f"{risk if risk is not None else 'an unreported number of'} "
+                        f"constructs are input-dependent and may hole at runtime; only "
+                        f"execution can settle this, and the differential harness has "
+                        f"reached {exec_cov if exec_cov is not None else 0}/{fn_total} "
+                        f"functions. Static hole-freedom is an upper bound "
+                        f"(STRATEGY.md §17, §19).")
+        dyn = c.claim(
+            "G3.2",
+            f"The core of {module} is hole-free at RUNTIME: no execution of it reaches a "
+            f"hole on any input.",
+            dyn_st, evidence_kind=TEST if risk != 0 else STATIC,
+            scope={"functionsExercised": exec_cov or 0, "functionsTotal": fn_total,
+                   "coverage": dyn_frac},
+            notes=dyn_note)
+        c.link(dyn, cov, "SUPPORTS")
+        if dyn_st != SUPPORTED:
+            d3 = c.claim("D3", "Upper-bound defeater: `Func.total` is computed from the "
+                               "same AST it describes, so it cannot see holes the "
+                               "interpreter introduces. Undefeated except where "
+                               "execution has looked.", UNSUPPORTED)
+            c.link(d3, core, "COUNTERS")
     sub_status["G3"] = st
     c.link(cov, strat, "SUPPORTS")
 
@@ -447,7 +615,7 @@ def build_case(module, root):
             c.evid("E3", f"Mutation score: {killed}/{tot} mutants killed ({score:.1%}).",
                    artifact="mutation.json",
                    value={"killed": killed, "total": tot}, metric="mutation-score",
-                   status=st)
+                   evidence_kind=TEST, status=st)
             c.link("E3", spec, "SUPPORTS" if st == SUPPORTED else "COUNTERS")
     sub_status["G4"] = st
     c.link(spec, strat, "SUPPORTS")
@@ -484,16 +652,61 @@ def build_case(module, root):
             st = SUPPORTED
         else:
             st = UNSUPPORTED
+        # R4 + R8: the sweep in audit.json is REPO-wide, not module-scoped. Same
+        # standard already applied to conformance.json (untagged) and mutation.json
+        # (off-subject): evidence that cannot be attributed to this subject cannot
+        # fully support a claim about this subject. Here the evidence is not
+        # off-subject — the module is interpreted by the very environment that was
+        # swept — so it is not UNDEVELOPED; but it is not module-scoped either, and
+        # no module-specific theorem set exists, so it is capped at WEAK and the
+        # part that *is* earned is asserted as a narrowed sibling.
+        repo_scoped = ax_file != "axioms.json"
+        g5_notes = [f"sorryAx present: {bad}"] if bad else \
+            ([] if n_thms else ["no theorems recorded — nothing to validate."])
+        if repo_scoped and not bad:
+            if ORDER[st] >= ORDER[WEAK]:
+                st = WEAK
+            g5_notes.append(
+                f"the {n_thms} declaration(s) swept are repo-wide (audit.json), not "
+                f"theorems about {module}: no module-scoped `#audit_axioms` dump exists, "
+                f"so nothing here is attributable to this module in particular. "
+                f"Capped at WEAK by the same provenance rule applied to conformance.json "
+                f"and mutation.json.")
         pv = c.claim("G5", "All theorems about this module are kernel-checked and depend "
                            "on no unsound axiom.", st,
-                     notes=f"sorryAx present: {bad}" if bad else
-                     (None if n_thms else "no theorems recorded — nothing to validate."))
+                     evidence_kind=PROOF,
+                     scope={"scopedTo": "repository" if repo_scoped else module,
+                            "declarations": n_thms},
+                     notes=" ".join(g5_notes) or None)
         c.evid("E4", f"Axiom basis: {', '.join(map(str, used)) or 'none'} "
                      f"over {n_thms} theorem/declaration(s)"
                      + (f"; source: {ax['source']}" if ax.get("source") else "") + ".",
                artifact=ax_file, value={"axioms": used, "theorems": n_thms},
-               metric="axiom-basis", status=st)
-        c.link("E4", pv, "SUPPORTS" if st == SUPPORTED else "COUNTERS")
+               metric="axiom-basis", evidence_kind=PROOF,
+               scope={"scopedTo": "repository" if repo_scoped else module}, status=st)
+        c.link("E4", pv, "SUPPORTS" if st in (SUPPORTED, WEAK) else "COUNTERS")
+        if repo_scoped:
+            # The narrowed claim that the sweep does earn, stated as true rather than
+            # hedged: it is about the repository, and it is about the repository that
+            # this module's semantics lives in.
+            repo_st = DEFEATED if bad else (SUPPORTED if n_thms else UNSUPPORTED)
+            chk = (art["audit"] or {}).get("lean4checker") \
+                if isinstance(art["audit"], dict) else None
+            g51 = c.claim(
+                "G5.1",
+                f"The Autoform repository's {n_thms} kernel-checked declaration(s) — "
+                f"which include the Core semantics this module is interpreted by — rest "
+                f"only on {', '.join(map(str, used)) or 'no'} axiom(s), with no leak.",
+                repo_st, evidence_kind=PROOF,
+                scope={"scopedTo": "repository", "declarations": n_thms},
+                notes=(f"lean4checker: {chk.get('status')} ({chk.get('mode')})"
+                       if isinstance(chk, dict) else None))
+            c.link(g51, pv, "SUPPORTS")
+            c.claim("C2", "Context: audit.json's axiom sweep is repo-wide. It bounds the "
+                          "axiom basis of everything in the repository, including this "
+                          "module's semantics, but it is not evidence about theorems "
+                          "specific to this module — there are none.",
+                    assumed=True, status="ASSUMED")
     sub_status["G5"] = st
     c.link(pv, strat, "SUPPORTS")
 
@@ -506,7 +719,16 @@ def build_case(module, root):
         blockers.append(f"{sum(labels.values())} unresolved holes carried as assumptions")
         top_status = weakest([top_status, UNSUPPORTED])
     if sub_status.get("G2") != SUPPORTED:
-        blockers.append("translation faithfulness not established")
+        blockers.append("translation faithfulness not established over the whole module "
+                        "(see G2 coverage)")
+    # R9: even a fully-covering differential run is TEST evidence. G1 asserts behaviour
+    # for all inputs; sampled execution cannot discharge that, so the top claim carries
+    # the distinction the trust ledger prints as `NOT PROVED : transpiler faithfulness`.
+    g2_node = next((n for n in c.claims if n["id"] == "G2"), None)
+    if g2_node is not None and g2_node.get("evidenceKind") == TEST:
+        blockers.append("transpiler faithfulness is TESTED, not PROVED "
+                        "(agrees with the trust ledger's NOT PROVED line)")
+        top_status = weakest([top_status, WEAK])
     for node in c.claims:
         if node["id"] == top:
             node["status"] = top_status
@@ -611,14 +833,22 @@ def render_markdown(c, meta):
     L.append("```")
     L.append(f"{GLYPH[st]} G1  module {c.module} behaves as specified   [{st}]")
     L.append("└── S1  argue over the four failure modes")
-    order = ["G2", "G3", "G3.1", "G4", "G5"]
+    order = ["G2", "G2.1", "G2.2", "G3", "G3.1", "G3.2", "G4", "G5", "G5.1"]
     for cid in order:
         n = byid.get(cid)
         if not n:
             continue
         s = n["status"]
-        indent = "    │   └── " if cid == "G3.1" else "    ├── "
-        L.append(f"{indent}{GLYPH.get(s, '?')} {cid}  {n['description']}  [{s}]")
+        indent = "    │   └── " if "." in cid else "    ├── "
+        kind = n.get("evidenceKind")
+        cov = (n.get("scope") or {}).get("coverage")
+        tail = f"  [{s}"
+        if kind:
+            tail += f"; {kind}"
+        if cov is not None:
+            tail += f"; coverage {cov:.1%}"
+        tail += "]"
+        L.append(f"{indent}{GLYPH.get(s, '?')} {cid}  {n['description']}{tail}")
         for e in c.evidence:
             if any(l["source"] == e["id"] and l["target"] == cid for l in c.links):
                 mark = "evidence" if any(
@@ -656,6 +886,14 @@ def render_markdown(c, meta):
     L.append(f"- Undeveloped goals: **{', '.join(und) or 'none'}**.")
     L.append(f"- Unsupported/defeated: **{', '.join(bad) or 'none'}**.")
     L.append(f"- Artifacts missing: **{', '.join(meta['artifactsMissing']) or 'none'}**.")
+    g2n = byid.get("G2")
+    if g2n is not None:
+        cov = (g2n.get("scope") or {}).get("coverage")
+        L.append(f"- Faithfulness: **TESTED, NOT PROVED**"
+                 + (f", over {cov:.1%} of the module's functions" if cov else "")
+                 + ". This is the same statement as the trust ledger's "
+                   "`NOT PROVED : transpiler faithfulness — see conformance.json`; the "
+                   "two artifacts agree.")
     L.append("")
     return "\n".join(L)
 

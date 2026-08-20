@@ -480,6 +480,13 @@ def main():
     if not targets:
         return 2
 
+    # Safety net: a mutation run that is interrupted (or killed by an impatient operator)
+    # otherwise leaves a mutant on disk, where a concurrent commit can capture it. The
+    # backup is written once, before anything is touched, and removed on a clean exit.
+    backup = path + ".mutate-backup"
+    with open(backup, "w", encoding="utf-8") as f:
+        f.write(original)
+
     all_mutants = (gen_mutants_generated(lines, decls) if generated
                    else gen_mutants(lines, decls))
     if args.decls:
@@ -541,7 +548,12 @@ def main():
                 rec["verdict"] = {}
                 rec["timeout"] = timed_out
                 for t in targets:
-                    dead = (t in hit_thms) or timed_out or (rc != 0 and not errs)
+                    # A build failure with no attributable line is counted as a kill for
+                    # every theorem — coarse, but it must not fire merely because the
+                    # errors landed in the *spec* file, which is the normal cross-file
+                    # case and is attributable via `hit_thms`.
+                    unattributable = rc != 0 and not errs and not spec_errs
+                    dead = (t in hit_thms) or timed_out or unattributable
                     if dead:
                         stats[t]["killed"] += 1
                     else:
@@ -555,6 +567,8 @@ def main():
     finally:
         with open(path, "w", encoding="utf-8") as f:
             f.write(original)
+        if os.path.exists(backup):
+            os.remove(backup)
         # make sure the restored file is what the build cache sees next time
         run_build(root, build_module, args.timeout)
 

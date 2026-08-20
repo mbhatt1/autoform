@@ -361,6 +361,9 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * manager's `__enter__`/`__exit__` this way and then calls the *temporary*, which
     * leaves a call with no name at all. See `boundMethodCall`. */
   var boundMethods    = Map.empty[String, (String, String)]
+  /** Receiver name -> attribute names read off it anywhere in the method being
+    * translated. Corroborates the second form of `boundMethodCall`. */
+  var attrsOf         = Map.empty[String, Set[String]]
 
   /** Static evidence that an operand is a C string/array-of-char. Joern's C frontend
     * types both `char *s` and `"abc"` as `char*`, including on literals. */
@@ -535,15 +538,21 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def boundMethodCall(c: Call, callee: Option[AstNode],
                       args: List[AstNode]): Option[ujson.Obj] =
     for {
-      cal      <- callee
-      t        <- Option(cal).collect { case i: Identifier => i.name }
-      (r, m)   <- boundMethods.get(t)
-      recvNode <- c.astChildren.collect { case a: AstNode => a }.l
-                    .find(k => aidx(k) == 0 && k.isInstanceOf[Identifier] &&
-                               k.asInstanceOf[Identifier].name == r)
-      _ = recvNode
+      cal <- callee
+      t   <- Option(cal).collect { case i: Identifier => i.name }
+      // The receiver is where the Python frontend always puts it: argument index 0.
+      r   <- c.astChildren.collect { case a: AstNode => a }.l
+               .collectFirst { case i: Identifier if aidx(i) == 0 => i.name }
+      // Two spellings, both grounded in this method's own CPG rather than assumed. The
+      // frontend names the callee after the temporary for `__enter__` and after the
+      // attribute itself for `__exit__`, so accept either — but only when the receiver
+      // that the *binding* used is the receiver this call passes, or the attribute is one
+      // this method is seen to read off that receiver. Neither can turn `g = a.m; g()`
+      // into a call on some unrelated object.
+      m   <- boundMethods.get(t).collect { case (br, bm) if br == r => bm }
+               .orElse(if (attrsOf.getOrElse(r, Set.empty).contains(t)) Some(t) else None)
     } yield ujson.Obj("k" -> "mcall", "recv" -> ujson.Obj("k" -> "name", "v" -> r),
-                      "m" -> m, "args" -> exprs(args))
+                      "m" -> mangleName(m, currentClass), "args" -> exprs(args))
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
@@ -948,11 +957,16 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         }
       }
       .groupBy(_._1).collect { case (k, List(one)) => k -> one._2 }.toMap
+    attrsOf = m.body.ast.isCall
+      .filter(_.methodFullName == "<operator>.fieldAccess").l
+      .flatMap(fa => asField(fa).collect { case (r: Identifier, f) => r.name -> f })
+      .groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
     val body = stmt(m.body)
     moduleScope = false
     currentClass = None
     declaredGlobals = Set.empty
     boundMethods = Map.empty
+    attrsOf = Map.empty
     ujson.Obj(
       "name"   -> mangledFullName(m.fullName),
       "file"   -> m.filename,

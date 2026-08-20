@@ -1340,3 +1340,73 @@ honesty, not by leniency.
 (6,995, which Core has no type for); `skip_varargs` 13,188; `skip_self_not_object` 1,361.
 Top inconclusive labels: `setField:cache_clear:non-object` 49, `mcall:__init__:non-object`
 36, `call:super` 30, `call:set` 22.
+
+## 28. Refinement reaches real code shapes
+
+§13 called the missing deep≈shallow refinement "the single largest architectural debt", and
+§20 closed the straight-line case. Two obligations remained, and they were the ones that
+mattered: refinement could not touch a loop or a mutated object — i.e. not what programs
+are made of. Both are now closed.
+
+### The loop rule
+
+`execStmt_loop_rule` is a Hoare while-rule adapted to the fuel-indexed interpreter, with
+one design choice doing the work: the invariant `I : Nat → Heap → Env → Prop` is **indexed
+by a termination measure that must strictly decrease**, and the fuel bound is derived from
+it. Partial correctness and termination are therefore proved *together* — at measure `0`
+the step obligation would have to produce `m' < 0`, so the invariant can only exit.
+`execFor_rule` is the `for` counterpart with the remaining sequence as the measure.
+
+Proved on real translated functions, not toys:
+
+* `sumto_refines` (C, from `math.c`): `sumto n = n*(n+1)/2`. The per-iteration `Fits32`
+  obligations are discharged from a **closed-form** domain via monotonicity of the
+  triangular-number function, so the domain reads `0 ≤ n ∧ n ≤ 65535 ∧ Fits32 (n*(n+1)/2)`
+  rather than a quantified per-step mess.
+* `gcdish_refines` (Python, from `ops.py`): `gcdish a b = Int.gcd a b`. The measure is
+  `b.natAbs`; correctness rests on `gcd a b = gcd b (a % b)`, and `%` here is `.python`
+  (`Int.fmod`), which agrees with `Int.emod` only because both operands are nonnegative.
+  **The dialect split reappearing inside a loop invariant** — §16's parameterization is not
+  a peripheral concern, it reaches into the proof obligations themselves.
+
+### The representation predicate
+
+`HeapRep α` pairs a class name with a **partial** abstraction function, and
+`Represents R h r a` says heap object `r` represents abstract value `a`. Two lemmas make it
+usable: `Represents.frame` (a write to another address preserves it) and
+`Represents.update` (a write to this address re-establishes it), both proved against the
+real `Heap.setField` (`List.mapIdx`).
+
+`abs` being partial is the load-bearing choice: an ill-formed object represents *nothing*
+rather than something wrong. Concretely, an instance of a function-local class (one with a
+captured frame) returns `none`, so it is not represented rather than silently
+mis-represented.
+
+Proved end to end on a `Counter` class: `bump_step` is a full dispatch of a method that
+**mutates its receiver** — receiver evaluation, argument evaluation, `resolveMethod`
+dispatch, field read, field write, return — ending in a heap that still represents, now at
+`a + k`. `total_run` carries an invariant through `execFor_rule` over an arbitrary list,
+through object construction and `__init__`; `total_refines` lands in `Refines` proper, so
+§20's non-vacuity theorems apply (no hole, terminates in `|ys| + 13` fuel).
+
+### An incidental finding worth knowing
+
+**`String.endsWith` does not reduce definitionally** — it goes through `String.Slice`
+pattern matching. So `Ctx.resolveMethod`, which resolves by suffix, cannot be discharged by
+`rfl` the way `Ctx.resolve` can on an exact name; it needs `simp [String.endsWith]; decide`
+per name. Any proof touching method dispatch will hit this.
+
+### Still open, stated not admitted
+
+**Loop cost is input-dependent, but `Refines` carries a constant fuel bound.** So the
+`Refines` instances need bounded domains (`n ≤ 65535`, `b ≤ 1000000`) while the parametric
+`_run` theorems are the sharp statements. Making `Refines` carry an argument-dependent
+bound is the honest fix and is not done — this is a real limitation of the refinement
+relation, not of these proofs.
+
+Also: `n ≤ 65535` in `sumto`'s domain is *implied* by `Fits32 (n*(n+1)/2)` but stated
+rather than derived, because deriving it needs nonlinear arithmetic unavailable without
+Mathlib. And representation covers field-mutating objects only; container classes need
+boxed containers first.
+
+All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.

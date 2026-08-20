@@ -1,6 +1,7 @@
 import Batteries
 import Std.Tactic.BVDecide
 import Autoform.Lang.Imp.Semantics
+import Autoform.Lang.Core.Numeric
 
 /-!
 # Tiered proof portfolio (STRATEGY.md §5, Tier 3 of the gap list)
@@ -252,12 +253,25 @@ def unavailableTiers : IO (List String) := do
     , "tier 4/5: best-first search with decomposition/generalization — implemented; \
        reached only with `portfolio (maxTier := 4)` or higher" ] : List String)
 
+/-- Run an attempt with the message log restored afterwards.
+
+A failing rung is allowed to be noisy — `simp` can blow the recursion limit, `omega` can
+complain — but that noise is *not* a build error: the goal is still handled by the next
+rung, or reported honestly by the transcript. Anything a rung has to say about its own
+success is untrusted anyway; what counts is `screenProof`. -/
+def quietly {α} (x : TermElabM α) : TermElabM α := do
+  let msgs := (← getThe Core.State).messages
+  try
+    x
+  finally
+    modifyThe Core.State fun st => { st with messages := msgs }
+
 /-- Run one rung against `goal`, restoring all state if it does not fully close it.
 
 Success requires *both* that no goals remain **and** that the resulting proof term
 passes `screenProof`. The second check is the anti-self-certification guard: a rung is
 not trusted to report its own honesty. -/
-def tryRung (goal : MVarId) (r : Rung) : TermElabM Bool := do
+def tryRung (goal : MVarId) (r : Rung) : TermElabM Bool := quietly do
   let s ← saveState
   try
     let gs ← Tactic.run goal (Tactic.evalTactic r.tac)
@@ -274,7 +288,7 @@ def tryRung (goal : MVarId) (r : Rung) : TermElabM Bool := do
 /-- Apply `tac` to `goal` as a *move*: it may leave subgoals. Returns them, or `none` if
 the tactic failed or made no progress. State is restored on failure, and the caller is
 responsible for restoring it if it abandons the branch. -/
-def tryMove (goal : MVarId) (tac : TSyntax `tactic) : TermElabM (Option (List MVarId)) := do
+def tryMove (goal : MVarId) (tac : TSyntax `tactic) : TermElabM (Option (List MVarId)) := quietly do
   let s ← saveState
   let before ← instantiateMVars (← goal.getType)
   try
@@ -727,23 +741,30 @@ partial def toSMT (e : Expr) : MetaM (Option String) := do
         let some b ← form e.bindingBody! | return none
         return some s!"(=> {a} {b})"
       return none
-  -- strip the ∀ prefix, declaring each variable
+  -- Strip the ∀/→ prefix: numeric binders become declarations, propositional ones
+  -- (the hypotheses) become assumptions. `unsat` on hypotheses ∧ ¬conclusion is
+  -- exactly "the implication is valid".
   forallTelescope e fun xs body => do
     let mut decls : Array String := #[]
+    let mut hyps : Array String := #[]
     for x in xs do
-      let n := (← x.fvarId!.getUserName).toString
       let ty ← instantiateMVars (← inferType x)
+      let n := (← x.fvarId!.getUserName).toString
       if ty.isConstOf ``Int then
         decls := decls.push s!"(declare-const {n} Int)"
       else if ty.isConstOf ``Nat then
         decls := decls.push s!"(declare-const {n} Int)"
-        decls := decls.push s!"(assert (>= {n} 0))"
+        hyps := hyps.push s!"(assert (>= {n} 0))"
+      else if ← Meta.isProp ty then
+        let some h ← form ty | return none
+        hyps := hyps.push s!"(assert {h})"
       else
         return none
     let some b ← form body | return none
     return some <|
-      "(set-logic QF_LIA)\n" ++ String.intercalate "\n" decls.toList ++
-      s!"\n; the NEGATION of the claim; `unsat` therefore means the claim is valid\n\
+      "(set-logic QF_LIA)\n" ++ String.intercalate "\n" decls.toList ++ "\n" ++
+      String.intercalate "\n" hyps.toList ++
+      s!"\n; the NEGATION of the conclusion; `unsat` therefore means the claim is valid\n\
         (assert (not {b}))\n(check-sat)\n"
 
 /-- `#smt_evidence name : <prop>` — hand a linear-arithmetic statement to an external
@@ -823,3 +844,150 @@ open Lean.Elab.Command in
     logInfo <| s!"open obligations: {os.size}\n" ++ String.intercalate "\n" body
 
 end Autoform.Tactics
+
+
+/-! ## Demonstration on real goals from this project
+
+These are not toy goals invented to make the portfolio look good: they are statements
+about `Autoform.Imp`'s actual semantics and about `Autoform.Core.Numeric`'s machine
+integers. Each `portfolio!` prints which rung won, so the build log itself is the
+ledger evidence. -/
+
+namespace Demo
+
+open Autoform.Imp
+open Autoform.Core (IntType Width)
+
+/-- Expression evaluation on a closed term: tier 1, `rfl`. -/
+example : evalExpr State.empty (.add (.lit 2) (.mul (.lit 3) (.lit 4))) = 14 := by
+  portfolio!
+
+/-- A variable read against a concrete store: tier 1. -/
+example : evalExpr [7, 9] (.sub (.var 1) (.var 0)) = 2 := by portfolio!
+
+/-- Boolean evaluation, decidable comparison over `Int`. -/
+example : evalBExpr [4] (.and (.le (.var 0) (.lit 9)) (.not .ff)) = true := by
+  portfolio!
+
+/-- Running an actual program: assign then skip. The portfolio closes this by
+computation, which is exactly the property that makes `evalStmt` an oracle. -/
+example : evalStmt 4 State.empty (.seq (.assign 0 (.lit 7)) .skip) = .ok [7] := by
+  portfolio!
+
+/-- Zero fuel always runs out — bounded to the cheap tier to show `maxTier` works. -/
+example (s : State) (c : Stmt) : evalStmt 0 s c = .outOfFuel := by
+  portfolio! (maxTier := 1)
+
+/-- The effect boundary is never silently executed: a hole is reported, not skipped. -/
+example (n : Nat) (s : State) (h : Nat) :
+    evalStmt (n + 1) s (.opaqueHole h) = .hitHole h := by
+  portfolio! (maxTier := 1)
+
+/-- A loop whose guard is false terminates in the same state, under the *relation*. -/
+example (s : State) (c : Stmt) : BigStep s (.loop .ff c) s := by portfolio!
+
+/-- Assignment agrees with the relation, for *all* states and expressions. -/
+example (s : State) (x : Var) (e : Expr) :
+    BigStep s (.assign x e) (s.set x (evalExpr s e)) := by portfolio!
+
+/-- Plain arithmetic side-condition of the kind the transpiler emits. -/
+example (a b : Nat) : a + b + 0 = b + a := by portfolio! (maxTier := 1)
+
+/-! ### Tier 2, for real: `bv_decide`
+
+`Numeric.lean`'s open-obligation list says its bitwise/shift laws "should be closed with
+`bv_decide` after a `BitVec` refinement", and `bv_decide` is in Lean **core**. These are
+those obligations, stated at the `BitVec` level where they are the actual content:
+
+* obligation 1 (`wrap` is a ring homomorphism ℤ → ℤ/2ⁿ) is exactly "truncation commutes
+  with `+` and `*`",
+* obligation 3 (`shl_eq_mul`) is `x <<< k = x * 2 ^ k`,
+* obligation 4 (`band_self` and the de Morgan laws).
+
+Tiers 1–2-without-`bv_decide` closed none of these; SAT + a kernel-checked LRAT
+certificate closes all of them in about a second each. `#print axioms` on a `bv_decide`
+proof lists only `propext`/`Quot.sound`/`Classical.choice` — no `ofReduceBool`, no
+compiler trust — which is why this rung is allowed in and `native_decide` is not. -/
+
+/-- Obligation 1, additive half: truncation is an additive homomorphism. -/
+example (x y : BitVec 64) : (x + y).truncate 32 = x.truncate 32 + y.truncate 32 := by
+  portfolio!
+
+/-- Obligation 1, multiplicative half. -/
+example (x y : BitVec 64) : (x * y).truncate 32 = x.truncate 32 * y.truncate 32 := by
+  portfolio!
+
+/-- Obligation 3: shifting left by `k` is multiplication by `2 ^ k`, in-width. -/
+example (x : BitVec 32) : x <<< 5 = x * 32 := by portfolio!
+
+/-- Obligation 4: de Morgan for the machine bitwise operators. -/
+example (x y : BitVec 32) : ~~~(x &&& y) = ~~~x ||| ~~~y := by portfolio!
+
+/-! ### Tiers 4–5: search with decomposition
+
+Each of the following is *refused* by the flat ladder (the `#portfolio_check` above each
+one shows the tier-1–2 refusal, printed into the build log) and *closed* by the bounded
+best-first search, which finds the case analysis the flat rungs cannot: split the
+`IntType`, split the `Width` under it, then `decide` the leaves. The transcript of the
+winning path is in the `portfolio!` output. -/
+
+#portfolio_check ∀ t : IntType, 0 < t.modulus
+example : ∀ t : IntType, 0 < t.modulus := by portfolio! (maxTier := 5)
+
+#portfolio_check ∀ t : IntType, 0 < t.half
+example : ∀ t : IntType, 0 < t.half := by portfolio! (maxTier := 5)
+
+#portfolio_check ∀ w : Width, w.bits % 8 = 0
+example : ∀ w : Width, w.bits % 8 = 0 := by portfolio! (maxTier := 5)
+
+#portfolio_check ∀ t : IntType, t.wrap 0 = 0
+example : ∀ t : IntType, t.wrap 0 = 0 := by portfolio! (maxTier := 5)
+
+#portfolio_check ∀ t : IntType, t.isFixed = true → t.lo ≠ none
+example : ∀ t : IntType, t.isFixed = true → t.lo ≠ none := by portfolio! (maxTier := 5)
+
+/-! A statement about the interpreter, not about arithmetic: a hole never yields a
+state. Flat rungs cannot do it (it needs `cases` on the fuel *and* on the outcome); the
+search can. -/
+#portfolio_check ∀ (n : Nat) (s : State) (h : Nat), evalStmt n s (.opaqueHole h) ≠ .ok s
+example : ∀ (n : Nat) (s : State) (h : Nat),
+    evalStmt n s (.opaqueHole h) ≠ .ok s := by portfolio! (maxTier := 5)
+
+/-! ### Goals the portfolio correctly refuses
+
+`#portfolio_check` runs the same ladder but introduces no declaration, so a refusal is
+visible in the build log without anything being admitted. Both of these need induction
+over a derivation and over fuel simultaneously — beyond the bounded search too, and the
+portfolio says so instead of guessing. -/
+
+#portfolio_check ∀ (s : State) (c : Stmt) (s₁ s₂ : State),
+  BigStep s c s₁ → BigStep s c s₂ → s₁ = s₂
+
+#portfolio_check ∀ (s s' : State) (c : Stmt),
+  BigStep s c s' → ∃ n, evalStmt n s c = .ok s'
+
+/-! The refusals are then recorded as structured open obligations rather than as
+`sorry`-backed theorems. Nothing below is provable-by-citation: `#obligation` produces
+no proof term, only an `Obligation` record. -/
+#obligation Imp.bigStep_deterministic :
+  ∀ (s : State) (c : Stmt) (s₁ s₂ : State), BigStep s c s₁ → BigStep s c s₂ → s₁ = s₂
+
+#obligation Imp.evalStmt_complete :
+  ∀ (s s' : State) (c : Stmt), BigStep s c s' → ∃ n, evalStmt n s c = .ok s'
+
+/-! ### The SMT path, kept on the evidence side of the line
+
+An external solver is installed on some machines and reachable through
+`scripts/prover/smt.py`. It is *not* wired to the tactic, because nothing here can turn
+`unsat` into a Lean term. `#smt_evidence` therefore records an **open obligation** with
+the solver's verdict attached: the statement below stays unproved, and the warning says
+so. If a proof-reconstructing SMT frontend ever becomes a dependency, this is the seam
+where it plugs in — until then, the solver's opinion is triage data, nothing more. -/
+
+#smt_evidence Core.wrap_bound_linear :
+  ∀ (a b : Int), 0 ≤ a → a < 4294967296 → 0 ≤ b → b < 4294967296 →
+    0 ≤ a + b ∧ a + b < 8589934592
+
+#obligations
+
+end Demo

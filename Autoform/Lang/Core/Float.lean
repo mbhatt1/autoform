@@ -408,7 +408,7 @@ private def guard2 (c : FConfig) (x y : Fl) (k : Unit → FResult) : FResult :=
   else k ()
 
 /-- NaN propagation, checked before anything else, as IEEE §6.2 requires. -/
-private def nanIn (c : FConfig) (x y : Fl) : Bool := x.isNaN || y.isNaN
+private def nanIn (_c : FConfig) (x y : Fl) : Bool := x.isNaN || y.isNaN
 
 /-- Addition. The exact sum of two finite binary floats is a dyadic rational, computed
 here with `Int` arithmetic at the common exponent and then rounded once. -/
@@ -511,8 +511,13 @@ Python's float comparison is IEEE's: NaN is unordered (so `x != x` when `x` is N
 `nan < 1.0`, `nan > 1.0`, `nan == 1.0` are all `False`), and `+0.0 == -0.0`. Structural
 bit comparison gets both of these wrong, in opposite directions. -/
 
-/-- Ordering, or `none` when the operands are unordered (either is NaN). -/
-def cmp (c : FConfig) (x y : Fl) : Option Ordering :=
+/-- Ordering, or `none` when the operands are unordered (either is NaN).
+
+The configuration is unused, deliberately: comparison decodes both operands to their
+*exact* values, so a binary32 and a binary64 operand compare correctly without a
+conversion step (C's `float`→`double` promotion is exact, so this agrees with C too).
+Everything that *rounds* takes the format from the configuration; nothing here rounds. -/
+def cmp (_c : FConfig) (x y : Fl) : Option Ordering :=
   if x.isNaN || y.isNaN then none
   else if x.isZero && y.isZero then some .eq        -- +0.0 == -0.0
   else if x.isInf || y.isInf then
@@ -555,7 +560,7 @@ def ofInt (c : FConfig) (n : Int) : FResult :=
 
 /-- `int(x)`: truncation toward zero. `int(inf)` is `OverflowError`, `int(nan)` is
 `ValueError` — both are Python-specific and neither is a hole. -/
-def toInt (c : FConfig) (x : Fl) : Except String Int :=
+def toInt (_c : FConfig) (x : Fl) : Except String Int :=
   if x.isNaN then .error "ValueError"
   else if x.isInf then .error "OverflowError"
   else match x.toExact with
@@ -566,7 +571,7 @@ def toInt (c : FConfig) (x : Fl) : Except String Int :=
 
 /-- Exact comparison between an `Int` and a float, as Python performs it. No coercion in
 either direction, so `10^23 == 1e23` comes out `False`, matching CPython. -/
-def cmpInt (c : FConfig) (n : Int) (x : Fl) : Option Ordering :=
+def cmpInt (_c : FConfig) (n : Int) (x : Fl) : Option Ordering :=
   if x.isNaN then none
   else if x.isInf then some (if x.signBit then .gt else .lt)
   else match x.toExact with

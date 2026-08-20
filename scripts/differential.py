@@ -34,7 +34,9 @@ random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 FUEL = 5000
 MAX_TOTAL_CASES = 600      # keep the generated Lean file compile-bounded
 MAX_DEPTH = 8              # value-encoding depth limit
-MAX_ELEMS = 256            # value-encoding breadth limit
+MAX_ELEMS = 2048           # value-encoding breadth limit (a resource
+                           # bound, not a fidelity one: containers are
+                           # encoded whole or refused, never truncated)
 
 
 # --------------------------------------------------------------------------- AST
@@ -419,7 +421,60 @@ def build_lineno_index(src_root, wanted_files):
 VARARGS, VARKW = 0x04, 0x08
 
 
-def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
+def frame_param_order(code):
+    """Parameter names in *source* order, plus how each one binds.
+
+    `co_varnames` lists positional names, then keyword-only names, then `*args`, then
+    `**kwargs` — which is not the order they were written in, and not the order the
+    transpiler recorded. Rebuild the source order so it can be checked against the AST.
+    """
+    n, k = code.co_argcount, code.co_kwonlyargcount
+    pos = list(code.co_varnames[:n])
+    kwonly = list(code.co_varnames[n:n + k])
+    i = n + k
+    star = None
+    if code.co_flags & VARARGS:
+        star = code.co_varnames[i]; i += 1
+    dstar = code.co_varnames[i] if code.co_flags & VARKW else None
+    order = [(p, "pos") for p in pos]
+    if star is not None: order.append((star, "star"))
+    order += [(p, "kwonly") for p in kwonly]
+    if dstar is not None: order.append((dstar, "dstar"))
+    return order
+
+
+def bind_args(order, loc, enc, ast_params, self_name):
+    """Encode one call's arguments in the order Core will bind them.
+
+    Core binds by position: `applyFunc` zips `Func.params` with the argument list. That
+    is faithful to CPython only if the transpiler's parameter list is name-for-name the
+    source parameter list, so require exactly that and refuse otherwise — a silent
+    off-by-one in parameter binding would be indistinguishable from a semantics bug.
+
+    `*args` binds to a tuple and `**kwargs` to a dict, which is what the *callee* sees
+    and what the translated body reads (`cachetools.keys.hashkey` does `args + _kwmark`
+    on it). Refusing these cost ~13k calls for no fidelity reason.
+    """
+    names = [n for n, _ in order]
+    if self_name is not None: names = names[1:]
+    if ast_params is not None and names != list(ast_params):
+        raise ParamMismatch("%s vs %s" % (names, list(ast_params)))
+    slf, args = None, []
+    for i, (n, kind) in enumerate(order):
+        if i == 0 and n == self_name:
+            slf = enc.enc(loc[n])
+            continue
+        v = loc[n]
+        args.append(enc.enc(v))
+    return slf, args
+
+
+class ParamMismatch(Exception):
+    pass
+
+
+def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
+                params_by_name=None, live=None, pool=None):
     """Run the project's test suite under `sys.settrace`, recording calls into `wanted`.
 
     Each record is a fully-encoded snapshot taken *at call time*, so later mutation of
@@ -428,34 +483,50 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
     counts = {}
     live_files = set(p for (p, _) in index)
 
-    def snapshot(frame, qual):
+    params_by_name = params_by_name if params_by_name is not None else {}
+    live = live if live is not None else {}        # class name -> live instances
+    pool = pool if pool is not None else {}        # parameter name -> live values
+
+    def snapshot(frame, qual, key):
         code = frame.f_code
-        nargs = code.co_argcount
-        names = code.co_varnames[:nargs]
-        if code.co_flags & (VARARGS | VARKW):
-            stats["skip_varargs"] += 1; return None
+        order = frame_param_order(code)
         loc = frame.f_locals
+        self_name = order[0][0] if order and order[0][0] == "self" else None
         enc = Encoder()
         try:
-            slf = None
-            args = []
-            for i, n in enumerate(names):
-                if i == 0 and n == "self":
-                    slf = enc.enc(loc[n])
-                    if slf[0] != "ref":
-                        # e.g. a `tuple` subclass: the receiver is a value, not an
-                        # object with fields, and Core has no such receiver.
-                        stats["skip_self_not_object"] = \
-                            stats.get("skip_self_not_object", 0) + 1
-                        return None
-                else:
-                    args.append(enc.enc(loc[n]))
+            slf, args = bind_args(order, loc, enc, params_by_name.get(key), self_name)
+        except ParamMismatch as e:
+            stats["skip_param_mismatch"] = stats.get("skip_param_mismatch", 0) + 1
+            r = stats.setdefault("param_mismatch_detail", {})
+            r[qual] = e.args[0]
+            return None
         except (Unencodable, KeyError) as e:
             stats["skip_unencodable_args"] += 1
             r = stats.setdefault("unencodable_reasons", {})
             k = "%s: %s" % (qual, e.args[0] if e.args else type(e).__name__)
             r[k] = r.get(k, 0) + 1
             return None
+        if self_name is not None:
+            if slf is None or slf[0] != "ref":
+                # e.g. a `tuple` subclass: the receiver is a value, not an object with
+                # fields, and Core has no such receiver.
+                stats["skip_self_not_object"] = \
+                    stats.get("skip_self_not_object", 0) + 1
+                return None
+            # keep the live receiver: it is the only way to exercise sibling methods
+            # the suite never calls (see `constructed_cases`)
+            inst = loc[self_name]
+            bucket = live.setdefault(type(inst).__name__, [])
+            if len(bucket) < 4 and not any(o is inst for o in bucket):
+                bucket.append(inst)
+        for (n, kind) in order:
+            if n == self_name: continue
+            b = pool.setdefault(n, [])
+            if len(b) < 6:
+                try:
+                    if not any(o is loc[n] for o in b): b.append(loc[n])
+                except KeyError:
+                    pass
         return enc, slf, args
 
     # frames have no user-writable slot, so carry per-call state keyed by frame id
@@ -492,7 +563,7 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
         rel, qual = hit
         key = "%s:<module>.%s" % (rel, qual)
         if key not in wanted or counts.get(key, 0) >= limit_per_fn: return None
-        snap = snapshot(frame, qual)
+        snap = snapshot(frame, qual, key)
         if snap is None: return None
         enc, slf, args = snap
         counts[key] = counts.get(key, 0) + 1
@@ -523,6 +594,131 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
         sys.path[:] = old_path
     stats["test_runs"] = ran
     return records
+
+
+def _raw_attr(cls, name):
+    """The *descriptor* for `name`, not the value binding it would produce."""
+    for c in cls.__mro__:
+        if name in c.__dict__: return c.__dict__[name]
+    return None
+
+
+def find_class(rel, clsname):
+    """Locate a class the test suite already imported, by module path and name."""
+    mod = rel[:-3].replace("/", ".").replace("\\", ".")
+    if mod.endswith(".__init__"): mod = mod[:-9]
+    m = sys.modules.get(mod)
+    if m is None: return None
+    obj = m
+    for part in clsname.split("."):
+        obj = getattr(obj, part, None)
+        if obj is None: return None
+    return obj if isinstance(obj, type) else None
+
+
+class Timeout(Exception):
+    pass
+
+
+@contextlib.contextmanager
+def time_limit(seconds):
+    """Guard against a synthesized call that blocks (locks, sleeps, IO)."""
+    import signal
+    try:
+        def handler(sig, frm): raise Timeout()
+        old = signal.signal(signal.SIGALRM, handler)
+        signal.setitimer(signal.ITIMER_REAL, seconds)
+    except (ValueError, AttributeError):
+        yield; return            # not the main thread, or no SIGALRM: run unguarded
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old)
+
+
+def constructed_cases(methods, reached, live, pool, stats, ncases):
+    """Exercise hole-free methods the test suite never called.
+
+    The suite is the source of *realistic* state, so rather than fabricating an object
+    we reuse a real instance it built for a sibling method (falling back to calling the
+    class's own constructor), and draw arguments from values observed at parameters of
+    the same name. Everything else — encoding, refusal, comparison — is the same path
+    as a traced call, so a constructed case is no more lenient than a recorded one; it
+    is only differently sourced, and is tagged `constructed` in the report.
+    """
+    out = []
+    why = stats.setdefault("no_instance_detail", {})
+    for f, rel, qual in methods:
+        if f["name"] in reached: continue
+        if "." not in qual:
+            why[qual] = "not a method"; continue
+        clsname, attr = qual.rsplit(".", 1)
+        insts = list(live.get(clsname.split(".")[-1], ()))
+        cls = find_class(rel, clsname)
+        if not insts and cls is not None:
+            for mk in ((), (1,), (2, 1)):
+                try:
+                    with time_limit(2.0):
+                        insts = [cls(*mk)]
+                    break
+                except Exception:                       # noqa: BLE001
+                    continue
+        if not insts:
+            why[qual] = "no live instance and constructor rejected ()/(1)/(2,1)"
+            continue
+        raw = _raw_attr(type(insts[0]), attr) if not cls else \
+            (_raw_attr(cls, attr) or _raw_attr(type(insts[0]), attr))
+        if isinstance(raw, property): raw = raw.fget
+        if isinstance(raw, (staticmethod, classmethod)): raw = raw.__func__
+        if not inspect.isroutine(raw):
+            why[qual] = "no callable attribute %r on the class" % attr; continue
+        try:
+            order = frame_param_order(raw.__code__)
+        except AttributeError:
+            why[qual] = "builtin, no bytecode"; continue
+        names = [n for n, _ in order]
+        self_name = names[0] if names and names[0] == "self" else None
+        if self_name is None:
+            why[qual] = "no self parameter"; continue
+        if any(k in ("star", "dstar", "kwonly") for _, k in order):
+            why[qual] = "varargs/keyword-only: cannot synthesize a faithful call"
+            continue
+        if [n for n, _ in order][1:] != list(f["params"]):
+            why[qual] = "parameter list disagrees with the AST"; continue
+        made = 0
+        for attempt in range(ncases * 4):
+            if made >= ncases: break
+            inst = insts[attempt % len(insts)]
+            argv = []
+            for n, _ in order[1:]:
+                cand = pool.get(n) or []
+                argv.append(cand[attempt % len(cand)] if cand
+                            else random.randint(-8, 8))
+            enc = Encoder()
+            try:
+                slf = enc.enc(inst)
+                if slf[0] != "ref": raise Unencodable("self-not-object")
+                eargs = [enc.enc(a) for a in argv]
+            except Unencodable as e:
+                why[qual] = "unencodable receiver/arguments: %s" % (e.args[0],)
+                break
+            enc.freeze()
+            try:
+                with time_limit(2.0):
+                    got = raw(inst, *argv)
+                outcome = ("val", enc.enc_result(got))
+            except Timeout:
+                why[qual] = "call did not terminate within 2s"; break
+            except Unencodable as e:
+                why[qual] = "unencodable result: %s" % (e.args[0],); break
+            except Exception as e:                       # noqa: BLE001
+                outcome = ("exn", type(e).__name__)
+            out.append({"name": f["name"], "heap": enc.heap, "self": slf,
+                        "args": eargs, "outcome": outcome, "origin": "constructed"})
+            made += 1
+        if made: why.pop(qual, None)
+    return out
 
 
 def run_suite(test_dir):
@@ -631,9 +827,12 @@ def main():
         test_dirs = [tests_override] if tests_override else find_tests(src_root)
         index = build_lineno_index(src_root, rel_files)
         traced = []
+        params_by_name = {f["name"]: f["params"] for f in holefree}
+        live, pool = {}, {}
         if test_dirs and index:
             print("test suite: %s" % ", ".join(test_dirs))
-            traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats)
+            traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats,
+                                 params_by_name, live, pool)
         elif not test_dirs:
             print("test suite: none discovered under %s (pass --tests DIR)" % src_root)
         else:
@@ -668,7 +867,13 @@ def main():
                               "args": [("int", a) for a in args], "outcome": out,
                               "origin": "random"})
 
-        # methods never reached by the tests cannot be constructed from thin air
+        # (3) methods the suite never called: reuse an instance it built for a
+        # sibling method, or build one, and synthesize arguments from observed values
+        reached = set(c["name"] for c in cases)
+        built = constructed_cases(methods, reached, live, pool, stats, ncases)
+        cases += built
+        print("cases constructed for methods the suite never called: %d (%d functions)"
+              % (len(built), len(set(c["name"] for c in built))))
         reached = set(c["name"] for c in cases)
         stats["skip_no_instance"] = sum(1 for f, _, _ in methods
                                         if f["name"] not in reached)

@@ -1004,7 +1004,7 @@ def f_cachetools___init___py__module___TimedCache__Timer___init__ : Func :=
   , params := ["timer"]
   , body := (.seq
             (.setField (.name "self") "_Timer__timer" (.name "timer"))
-            (.setField (.name "self") "_Timer__timer" (.lit (.int 0)))) }
+            (.setField (.name "self") "_Timer__nesting" (.lit (.int 0)))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__call__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___call__ : Func :=
