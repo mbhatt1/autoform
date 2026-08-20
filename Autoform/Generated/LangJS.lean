@@ -59,225 +59,150 @@ def f_index_js__program_pMap__lambda_0 : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  .skip
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            .skip
-                                                            (.seq
-                                                              .skip
-                                                              (.seq
-                                                                .skip
-                                                                (.seq
-                                                                  .skip
-                                                                  (.seq
-                                                                    (.ifte
-                                                                      (.binop
-                                                                        "&&"
-                                                                        (.binop
-                                                                          "=="
-                                                                          (.index
-                                                                            (.name "iterable")
-                                                                            (.field
-                                                                              (.name "Symbol")
-                                                                              "iterator"))
-                                                                          (.name "undefined"))
-                                                                        (.binop
-                                                                          "=="
-                                                                          (.index
-                                                                            (.name "iterable")
-                                                                            (.field
-                                                                              (.name "Symbol")
-                                                                              "asyncIterator"))
-                                                                          (.name "undefined")))
-                                                                      (.hole "control:THROW")
-                                                                      .skip)
-                                                                    (.seq
-                                                                      (.ifte
-                                                                        (.binop
-                                                                          "!="
-                                                                          (.hole "op:instanceOf")
-                                                                          (.lit (.str "function")))
-                                                                        (.hole "control:THROW")
-                                                                        .skip)
-                                                                      (.seq
-                                                                        (.ifte
-                                                                          (.unop
-                                                                            "!"
-                                                                            (.binop
-                                                                              "||"
-                                                                              (.binop
-                                                                                "&&"
-                                                                                (.call
-                                                                                  "isSafeInteger"
-                                                                                  [ (.name
-                                                                                      "concurrency") ])
-                                                                                (.binop
-                                                                                  ">="
-                                                                                  (.name
-                                                                                    "concurrency")
-                                                                                  (.lit (.int 1))))
-                                                                              (.binop
-                                                                                "=="
-                                                                                (.name
-                                                                                  "concurrency")
-                                                                                (.field
-                                                                                  (.name "Number")
-                                                                                  "POSITIVE_INFINITY"))))
-                                                                          (.hole "control:THROW")
-                                                                          .skip)
-                                                                        (.seq
-                                                                          (.assign
-                                                                            "result"
-                                                                            (.call
-                                                                              "__ecma.Array.factory"
-                                                                              []))
-                                                                          (.seq
-                                                                            (.assign
-                                                                              "errors"
-                                                                              (.call
-                                                                                "__ecma.Array.factory"
-                                                                                []))
-                                                                            (.seq
-                                                                              (.seq
-                                                                                .skip
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "_tmp_6"
-                                                                                    (.hole
-                                                                                      "op:alloc"))
-                                                                                  (.seq
-                                                                                    (.expr
-                                                                                      (.call
-                                                                                        "<operator>.new"
-                                                                                        []))
-                                                                                    (.assign
-                                                                                      "skippedIndexesMap"
-                                                                                      (.name
-                                                                                        "_tmp_6")))))
-                                                                              (.seq
-                                                                                (.assign
-                                                                                  "isRejected"
-                                                                                  (.lit
-                                                                                    (.bool false)))
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "isResolved"
-                                                                                    (.lit
-                                                                                      (.bool false)))
-                                                                                  (.seq
-                                                                                    (.assign
-                                                                                      "isIterableDone"
-                                                                                      (.lit
-                                                                                        (.bool false)))
-                                                                                    (.seq
-                                                                                      (.assign
-                                                                                        "resolvingCount"
-                                                                                        (.lit
-                                                                                          (.int 0)))
-                                                                                      (.seq
-                                                                                        (.assign
-                                                                                          "currentIndex"
-                                                                                          (.lit
-                                                                                            (.int 0)))
-                                                                                        (.seq
-                                                                                          (.assign
-                                                                                            "iterator"
-                                                                                            (.cond
-                                                                                              (.binop
-                                                                                                "=="
-                                                                                                (.index
-                                                                                                  (.name
-                                                                                                    "iterable")
-                                                                                                  (.field
-                                                                                                    (.name
-                                                                                                      "Symbol")
-                                                                                                    "iterator"))
-                                                                                                (.name
-                                                                                                  "undefined"))
-                                                                                              (.call
-                                                                                                "Symbol.asyncIterator"
-                                                                                                [])
-                                                                                              (.call
-                                                                                                "Symbol.iterator"
-                                                                                                [])))
-                                                                                          (.seq
-                                                                                            (.assign
-                                                                                              "signalListener"
-                                                                                              (.fnref
-                                                                                                "index.js::program:pMap:<lambda>0:signalListener"))
-                                                                                            (.seq
-                                                                                              (.assign
-                                                                                                "cleanup"
-                                                                                                (.fnref
-                                                                                                  "index.js::program:pMap:<lambda>0:cleanup"))
-                                                                                              (.seq
-                                                                                                (.assign
-                                                                                                  "resolve"
-                                                                                                  (.fnref
-                                                                                                    "index.js::program:pMap:<lambda>0:resolve"))
-                                                                                                (.seq
-                                                                                                  (.assign
-                                                                                                    "reject"
-                                                                                                    (.fnref
-                                                                                                      "index.js::program:pMap:<lambda>0:reject"))
-                                                                                                  (.seq
-                                                                                                    (.ifte
-                                                                                                      (.name
-                                                                                                        "signal")
-                                                                                                      (.seq
-                                                                                                        (.ifte
-                                                                                                          (.field
-                                                                                                            (.name
-                                                                                                              "signal")
-                                                                                                            "aborted")
-                                                                                                          (.seq
-                                                                                                            (.expr
-                                                                                                              (.call
-                                                                                                                "index.js::program:pMap:<lambda>0:reject"
-                                                                                                                [ (.field
-                                                                                                                    (.name
-                                                                                                                      "signal")
-                                                                                                                    "reason") ]))
-                                                                                                            (.ret
-                                                                                                              (.lit
-                                                                                                                .unit)))
-                                                                                                          .skip)
-                                                                                                        (.expr
-                                                                                                          (.mcall
-                                                                                                            (.name
-                                                                                                              "signal")
-                                                                                                            "addEventListener"
-                                                                                                            [ (.lit
-                                                                                                                (.str "abort"))
-                                                                                                            , (.name
-                                                                                                                "signalListener")
-                                                                                                            , (.hole
-                                                                                                                "expr:BLOCK-prelude") ])))
-                                                                                                      .skip)
-                                                                                                    (.seq
-                                                                                                      (.assign
-                                                                                                        "next"
-                                                                                                        (.fnref
-                                                                                                          "index.js::program:pMap:<lambda>0:next"))
-                                                                                                      (.expr
-                                                                                                        (.call
-                                                                                                          "index.js::program:pMap:<lambda>0:<lambda>7"
-                                                                                                          [])))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.binop
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "iterator"))
+                                        (.name "undefined"))
+                                        (.binop
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "asyncIterator"))
+                                        (.name "undefined")))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.hole "op:instanceOf")
+                                        (.lit (.str "function")))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "&&"
+                                        (.call "isSafeInteger" [(.name "concurrency")])
+                                        (.binop ">=" (.name "concurrency") (.lit (.int 1))))
+                                        (.binop
+                                        "=="
+                                        (.name "concurrency")
+                                        (.field (.name "Number") "POSITIVE_INFINITY"))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.assign "result" (.call "__ecma.Array.factory" []))
+                                        (.seq
+                                        (.assign "errors" (.call "__ecma.Array.factory" []))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_6" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<operator>.new" []))
+                                        (.assign "skippedIndexesMap" (.name "_tmp_6")))))
+                                        (.seq
+                                        (.assign "isRejected" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "isResolved" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "isIterableDone" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "resolvingCount" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "currentIndex" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign
+                                        "iterator"
+                                        (.cond
+                                        (.binop
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "iterator"))
+                                        (.name "undefined"))
+                                        (.call "Symbol.asyncIterator" [])
+                                        (.call "Symbol.iterator" [])))
+                                        (.seq
+                                        (.assign
+                                        "signalListener"
+                                        (.fnref "index.js::program:pMap:<lambda>0:signalListener"))
+                                        (.seq
+                                        (.assign
+                                        "cleanup"
+                                        (.fnref "index.js::program:pMap:<lambda>0:cleanup"))
+                                        (.seq
+                                        (.assign
+                                        "resolve"
+                                        (.fnref "index.js::program:pMap:<lambda>0:resolve"))
+                                        (.seq
+                                        (.assign
+                                        "reject"
+                                        (.fnref "index.js::program:pMap:<lambda>0:reject"))
+                                        (.seq
+                                        (.ifte
+                                        (.name "signal")
+                                        (.seq
+                                        (.ifte
+                                        (.field (.name "signal") "aborted")
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:reject"
+                                        [(.field (.name "signal") "reason")]))
+                                        (.ret (.lit .unit)))
+                                        .skip)
+                                        (.expr
+                                        (.mcall
+                                        (.name "signal")
+                                        "addEventListener"
+                                        [ (.lit (.str "abort"))
+                                        , (.name "signalListener")
+                                        , (.hole "expr:BLOCK-prelude") ])))
+                                        .skip)
+                                        (.seq
+                                        (.assign
+                                        "next"
+                                        (.fnref "index.js::program:pMap:<lambda>0:next"))
+                                        (.expr
+                                        (.call "index.js::program:pMap:<lambda>0:<lambda>7" [])))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `index.js::program:pMap:<lambda>0:cleanup`  (from `index.js`) -/
 def f_index_js__program_pMap__lambda_0_cleanup : Func :=
@@ -359,53 +284,49 @@ def f_index_js__program_pMap__lambda_0__lambda_5__lambda_6 : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign "element" (.hole "op:await"))
-                                            (.seq
-                                              (.ifte (.name "isResolved") (.ret (.lit .unit)) .skip)
-                                              (.seq
-                                                (.assign "value" (.hole "op:await"))
-                                                (.seq
-                                                  (.ifte
-                                                    (.binop "==" (.name "value") (.name "pMapSkip"))
-                                                    (.expr
-                                                      (.mcall
-                                                        (.name "skippedIndexesMap")
-                                                        "set"
-                                                        [(.name "index"), (.name "value")]))
-                                                    .skip)
-                                                  (.seq
-                                                    (.setIndex
-                                                      (.name "result")
-                                                      (.name "index")
-                                                      (.name "value"))
-                                                    (.seq
-                                                      (.expr (.hole "op:postIncrement"))
-                                                      (.expr (.hole "op:await"))))))))))
+                                        .skip
+                                        (.seq
+                                        (.assign "element" (.hole "op:await"))
+                                        (.seq
+                                        (.ifte (.name "isResolved") (.ret (.lit .unit)) .skip)
+                                        (.seq
+                                        (.assign "value" (.hole "op:await"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "value") (.name "pMapSkip"))
+                                        (.expr
+                                        (.mcall
+                                        (.name "skippedIndexesMap")
+                                        "set"
+                                        [(.name "index"), (.name "value")]))
+                                        .skip)
+                                        (.seq
+                                        (.setIndex (.name "result") (.name "index") (.name "value"))
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.expr (.hole "op:await"))))))))))
                                       "__exc"
                                       (.seq
                                         (.expr (.name "error"))
                                         (.ifte
-                                          (.name "stopOnError")
-                                          (.expr
-                                            (.call
-                                              "index.js::program:pMap:<lambda>0:reject"
-                                              [(.name "error")]))
-                                          (.seq
-                                            (.expr
-                                              (.mcall (.name "errors") "push" [(.name "error")]))
-                                            (.seq
-                                              (.expr (.hole "op:postIncrement"))
-                                              (.tryCatch
-                                                (.expr (.hole "op:await"))
-                                                "__exc"
-                                                (.seq
-                                                  (.expr (.name "error"))
-                                                  (.expr
-                                                    (.call
-                                                      "index.js::program:pMap:<lambda>0:reject"
-                                                      [(.name "error")])))))))))))))))))))))) }
+                                        (.name "stopOnError")
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:reject"
+                                        [(.name "error")]))
+                                        (.seq
+                                        (.expr (.mcall (.name "errors") "push" [(.name "error")]))
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.tryCatch
+                                        (.expr (.hole "op:await"))
+                                        "__exc"
+                                        (.seq
+                                        (.expr (.name "error"))
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:reject"
+                                        [(.name "error")])))))))))))))))))))))) }
 
 /-- `index.js::program:pMap:<lambda>0:next`  (from `index.js`) -/
 def f_index_js__program_pMap__lambda_0_next : Func :=
@@ -442,186 +363,125 @@ def f_index_js__program_pMap__lambda_0_next : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  .skip
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      (.ifte
-                                                        (.name "isResolved")
-                                                        (.ret (.lit .unit))
-                                                        .skip)
-                                                      (.seq
-                                                        (.assign "nextItem" (.hole "op:await"))
-                                                        (.seq
-                                                          (.assign "index" (.name "currentIndex"))
-                                                          (.seq
-                                                            (.expr (.hole "op:postIncrement"))
-                                                            (.seq
-                                                              (.ifte
-                                                                (.field (.name "nextItem") "done")
-                                                                (.seq
-                                                                  (.assign
-                                                                    "isIterableDone"
-                                                                    (.lit (.bool true)))
-                                                                  (.seq
-                                                                    (.ifte
-                                                                      (.binop
-                                                                        "&&"
-                                                                        (.binop
-                                                                          "=="
-                                                                          (.name "resolvingCount")
-                                                                          (.lit (.int 0)))
-                                                                        (.unop
-                                                                          "!"
-                                                                          (.name "isResolved")))
-                                                                      (.seq
-                                                                        .skip
-                                                                        (.seq
-                                                                          (.ifte
-                                                                            (.binop
-                                                                              "&&"
-                                                                              (.unop
-                                                                                "!"
-                                                                                (.name
-                                                                                  "stopOnError"))
-                                                                              (.binop
-                                                                                ">"
-                                                                                (.field
-                                                                                  (.name "errors")
-                                                                                  "length")
-                                                                                (.lit (.int 0))))
-                                                                            (.seq
-                                                                              (.expr
-                                                                                (.call
-                                                                                  "index.js::program:pMap:<lambda>0:reject"
-                                                                                  [ (.hole
-                                                                                      "expr:BLOCK-impure") ]))
-                                                                              (.ret (.lit .unit)))
-                                                                            .skip)
-                                                                          (.seq
-                                                                            (.assign
-                                                                              "isResolved"
-                                                                              (.lit (.bool true)))
-                                                                            (.seq
-                                                                              (.ifte
-                                                                                (.binop
-                                                                                  "=="
-                                                                                  (.field
-                                                                                    (.name
-                                                                                      "skippedIndexesMap")
-                                                                                    "size")
-                                                                                  (.lit (.int 0)))
-                                                                                (.seq
-                                                                                  (.expr
-                                                                                    (.call
-                                                                                      "index.js::program:pMap:<lambda>0:resolve"
-                                                                                      [ (.name
-                                                                                          "result") ]))
-                                                                                  (.ret
-                                                                                    (.lit .unit)))
-                                                                                .skip)
-                                                                              (.seq
-                                                                                (.assign
-                                                                                  "pureResult"
-                                                                                  (.call
-                                                                                    "__ecma.Array.factory"
-                                                                                    []))
-                                                                                (.seq
-                                                                                  (.seq
-                                                                                    .skip
-                                                                                    (.seq
-                                                                                      .skip
-                                                                                      (.seq
-                                                                                        .skip
-                                                                                        (.seq
-                                                                                          .skip
-                                                                                          (.seq
-                                                                                            (.assign
-                                                                                              "_iterator_0"
-                                                                                              (.hole
-                                                                                                "op:iterator"))
-                                                                                            (.seq
-                                                                                              (.expr
-                                                                                                (.name
-                                                                                                  "_result_0"))
-                                                                                              (.seq
-                                                                                                (.expr
-                                                                                                  (.name
-                                                                                                    "index"))
-                                                                                                (.seq
-                                                                                                  (.expr
-                                                                                                    (.name
-                                                                                                      "value"))
-                                                                                                  (.loop
-                                                                                                    (.unop
-                                                                                                      "!"
-                                                                                                      (.field
-                                                                                                        (.hole
-                                                                                                          "op:assignment")
-                                                                                                        "done"))
-                                                                                                    (.seq
-                                                                                                      (.assign
-                                                                                                        "index"
-                                                                                                        (.index
-                                                                                                          (.field
-                                                                                                            (.name
-                                                                                                              "_result_0")
-                                                                                                            "value")
-                                                                                                          (.lit
-                                                                                                            (.int 0))))
-                                                                                                      (.seq
-                                                                                                        (.assign
-                                                                                                          "value"
-                                                                                                          (.index
-                                                                                                            (.field
-                                                                                                              (.name
-                                                                                                                "_result_0")
-                                                                                                              "value")
-                                                                                                            (.lit
-                                                                                                              (.int 1))))
-                                                                                                        (.seq
-                                                                                                          (.ifte
-                                                                                                            (.binop
-                                                                                                              "=="
-                                                                                                              (.mcall
-                                                                                                                (.name
-                                                                                                                  "skippedIndexesMap")
-                                                                                                                "get"
-                                                                                                                [ (.name
-                                                                                                                    "index") ])
-                                                                                                              (.name
-                                                                                                                "pMapSkip"))
-                                                                                                            .cont
-                                                                                                            .skip)
-                                                                                                          (.expr
-                                                                                                            (.mcall
-                                                                                                              (.name
-                                                                                                                "pureResult")
-                                                                                                              "push"
-                                                                                                              [ (.name
-                                                                                                                  "value") ]))))))))))))))
-                                                                                  (.expr
-                                                                                    (.call
-                                                                                      "index.js::program:pMap:<lambda>0:resolve"
-                                                                                      [ (.name
-                                                                                          "pureResult") ]))))))))
-                                                                      .skip)
-                                                                    (.ret (.lit .unit))))
-                                                                .skip)
-                                                              (.seq
-                                                                (.expr (.hole "op:postIncrement"))
-                                                                (.expr
-                                                                  (.call
-                                                                    "index.js::program:pMap:<lambda>0:<lambda>5:<lambda>6"
-                                                                    []))))))))))))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte (.name "isResolved") (.ret (.lit .unit)) .skip)
+                                        (.seq
+                                        (.assign "nextItem" (.hole "op:await"))
+                                        (.seq
+                                        (.assign "index" (.name "currentIndex"))
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.seq
+                                        (.ifte
+                                        (.field (.name "nextItem") "done")
+                                        (.seq
+                                        (.assign "isIterableDone" (.lit (.bool true)))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.binop "==" (.name "resolvingCount") (.lit (.int 0)))
+                                        (.unop "!" (.name "isResolved")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.unop "!" (.name "stopOnError"))
+                                        (.binop
+                                        ">"
+                                        (.field (.name "errors") "length")
+                                        (.lit (.int 0))))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:reject"
+                                        [(.hole "expr:BLOCK-impure")]))
+                                        (.ret (.lit .unit)))
+                                        .skip)
+                                        (.seq
+                                        (.assign "isResolved" (.lit (.bool true)))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.field (.name "skippedIndexesMap") "size")
+                                        (.lit (.int 0)))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:resolve"
+                                        [(.name "result")]))
+                                        (.ret (.lit .unit)))
+                                        .skip)
+                                        (.seq
+                                        (.assign "pureResult" (.call "__ecma.Array.factory" []))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_iterator_0" (.hole "op:iterator"))
+                                        (.seq
+                                        (.expr (.name "_result_0"))
+                                        (.seq
+                                        (.expr (.name "index"))
+                                        (.seq
+                                        (.expr (.name "value"))
+                                        (.loop
+                                        (.unop "!" (.field (.hole "op:assignment") "done"))
+                                        (.seq
+                                        (.assign
+                                        "index"
+                                        (.index
+                                        (.field (.name "_result_0") "value")
+                                        (.lit (.int 0))))
+                                        (.seq
+                                        (.assign
+                                        "value"
+                                        (.index
+                                        (.field (.name "_result_0") "value")
+                                        (.lit (.int 1))))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.mcall (.name "skippedIndexesMap") "get" [(.name "index")])
+                                        (.name "pMapSkip"))
+                                        .cont
+                                        .skip)
+                                        (.expr
+                                        (.mcall (.name "pureResult") "push" [(.name "value")]))))))))))))))
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:resolve"
+                                        [(.name "pureResult")]))))))))
+                                        .skip)
+                                        (.ret (.lit .unit))))
+                                        .skip)
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMap:<lambda>0:<lambda>5:<lambda>6"
+                                        []))))))))))))))))))))))))))))) }
 
 /-- `index.js::program:pMap:<lambda>0:<lambda>7`  (from `index.js`) -/
 def f_index_js__program_pMap__lambda_0__lambda_7 : Func :=
@@ -751,10 +611,10 @@ def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn__lambda_
                                       (.seq
                                         (.assign "_tmp_16" (.hole "op:await"))
                                         (.seq
-                                          (.assign "done" (.field (.name "_tmp_16") "done"))
-                                          (.seq
-                                            (.assign "value" (.field (.name "_tmp_16") "value"))
-                                            (.expr (.name "_tmp_16"))))))))
+                                        (.assign "done" (.field (.name "_tmp_16") "done"))
+                                        (.seq
+                                        (.assign "value" (.field (.name "_tmp_16") "value"))
+                                        (.expr (.name "_tmp_16"))))))))
                                 (.seq
                                   (.ifte
                                     (.name "done")
@@ -763,8 +623,8 @@ def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn__lambda_
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.setField (.name "_tmp_17") "done" (.lit (.bool true)))
-                                          (.ret (.name "_tmp_17")))))
+                                        (.setField (.name "_tmp_17") "done" (.lit (.bool true)))
+                                        (.ret (.name "_tmp_17")))))
                                     .skip)
                                   (.seq
                                     (.expr
@@ -775,73 +635,55 @@ def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn__lambda_
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign "currentIndex" (.hole "op:postIncrement"))
-                                            (.seq
-                                              (.assign "returnValue" (.hole "op:await"))
-                                              (.seq
-                                                (.expr (.hole "op:postIncrement"))
-                                                (.seq
-                                                  (.ifte
-                                                    (.binop
-                                                      "=="
-                                                      (.name "returnValue")
-                                                      (.name "pMapSkip"))
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        (.assign
-                                                          "index"
-                                                          (.mcall
-                                                            (.name "promises")
-                                                            "indexOf"
-                                                            [(.name "promise")]))
-                                                        (.ifte
-                                                          (.binop
-                                                            ">"
-                                                            (.name "index")
-                                                            (.lit (.int 0)))
-                                                          (.expr
-                                                            (.mcall
-                                                              (.name "promises")
-                                                              "splice"
-                                                              [(.name "index"), (.lit (.int 1))]))
-                                                          .skip)))
-                                                    .skip)
-                                                  (.seq
-                                                    (.expr
-                                                      (.call
-                                                        "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
-                                                        []))
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        (.setField
-                                                          (.name "_tmp_18")
-                                                          "done"
-                                                          (.lit (.bool false)))
-                                                        (.seq
-                                                          (.setField
-                                                            (.name "_tmp_18")
-                                                            "value"
-                                                            (.name "returnValue"))
-                                                          (.ret (.name "_tmp_18"))))))))))))
+                                        .skip
+                                        (.seq
+                                        (.assign "currentIndex" (.hole "op:postIncrement"))
+                                        (.seq
+                                        (.assign "returnValue" (.hole "op:await"))
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "returnValue") (.name "pMapSkip"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "index"
+                                        (.mcall (.name "promises") "indexOf" [(.name "promise")]))
+                                        (.ifte
+                                        (.binop ">" (.name "index") (.lit (.int 0)))
+                                        (.expr
+                                        (.mcall
+                                        (.name "promises")
+                                        "splice"
+                                        [(.name "index"), (.lit (.int 1))]))
+                                        .skip)))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
+                                        []))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.setField (.name "_tmp_18") "done" (.lit (.bool false)))
+                                        (.seq
+                                        (.setField (.name "_tmp_18") "value" (.name "returnValue"))
+                                        (.ret (.name "_tmp_18"))))))))))))
                                       "__exc"
                                       (.seq
                                         (.expr (.name "error"))
                                         (.seq
-                                          (.expr (.hole "op:postIncrement"))
-                                          (.seq
-                                            (.assign "isDone" (.lit (.bool true)))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.setField
-                                                  (.name "_tmp_19")
-                                                  "error"
-                                                  (.name "error"))
-                                                (.ret (.name "_tmp_19"))))))))))))))))))))) }
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.seq
+                                        (.assign "isDone" (.lit (.bool true)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.setField (.name "_tmp_19") "error" (.name "error"))
+                                        (.ret (.name "_tmp_19"))))))))))))))))))))) }
 
 /-- `index.js::program:pMapIterable:_computed_object_method_0:trySpawn`  (from `index.js`) -/
 def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn : Func :=
@@ -877,15 +719,15 @@ def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn : Func :
                                       (.unop
                                         "!"
                                         (.binop
-                                          "&&"
-                                          (.binop
-                                            "<"
-                                            (.name "pendingPromisesCount")
-                                            (.name "concurrency"))
-                                          (.binop
-                                            "<"
-                                            (.field (.name "promises") "length")
-                                            (.name "backpressure")))))
+                                        "&&"
+                                        (.binop
+                                        "<"
+                                        (.name "pendingPromisesCount")
+                                        (.name "concurrency"))
+                                        (.binop
+                                        "<"
+                                        (.field (.name "promises") "length")
+                                        (.name "backpressure")))))
                                     (.ret (.lit .unit))
                                     .skip)
                                   (.seq
@@ -894,8 +736,8 @@ def f_index_js__program_pMapIterable__computed_object_method_0_trySpawn : Func :
                                       (.assign
                                         "promise"
                                         (.call
-                                          "index.js::program:pMapIterable:_computed_object_method_0:trySpawn:<lambda>8"
-                                          []))
+                                        "index.js::program:pMapIterable:_computed_object_method_0:trySpawn:<lambda>8"
+                                        []))
                                       (.expr (.mcall (.name "promises") "push" [(.name "promise")])))))))))))))))) }
 
 /-- `index.js::program:pMapIterable:_computed_object_method_0`  (from `index.js`) -/
@@ -934,11 +776,11 @@ def f_index_js__program_pMapIterable__computed_object_method_0 : Func :=
                                       "iterator"
                                       (.cond
                                         (.binop
-                                          "=="
-                                          (.index
-                                            (.name "iterable")
-                                            (.field (.name "Symbol") "asyncIterator"))
-                                          (.name "undefined"))
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "asyncIterator"))
+                                        (.name "undefined"))
                                         (.call "Symbol.iterator" [])
                                         (.call "Symbol.asyncIterator" [])))
                                     (.seq
@@ -946,75 +788,56 @@ def f_index_js__program_pMapIterable__computed_object_method_0 : Func :=
                                       (.seq
                                         (.assign "pendingPromisesCount" (.lit (.int 0)))
                                         (.seq
-                                          (.assign "isDone" (.lit (.bool false)))
-                                          (.seq
-                                            (.assign "index" (.lit (.int 0)))
-                                            (.seq
-                                              (.expr
-                                                (.call
-                                                  "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
-                                                  []))
-                                              (.loop
-                                                (.binop
-                                                  ">"
-                                                  (.field (.name "promises") "length")
-                                                  (.lit (.int 0)))
-                                                (.seq
-                                                  .skip
-                                                  (.seq
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            .skip
-                                                            (.seq
-                                                              (.assign "_tmp_20" (.hole "op:await"))
-                                                              (.seq
-                                                                (.assign
-                                                                  "error"
-                                                                  (.field (.name "_tmp_20") "error"))
-                                                                (.seq
-                                                                  (.assign
-                                                                    "done"
-                                                                    (.field
-                                                                      (.name "_tmp_20")
-                                                                      "done"))
-                                                                  (.seq
-                                                                    (.assign
-                                                                      "value"
-                                                                      (.field
-                                                                        (.name "_tmp_20")
-                                                                        "value"))
-                                                                    (.expr (.name "_tmp_20"))))))))))
-                                                    (.seq
-                                                      (.expr (.mcall (.name "promises") "shift" []))
-                                                      (.seq
-                                                        (.ifte
-                                                          (.name "error")
-                                                          (.hole "control:THROW")
-                                                          .skip)
-                                                        (.seq
-                                                          (.ifte
-                                                            (.name "done")
-                                                            (.ret (.lit .unit))
-                                                            .skip)
-                                                          (.seq
-                                                            (.expr
-                                                              (.call
-                                                                "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
-                                                                []))
-                                                            (.seq
-                                                              (.ifte
-                                                                (.binop
-                                                                  "=="
-                                                                  (.name "value")
-                                                                  (.name "pMapSkip"))
-                                                                .cont
-                                                                .skip)
-                                                              (.ret (.name "value")))))))))))))))))))))))))))) }
+                                        (.assign "isDone" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "index" (.lit (.int 0)))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
+                                        []))
+                                        (.loop
+                                        (.binop
+                                        ">"
+                                        (.field (.name "promises") "length")
+                                        (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_20" (.hole "op:await"))
+                                        (.seq
+                                        (.assign "error" (.field (.name "_tmp_20") "error"))
+                                        (.seq
+                                        (.assign "done" (.field (.name "_tmp_20") "done"))
+                                        (.seq
+                                        (.assign "value" (.field (.name "_tmp_20") "value"))
+                                        (.expr (.name "_tmp_20"))))))))))
+                                        (.seq
+                                        (.expr (.mcall (.name "promises") "shift" []))
+                                        (.seq
+                                        (.ifte (.name "error") (.hole "control:THROW") .skip)
+                                        (.seq
+                                        (.ifte (.name "done") (.ret (.lit .unit)) .skip)
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.js::program:pMapIterable:_computed_object_method_0:trySpawn"
+                                        []))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "value") (.name "pMapSkip"))
+                                        .cont
+                                        .skip)
+                                        (.ret (.name "value")))))))))))))))))))))))))))) }
 
 /-- `index.js::program:pMapIterable`  (from `index.js`) -/
 def f_index_js__program_pMapIterable : Func :=
@@ -1049,100 +872,97 @@ def f_index_js__program_pMapIterable : Func :=
                                       (.assign
                                         "_tmp_10"
                                         (.cond
-                                          (.binop "==" (.name "param3_1") (.hole "op:void"))
-                                          (.name "_tmp_9")
-                                          (.name "param3_1")))
+                                        (.binop "==" (.name "param3_1") (.hole "op:void"))
+                                        (.name "_tmp_9")
+                                        (.name "param3_1")))
                                       (.seq
                                         (.assign
-                                          "concurrency"
-                                          (.cond
-                                            (.binop
-                                              "=="
-                                              (.field (.name "_tmp_10") "concurrency")
-                                              (.hole "op:void"))
-                                            (.field (.name "Number") "POSITIVE_INFINITY")
-                                            (.field (.name "_tmp_10") "concurrency")))
+                                        "concurrency"
+                                        (.cond
+                                        (.binop
+                                        "=="
+                                        (.field (.name "_tmp_10") "concurrency")
+                                        (.hole "op:void"))
+                                        (.field (.name "Number") "POSITIVE_INFINITY")
+                                        (.field (.name "_tmp_10") "concurrency")))
                                         (.seq
-                                          (.assign
-                                            "backpressure"
-                                            (.cond
-                                              (.binop
-                                                "=="
-                                                (.field (.name "_tmp_10") "backpressure")
-                                                (.hole "op:void"))
-                                              (.name "concurrency")
-                                              (.field (.name "_tmp_10") "backpressure")))
-                                          (.expr (.name "_tmp_10"))))))
+                                        (.assign
+                                        "backpressure"
+                                        (.cond
+                                        (.binop
+                                        "=="
+                                        (.field (.name "_tmp_10") "backpressure")
+                                        (.hole "op:void"))
+                                        (.name "concurrency")
+                                        (.field (.name "_tmp_10") "backpressure")))
+                                        (.expr (.name "_tmp_10"))))))
                                   (.seq
                                     (.ifte
                                       (.binop
                                         "&&"
                                         (.binop
-                                          "=="
-                                          (.index
-                                            (.name "iterable")
-                                            (.field (.name "Symbol") "iterator"))
-                                          (.name "undefined"))
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "iterator"))
+                                        (.name "undefined"))
                                         (.binop
-                                          "=="
-                                          (.index
-                                            (.name "iterable")
-                                            (.field (.name "Symbol") "asyncIterator"))
-                                          (.name "undefined")))
+                                        "=="
+                                        (.index
+                                        (.name "iterable")
+                                        (.field (.name "Symbol") "asyncIterator"))
+                                        (.name "undefined")))
                                       (.hole "control:THROW")
                                       .skip)
                                     (.seq
                                       (.ifte
                                         (.binop
-                                          "!="
-                                          (.hole "op:instanceOf")
-                                          (.lit (.str "function")))
+                                        "!="
+                                        (.hole "op:instanceOf")
+                                        (.lit (.str "function")))
                                         (.hole "control:THROW")
                                         .skip)
                                       (.seq
                                         (.ifte
-                                          (.unop
-                                            "!"
-                                            (.binop
-                                              "||"
-                                              (.binop
-                                                "&&"
-                                                (.call "isSafeInteger" [(.name "concurrency")])
-                                                (.binop ">=" (.name "concurrency") (.lit (.int 1))))
-                                              (.binop
-                                                "=="
-                                                (.name "concurrency")
-                                                (.field (.name "Number") "POSITIVE_INFINITY"))))
-                                          (.hole "control:THROW")
-                                          .skip)
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "&&"
+                                        (.call "isSafeInteger" [(.name "concurrency")])
+                                        (.binop ">=" (.name "concurrency") (.lit (.int 1))))
+                                        (.binop
+                                        "=="
+                                        (.name "concurrency")
+                                        (.field (.name "Number") "POSITIVE_INFINITY"))))
+                                        (.hole "control:THROW")
+                                        .skip)
                                         (.seq
-                                          (.ifte
-                                            (.unop
-                                              "!"
-                                              (.binop
-                                                "||"
-                                                (.binop
-                                                  "&&"
-                                                  (.call "isSafeInteger" [(.name "backpressure")])
-                                                  (.binop
-                                                    ">="
-                                                    (.name "backpressure")
-                                                    (.name "concurrency")))
-                                                (.binop
-                                                  "=="
-                                                  (.name "backpressure")
-                                                  (.field (.name "Number") "POSITIVE_INFINITY"))))
-                                            (.hole "control:THROW")
-                                            .skip)
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.setIndex
-                                                (.name "_tmp_15")
-                                                (.hole "lit:unquoted")
-                                                (.fnref
-                                                  "index.js::program:pMapIterable:_computed_object_method_0"))
-                                              (.ret (.name "_tmp_15")))))))))))))))))))) }
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "&&"
+                                        (.call "isSafeInteger" [(.name "backpressure")])
+                                        (.binop ">=" (.name "backpressure") (.name "concurrency")))
+                                        (.binop
+                                        "=="
+                                        (.name "backpressure")
+                                        (.field (.name "Number") "POSITIVE_INFINITY"))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.setIndex
+                                        (.name "_tmp_15")
+                                        (.hole "lit:unquoted")
+                                        (.fnref
+                                        "index.js::program:pMapIterable:_computed_object_method_0"))
+                                        (.ret (.name "_tmp_15")))))))))))))))))))) }
 
 /-- Module-level initializers: run these to populate the globals frame
 before calling any entry point. -/

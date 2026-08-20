@@ -46,128 +46,102 @@ def f_index_ts__program : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "EventEmitter"
-                                            (.field
-                                              (.call "require" [(.lit (.str "eventemitter3"))])
-                                              "EventEmitter"))
-                                          (.seq
-                                            (.assign
-                                              "pTimeout"
-                                              (.call "require" [(.lit (.str "p-timeout"))]))
-                                            (.seq
-                                              (.seq
-                                                (.assign
-                                                  "Queue"
-                                                  (.field
-                                                    (.call "require" [(.lit (.str "./queue.js"))])
-                                                    "Queue"))
-                                                (.assign
-                                                  "RunFunction"
-                                                  (.field
-                                                    (.call "require" [(.lit (.str "./queue.js"))])
-                                                    "RunFunction")))
-                                              (.seq
-                                                (.assign
-                                                  "PriorityQueue"
-                                                  (.call
-                                                    "require"
-                                                    [(.lit (.str "./priority-queue.js"))]))
-                                                (.seq
-                                                  (.seq
-                                                    (.assign
-                                                      "QueueAddOptions"
-                                                      (.field
-                                                        (.call
-                                                          "require"
-                                                          [(.lit (.str "./options.js"))])
-                                                        "QueueAddOptions"))
-                                                    (.seq
-                                                      (.assign
-                                                        "Options"
-                                                        (.field
-                                                          (.call
-                                                            "require"
-                                                            [(.lit (.str "./options.js"))])
-                                                          "Options"))
-                                                      (.assign
-                                                        "TaskOptions"
-                                                        (.field
-                                                          (.call
-                                                            "require"
-                                                            [(.lit (.str "./options.js"))])
-                                                          "TaskOptions"))))
-                                                  (.seq
-                                                    (.seq
-                                                      (.seq
-                                                        .skip
-                                                        (.assign
-                                                          "PQueue"
-                                                          (.fnref "index.ts::program:PQueue:<init>")))
-                                                      (.setIndex
-                                                        (.name "exports")
-                                                        (.lit (.str "default"))
-                                                        (.name "PQueue")))
-                                                    (.seq
-                                                      (.seq
-                                                        (.assign
-                                                          "_queue.js"
-                                                          (.call
-                                                            "require"
-                                                            [(.lit (.str "./queue.js"))]))
-                                                        (.setField
-                                                          (.name "exports")
-                                                          "Queue"
-                                                          (.field (.name "_queue.js") "Queue")))
-                                                      (.seq
-                                                        (.seq
-                                                          (.assign
-                                                            "_priority-queue.js"
-                                                            (.call
-                                                              "require"
-                                                              [(.lit (.str "./priority-queue.js"))]))
-                                                          (.setField
-                                                            (.name "exports")
-                                                            "PriorityQueue"
-                                                            (.field
-                                                              (.name "_priority-queue.js")
-                                                              "default")))
-                                                        (.seq
-                                                          (.seq
-                                                            (.assign
-                                                              "_options.js"
-                                                              (.call
-                                                                "require"
-                                                                [(.lit (.str "./options.js"))]))
-                                                            (.seq
-                                                              (.setField
-                                                                (.name "exports")
-                                                                "QueueAddOptions"
-                                                                (.field
-                                                                  (.name "_options.js")
-                                                                  "QueueAddOptions"))
-                                                              (.setField
-                                                                (.name "exports")
-                                                                "Options"
-                                                                (.field
-                                                                  (.name "_options.js")
-                                                                  "Options"))))
-                                                          (.seq
-                                                            (.seq
-                                                              (.assign
-                                                                "_p-timeout"
-                                                                (.call
-                                                                  "require"
-                                                                  [(.lit (.str "p-timeout"))]))
-                                                              (.setField
-                                                                (.name "exports")
-                                                                "TimeoutError"
-                                                                (.field
-                                                                  (.name "_p-timeout")
-                                                                  "TimeoutError")))
-                                                            (.seq
-                                                              (.hole "stmt:TYPE_DECL")
-                                                              (.hole "stmt:TYPE_DECL"))))))))))))))))))))))))))) }
+                                        (.assign
+                                        "EventEmitter"
+                                        (.field
+                                        (.call "require" [(.lit (.str "eventemitter3"))])
+                                        "EventEmitter"))
+                                        (.seq
+                                        (.assign
+                                        "pTimeout"
+                                        (.call "require" [(.lit (.str "p-timeout"))]))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "Queue"
+                                        (.field
+                                        (.call "require" [(.lit (.str "./queue.js"))])
+                                        "Queue"))
+                                        (.assign
+                                        "RunFunction"
+                                        (.field
+                                        (.call "require" [(.lit (.str "./queue.js"))])
+                                        "RunFunction")))
+                                        (.seq
+                                        (.assign
+                                        "PriorityQueue"
+                                        (.call "require" [(.lit (.str "./priority-queue.js"))]))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "QueueAddOptions"
+                                        (.field
+                                        (.call "require" [(.lit (.str "./options.js"))])
+                                        "QueueAddOptions"))
+                                        (.seq
+                                        (.assign
+                                        "Options"
+                                        (.field
+                                        (.call "require" [(.lit (.str "./options.js"))])
+                                        "Options"))
+                                        (.assign
+                                        "TaskOptions"
+                                        (.field
+                                        (.call "require" [(.lit (.str "./options.js"))])
+                                        "TaskOptions"))))
+                                        (.seq
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.assign
+                                        "PQueue"
+                                        (.fnref "index.ts::program:PQueue:<init>")))
+                                        (.setIndex
+                                        (.name "exports")
+                                        (.lit (.str "default"))
+                                        (.name "PQueue")))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "_queue.js"
+                                        (.call "require" [(.lit (.str "./queue.js"))]))
+                                        (.setField
+                                        (.name "exports")
+                                        "Queue"
+                                        (.field (.name "_queue.js") "Queue")))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "_priority-queue.js"
+                                        (.call "require" [(.lit (.str "./priority-queue.js"))]))
+                                        (.setField
+                                        (.name "exports")
+                                        "PriorityQueue"
+                                        (.field (.name "_priority-queue.js") "default")))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "_options.js"
+                                        (.call "require" [(.lit (.str "./options.js"))]))
+                                        (.seq
+                                        (.setField
+                                        (.name "exports")
+                                        "QueueAddOptions"
+                                        (.field (.name "_options.js") "QueueAddOptions"))
+                                        (.setField
+                                        (.name "exports")
+                                        "Options"
+                                        (.field (.name "_options.js") "Options"))))
+                                        (.seq
+                                        (.seq
+                                        (.assign
+                                        "_p-timeout"
+                                        (.call "require" [(.lit (.str "p-timeout"))]))
+                                        (.setField
+                                        (.name "exports")
+                                        "TimeoutError"
+                                        (.field (.name "_p-timeout") "TimeoutError")))
+                                        (.seq (.hole "stmt:TYPE_DECL") (.hole "stmt:TYPE_DECL"))))))))))))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:<init>`  (from `index.ts`) -/
 def f_index_ts__program_PQueue__init_ : Func :=
@@ -204,360 +178,212 @@ def f_index_ts__program_PQueue__init_ : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  .skip
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            (.assign
-                                                              "intervalCount"
-                                                              (.lit (.int 0)))
-                                                            (.seq
-                                                              (.assign
-                                                                "rateLimitedInInterval"
-                                                                (.lit (.bool false)))
-                                                              (.seq
-                                                                (.assign
-                                                                  "rateLimitFlushScheduled"
-                                                                  (.lit (.bool false)))
-                                                                (.seq
-                                                                  (.assign
-                                                                    "intervalEnd"
-                                                                    (.lit (.int 0)))
-                                                                  (.seq
-                                                                    (.assign
-                                                                      "strictTicks"
-                                                                      (.call
-                                                                        "__ecma.Array.factory"
-                                                                        []))
-                                                                    (.seq
-                                                                      (.assign
-                                                                        "strictTicksStartIndex"
-                                                                        (.lit (.int 0)))
-                                                                      (.seq
-                                                                        (.assign
-                                                                          "pending"
-                                                                          (.lit (.int 0)))
-                                                                        (.seq
-                                                                          (.assign
-                                                                            "idAssigner"
-                                                                            (.hole "lit:unquoted"))
-                                                                          (.seq
-                                                                            (.seq
-                                                                              .skip
-                                                                              (.seq
-                                                                                (.assign
-                                                                                  "_tmp_7"
-                                                                                  (.hole "op:alloc"))
-                                                                                (.seq
-                                                                                  (.expr
-                                                                                    (.call
-                                                                                      "<operator>.new"
-                                                                                      []))
-                                                                                  (.assign
-                                                                                    "runningTasks"
-                                                                                    (.name "_tmp_7")))))
-                                                                            (.seq
-                                                                              (.seq
-                                                                                .skip
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "_tmp_8"
-                                                                                    (.hole
-                                                                                      "op:alloc"))
-                                                                                  (.seq
-                                                                                    (.expr
-                                                                                      (.call
-                                                                                        "<operator>.new"
-                                                                                        []))
-                                                                                    (.assign
-                                                                                      "queueAbortListenerCleanupFunctions"
-                                                                                      (.name
-                                                                                        "_tmp_8")))))
-                                                                              (.seq
-                                                                                (.expr
-                                                                                  (.call "super" []))
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "options"
-                                                                                    (.hole
-                                                                                      "op:cast"))
-                                                                                  (.seq
-                                                                                    (.ifte
-                                                                                      (.unop
-                                                                                        "!"
-                                                                                        (.binop
-                                                                                          "&&"
-                                                                                          (.binop
-                                                                                            "=="
-                                                                                            (.hole
-                                                                                              "op:instanceOf")
-                                                                                            (.lit
-                                                                                              (.str "number")))
-                                                                                          (.binop
-                                                                                            ">="
-                                                                                            (.field
-                                                                                              (.name
-                                                                                                "options")
-                                                                                              "intervalCap")
-                                                                                            (.lit
-                                                                                              (.int 1)))))
-                                                                                      (.hole
-                                                                                        "control:THROW")
-                                                                                      .skip)
-                                                                                    (.seq
-                                                                                      (.ifte
-                                                                                        (.binop
-                                                                                          "||"
-                                                                                          (.binop
-                                                                                            "=="
-                                                                                            (.field
-                                                                                              (.name
-                                                                                                "options")
-                                                                                              "interval")
-                                                                                            (.name
-                                                                                              "undefined"))
-                                                                                          (.unop
-                                                                                            "!"
-                                                                                            (.binop
-                                                                                              "&&"
-                                                                                              (.mcall
-                                                                                                (.name
-                                                                                                  "options")
-                                                                                                "interval"
-                                                                                                [ (.field
-                                                                                                    (.name
-                                                                                                      "options")
-                                                                                                    "interval") ])
-                                                                                              (.binop
-                                                                                                ">="
-                                                                                                (.field
-                                                                                                  (.name
-                                                                                                    "options")
-                                                                                                  "interval")
-                                                                                                (.lit
-                                                                                                  (.int 0))))))
-                                                                                        (.hole
-                                                                                          "control:THROW")
-                                                                                        .skip)
-                                                                                      (.seq
-                                                                                        (.ifte
-                                                                                          (.binop
-                                                                                            "&&"
-                                                                                            (.field
-                                                                                              (.name
-                                                                                                "options")
-                                                                                              "strict")
-                                                                                            (.binop
-                                                                                              "=="
-                                                                                              (.field
-                                                                                                (.name
-                                                                                                  "options")
-                                                                                                "interval")
-                                                                                              (.lit
-                                                                                                (.int 0))))
-                                                                                          (.hole
-                                                                                            "control:THROW")
-                                                                                          .skip)
-                                                                                        (.seq
-                                                                                          (.ifte
-                                                                                            (.binop
-                                                                                              "&&"
-                                                                                              (.field
-                                                                                                (.name
-                                                                                                  "options")
-                                                                                                "strict")
-                                                                                              (.binop
-                                                                                                "=="
-                                                                                                (.field
-                                                                                                  (.name
-                                                                                                    "options")
-                                                                                                  "intervalCap")
-                                                                                                (.field
-                                                                                                  (.name
-                                                                                                    "Number")
-                                                                                                  "POSITIVE_INFINITY")))
-                                                                                            (.hole
-                                                                                              "control:THROW")
-                                                                                            .skip)
-                                                                                          (.seq
-                                                                                            (.setField
-                                                                                              (.name
-                                                                                                "this")
-                                                                                              "#carryoverIntervalCount"
-                                                                                              (.binop
-                                                                                                "||"
-                                                                                                (.binop
-                                                                                                  "||"
-                                                                                                  (.field
-                                                                                                    (.name
-                                                                                                      "options")
-                                                                                                    "carryoverIntervalCount")
-                                                                                                  (.field
-                                                                                                    (.name
-                                                                                                      "options")
-                                                                                                    "carryoverConcurrencyCount"))
-                                                                                                (.lit
-                                                                                                  (.bool false))))
-                                                                                            (.seq
-                                                                                              (.setField
-                                                                                                (.name
-                                                                                                  "this")
-                                                                                                "#isIntervalIgnored"
-                                                                                                (.binop
-                                                                                                  "||"
-                                                                                                  (.binop
-                                                                                                    "=="
-                                                                                                    (.field
-                                                                                                      (.name
-                                                                                                        "options")
-                                                                                                      "intervalCap")
-                                                                                                    (.field
-                                                                                                      (.name
-                                                                                                        "Number")
-                                                                                                      "POSITIVE_INFINITY"))
-                                                                                                  (.binop
-                                                                                                    "=="
-                                                                                                    (.field
-                                                                                                      (.name
-                                                                                                        "options")
-                                                                                                      "interval")
-                                                                                                    (.lit
-                                                                                                      (.int 0)))))
-                                                                                              (.seq
-                                                                                                (.setField
-                                                                                                  (.name
-                                                                                                    "this")
-                                                                                                  "#intervalCap"
-                                                                                                  (.field
-                                                                                                    (.name
-                                                                                                      "options")
-                                                                                                    "intervalCap"))
-                                                                                                (.seq
-                                                                                                  (.setField
-                                                                                                    (.name
-                                                                                                      "this")
-                                                                                                    "#interval"
-                                                                                                    (.field
-                                                                                                      (.name
-                                                                                                        "options")
-                                                                                                      "interval"))
-                                                                                                  (.seq
-                                                                                                    (.setField
-                                                                                                      (.name
-                                                                                                        "this")
-                                                                                                      "#strict"
-                                                                                                      (.hole
-                                                                                                        "op:notNullAssert"))
-                                                                                                    (.seq
-                                                                                                      (.seq
-                                                                                                        .skip
-                                                                                                        (.seq
-                                                                                                          (.assign
-                                                                                                            "_tmp_5"
-                                                                                                            (.hole
-                                                                                                              "op:alloc"))
-                                                                                                          (.seq
-                                                                                                            (.expr
-                                                                                                              (.call
-                                                                                                                "<operator>.new"
-                                                                                                                []))
-                                                                                                            (.setField
-                                                                                                              (.name
-                                                                                                                "this")
-                                                                                                              "#queue"
-                                                                                                              (.name
-                                                                                                                "_tmp_5")))))
-                                                                                                      (.seq
-                                                                                                        (.setField
-                                                                                                          (.name
-                                                                                                            "this")
-                                                                                                          "#queueClass"
-                                                                                                          (.hole
-                                                                                                            "op:notNullAssert"))
-                                                                                                        (.seq
-                                                                                                          (.setField
-                                                                                                            (.name
-                                                                                                              "this")
-                                                                                                            "concurrency"
-                                                                                                            (.hole
-                                                                                                              "op:notNullAssert"))
-                                                                                                          (.seq
-                                                                                                            (.ifte
-                                                                                                              (.binop
-                                                                                                                "&&"
-                                                                                                                (.binop
-                                                                                                                  "!="
-                                                                                                                  (.field
-                                                                                                                    (.name
-                                                                                                                      "options")
-                                                                                                                    "timeout")
-                                                                                                                  (.name
-                                                                                                                    "undefined"))
-                                                                                                                (.unop
-                                                                                                                  "!"
-                                                                                                                  (.binop
-                                                                                                                    "&&"
-                                                                                                                    (.mcall
-                                                                                                                      (.name
-                                                                                                                        "options")
-                                                                                                                      "timeout"
-                                                                                                                      [ (.field
-                                                                                                                          (.name
-                                                                                                                            "options")
-                                                                                                                          "timeout") ])
-                                                                                                                    (.binop
-                                                                                                                      ">"
-                                                                                                                      (.field
-                                                                                                                        (.name
-                                                                                                                          "options")
-                                                                                                                        "timeout")
-                                                                                                                      (.lit
-                                                                                                                        (.int 0))))))
-                                                                                                              (.hole
-                                                                                                                "control:THROW")
-                                                                                                              .skip)
-                                                                                                            (.seq
-                                                                                                              (.setField
-                                                                                                                (.name
-                                                                                                                  "this")
-                                                                                                                "timeout"
-                                                                                                                (.field
-                                                                                                                  (.name
-                                                                                                                    "options")
-                                                                                                                  "timeout"))
-                                                                                                              (.seq
-                                                                                                                (.setField
-                                                                                                                  (.name
-                                                                                                                    "this")
-                                                                                                                  "#isPaused"
-                                                                                                                  (.binop
-                                                                                                                    "=="
-                                                                                                                    (.field
-                                                                                                                      (.name
-                                                                                                                        "options")
-                                                                                                                      "autoStart")
-                                                                                                                    (.lit
-                                                                                                                      (.bool false))))
-                                                                                                                (.expr
-                                                                                                                  (.mcall
-                                                                                                                    (.name
-                                                                                                                      "this")
-                                                                                                                    "#setupRateLimitTracking"
-                                                                                                                    []))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "intervalCount" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "rateLimitedInInterval" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "rateLimitFlushScheduled" (.lit (.bool false)))
+                                        (.seq
+                                        (.assign "intervalEnd" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "strictTicks" (.call "__ecma.Array.factory" []))
+                                        (.seq
+                                        (.assign "strictTicksStartIndex" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "pending" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "idAssigner" (.hole "lit:unquoted"))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_7" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<operator>.new" []))
+                                        (.assign "runningTasks" (.name "_tmp_7")))))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_8" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<operator>.new" []))
+                                        (.assign
+                                        "queueAbortListenerCleanupFunctions"
+                                        (.name "_tmp_8")))))
+                                        (.seq
+                                        (.expr (.call "super" []))
+                                        (.seq
+                                        (.assign "options" (.hole "op:cast"))
+                                        (.seq
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "&&"
+                                        (.binop "==" (.hole "op:instanceOf") (.lit (.str "number")))
+                                        (.binop
+                                        ">="
+                                        (.field (.name "options") "intervalCap")
+                                        (.lit (.int 1)))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "interval")
+                                        (.name "undefined"))
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "&&"
+                                        (.mcall
+                                        (.name "options")
+                                        "interval"
+                                        [(.field (.name "options") "interval")])
+                                        (.binop
+                                        ">="
+                                        (.field (.name "options") "interval")
+                                        (.lit (.int 0))))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.field (.name "options") "strict")
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "interval")
+                                        (.lit (.int 0))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.field (.name "options") "strict")
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "intervalCap")
+                                        (.field (.name "Number") "POSITIVE_INFINITY")))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#carryoverIntervalCount"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.field (.name "options") "carryoverIntervalCount")
+                                        (.field (.name "options") "carryoverConcurrencyCount"))
+                                        (.lit (.bool false))))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#isIntervalIgnored"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "intervalCap")
+                                        (.field (.name "Number") "POSITIVE_INFINITY"))
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "interval")
+                                        (.lit (.int 0)))))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#intervalCap"
+                                        (.field (.name "options") "intervalCap"))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#interval"
+                                        (.field (.name "options") "interval"))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#strict"
+                                        (.hole "op:notNullAssert"))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_5" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<operator>.new" []))
+                                        (.setField (.name "this") "#queue" (.name "_tmp_5")))))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#queueClass"
+                                        (.hole "op:notNullAssert"))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "concurrency"
+                                        (.hole "op:notNullAssert"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.binop
+                                        "!="
+                                        (.field (.name "options") "timeout")
+                                        (.name "undefined"))
+                                        (.unop
+                                        "!"
+                                        (.binop
+                                        "&&"
+                                        (.mcall
+                                        (.name "options")
+                                        "timeout"
+                                        [(.field (.name "options") "timeout")])
+                                        (.binop
+                                        ">"
+                                        (.field (.name "options") "timeout")
+                                        (.lit (.int 0))))))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "timeout"
+                                        (.field (.name "options") "timeout"))
+                                        (.seq
+                                        (.setField
+                                        (.name "this")
+                                        "#isPaused"
+                                        (.binop
+                                        "=="
+                                        (.field (.name "options") "autoStart")
+                                        (.lit (.bool false))))
+                                        (.expr (.mcall (.name "this") "#setupRateLimitTracking" []))))))))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:#cleanupStrictTicks`  (from `index.ts`) -/
 def f_index_ts__program_PQueue__cleanupStrictTicks : Func :=
@@ -886,9 +712,9 @@ def f_index_ts__program_PQueue__tryToStartAnother : Func :=
                                       (.assign "now" (.mcall (.name "Date") "now" []))
                                       (.expr
                                         (.mcall
-                                          (.name "this")
-                                          "#cleanupStrictTicks"
-                                          [(.name "now")]))))
+                                        (.name "this")
+                                        "#cleanupStrictTicks"
+                                        [(.name "now")]))))
                                   .skip)
                                 (.expr (.mcall (.name "this") "emit" [(.lit (.str "idle"))]))))
                             .skip)
@@ -922,34 +748,28 @@ def f_index_ts__program_PQueue__tryToStartAnother : Func :=
                                       (.assign "job" (.hole "op:notNullAssert"))
                                       (.seq
                                         (.ifte
-                                          (.unop "!" (.field (.name "this") "#isIntervalIgnored"))
-                                          (.seq
-                                            (.expr
-                                              (.mcall
-                                                (.name "this")
-                                                "#consumeIntervalSlot"
-                                                [(.name "now")]))
-                                            (.expr
-                                              (.mcall (.name "this") "#scheduleRateLimitUpdate" [])))
-                                          .skip)
+                                        (.unop "!" (.field (.name "this") "#isIntervalIgnored"))
                                         (.seq
-                                          (.ifte
-                                            (.name "canInitializeInterval")
-                                            (.expr
-                                              (.mcall
-                                                (.name "this")
-                                                "#initializeIntervalIfNeeded"
-                                                []))
-                                            .skip)
-                                          (.seq
-                                            (.expr
-                                              (.mcall
-                                                (.name "this")
-                                                "emit"
-                                                [(.lit (.str "active"))]))
-                                            (.seq
-                                              (.expr (.call "job" []))
-                                              (.assign "taskStarted" (.lit (.bool true)))))))))
+                                        (.expr
+                                        (.mcall
+                                        (.name "this")
+                                        "#consumeIntervalSlot"
+                                        [(.name "now")]))
+                                        (.expr
+                                        (.mcall (.name "this") "#scheduleRateLimitUpdate" [])))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.name "canInitializeInterval")
+                                        (.expr
+                                        (.mcall (.name "this") "#initializeIntervalIfNeeded" []))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.mcall (.name "this") "emit" [(.lit (.str "active"))]))
+                                        (.seq
+                                        (.expr (.call "job" []))
+                                        (.assign "taskStarted" (.lit (.bool true)))))))))
                                   .skip)))))
                         .skip)
                       (.ret (.name "taskStarted")))))))) }
@@ -1144,71 +964,68 @@ def f_index_ts__program_PQueue_add1__lambda_2 : Func :=
                                     (.seq
                                       (.expr
                                         (.mcall
-                                          (.hole "op:assignment")
-                                          "enqueue"
-                                          [(.name "run"), (.name "options")]))
+                                        (.hole "op:assignment")
+                                        "enqueue"
+                                        [(.name "run"), (.name "options")]))
                                       (.seq
                                         (.assign
-                                          "removeQueuedTask"
-                                          (.fnref
-                                            "index.ts::program:PQueue:add1:<lambda>2:removeQueuedTask"))
+                                        "removeQueuedTask"
+                                        (.fnref
+                                        "index.ts::program:PQueue:add1:<lambda>2:removeQueuedTask"))
                                         (.seq
-                                          (.ifte
-                                            (.field (.name "options") "signal")
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        (.assign "_tmp_34" (.name "options"))
-                                                        (.seq
-                                                          (.assign
-                                                            "signal"
-                                                            (.field (.name "_tmp_34") "signal"))
-                                                          (.expr (.name "_tmp_34"))))))
-                                                  (.seq
-                                                    (.assign
-                                                      "queueAbortHandler"
-                                                      (.fnref
-                                                        "index.ts::program:PQueue:add1:<lambda>2:queueAbortHandler"))
-                                                    (.seq
-                                                      (.assign
-                                                        "cleanupQueueAbortHandler"
-                                                        (.fnref
-                                                          "index.ts::program:PQueue:add1:<lambda>2:<lambda>10"))
-                                                      (.seq
-                                                        (.ifte
-                                                          (.field (.name "signal") "aborted")
-                                                          (.seq
-                                                            (.expr
-                                                              (.call
-                                                                "index.ts::program:PQueue:add1:<lambda>2:queueAbortHandler"
-                                                                []))
-                                                            (.ret (.lit .unit)))
-                                                          .skip)
-                                                        (.seq
-                                                          (.expr
-                                                            (.mcall
-                                                              (.name "signal")
-                                                              "addEventListener"
-                                                              [ (.lit (.str "abort"))
-                                                              , (.name "queueAbortHandler")
-                                                              , (.hole "expr:BLOCK-prelude") ]))
-                                                          (.expr
-                                                            (.mcall
-                                                              (.hole "op:assignment")
-                                                              "add"
-                                                              [(.name "cleanupQueueAbortHandler")])))))))))
-                                            .skip)
-                                          (.seq
-                                            (.expr
-                                              (.mcall (.name "this") "emit" [(.lit (.str "add"))]))
-                                            (.expr (.mcall (.name "this") "#tryToStartAnother" []))))))))))))))))))) }
+                                        (.ifte
+                                        (.field (.name "options") "signal")
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_34" (.name "options"))
+                                        (.seq
+                                        (.assign "signal" (.field (.name "_tmp_34") "signal"))
+                                        (.expr (.name "_tmp_34"))))))
+                                        (.seq
+                                        (.assign
+                                        "queueAbortHandler"
+                                        (.fnref
+                                        "index.ts::program:PQueue:add1:<lambda>2:queueAbortHandler"))
+                                        (.seq
+                                        (.assign
+                                        "cleanupQueueAbortHandler"
+                                        (.fnref
+                                        "index.ts::program:PQueue:add1:<lambda>2:<lambda>10"))
+                                        (.seq
+                                        (.ifte
+                                        (.field (.name "signal") "aborted")
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "index.ts::program:PQueue:add1:<lambda>2:queueAbortHandler"
+                                        []))
+                                        (.ret (.lit .unit)))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.name "signal")
+                                        "addEventListener"
+                                        [ (.lit (.str "abort"))
+                                        , (.name "queueAbortHandler")
+                                        , (.hole "expr:BLOCK-prelude") ]))
+                                        (.expr
+                                        (.mcall
+                                        (.hole "op:assignment")
+                                        "add"
+                                        [(.name "cleanupQueueAbortHandler")])))))))))
+                                        .skip)
+                                        (.seq
+                                        (.expr (.mcall (.name "this") "emit" [(.lit (.str "add"))]))
+                                        (.expr (.mcall (.name "this") "#tryToStartAnother" []))))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:add1:<lambda>2:<lambda>4:<lambda>5:<lambda>6`  (from `index.ts`) -/
 def f_index_ts__program_PQueue_add1__lambda_2__lambda_4__lambda_5__lambda_6 : Func :=
@@ -1269,159 +1086,122 @@ def f_index_ts__program_PQueue_add1__lambda_2_run : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.expr (.call "cleanupQueueAbortHandler" []))
-                                                (.seq
-                                                  (.expr (.hole "op:postIncrement"))
-                                                  (.seq
-                                                    (.expr
-                                                      (.mcall
-                                                        (.hole "op:assignment")
-                                                        "set"
-                                                        [ (.name "taskSymbol")
-                                                        , (.hole "expr:BLOCK-prelude") ]))
-                                                    (.tryFinally
-                                                      (.tryCatch
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            .skip
-                                                            (.seq
-                                                              (.tryCatch
-                                                                (.expr
-                                                                  (.mcall
-                                                                    (.field
-                                                                      (.name "options")
-                                                                      "signal")
-                                                                    "throwIfAborted"
-                                                                    []))
-                                                                "__exc"
-                                                                (.seq
-                                                                  (.expr (.name "error"))
-                                                                  (.seq
-                                                                    (.expr
-                                                                      (.mcall
-                                                                        (.name "this")
-                                                                        "#rollbackIntervalConsumption"
-                                                                        []))
-                                                                    (.seq
-                                                                      (.expr
-                                                                        (.mcall
-                                                                          (.hole "op:assignment")
-                                                                          "delete"
-                                                                          [(.name "taskSymbol")]))
-                                                                      (.hole "control:THROW")))))
-                                                              (.seq
-                                                                (.assign
-                                                                  "operation"
-                                                                  (.call
-                                                                    "function_"
-                                                                    [(.hole "expr:BLOCK-prelude")]))
-                                                                (.seq
-                                                                  (.ifte
-                                                                    (.binop
-                                                                      "!="
-                                                                      (.field
-                                                                        (.name "options")
-                                                                        "timeout")
-                                                                      (.name "undefined"))
-                                                                    (.assign
-                                                                      "operation"
-                                                                      (.call
-                                                                        "pTimeout"
-                                                                        [ (.call
-                                                                            "resolve"
-                                                                            [(.name "operation")])
-                                                                        , (.hole
-                                                                            "expr:BLOCK-prelude") ]))
-                                                                    .skip)
-                                                                  (.seq
-                                                                    (.ifte
-                                                                      (.field
-                                                                        (.name "options")
-                                                                        "signal")
-                                                                      (.seq
-                                                                        .skip
-                                                                        (.seq
-                                                                          (.seq
-                                                                            .skip
-                                                                            (.seq
-                                                                              .skip
-                                                                              (.seq
-                                                                                (.assign
-                                                                                  "_tmp_26"
-                                                                                  (.name "options"))
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "signal"
-                                                                                    (.field
-                                                                                      (.name
-                                                                                        "_tmp_26")
-                                                                                      "signal"))
-                                                                                  (.expr
-                                                                                    (.name
-                                                                                      "_tmp_26"))))))
-                                                                          (.assign
-                                                                            "operation"
-                                                                            (.call
-                                                                              "race"
-                                                                              [ (.hole
-                                                                                  "expr:BLOCK-impure") ]))))
-                                                                      .skip)
-                                                                    (.seq
-                                                                      (.assign
-                                                                        "result"
-                                                                        (.hole "op:await"))
-                                                                      (.seq
-                                                                        (.expr
-                                                                          (.call
-                                                                            "resolve"
-                                                                            [(.name "result")]))
-                                                                        (.expr
-                                                                          (.mcall
-                                                                            (.name "this")
-                                                                            "emit"
-                                                                            [ (.lit
-                                                                                (.str "completed"))
-                                                                            , (.name "result") ]))))))))))
-                                                        "__exc"
-                                                        (.seq
-                                                          (.expr (.name "error"))
-                                                          (.seq
-                                                            (.expr
-                                                              (.call "reject" [(.name "error")]))
-                                                            (.expr
-                                                              (.mcall
-                                                                (.name "this")
-                                                                "emit"
-                                                                [ (.lit (.str "error"))
-                                                                , (.name "error") ])))))
-                                                      (.seq
-                                                        (.ifte
-                                                          (.name "eventListener")
-                                                          (.expr
-                                                            (.mcall
-                                                              (.field (.name "options") "signal")
-                                                              "removeEventListener"
-                                                              [ (.lit (.str "abort"))
-                                                              , (.name "eventListener") ]))
-                                                          .skip)
-                                                        (.seq
-                                                          (.expr
-                                                            (.mcall
-                                                              (.hole "op:assignment")
-                                                              "delete"
-                                                              [(.name "taskSymbol")]))
-                                                          (.expr
-                                                            (.call
-                                                              "queueMicrotask"
-                                                              [ (.fnref
-                                                                  "index.ts::program:PQueue:add1:<lambda>2:<lambda>4:<lambda>7") ])))))))))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.expr (.call "cleanupQueueAbortHandler" []))
+                                        (.seq
+                                        (.expr (.hole "op:postIncrement"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.hole "op:assignment")
+                                        "set"
+                                        [(.name "taskSymbol"), (.hole "expr:BLOCK-prelude")]))
+                                        (.tryFinally
+                                        (.tryCatch
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.tryCatch
+                                        (.expr
+                                        (.mcall
+                                        (.field (.name "options") "signal")
+                                        "throwIfAborted"
+                                        []))
+                                        "__exc"
+                                        (.seq
+                                        (.expr (.name "error"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall (.name "this") "#rollbackIntervalConsumption" []))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.hole "op:assignment")
+                                        "delete"
+                                        [(.name "taskSymbol")]))
+                                        (.hole "control:THROW")))))
+                                        (.seq
+                                        (.assign
+                                        "operation"
+                                        (.call "function_" [(.hole "expr:BLOCK-prelude")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "options") "timeout")
+                                        (.name "undefined"))
+                                        (.assign
+                                        "operation"
+                                        (.call
+                                        "pTimeout"
+                                        [ (.call "resolve" [(.name "operation")])
+                                        , (.hole "expr:BLOCK-prelude") ]))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.field (.name "options") "signal")
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "_tmp_26" (.name "options"))
+                                        (.seq
+                                        (.assign "signal" (.field (.name "_tmp_26") "signal"))
+                                        (.expr (.name "_tmp_26"))))))
+                                        (.assign
+                                        "operation"
+                                        (.call "race" [(.hole "expr:BLOCK-impure")]))))
+                                        .skip)
+                                        (.seq
+                                        (.assign "result" (.hole "op:await"))
+                                        (.seq
+                                        (.expr (.call "resolve" [(.name "result")]))
+                                        (.expr
+                                        (.mcall
+                                        (.name "this")
+                                        "emit"
+                                        [(.lit (.str "completed")), (.name "result")]))))))))))
+                                        "__exc"
+                                        (.seq
+                                        (.expr (.name "error"))
+                                        (.seq
+                                        (.expr (.call "reject" [(.name "error")]))
+                                        (.expr
+                                        (.mcall
+                                        (.name "this")
+                                        "emit"
+                                        [(.lit (.str "error")), (.name "error")])))))
+                                        (.seq
+                                        (.ifte
+                                        (.name "eventListener")
+                                        (.expr
+                                        (.mcall
+                                        (.field (.name "options") "signal")
+                                        "removeEventListener"
+                                        [(.lit (.str "abort")), (.name "eventListener")]))
+                                        .skip)
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.hole "op:assignment")
+                                        "delete"
+                                        [(.name "taskSymbol")]))
+                                        (.expr
+                                        (.call
+                                        "queueMicrotask"
+                                        [ (.fnref
+                                        "index.ts::program:PQueue:add1:<lambda>2:<lambda>4:<lambda>7") ])))))))))))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:add1:<lambda>2:<lambda>4:<lambda>7`  (from `index.ts`) -/
 def f_index_ts__program_PQueue_add1__lambda_2__lambda_4__lambda_7 : Func :=
@@ -1536,12 +1316,12 @@ def f_index_ts__program_PQueue_add1 : Func :=
                                       (.expr (.hole "op:spread"))
                                       (.seq
                                         (.setField
-                                          (.name "_tmp_17")
-                                          "id"
-                                          (.binop
-                                            "||"
-                                            (.field (.name "options") "id")
-                                            (.mcall (.hole "op:assignment") "toString" [])))
+                                        (.name "_tmp_17")
+                                        "id"
+                                        (.binop
+                                        "||"
+                                        (.field (.name "options") "id")
+                                        (.mcall (.hole "op:assignment") "toString" [])))
                                         (.assign "options" (.name "_tmp_17"))))))
                                 (.seq
                                   (.ifte
@@ -1554,15 +1334,15 @@ def f_index_ts__program_PQueue_add1 : Func :=
                                       (.unop
                                         "!"
                                         (.binop
-                                          "&&"
-                                          (.mcall
-                                            (.name "options")
-                                            "timeout"
-                                            [(.field (.name "options") "timeout")])
-                                          (.binop
-                                            ">"
-                                            (.field (.name "options") "timeout")
-                                            (.lit (.int 0))))))
+                                        "&&"
+                                        (.mcall
+                                        (.name "options")
+                                        "timeout"
+                                        [(.field (.name "options") "timeout")])
+                                        (.binop
+                                        ">"
+                                        (.field (.name "options") "timeout")
+                                        (.lit (.int 0))))))
                                     (.hole "control:THROW")
                                     .skip)
                                   (.seq
@@ -1571,9 +1351,9 @@ def f_index_ts__program_PQueue_add1 : Func :=
                                       (.assign "_tmp_20" (.hole "op:alloc"))
                                       (.seq
                                         (.expr
-                                          (.call
-                                            "<operator>.new"
-                                            [(.fnref "index.ts::program:PQueue:add1:<lambda>2")]))
+                                        (.call
+                                        "<operator>.new"
+                                        [(.fnref "index.ts::program:PQueue:add1:<lambda>2")]))
                                         (.ret (.name "_tmp_20"))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:addAll`  (from `index.ts`) -/
@@ -1824,14 +1604,14 @@ def f_index_ts__program_PQueue__onEvent__lambda_15_listener : Func :=
                                       (.seq
                                         (.expr (.name "event"))
                                         (.loop
-                                          (.unop "!" (.field (.hole "op:assignment") "done"))
-                                          (.seq
-                                            (.assign "event" (.field (.name "_result_1") "value"))
-                                            (.expr
-                                              (.mcall
-                                                (.name "this")
-                                                "off"
-                                                [(.name "event"), (.name "listener")]))))))))))
+                                        (.unop "!" (.field (.hole "op:assignment") "done"))
+                                        (.seq
+                                        (.assign "event" (.field (.name "_result_1") "value"))
+                                        (.expr
+                                        (.mcall
+                                        (.name "this")
+                                        "off"
+                                        [(.name "event"), (.name "listener")]))))))))))
                             (.expr (.call "resolve" []))))))))))) }
 
 /-- `index.ts::program:PQueue:#onEvent:<lambda>15`  (from `index.ts`) -/
@@ -1871,10 +1651,10 @@ def f_index_ts__program_PQueue__onEvent__lambda_15 : Func :=
                                       (.seq
                                         (.assign "event" (.field (.name "_result_2") "value"))
                                         (.expr
-                                          (.mcall
-                                            (.name "this")
-                                            "on"
-                                            [(.name "event"), (.name "listener")]))))))))))))))))) }
+                                        (.mcall
+                                        (.name "this")
+                                        "on"
+                                        [(.name "event"), (.name "listener")]))))))))))))))))) }
 
 /-- `index.ts::program:PQueue:#onEvent`  (from `index.ts`) -/
 def f_index_ts__program_PQueue__onEvent : Func :=
@@ -2358,17 +2138,17 @@ def f_priority_queue_ts__program_PriorityQueue_enqueue : Func :=
                                         (.binop "||" (.name "options") (.name "_tmp_0")))
                                       (.seq
                                         (.assign
-                                          "priority"
-                                          (.cond
-                                            (.binop
-                                              "=="
-                                              (.field (.name "_tmp_1") "priority")
-                                              (.hole "op:void"))
-                                            (.lit (.int 0))
-                                            (.field (.name "_tmp_1") "priority")))
+                                        "priority"
+                                        (.cond
+                                        (.binop
+                                        "=="
+                                        (.field (.name "_tmp_1") "priority")
+                                        (.hole "op:void"))
+                                        (.lit (.int 0))
+                                        (.field (.name "_tmp_1") "priority")))
                                         (.seq
-                                          (.assign "id" (.field (.name "_tmp_1") "id"))
-                                          (.expr (.name "_tmp_1")))))))
+                                        (.assign "id" (.field (.name "_tmp_1") "id"))
+                                        (.expr (.name "_tmp_1")))))))
                                 (.seq
                                   (.seq
                                     .skip
@@ -2377,68 +2157,57 @@ def f_priority_queue_ts__program_PriorityQueue_enqueue : Func :=
                                       (.seq
                                         (.assign "_tmp_2" (.name "this"))
                                         (.seq
-                                          (.assign "size" (.field (.name "_tmp_2") "size"))
-                                          (.expr (.name "_tmp_2"))))))
+                                        (.assign "size" (.field (.name "_tmp_2") "size"))
+                                        (.expr (.name "_tmp_2"))))))
                                   (.seq
                                     (.seq
                                       .skip
                                       (.seq
                                         (.setField (.name "_tmp_3") "priority" (.name "priority"))
                                         (.seq
-                                          (.setField (.name "_tmp_3") "id" (.name "id"))
-                                          (.seq
-                                            (.setField (.name "_tmp_3") "run" (.name "run"))
-                                            (.assign "element" (.name "_tmp_3"))))))
+                                        (.setField (.name "_tmp_3") "id" (.name "id"))
+                                        (.seq
+                                        (.setField (.name "_tmp_3") "run" (.name "run"))
+                                        (.assign "element" (.name "_tmp_3"))))))
                                     (.seq
                                       (.ifte
                                         (.binop "==" (.name "size") (.lit (.int 0)))
                                         (.seq
-                                          (.setField
-                                            (.field (.name "this") "#queue")
-                                            "length"
-                                            (.lit (.int 0)))
-                                          (.seq
-                                            (.setField (.name "this") "#head" (.lit (.int 0)))
-                                            (.seq
-                                              (.expr
-                                                (.mcall
-                                                  (.hole "op:assignment")
-                                                  "push"
-                                                  [(.name "element")]))
-                                              (.ret (.lit .unit)))))
+                                        (.setField
+                                        (.field (.name "this") "#queue")
+                                        "length"
+                                        (.lit (.int 0)))
+                                        (.seq
+                                        (.setField (.name "this") "#head" (.lit (.int 0)))
+                                        (.seq
+                                        (.expr
+                                        (.mcall (.hole "op:assignment") "push" [(.name "element")]))
+                                        (.ret (.lit .unit)))))
                                         .skip)
                                       (.seq
                                         (.ifte
-                                          (.binop
-                                            ">="
-                                            (.hole "op:notNullAssert")
-                                            (.name "priority"))
-                                          (.seq
-                                            (.expr
-                                              (.mcall
-                                                (.hole "op:assignment")
-                                                "push"
-                                                [(.name "element")]))
-                                            (.ret (.lit .unit)))
-                                          .skip)
+                                        (.binop ">=" (.hole "op:notNullAssert") (.name "priority"))
                                         (.seq
-                                          (.expr (.mcall (.name "this") "#compact" []))
-                                          (.seq
-                                            (.assign
-                                              "index"
-                                              (.call
-                                                "lowerBound"
-                                                [ (.field (.name "this") "#queue")
-                                                , (.name "element")
-                                                , (.fnref
-                                                    "priority-queue.ts::program:PriorityQueue:enqueue:<lambda>0") ]))
-                                            (.expr
-                                              (.mcall
-                                                (.hole "op:assignment")
-                                                "splice"
-                                                [ (.name "index")
-                                                , (.lit (.int 0))
-                                                , (.name "element") ]))))))))))))))))))) }
+                                        (.expr
+                                        (.mcall (.hole "op:assignment") "push" [(.name "element")]))
+                                        (.ret (.lit .unit)))
+                                        .skip)
+                                        (.seq
+                                        (.expr (.mcall (.name "this") "#compact" []))
+                                        (.seq
+                                        (.assign
+                                        "index"
+                                        (.call
+                                        "lowerBound"
+                                        [ (.field (.name "this") "#queue")
+                                        , (.name "element")
+                                        , (.fnref
+                                        "priority-queue.ts::program:PriorityQueue:enqueue:<lambda>0") ]))
+                                        (.expr
+                                        (.mcall
+                                        (.hole "op:assignment")
+                                        "splice"
+                                        [(.name "index"), (.lit (.int 0)), (.name "element")]))))))))))))))))))) }
 
 /-- `priority-queue.ts::program:PriorityQueue:setPriority:<lambda>1`  (from `priority-queue.ts`) -/
 def f_priority_queue_ts__program_PriorityQueue_setPriority__lambda_1 : Func :=

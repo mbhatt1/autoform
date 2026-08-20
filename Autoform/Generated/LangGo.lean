@@ -212,29 +212,28 @@ def f_envconfig_processField : Func :=
                                       (.ifte
                                         (.binop "!=" (.name "b") (.name "nil"))
                                         (.ret
-                                          (.call "UnmarshalBinary" [(.hole "call:no-callee-name")]))
+                                        (.call "UnmarshalBinary" [(.hole "call:no-callee-name")]))
                                         .skip)
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.ifte
-                                            (.binop
-                                              "=="
-                                              (.call "Kind" [])
-                                              (.field (.name "reflect") "Ptr"))
-                                            (.seq
-                                              (.assign "typ" (.call "Elem" []))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.ifte
-                                                    (.call "IsNil" [])
-                                                    (.expr
-                                                      (.call "Set" [(.call "New" [(.name "typ")])]))
-                                                    .skip)
-                                                  (.assign "field" (.call "Elem" [])))))
-                                            .skip)
-                                          (.seq (.hole "control:SWITCH") (.ret (.name "nil"))))))))))))))))))) }
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.call "Kind" [])
+                                        (.field (.name "reflect") "Ptr"))
+                                        (.seq
+                                        (.assign "typ" (.call "Elem" []))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.call "IsNil" [])
+                                        (.expr (.call "Set" [(.call "New" [(.name "typ")])]))
+                                        .skip)
+                                        (.assign "field" (.call "Elem" [])))))
+                                        .skip)
+                                        (.seq (.hole "control:SWITCH") (.ret (.name "nil"))))))))))))))))))) }
 
 /-- `envconfig.interfaceFrom`  (from `envconfig.go`) -/
 def f_envconfig_interfaceFrom : Func :=
@@ -412,38 +411,38 @@ def f_envconfig_TestParseURL : Func :=
                                       (.binop "!=" (.name "err") (.name "nil"))
                                       (.expr
                                         (.call
-                                          "Fatalf"
-                                          [(.lit (.str "unexpected error: %v")), (.name "err")]))
+                                        "Fatalf"
+                                        [(.lit (.str "unexpected error: %v")), (.name "err")]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.seq
                                         (.ifte
-                                          (.binop
-                                            "!="
-                                            (.field (.name "s") "UrlValue")
-                                            (.hole "op:indirection"))
-                                          (.expr
-                                            (.call
-                                              "Errorf"
-                                              [ (.lit (.str "expected %q, got %q"))
-                                              , (.name "u")
-                                              , (.mcall (.name "s") "UrlValue" []) ]))
-                                          .skip)
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "UrlValue")
+                                        (.hole "op:indirection"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.name "u")
+                                        , (.mcall (.name "s") "UrlValue" []) ]))
+                                        .skip)
                                         (.seq
-                                          .skip
-                                          (.ifte
-                                            (.binop
-                                              "!="
-                                              (.hole "op:indirection")
-                                              (.hole "op:indirection"))
-                                            (.expr
-                                              (.call
-                                                "Errorf"
-                                                [ (.lit (.str "expected %q, got %q"))
-                                                , (.name "u")
-                                                , (.field (.name "s") "UrlPointer") ]))
-                                            .skip))))))))))))))))) }
+                                        .skip
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.hole "op:indirection")
+                                        (.hole "op:indirection"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.name "u")
+                                        , (.field (.name "s") "UrlPointer") ]))
+                                        .skip))))))))))))))))) }
 
 /-- `envconfig.TestParseURLError`  (from `envconfig_1.8_test.go`) -/
 def f_envconfig_TestParseURLError : Func :=
@@ -505,27 +504,27 @@ def f_envconfig_TestParseURLError : Func :=
                                       (.assign
                                         "expectedUnerlyingError"
                                         (.call
-                                          "Error"
-                                          [ (.lit (.str "parse"))
-                                          , (.lit (.str "http_://foo"))
-                                          , (.call
-                                              "New"
-                                              [ (.lit
-                                                  (.str "first path segment in URL cannot contain colon")) ]) ]))
+                                        "Error"
+                                        [ (.lit (.str "parse"))
+                                        , (.lit (.str "http_://foo"))
+                                        , (.call
+                                        "New"
+                                        [ (.lit
+                                        (.str "first path segment in URL cannot contain colon")) ]) ]))
                                       (.seq
                                         .skip
                                         (.ifte
-                                          (.binop
-                                            "!="
-                                            (.mcall (.name "v") "Err" [])
-                                            (.call "Error" []))
-                                          (.expr
-                                            (.call
-                                              "Errorf"
-                                              [ (.lit (.str "expected %q, got %q"))
-                                              , (.name "expectedUnerlyingError")
-                                              , (.field (.name "v") "Err") ]))
-                                          .skip)))))))))))))))) }
+                                        (.binop
+                                        "!="
+                                        (.mcall (.name "v") "Err" [])
+                                        (.call "Error" []))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.name "expectedUnerlyingError")
+                                        , (.field (.name "v") "Err") ]))
+                                        .skip)))))))))))))))) }
 
 /-- `envconfig_1.8_test.go:envconfig.envconfig_1.8_test.go`  (from `envconfig_1.8_test.go`) -/
 def f_envconfig_1_8_test_go_envconfig_envconfig_1_8_test_go : Func :=
@@ -609,871 +608,549 @@ def f_envconfig_TestProcess : Func :=
                                     (.seq
                                       (.expr
                                         (.call
-                                          "Setenv"
-                                          [(.lit (.str "SERVICE_HOST")), (.lit (.str "127.0.0.1"))]))
+                                        "Setenv"
+                                        [(.lit (.str "SERVICE_HOST")), (.lit (.str "127.0.0.1"))]))
                                       (.seq
                                         (.expr
-                                          (.call
-                                            "Setenv"
-                                            [(.lit (.str "ENV_CONFIG_TTL")), (.lit (.str "30"))]))
+                                        (.call
+                                        "Setenv"
+                                        [(.lit (.str "ENV_CONFIG_TTL")), (.lit (.str "30"))]))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "Setenv"
-                                              [ (.lit (.str "ENV_CONFIG_REQUIREDVAR"))
-                                              , (.lit (.str "foo")) ]))
-                                          (.seq
-                                            (.expr
-                                              (.call
-                                                "Setenv"
-                                                [ (.lit (.str "ENV_CONFIG_IGNORED"))
-                                                , (.lit (.str "was-not-ignored")) ]))
-                                            (.seq
-                                              (.expr
-                                                (.call
-                                                  "Setenv"
-                                                  [ (.lit (.str "ENV_CONFIG_OUTER_INNER"))
-                                                  , (.lit (.str "iamnested")) ]))
-                                              (.seq
-                                                (.expr
-                                                  (.call
-                                                    "Setenv"
-                                                    [ (.lit (.str "ENV_CONFIG_AFTERNESTED"))
-                                                    , (.lit (.str "after")) ]))
-                                                (.seq
-                                                  (.expr
-                                                    (.call
-                                                      "Setenv"
-                                                      [ (.lit (.str "ENV_CONFIG_HONOR"))
-                                                      , (.lit (.str "honor")) ]))
-                                                  (.seq
-                                                    (.expr
-                                                      (.call
-                                                        "Setenv"
-                                                        [ (.lit (.str "ENV_CONFIG_DATETIME"))
-                                                        , (.lit (.str "2016-08-16T18:57:05Z")) ]))
-                                                    (.seq
-                                                      (.expr
-                                                        (.call
-                                                          "Setenv"
-                                                          [ (.lit
-                                                              (.str "ENV_CONFIG_MULTI_WORD_VAR_WITH_AUTO_SPLIT"))
-                                                          , (.lit (.str "24")) ]))
-                                                      (.seq
-                                                        (.expr
-                                                          (.call
-                                                            "Setenv"
-                                                            [ (.lit
-                                                                (.str "ENV_CONFIG_MULTI_WORD_ACR_WITH_AUTO_SPLIT"))
-                                                            , (.lit (.str "25")) ]))
-                                                        (.seq
-                                                          (.expr
-                                                            (.call
-                                                              "Setenv"
-                                                              [ (.lit (.str "ENV_CONFIG_URLVALUE"))
-                                                              , (.lit
-                                                                  (.str "https://github.com/kelseyhightower/envconfig")) ]))
-                                                          (.seq
-                                                            (.expr
-                                                              (.call
-                                                                "Setenv"
-                                                                [ (.lit
-                                                                    (.str "ENV_CONFIG_URLPOINTER"))
-                                                                , (.lit
-                                                                    (.str "https://github.com/kelseyhightower/envconfig")) ]))
-                                                            (.seq
-                                                              .skip
-                                                              (.seq
-                                                                (.assign
-                                                                  "err"
-                                                                  (.call
-                                                                    "envconfig.Process"
-                                                                    [ (.lit (.str "env_config"))
-                                                                    , (.hole "op:addressOf") ]))
-                                                                (.seq
-                                                                  .skip
-                                                                  (.seq
-                                                                    (.ifte
-                                                                      (.binop
-                                                                        "!="
-                                                                        (.name "err")
-                                                                        (.name "nil"))
-                                                                      (.expr
-                                                                        (.call
-                                                                          "Error"
-                                                                          [(.call "Error" [])]))
-                                                                      .skip)
-                                                                    (.seq
-                                                                      .skip
-                                                                      (.seq
-                                                                        (.ifte
-                                                                          (.binop
-                                                                            "!="
-                                                                            (.field
-                                                                              (.name "s")
-                                                                              "NoPrefixWithAlt")
-                                                                            (.lit
-                                                                              (.str "127.0.0.1")))
-                                                                          (.expr
-                                                                            (.call
-                                                                              "Errorf"
-                                                                              [ (.lit
-                                                                                  (.str "expected %v, got %v"))
-                                                                              , (.lit
-                                                                                  (.str "127.0.0.1"))
-                                                                              , (.field
-                                                                                  (.name "s")
-                                                                                  "NoPrefixWithAlt") ]))
-                                                                          .skip)
-                                                                        (.seq
-                                                                          .skip
-                                                                          (.seq
-                                                                            (.ifte
-                                                                              (.unop
-                                                                                "!"
-                                                                                (.field
-                                                                                  (.name "s")
-                                                                                  "Debug"))
-                                                                              (.expr
-                                                                                (.call
-                                                                                  "Errorf"
-                                                                                  [ (.lit
-                                                                                      (.str "expected %v, got %v"))
-                                                                                  , (.name "true")
-                                                                                  , (.field
-                                                                                      (.name "s")
-                                                                                      "Debug") ]))
-                                                                              .skip)
-                                                                            (.seq
-                                                                              .skip
-                                                                              (.seq
-                                                                                (.ifte
-                                                                                  (.binop
-                                                                                    "!="
-                                                                                    (.field
-                                                                                      (.name "s")
-                                                                                      "Port")
-                                                                                    (.lit
-                                                                                      (.int 8080)))
-                                                                                  (.expr
-                                                                                    (.call
-                                                                                      "Errorf"
-                                                                                      [ (.lit
-                                                                                          (.str "expected %d, got %v"))
-                                                                                      , (.lit
-                                                                                          (.int 8080))
-                                                                                      , (.field
-                                                                                          (.name
-                                                                                            "s")
-                                                                                          "Port") ]))
-                                                                                  .skip)
-                                                                                (.seq
-                                                                                  .skip
-                                                                                  (.seq
-                                                                                    (.ifte
-                                                                                      (.binop
-                                                                                        "!="
-                                                                                        (.field
-                                                                                          (.name
-                                                                                            "s")
-                                                                                          "Rate")
-                                                                                        (.hole
-                                                                                          "lit:float"))
-                                                                                      (.expr
-                                                                                        (.call
-                                                                                          "Errorf"
-                                                                                          [ (.lit
-                                                                                              (.str "expected %f, got %v"))
-                                                                                          , (.hole
-                                                                                              "lit:float")
-                                                                                          , (.field
-                                                                                              (.name
-                                                                                                "s")
-                                                                                              "Rate") ]))
-                                                                                      .skip)
-                                                                                    (.seq
-                                                                                      .skip
-                                                                                      (.seq
-                                                                                        (.ifte
-                                                                                          (.binop
-                                                                                            "!="
-                                                                                            (.field
-                                                                                              (.name
-                                                                                                "s")
-                                                                                              "TTL")
-                                                                                            (.lit
-                                                                                              (.int 30)))
-                                                                                          (.expr
-                                                                                            (.call
-                                                                                              "Errorf"
-                                                                                              [ (.lit
-                                                                                                  (.str "expected %d, got %v"))
-                                                                                              , (.lit
-                                                                                                  (.int 30))
-                                                                                              , (.field
-                                                                                                  (.name
-                                                                                                    "s")
-                                                                                                  "TTL") ]))
-                                                                                          .skip)
-                                                                                        (.seq
-                                                                                          .skip
-                                                                                          (.seq
-                                                                                            (.ifte
-                                                                                              (.binop
-                                                                                                "!="
-                                                                                                (.field
-                                                                                                  (.name
-                                                                                                    "s")
-                                                                                                  "User")
-                                                                                                (.lit
-                                                                                                  (.str "Kelsey")))
-                                                                                              (.expr
-                                                                                                (.call
-                                                                                                  "Errorf"
-                                                                                                  [ (.lit
-                                                                                                      (.str "expected %s, got %s"))
-                                                                                                  , (.lit
-                                                                                                      (.str "Kelsey"))
-                                                                                                  , (.field
-                                                                                                      (.name
-                                                                                                        "s")
-                                                                                                      "User") ]))
-                                                                                              .skip)
-                                                                                            (.seq
-                                                                                              .skip
-                                                                                              (.seq
-                                                                                                (.ifte
-                                                                                                  (.binop
-                                                                                                    "!="
-                                                                                                    (.field
-                                                                                                      (.name
-                                                                                                        "s")
-                                                                                                      "Timeout")
-                                                                                                    (.binop
-                                                                                                      "*"
-                                                                                                      (.lit
-                                                                                                        (.int 2))
-                                                                                                      (.field
-                                                                                                        (.name
-                                                                                                          "time")
-                                                                                                        "Minute")))
-                                                                                                  (.expr
-                                                                                                    (.call
-                                                                                                      "Errorf"
-                                                                                                      [ (.lit
-                                                                                                          (.str "expected %s, got %s"))
-                                                                                                      , (.binop
-                                                                                                          "*"
-                                                                                                          (.lit
-                                                                                                            (.int 2))
-                                                                                                          (.field
-                                                                                                            (.name
-                                                                                                              "time")
-                                                                                                            "Minute"))
-                                                                                                      , (.field
-                                                                                                          (.name
-                                                                                                            "s")
-                                                                                                          "Timeout") ]))
-                                                                                                  .skip)
-                                                                                                (.seq
-                                                                                                  .skip
-                                                                                                  (.seq
-                                                                                                    (.ifte
-                                                                                                      (.binop
-                                                                                                        "!="
-                                                                                                        (.field
-                                                                                                          (.name
-                                                                                                            "s")
-                                                                                                          "RequiredVar")
-                                                                                                        (.lit
-                                                                                                          (.str "foo")))
-                                                                                                      (.expr
-                                                                                                        (.call
-                                                                                                          "Errorf"
-                                                                                                          [ (.lit
-                                                                                                              (.str "expected %s, got %s"))
-                                                                                                          , (.lit
-                                                                                                              (.str "foo"))
-                                                                                                          , (.field
-                                                                                                              (.name
-                                                                                                                "s")
-                                                                                                              "RequiredVar") ]))
-                                                                                                      .skip)
-                                                                                                    (.seq
-                                                                                                      .skip
-                                                                                                      (.seq
-                                                                                                        (.ifte
-                                                                                                          (.binop
-                                                                                                            "||"
-                                                                                                            (.binop
-                                                                                                              "||"
-                                                                                                              (.binop
-                                                                                                                "||"
-                                                                                                                (.binop
-                                                                                                                  "!="
-                                                                                                                  (.mcall
-                                                                                                                    (.name
-                                                                                                                      "s")
-                                                                                                                    "AdminUsers"
-                                                                                                                    [ (.field
-                                                                                                                        (.name
-                                                                                                                          "s")
-                                                                                                                        "AdminUsers") ])
-                                                                                                                  (.lit
-                                                                                                                    (.int 3)))
-                                                                                                                (.binop
-                                                                                                                  "!="
-                                                                                                                  (.index
-                                                                                                                    (.field
-                                                                                                                      (.name
-                                                                                                                        "s")
-                                                                                                                      "AdminUsers")
-                                                                                                                    (.lit
-                                                                                                                      (.int 0)))
-                                                                                                                  (.lit
-                                                                                                                    (.str "John"))))
-                                                                                                              (.binop
-                                                                                                                "!="
-                                                                                                                (.index
-                                                                                                                  (.field
-                                                                                                                    (.name
-                                                                                                                      "s")
-                                                                                                                    "AdminUsers")
-                                                                                                                  (.lit
-                                                                                                                    (.int 1)))
-                                                                                                                (.lit
-                                                                                                                  (.str "Adam"))))
-                                                                                                            (.binop
-                                                                                                              "!="
-                                                                                                              (.index
-                                                                                                                (.field
-                                                                                                                  (.name
-                                                                                                                    "s")
-                                                                                                                  "AdminUsers")
-                                                                                                                (.lit
-                                                                                                                  (.int 2)))
-                                                                                                              (.lit
-                                                                                                                (.str "Will"))))
-                                                                                                          (.expr
-                                                                                                            (.call
-                                                                                                              "Errorf"
-                                                                                                              [ (.lit
-                                                                                                                  (.str "expected %#v, got %#v"))
-                                                                                                              , (.hole
-                                                                                                                  "op:arrayInitializer")
-                                                                                                              , (.field
-                                                                                                                  (.name
-                                                                                                                    "s")
-                                                                                                                  "AdminUsers") ]))
-                                                                                                          .skip)
-                                                                                                        (.seq
-                                                                                                          .skip
-                                                                                                          (.seq
-                                                                                                            (.ifte
-                                                                                                              (.binop
-                                                                                                                "||"
-                                                                                                                (.binop
-                                                                                                                  "||"
-                                                                                                                  (.binop
-                                                                                                                    "||"
-                                                                                                                    (.binop
-                                                                                                                      "!="
-                                                                                                                      (.mcall
-                                                                                                                        (.name
-                                                                                                                          "s")
-                                                                                                                        "MagicNumbers"
-                                                                                                                        [ (.field
-                                                                                                                            (.name
-                                                                                                                              "s")
-                                                                                                                            "MagicNumbers") ])
-                                                                                                                      (.lit
-                                                                                                                        (.int 3)))
-                                                                                                                    (.binop
-                                                                                                                      "!="
-                                                                                                                      (.index
-                                                                                                                        (.field
-                                                                                                                          (.name
-                                                                                                                            "s")
-                                                                                                                          "MagicNumbers")
-                                                                                                                        (.lit
-                                                                                                                          (.int 0)))
-                                                                                                                      (.lit
-                                                                                                                        (.int 5))))
-                                                                                                                  (.binop
-                                                                                                                    "!="
-                                                                                                                    (.index
-                                                                                                                      (.field
-                                                                                                                        (.name
-                                                                                                                          "s")
-                                                                                                                        "MagicNumbers")
-                                                                                                                      (.lit
-                                                                                                                        (.int 1)))
-                                                                                                                    (.lit
-                                                                                                                      (.int 10))))
-                                                                                                                (.binop
-                                                                                                                  "!="
-                                                                                                                  (.index
-                                                                                                                    (.field
-                                                                                                                      (.name
-                                                                                                                        "s")
-                                                                                                                      "MagicNumbers")
-                                                                                                                    (.lit
-                                                                                                                      (.int 2)))
-                                                                                                                  (.lit
-                                                                                                                    (.int 20))))
-                                                                                                              (.expr
-                                                                                                                (.call
-                                                                                                                  "Errorf"
-                                                                                                                  [ (.lit
-                                                                                                                      (.str "expected %#v, got %#v"))
-                                                                                                                  , (.hole
-                                                                                                                      "op:arrayInitializer")
-                                                                                                                  , (.field
-                                                                                                                      (.name
-                                                                                                                        "s")
-                                                                                                                      "MagicNumbers") ]))
-                                                                                                              .skip)
-                                                                                                            (.seq
-                                                                                                              .skip
-                                                                                                              (.seq
-                                                                                                                (.ifte
-                                                                                                                  (.binop
-                                                                                                                    "!="
-                                                                                                                    (.mcall
-                                                                                                                      (.name
-                                                                                                                        "s")
-                                                                                                                      "EmptyNumbers"
-                                                                                                                      [ (.field
-                                                                                                                          (.name
-                                                                                                                            "s")
-                                                                                                                          "EmptyNumbers") ])
-                                                                                                                    (.lit
-                                                                                                                      (.int 0)))
-                                                                                                                  (.expr
-                                                                                                                    (.call
-                                                                                                                      "Errorf"
-                                                                                                                      [ (.lit
-                                                                                                                          (.str "expected %#v, got %#v"))
-                                                                                                                      , (.hole
-                                                                                                                          "op:arrayInitializer")
-                                                                                                                      , (.field
-                                                                                                                          (.name
-                                                                                                                            "s")
-                                                                                                                          "EmptyNumbers") ]))
-                                                                                                                  .skip)
-                                                                                                                (.seq
-                                                                                                                  .skip
-                                                                                                                  (.seq
-                                                                                                                    (.assign
-                                                                                                                      "expected"
-                                                                                                                      (.lit
-                                                                                                                        (.str "this is a test value")))
-                                                                                                                    (.seq
-                                                                                                                      .skip
-                                                                                                                      (.seq
-                                                                                                                        (.ifte
-                                                                                                                          (.binop
-                                                                                                                            "!="
-                                                                                                                            (.mcall
-                                                                                                                              (.name
-                                                                                                                                "s")
-                                                                                                                              "ByteSlice"
-                                                                                                                              [ (.field
-                                                                                                                                  (.name
-                                                                                                                                    "s")
-                                                                                                                                  "ByteSlice") ])
-                                                                                                                            (.name
-                                                                                                                              "expected"))
-                                                                                                                          (.expr
-                                                                                                                            (.call
-                                                                                                                              "Errorf"
-                                                                                                                              [ (.lit
-                                                                                                                                  (.str "expected %v, got %v"))
-                                                                                                                              , (.name
-                                                                                                                                  "expected")
-                                                                                                                              , (.mcall
-                                                                                                                                  (.name
-                                                                                                                                    "s")
-                                                                                                                                  "ByteSlice"
-                                                                                                                                  [ (.field
-                                                                                                                                      (.name
-                                                                                                                                        "s")
-                                                                                                                                      "ByteSlice") ]) ]))
-                                                                                                                          .skip)
-                                                                                                                        (.seq
-                                                                                                                          .skip
-                                                                                                                          (.seq
-                                                                                                                            (.ifte
-                                                                                                                              (.binop
-                                                                                                                                "!="
-                                                                                                                                (.field
-                                                                                                                                  (.name
-                                                                                                                                    "s")
-                                                                                                                                  "Ignored")
-                                                                                                                                (.lit
-                                                                                                                                  (.str "")))
-                                                                                                                              (.expr
-                                                                                                                                (.call
-                                                                                                                                  "Errorf"
-                                                                                                                                  [ (.lit
-                                                                                                                                      (.str "expected empty string, got %#v"))
-                                                                                                                                  , (.field
-                                                                                                                                      (.name
-                                                                                                                                        "s")
-                                                                                                                                      "Ignored") ]))
-                                                                                                                              .skip)
-                                                                                                                            (.seq
-                                                                                                                              .skip
-                                                                                                                              (.seq
-                                                                                                                                (.ifte
-                                                                                                                                  (.binop
-                                                                                                                                    "||"
-                                                                                                                                    (.binop
-                                                                                                                                      "||"
-                                                                                                                                      (.binop
-                                                                                                                                        "||"
-                                                                                                                                        (.binop
-                                                                                                                                          "!="
-                                                                                                                                          (.mcall
-                                                                                                                                            (.name
-                                                                                                                                              "s")
-                                                                                                                                            "ColorCodes"
-                                                                                                                                            [ (.field
-                                                                                                                                                (.name
-                                                                                                                                                  "s")
-                                                                                                                                                "ColorCodes") ])
-                                                                                                                                          (.lit
-                                                                                                                                            (.int 3)))
-                                                                                                                                        (.binop
-                                                                                                                                          "!="
-                                                                                                                                          (.index
-                                                                                                                                            (.field
-                                                                                                                                              (.name
-                                                                                                                                                "s")
-                                                                                                                                              "ColorCodes")
-                                                                                                                                            (.lit
-                                                                                                                                              (.str "red")))
-                                                                                                                                          (.lit
-                                                                                                                                            (.int 1))))
-                                                                                                                                      (.binop
-                                                                                                                                        "!="
-                                                                                                                                        (.index
-                                                                                                                                          (.field
-                                                                                                                                            (.name
-                                                                                                                                              "s")
-                                                                                                                                            "ColorCodes")
-                                                                                                                                          (.lit
-                                                                                                                                            (.str "green")))
-                                                                                                                                        (.lit
-                                                                                                                                          (.int 2))))
-                                                                                                                                    (.binop
-                                                                                                                                      "!="
-                                                                                                                                      (.index
-                                                                                                                                        (.field
-                                                                                                                                          (.name
-                                                                                                                                            "s")
-                                                                                                                                          "ColorCodes")
-                                                                                                                                        (.lit
-                                                                                                                                          (.str "blue")))
-                                                                                                                                      (.lit
-                                                                                                                                        (.int 3))))
-                                                                                                                                  (.expr
-                                                                                                                                    (.call
-                                                                                                                                      "Errorf"
-                                                                                                                                      [ (.lit
-                                                                                                                                          (.str "expected %#v, got %#v"))
-                                                                                                                                      , (.field
-                                                                                                                                          (.name
-                                                                                                                                            "s")
-                                                                                                                                          "ColorCodes") ]))
-                                                                                                                                  .skip)
-                                                                                                                                (.seq
-                                                                                                                                  .skip
-                                                                                                                                  (.seq
-                                                                                                                                    (.ifte
-                                                                                                                                      (.binop
-                                                                                                                                        "!="
-                                                                                                                                        (.field
-                                                                                                                                          (.field
-                                                                                                                                            (.name
-                                                                                                                                              "s")
-                                                                                                                                            "NestedSpecification")
-                                                                                                                                          "Property")
-                                                                                                                                        (.lit
-                                                                                                                                          (.str "iamnested")))
-                                                                                                                                      (.expr
-                                                                                                                                        (.call
-                                                                                                                                          "Errorf"
-                                                                                                                                          [ (.lit
-                                                                                                                                              (.str "expected '%s' string, got %#v"))
-                                                                                                                                          , (.lit
-                                                                                                                                              (.str "iamnested"))
-                                                                                                                                          , (.field
-                                                                                                                                              (.field
-                                                                                                                                                (.name
-                                                                                                                                                  "s")
-                                                                                                                                                "NestedSpecification")
-                                                                                                                                              "Property") ]))
-                                                                                                                                      .skip)
-                                                                                                                                    (.seq
-                                                                                                                                      .skip
-                                                                                                                                      (.seq
-                                                                                                                                        (.ifte
-                                                                                                                                          (.binop
-                                                                                                                                            "!="
-                                                                                                                                            (.field
-                                                                                                                                              (.field
-                                                                                                                                                (.name
-                                                                                                                                                  "s")
-                                                                                                                                                "NestedSpecification")
-                                                                                                                                              "PropertyWithDefault")
-                                                                                                                                            (.lit
-                                                                                                                                              (.str "fuzzybydefault")))
-                                                                                                                                          (.expr
-                                                                                                                                            (.call
-                                                                                                                                              "Errorf"
-                                                                                                                                              [ (.lit
-                                                                                                                                                  (.str "expected default '%s' string, got %#v"))
-                                                                                                                                              , (.lit
-                                                                                                                                                  (.str "fuzzybydefault"))
-                                                                                                                                              , (.field
-                                                                                                                                                  (.field
-                                                                                                                                                    (.name
-                                                                                                                                                      "s")
-                                                                                                                                                    "NestedSpecification")
-                                                                                                                                                  "PropertyWithDefault") ]))
-                                                                                                                                          .skip)
-                                                                                                                                        (.seq
-                                                                                                                                          .skip
-                                                                                                                                          (.seq
-                                                                                                                                            (.ifte
-                                                                                                                                              (.binop
-                                                                                                                                                "!="
-                                                                                                                                                (.field
-                                                                                                                                                  (.name
-                                                                                                                                                    "s")
-                                                                                                                                                  "AfterNested")
-                                                                                                                                                (.lit
-                                                                                                                                                  (.str "after")))
-                                                                                                                                              (.expr
-                                                                                                                                                (.call
-                                                                                                                                                  "Errorf"
-                                                                                                                                                  [ (.lit
-                                                                                                                                                      (.str "expected default '%s' string, got %#v"))
-                                                                                                                                                  , (.lit
-                                                                                                                                                      (.str "after"))
-                                                                                                                                                  , (.field
-                                                                                                                                                      (.name
-                                                                                                                                                        "s")
-                                                                                                                                                      "AfterNested") ]))
-                                                                                                                                              .skip)
-                                                                                                                                            (.seq
-                                                                                                                                              .skip
-                                                                                                                                              (.seq
-                                                                                                                                                (.ifte
-                                                                                                                                                  (.binop
-                                                                                                                                                    "!="
-                                                                                                                                                    (.field
-                                                                                                                                                      (.field
-                                                                                                                                                        (.name
-                                                                                                                                                          "s")
-                                                                                                                                                        "DecodeStruct")
-                                                                                                                                                      "Value")
-                                                                                                                                                    (.lit
-                                                                                                                                                      (.str "decoded")))
-                                                                                                                                                  (.expr
-                                                                                                                                                    (.call
-                                                                                                                                                      "Errorf"
-                                                                                                                                                      [ (.lit
-                                                                                                                                                          (.str "expected default '%s' string, got %#v"))
-                                                                                                                                                      , (.lit
-                                                                                                                                                          (.str "decoded"))
-                                                                                                                                                      , (.field
-                                                                                                                                                          (.field
-                                                                                                                                                            (.name
-                                                                                                                                                              "s")
-                                                                                                                                                            "DecodeStruct")
-                                                                                                                                                          "Value") ]))
-                                                                                                                                                  .skip)
-                                                                                                                                                (.seq
-                                                                                                                                                  (.seq
-                                                                                                                                                    .skip
-                                                                                                                                                    (.assign
-                                                                                                                                                      "expected"
-                                                                                                                                                      (.call
-                                                                                                                                                        "Date"
-                                                                                                                                                        [ (.lit
-                                                                                                                                                            (.int 2016))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 8))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 16))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 18))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 57))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 5))
-                                                                                                                                                        , (.lit
-                                                                                                                                                            (.int 0))
-                                                                                                                                                        , (.field
-                                                                                                                                                            (.name
-                                                                                                                                                              "time")
-                                                                                                                                                            "UTC") ])))
-                                                                                                                                                  (.seq
-                                                                                                                                                    (.ifte
-                                                                                                                                                      (.unop
-                                                                                                                                                        "!"
-                                                                                                                                                        (.mcall
-                                                                                                                                                          (.name
-                                                                                                                                                            "s")
-                                                                                                                                                          "Datetime"
-                                                                                                                                                          [ (.name
-                                                                                                                                                              "expected") ]))
-                                                                                                                                                      (.expr
-                                                                                                                                                        (.call
-                                                                                                                                                          "Errorf"
-                                                                                                                                                          [ (.lit
-                                                                                                                                                              (.str "expected %s, got %s"))
-                                                                                                                                                          , (.call
-                                                                                                                                                              "Format"
-                                                                                                                                                              [ (.field
-                                                                                                                                                                  (.name
-                                                                                                                                                                    "time")
-                                                                                                                                                                  "RFC3339") ])
-                                                                                                                                                          , (.mcall
-                                                                                                                                                              (.name
-                                                                                                                                                                "s")
-                                                                                                                                                              "Datetime"
-                                                                                                                                                              [ (.field
-                                                                                                                                                                  (.name
-                                                                                                                                                                    "time")
-                                                                                                                                                                  "RFC3339") ]) ]))
-                                                                                                                                                      .skip)
-                                                                                                                                                    (.seq
-                                                                                                                                                      .skip
-                                                                                                                                                      (.seq
-                                                                                                                                                        (.ifte
-                                                                                                                                                          (.binop
-                                                                                                                                                            "!="
-                                                                                                                                                            (.field
-                                                                                                                                                              (.name
-                                                                                                                                                                "s")
-                                                                                                                                                              "MultiWordVarWithAutoSplit")
-                                                                                                                                                            (.lit
-                                                                                                                                                              (.int 24)))
-                                                                                                                                                          (.expr
-                                                                                                                                                            (.call
-                                                                                                                                                              "Errorf"
-                                                                                                                                                              [ (.lit
-                                                                                                                                                                  (.str "expected %q, got %q"))
-                                                                                                                                                              , (.lit
-                                                                                                                                                                  (.int 24))
-                                                                                                                                                              , (.field
-                                                                                                                                                                  (.name
-                                                                                                                                                                    "s")
-                                                                                                                                                                  "MultiWordVarWithAutoSplit") ]))
-                                                                                                                                                          .skip)
-                                                                                                                                                        (.seq
-                                                                                                                                                          .skip
-                                                                                                                                                          (.seq
-                                                                                                                                                            (.ifte
-                                                                                                                                                              (.binop
-                                                                                                                                                                "!="
-                                                                                                                                                                (.field
-                                                                                                                                                                  (.name
-                                                                                                                                                                    "s")
-                                                                                                                                                                  "MultiWordACRWithAutoSplit")
-                                                                                                                                                                (.lit
-                                                                                                                                                                  (.int 25)))
-                                                                                                                                                              (.expr
-                                                                                                                                                                (.call
-                                                                                                                                                                  "Errorf"
-                                                                                                                                                                  [ (.lit
-                                                                                                                                                                      (.str "expected %d, got %d"))
-                                                                                                                                                                  , (.lit
-                                                                                                                                                                      (.int 25))
-                                                                                                                                                                  , (.field
-                                                                                                                                                                      (.name
-                                                                                                                                                                        "s")
-                                                                                                                                                                      "MultiWordACRWithAutoSplit") ]))
-                                                                                                                                                              .skip)
-                                                                                                                                                            (.seq
-                                                                                                                                                              .skip
-                                                                                                                                                              (.seq
-                                                                                                                                                                (.assign
-                                                                                                                                                                  "u"
-                                                                                                                                                                  (.call
-                                                                                                                                                                    "Parse"
-                                                                                                                                                                    [ (.lit
-                                                                                                                                                                        (.str "https://github.com/kelseyhightower/envconfig")) ]))
-                                                                                                                                                                (.seq
-                                                                                                                                                                  .skip
-                                                                                                                                                                  (.seq
-                                                                                                                                                                    (.ifte
-                                                                                                                                                                      (.binop
-                                                                                                                                                                        "!="
-                                                                                                                                                                        (.name
-                                                                                                                                                                          "err")
-                                                                                                                                                                        (.name
-                                                                                                                                                                          "nil"))
-                                                                                                                                                                      (.expr
-                                                                                                                                                                        (.call
-                                                                                                                                                                          "Fatalf"
-                                                                                                                                                                          [ (.lit
-                                                                                                                                                                              (.str "unexpected error: %v"))
-                                                                                                                                                                          , (.name
-                                                                                                                                                                              "err") ]))
-                                                                                                                                                                      .skip)
-                                                                                                                                                                    (.seq
-                                                                                                                                                                      .skip
-                                                                                                                                                                      (.seq
-                                                                                                                                                                        (.ifte
-                                                                                                                                                                          (.binop
-                                                                                                                                                                            "!="
-                                                                                                                                                                            (.hole
-                                                                                                                                                                              "op:indirection")
-                                                                                                                                                                            (.hole
-                                                                                                                                                                              "op:indirection"))
-                                                                                                                                                                          (.expr
-                                                                                                                                                                            (.call
-                                                                                                                                                                              "Errorf"
-                                                                                                                                                                              [ (.lit
-                                                                                                                                                                                  (.str "expected %q, got %q"))
-                                                                                                                                                                              , (.name
-                                                                                                                                                                                  "u")
-                                                                                                                                                                              , (.mcall
-                                                                                                                                                                                  (.field
-                                                                                                                                                                                    (.name
-                                                                                                                                                                                      "s")
-                                                                                                                                                                                    "UrlValue")
-                                                                                                                                                                                  "Value"
-                                                                                                                                                                                  []) ]))
-                                                                                                                                                                          .skip)
-                                                                                                                                                                        (.seq
-                                                                                                                                                                          .skip
-                                                                                                                                                                          (.ifte
-                                                                                                                                                                            (.binop
-                                                                                                                                                                              "!="
-                                                                                                                                                                              (.hole
-                                                                                                                                                                                "op:indirection")
-                                                                                                                                                                              (.hole
-                                                                                                                                                                                "op:indirection"))
-                                                                                                                                                                            (.expr
-                                                                                                                                                                              (.call
-                                                                                                                                                                                "Errorf"
-                                                                                                                                                                                [ (.lit
-                                                                                                                                                                                    (.str "expected %q, got %q"))
-                                                                                                                                                                                , (.name
-                                                                                                                                                                                    "u")
-                                                                                                                                                                                , (.mcall
-                                                                                                                                                                                    (.field
-                                                                                                                                                                                      (.name
-                                                                                                                                                                                        "s")
-                                                                                                                                                                                      "UrlPointer")
-                                                                                                                                                                                    "Value"
-                                                                                                                                                                                    []) ]))
-                                                                                                                                                                            .skip))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_REQUIREDVAR"))
+                                        , (.lit (.str "foo")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_IGNORED"))
+                                        , (.lit (.str "was-not-ignored")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_OUTER_INNER"))
+                                        , (.lit (.str "iamnested")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_AFTERNESTED"))
+                                        , (.lit (.str "after")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [(.lit (.str "ENV_CONFIG_HONOR")), (.lit (.str "honor"))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_DATETIME"))
+                                        , (.lit (.str "2016-08-16T18:57:05Z")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_MULTI_WORD_VAR_WITH_AUTO_SPLIT"))
+                                        , (.lit (.str "24")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_MULTI_WORD_ACR_WITH_AUTO_SPLIT"))
+                                        , (.lit (.str "25")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_URLVALUE"))
+                                        , (.lit (.str "https://github.com/kelseyhightower/envconfig")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_URLPOINTER"))
+                                        , (.lit (.str "https://github.com/kelseyhightower/envconfig")) ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "err"
+                                        (.call
+                                        "envconfig.Process"
+                                        [(.lit (.str "env_config")), (.hole "op:addressOf")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "err") (.name "nil"))
+                                        (.expr (.call "Error" [(.call "Error" [])]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "NoPrefixWithAlt")
+                                        (.lit (.str "127.0.0.1")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.lit (.str "127.0.0.1"))
+                                        , (.field (.name "s") "NoPrefixWithAlt") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.unop "!" (.field (.name "s") "Debug"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.name "true")
+                                        , (.field (.name "s") "Debug") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.field (.name "s") "Port") (.lit (.int 8080)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %d, got %v"))
+                                        , (.lit (.int 8080))
+                                        , (.field (.name "s") "Port") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "Rate")
+                                        (.hole "lit:float"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %f, got %v"))
+                                        , (.hole "lit:float")
+                                        , (.field (.name "s") "Rate") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.field (.name "s") "TTL") (.lit (.int 30)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %d, got %v"))
+                                        , (.lit (.int 30))
+                                        , (.field (.name "s") "TTL") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "User")
+                                        (.lit (.str "Kelsey")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "Kelsey"))
+                                        , (.field (.name "s") "User") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "Timeout")
+                                        (.binop
+                                        "*"
+                                        (.lit (.int 2))
+                                        (.field (.name "time") "Minute")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.binop
+                                        "*"
+                                        (.lit (.int 2))
+                                        (.field (.name "time") "Minute"))
+                                        , (.field (.name "s") "Timeout") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "RequiredVar")
+                                        (.lit (.str "foo")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "foo"))
+                                        , (.field (.name "s") "RequiredVar") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "!="
+                                        (.mcall
+                                        (.name "s")
+                                        "AdminUsers"
+                                        [(.field (.name "s") "AdminUsers")])
+                                        (.lit (.int 3)))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "AdminUsers") (.lit (.int 0)))
+                                        (.lit (.str "John"))))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "AdminUsers") (.lit (.int 1)))
+                                        (.lit (.str "Adam"))))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "AdminUsers") (.lit (.int 2)))
+                                        (.lit (.str "Will"))))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %#v, got %#v"))
+                                        , (.hole "op:arrayInitializer")
+                                        , (.field (.name "s") "AdminUsers") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "!="
+                                        (.mcall
+                                        (.name "s")
+                                        "MagicNumbers"
+                                        [(.field (.name "s") "MagicNumbers")])
+                                        (.lit (.int 3)))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "MagicNumbers") (.lit (.int 0)))
+                                        (.lit (.int 5))))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "MagicNumbers") (.lit (.int 1)))
+                                        (.lit (.int 10))))
+                                        (.binop
+                                        "!="
+                                        (.index (.field (.name "s") "MagicNumbers") (.lit (.int 2)))
+                                        (.lit (.int 20))))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %#v, got %#v"))
+                                        , (.hole "op:arrayInitializer")
+                                        , (.field (.name "s") "MagicNumbers") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.mcall
+                                        (.name "s")
+                                        "EmptyNumbers"
+                                        [(.field (.name "s") "EmptyNumbers")])
+                                        (.lit (.int 0)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %#v, got %#v"))
+                                        , (.hole "op:arrayInitializer")
+                                        , (.field (.name "s") "EmptyNumbers") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "expected" (.lit (.str "this is a test value")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.mcall
+                                        (.name "s")
+                                        "ByteSlice"
+                                        [(.field (.name "s") "ByteSlice")])
+                                        (.name "expected"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.name "expected")
+                                        , (.mcall
+                                        (.name "s")
+                                        "ByteSlice"
+                                        [(.field (.name "s") "ByteSlice")]) ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "Ignored")
+                                        (.lit (.str "")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected empty string, got %#v"))
+                                        , (.field (.name "s") "Ignored") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "!="
+                                        (.mcall
+                                        (.name "s")
+                                        "ColorCodes"
+                                        [(.field (.name "s") "ColorCodes")])
+                                        (.lit (.int 3)))
+                                        (.binop
+                                        "!="
+                                        (.index
+                                        (.field (.name "s") "ColorCodes")
+                                        (.lit (.str "red")))
+                                        (.lit (.int 1))))
+                                        (.binop
+                                        "!="
+                                        (.index
+                                        (.field (.name "s") "ColorCodes")
+                                        (.lit (.str "green")))
+                                        (.lit (.int 2))))
+                                        (.binop
+                                        "!="
+                                        (.index
+                                        (.field (.name "s") "ColorCodes")
+                                        (.lit (.str "blue")))
+                                        (.lit (.int 3))))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %#v, got %#v"))
+                                        , (.field (.name "s") "ColorCodes") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field
+                                        (.field (.name "s") "NestedSpecification")
+                                        "Property")
+                                        (.lit (.str "iamnested")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected '%s' string, got %#v"))
+                                        , (.lit (.str "iamnested"))
+                                        , (.field
+                                        (.field (.name "s") "NestedSpecification")
+                                        "Property") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field
+                                        (.field (.name "s") "NestedSpecification")
+                                        "PropertyWithDefault")
+                                        (.lit (.str "fuzzybydefault")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected default '%s' string, got %#v"))
+                                        , (.lit (.str "fuzzybydefault"))
+                                        , (.field
+                                        (.field (.name "s") "NestedSpecification")
+                                        "PropertyWithDefault") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "AfterNested")
+                                        (.lit (.str "after")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected default '%s' string, got %#v"))
+                                        , (.lit (.str "after"))
+                                        , (.field (.name "s") "AfterNested") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.field (.name "s") "DecodeStruct") "Value")
+                                        (.lit (.str "decoded")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected default '%s' string, got %#v"))
+                                        , (.lit (.str "decoded"))
+                                        , (.field (.field (.name "s") "DecodeStruct") "Value") ]))
+                                        .skip)
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.assign
+                                        "expected"
+                                        (.call
+                                        "Date"
+                                        [ (.lit (.int 2016))
+                                        , (.lit (.int 8))
+                                        , (.lit (.int 16))
+                                        , (.lit (.int 18))
+                                        , (.lit (.int 57))
+                                        , (.lit (.int 5))
+                                        , (.lit (.int 0))
+                                        , (.field (.name "time") "UTC") ])))
+                                        (.seq
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.mcall (.name "s") "Datetime" [(.name "expected")]))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.call "Format" [(.field (.name "time") "RFC3339")])
+                                        , (.mcall
+                                        (.name "s")
+                                        "Datetime"
+                                        [(.field (.name "time") "RFC3339")]) ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "MultiWordVarWithAutoSplit")
+                                        (.lit (.int 24)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.lit (.int 24))
+                                        , (.field (.name "s") "MultiWordVarWithAutoSplit") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "MultiWordACRWithAutoSplit")
+                                        (.lit (.int 25)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %d, got %d"))
+                                        , (.lit (.int 25))
+                                        , (.field (.name "s") "MultiWordACRWithAutoSplit") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "u"
+                                        (.call
+                                        "Parse"
+                                        [ (.lit (.str "https://github.com/kelseyhightower/envconfig")) ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "err") (.name "nil"))
+                                        (.expr
+                                        (.call
+                                        "Fatalf"
+                                        [(.lit (.str "unexpected error: %v")), (.name "err")]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.hole "op:indirection")
+                                        (.hole "op:indirection"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.name "u")
+                                        , (.mcall (.field (.name "s") "UrlValue") "Value" []) ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.hole "op:indirection")
+                                        (.hole "op:indirection"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.name "u")
+                                        , (.mcall (.field (.name "s") "UrlPointer") "Value" []) ]))
+                                        .skip))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `envconfig.TestParseErrorBool`  (from `envconfig_test.go`) -/
 def f_envconfig_TestParseErrorBool : Func :=
@@ -1523,21 +1200,21 @@ def f_envconfig_TestParseErrorBool : Func :=
                                         (.lit (.str "Debug")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %s, got %v"))
-                                          , (.lit (.str "Debug"))
-                                          , (.field (.name "v") "FieldName") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %v"))
+                                        , (.lit (.str "Debug"))
+                                        , (.field (.name "v") "FieldName") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.ifte
                                         (.binop "!=" (.field (.name "s") "Debug") (.name "false"))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "expected %v, got %v"))
-                                            , (.name "false")
-                                            , (.field (.name "s") "Debug") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.name "false")
+                                        , (.field (.name "s") "Debug") ]))
                                         .skip))))))))))))))) }
 
 /-- `envconfig.TestParseErrorFloat32`  (from `envconfig_test.go`) -/
@@ -1587,21 +1264,21 @@ def f_envconfig_TestParseErrorFloat32 : Func :=
                                         (.lit (.str "Rate")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %s, got %v"))
-                                          , (.lit (.str "Rate"))
-                                          , (.field (.name "v") "FieldName") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %v"))
+                                        , (.lit (.str "Rate"))
+                                        , (.field (.name "v") "FieldName") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.ifte
                                         (.binop "!=" (.field (.name "s") "Rate") (.lit (.int 0)))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "expected %v, got %v"))
-                                            , (.lit (.int 0))
-                                            , (.field (.name "s") "Rate") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.lit (.int 0))
+                                        , (.field (.name "s") "Rate") ]))
                                         .skip))))))))))))))) }
 
 /-- `envconfig.TestParseErrorInt`  (from `envconfig_test.go`) -/
@@ -1651,21 +1328,21 @@ def f_envconfig_TestParseErrorInt : Func :=
                                         (.lit (.str "Port")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %s, got %v"))
-                                          , (.lit (.str "Port"))
-                                          , (.field (.name "v") "FieldName") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %v"))
+                                        , (.lit (.str "Port"))
+                                        , (.field (.name "v") "FieldName") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.ifte
                                         (.binop "!=" (.field (.name "s") "Port") (.lit (.int 0)))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "expected %v, got %v"))
-                                            , (.lit (.int 0))
-                                            , (.field (.name "s") "Port") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.lit (.int 0))
+                                        , (.field (.name "s") "Port") ]))
                                         .skip))))))))))))))) }
 
 /-- `envconfig.TestParseErrorUint`  (from `envconfig_test.go`) -/
@@ -1723,10 +1400,10 @@ def f_envconfig_TestParseErrorUint : Func :=
                                       (.binop "!=" (.field (.name "s") "TTL") (.lit (.int 0)))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %v, got %v"))
-                                          , (.lit (.int 0))
-                                          , (.field (.name "s") "TTL") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.lit (.int 0))
+                                        , (.field (.name "s") "TTL") ]))
                                       .skip)))))))))))))) }
 
 /-- `envconfig.TestParseErrorSplitWords`  (from `envconfig_test.go`) -/
@@ -1791,10 +1468,10 @@ def f_envconfig_TestParseErrorSplitWords : Func :=
                                         (.lit (.int 0)))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %v, got %v"))
-                                          , (.lit (.int 0))
-                                          , (.field (.name "s") "MultiWordVarWithAutoSplit") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.lit (.int 0))
+                                        , (.field (.name "s") "MultiWordVarWithAutoSplit") ]))
                                       .skip)))))))))))))) }
 
 /-- `envconfig.TestErrInvalidSpecification`  (from `envconfig_test.go`) -/
@@ -1932,24 +1609,24 @@ def f_envconfig_TestAlternateVarNames : Func :=
                                         (.lit (.str "bar")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %q, got %q"))
-                                          , (.lit (.str "bar"))
-                                          , (.field (.name "s") "MultiWordVarWithAlt") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.lit (.str "bar"))
+                                        , (.field (.name "s") "MultiWordVarWithAlt") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.ifte
                                         (.binop
-                                          "!="
-                                          (.field (.name "s") "MultiWordVarWithLowerCaseAlt")
-                                          (.lit (.str "baz")))
+                                        "!="
+                                        (.field (.name "s") "MultiWordVarWithLowerCaseAlt")
+                                        (.lit (.str "baz")))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "expected %q, got %q"))
-                                            , (.lit (.str "baz"))
-                                            , (.field (.name "s") "MultiWordVarWithLowerCaseAlt") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.lit (.str "baz"))
+                                        , (.field (.name "s") "MultiWordVarWithLowerCaseAlt") ]))
                                         .skip))))))))))))))) }
 
 /-- `envconfig.TestRequiredVar`  (from `envconfig_test.go`) -/
@@ -2227,15 +1904,15 @@ def f_envconfig_TestAlternateNameDefaultVar : Func :=
                                       .skip
                                       (.ifte
                                         (.binop
-                                          "!="
-                                          (.field (.name "s") "NoPrefixDefault")
-                                          (.lit (.str "127.0.0.1")))
+                                        "!="
+                                        (.field (.name "s") "NoPrefixDefault")
+                                        (.lit (.str "127.0.0.1")))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "expected %q, got %q"))
-                                            , (.lit (.str "127.0.0.1"))
-                                            , (.field (.name "s") "NoPrefixDefault") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %q, got %q"))
+                                        , (.lit (.str "127.0.0.1"))
+                                        , (.field (.name "s") "NoPrefixDefault") ]))
                                         .skip))))))))))))))) }
 
 /-- `envconfig.TestRequiredDefault`  (from `envconfig_test.go`) -/
@@ -2475,8 +2152,8 @@ def f_envconfig_TestEmbeddedStruct : Func :=
                                       (.assign
                                         "err"
                                         (.call
-                                          "envconfig.Process"
-                                          [(.lit (.str "env_config")), (.hole "op:addressOf")])))
+                                        "envconfig.Process"
+                                        [(.lit (.str "env_config")), (.hole "op:addressOf")])))
                                     (.seq
                                       (.ifte
                                         (.binop "!=" (.name "err") (.name "nil"))
@@ -2485,161 +2162,137 @@ def f_envconfig_TestEmbeddedStruct : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.ifte
-                                            (.unop "!" (.field (.name "s") "Enabled"))
-                                            (.expr
-                                              (.call
-                                                "Errorf"
-                                                [ (.lit (.str "expected %v, got %v"))
-                                                , (.name "true")
-                                                , (.field (.name "s") "Enabled") ]))
-                                            .skip)
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.ifte
-                                                (.binop
-                                                  "!="
-                                                  (.field (.name "s") "EmbeddedPort")
-                                                  (.lit (.int 1234)))
-                                                (.expr
-                                                  (.call
-                                                    "Errorf"
-                                                    [ (.lit (.str "expected %d, got %v"))
-                                                    , (.lit (.int 1234))
-                                                    , (.field (.name "s") "EmbeddedPort") ]))
-                                                .skip)
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.ifte
-                                                    (.binop
-                                                      "!="
-                                                      (.field (.name "s") "MultiWordVar")
-                                                      (.lit (.str "foo")))
-                                                    (.expr
-                                                      (.call
-                                                        "Errorf"
-                                                        [ (.lit (.str "expected %s, got %s"))
-                                                        , (.lit (.str "foo"))
-                                                        , (.field (.name "s") "MultiWordVar") ]))
-                                                    .skip)
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      (.ifte
-                                                        (.binop
-                                                          "!="
-                                                          (.field
-                                                            (.field (.name "s") "Embedded")
-                                                            "MultiWordVar")
-                                                          (.lit (.str "foo")))
-                                                        (.expr
-                                                          (.call
-                                                            "Errorf"
-                                                            [ (.lit (.str "expected %s, got %s"))
-                                                            , (.lit (.str "foo"))
-                                                            , (.field
-                                                                (.field (.name "s") "Embedded")
-                                                                "MultiWordVar") ]))
-                                                        .skip)
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          (.ifte
-                                                            (.binop
-                                                              "!="
-                                                              (.field
-                                                                (.name "s")
-                                                                "MultiWordVarWithAlt")
-                                                              (.lit (.str "bar")))
-                                                            (.expr
-                                                              (.call
-                                                                "Errorf"
-                                                                [ (.lit
-                                                                    (.str "expected %s, got %s"))
-                                                                , (.lit (.str "bar"))
-                                                                , (.field
-                                                                    (.name "s")
-                                                                    "MultiWordVarWithAlt") ]))
-                                                            .skip)
-                                                          (.seq
-                                                            .skip
-                                                            (.seq
-                                                              (.ifte
-                                                                (.binop
-                                                                  "!="
-                                                                  (.field
-                                                                    (.field (.name "s") "Embedded")
-                                                                    "MultiWordVarWithAlt")
-                                                                  (.lit (.str "baz")))
-                                                                (.expr
-                                                                  (.call
-                                                                    "Errorf"
-                                                                    [ (.lit
-                                                                        (.str "expected %s, got %s"))
-                                                                    , (.lit (.str "baz"))
-                                                                    , (.field
-                                                                        (.field
-                                                                          (.name "s")
-                                                                          "Embedded")
-                                                                        "MultiWordVarWithAlt") ]))
-                                                                .skip)
-                                                              (.seq
-                                                                .skip
-                                                                (.seq
-                                                                  (.ifte
-                                                                    (.binop
-                                                                      "!="
-                                                                      (.field
-                                                                        (.name "s")
-                                                                        "EmbeddedAlt")
-                                                                      (.lit (.str "foobar")))
-                                                                    (.expr
-                                                                      (.call
-                                                                        "Errorf"
-                                                                        [ (.lit
-                                                                            (.str "expected %s, got %s"))
-                                                                        , (.lit (.str "foobar"))
-                                                                        , (.field
-                                                                            (.name "s")
-                                                                            "EmbeddedAlt") ]))
-                                                                    .skip)
-                                                                  (.seq
-                                                                    .skip
-                                                                    (.seq
-                                                                      (.ifte
-                                                                        (.binop
-                                                                          "!="
-                                                                          (.hole "op:indirection")
-                                                                          (.lit (.str "foobaz")))
-                                                                        (.expr
-                                                                          (.call
-                                                                            "Errorf"
-                                                                            [ (.lit
-                                                                                (.str "expected %s, got %s"))
-                                                                            , (.lit (.str "foobaz"))
-                                                                            , (.hole
-                                                                                "op:indirection") ]))
-                                                                        .skip)
-                                                                      (.seq
-                                                                        .skip
-                                                                        (.ifte
-                                                                          (.binop
-                                                                            "!="
-                                                                            (.field
-                                                                              (.name "s")
-                                                                              "EmbeddedIgnored")
-                                                                            (.lit (.str "")))
-                                                                          (.expr
-                                                                            (.call
-                                                                              "Errorf"
-                                                                              [ (.lit
-                                                                                  (.str "expected empty string, got %#v"))
-                                                                              , (.field
-                                                                                  (.name "s")
-                                                                                  "Ignored") ]))
-                                                                          .skip)))))))))))))))))))))))))))))))) }
+                                        (.ifte
+                                        (.unop "!" (.field (.name "s") "Enabled"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %v, got %v"))
+                                        , (.name "true")
+                                        , (.field (.name "s") "Enabled") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "EmbeddedPort")
+                                        (.lit (.int 1234)))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %d, got %v"))
+                                        , (.lit (.int 1234))
+                                        , (.field (.name "s") "EmbeddedPort") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "MultiWordVar")
+                                        (.lit (.str "foo")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "foo"))
+                                        , (.field (.name "s") "MultiWordVar") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.field (.name "s") "Embedded") "MultiWordVar")
+                                        (.lit (.str "foo")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "foo"))
+                                        , (.field (.field (.name "s") "Embedded") "MultiWordVar") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "MultiWordVarWithAlt")
+                                        (.lit (.str "bar")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "bar"))
+                                        , (.field (.name "s") "MultiWordVarWithAlt") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field
+                                        (.field (.name "s") "Embedded")
+                                        "MultiWordVarWithAlt")
+                                        (.lit (.str "baz")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "baz"))
+                                        , (.field
+                                        (.field (.name "s") "Embedded")
+                                        "MultiWordVarWithAlt") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "EmbeddedAlt")
+                                        (.lit (.str "foobar")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "foobar"))
+                                        , (.field (.name "s") "EmbeddedAlt") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.hole "op:indirection")
+                                        (.lit (.str "foobaz")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.lit (.str "foobaz"))
+                                        , (.hole "op:indirection") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "s") "EmbeddedIgnored")
+                                        (.lit (.str "")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected empty string, got %#v"))
+                                        , (.field (.name "s") "Ignored") ]))
+                                        .skip)))))))))))))))))))))))))))))))) }
 
 /-- `envconfig.TestEmbeddedButIgnoredStruct`  (from `envconfig_test.go`) -/
 def f_envconfig_TestEmbeddedButIgnoredStruct : Func :=
@@ -2798,41 +2451,38 @@ def f_envconfig_TestCustomValueFields : Func :=
                                       (.ifte
                                         (.binop "!=" (.mcall (.name "s") "Bar" []) (.name "want"))
                                         (.expr
-                                          (.call
-                                            "Errorf"
-                                            [ (.lit (.str "bar: got %#q, want %#q"))
-                                            , (.field (.name "s") "Bar")
-                                            , (.name "want") ]))
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "bar: got %#q, want %#q"))
+                                        , (.field (.name "s") "Bar")
+                                        , (.name "want") ]))
                                         .skip)
                                       (.seq
                                         (.seq .skip (.assign "want" (.hole "lit:unquoted")))
                                         (.seq
-                                          (.ifte
-                                            (.binop
-                                              "!="
-                                              (.mcall (.name "s") "Baz" [])
-                                              (.name "want"))
-                                            (.expr
-                                              (.call
-                                                "Errorf"
-                                                [ (.hole "lit:unquoted")
-                                                , (.field (.name "s") "Baz")
-                                                , (.name "want") ]))
-                                            .skip)
-                                          (.seq
-                                            (.seq .skip (.assign "want" (.hole "lit:unquoted")))
-                                            (.ifte
-                                              (.binop
-                                                "!="
-                                                (.field (.field (.name "s") "Struct") "Inner")
-                                                (.name "want"))
-                                              (.expr
-                                                (.call
-                                                  "Errorf"
-                                                  [ (.hole "lit:unquoted")
-                                                  , (.field (.field (.name "s") "Struct") "Inner")
-                                                  , (.name "want") ]))
-                                              .skip)))))))))))))))))) }
+                                        (.ifte
+                                        (.binop "!=" (.mcall (.name "s") "Baz" []) (.name "want"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.hole "lit:unquoted")
+                                        , (.field (.name "s") "Baz")
+                                        , (.name "want") ]))
+                                        .skip)
+                                        (.seq
+                                        (.seq .skip (.assign "want" (.hole "lit:unquoted")))
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.field (.name "s") "Struct") "Inner")
+                                        (.name "want"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.hole "lit:unquoted")
+                                        , (.field (.field (.name "s") "Struct") "Inner")
+                                        , (.name "want") ]))
+                                        .skip)))))))))))))))))) }
 
 /-- `envconfig.TestCustomPointerFields`  (from `envconfig_test.go`) -/
 def f_envconfig_TestCustomPointerFields : Func :=
@@ -2881,52 +2531,49 @@ def f_envconfig_TestCustomPointerFields : Func :=
                                       (.binop "!=" (.field (.name "s") "Foo") (.name "want"))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "foo: got %#q, want %#q"))
-                                          , (.field (.name "s") "Foo")
-                                          , (.name "want") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "foo: got %#q, want %#q"))
+                                        , (.field (.name "s") "Foo")
+                                        , (.name "want") ]))
                                       .skip)
                                     (.seq
                                       (.seq .skip (.assign "want" (.lit (.str "[bar]"))))
                                       (.seq
                                         (.ifte
-                                          (.binop "!=" (.mcall (.name "s") "Bar" []) (.name "want"))
-                                          (.expr
-                                            (.call
-                                              "Errorf"
-                                              [ (.lit (.str "bar: got %#q, want %#q"))
-                                              , (.field (.name "s") "Bar")
-                                              , (.name "want") ]))
-                                          .skip)
+                                        (.binop "!=" (.mcall (.name "s") "Bar" []) (.name "want"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "bar: got %#q, want %#q"))
+                                        , (.field (.name "s") "Bar")
+                                        , (.name "want") ]))
+                                        .skip)
                                         (.seq
-                                          (.seq .skip (.assign "want" (.hole "lit:unquoted")))
-                                          (.seq
-                                            (.ifte
-                                              (.binop
-                                                "!="
-                                                (.mcall (.name "s") "Baz" [])
-                                                (.name "want"))
-                                              (.expr
-                                                (.call
-                                                  "Errorf"
-                                                  [ (.hole "lit:unquoted")
-                                                  , (.field (.name "s") "Baz")
-                                                  , (.name "want") ]))
-                                              .skip)
-                                            (.seq
-                                              (.seq .skip (.assign "want" (.hole "lit:unquoted")))
-                                              (.ifte
-                                                (.binop
-                                                  "!="
-                                                  (.field (.field (.name "s") "Struct") "Inner")
-                                                  (.name "want"))
-                                                (.expr
-                                                  (.call
-                                                    "Errorf"
-                                                    [ (.hole "lit:unquoted")
-                                                    , (.field (.field (.name "s") "Struct") "Inner")
-                                                    , (.name "want") ]))
-                                                .skip))))))))))))))))))) }
+                                        (.seq .skip (.assign "want" (.hole "lit:unquoted")))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.mcall (.name "s") "Baz" []) (.name "want"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.hole "lit:unquoted")
+                                        , (.field (.name "s") "Baz")
+                                        , (.name "want") ]))
+                                        .skip)
+                                        (.seq
+                                        (.seq .skip (.assign "want" (.hole "lit:unquoted")))
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.field (.name "s") "Struct") "Inner")
+                                        (.name "want"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.hole "lit:unquoted")
+                                        , (.field (.field (.name "s") "Struct") "Inner")
+                                        , (.name "want") ]))
+                                        .skip))))))))))))))))))) }
 
 /-- `envconfig.TestEmptyPrefixUsesFieldNames`  (from `envconfig_test.go`) -/
 def f_envconfig_TestEmptyPrefixUsesFieldNames : Func :=
@@ -3063,37 +2710,37 @@ def f_envconfig_TestTextUnmarshalerError : Func :=
                                         (.lit (.str "Datetime")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %s, got %v"))
-                                          , (.lit (.str "Datetime"))
-                                          , (.field (.name "v") "FieldName") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %v"))
+                                        , (.lit (.str "Datetime"))
+                                        , (.field (.name "v") "FieldName") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.seq
                                         (.assign
-                                          "expectedLowLevelError"
-                                          (.mcall
-                                            (.name "time")
-                                            "RFC3339"
-                                            [ (.field (.name "time") "RFC3339")
-                                            , (.lit (.str "I'M NOT A DATE"))
-                                            , (.lit (.str "2006"))
-                                            , (.lit (.str "I'M NOT A DATE")) ]))
+                                        "expectedLowLevelError"
+                                        (.mcall
+                                        (.name "time")
+                                        "RFC3339"
+                                        [ (.field (.name "time") "RFC3339")
+                                        , (.lit (.str "I'M NOT A DATE"))
+                                        , (.lit (.str "2006"))
+                                        , (.lit (.str "I'M NOT A DATE")) ]))
                                         (.seq
-                                          .skip
-                                          (.ifte
-                                            (.binop
-                                              "!="
-                                              (.mcall (.name "v") "Err" [])
-                                              (.call "Error" []))
-                                            (.expr
-                                              (.call
-                                                "Errorf"
-                                                [ (.lit (.str "expected %s, got %s"))
-                                                , (.name "expectedLowLevelError")
-                                                , (.field (.name "v") "Err") ]))
-                                            .skip))))))))))))))))) }
+                                        .skip
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.mcall (.name "v") "Err" [])
+                                        (.call "Error" []))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %s"))
+                                        , (.name "expectedLowLevelError")
+                                        , (.field (.name "v") "Err") ]))
+                                        .skip))))))))))))))))) }
 
 /-- `envconfig.TestBinaryUnmarshalerError`  (from `envconfig_test.go`) -/
 def f_envconfig_TestBinaryUnmarshalerError : Func :=
@@ -3147,41 +2794,41 @@ def f_envconfig_TestBinaryUnmarshalerError : Func :=
                                         (.lit (.str "UrlPointer")))
                                       (.expr
                                         (.call
-                                          "Errorf"
-                                          [ (.lit (.str "expected %s, got %v"))
-                                          , (.lit (.str "UrlPointer"))
-                                          , (.field (.name "v") "FieldName") ]))
+                                        "Errorf"
+                                        [ (.lit (.str "expected %s, got %v"))
+                                        , (.lit (.str "UrlPointer"))
+                                        , (.field (.name "v") "FieldName") ]))
                                       .skip)
                                     (.seq
                                       .skip
                                       (.seq
                                         (.assign "ue" (.field (.name "v") "Err"))
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.ifte
-                                              (.unop "!" (.name "ok"))
-                                              (.expr
-                                                (.call
-                                                  "Errorf"
-                                                  [ (.lit
-                                                      (.str "expected error type to be \\\"*url.Error\\\", got %T"))
-                                                  , (.field (.name "v") "Err") ]))
-                                              .skip)
-                                            (.seq
-                                              .skip
-                                              (.ifte
-                                                (.binop
-                                                  "!="
-                                                  (.field (.name "ue") "Op")
-                                                  (.lit (.str "parse")))
-                                                (.expr
-                                                  (.call
-                                                    "Errorf"
-                                                    [ (.lit
-                                                        (.str "expected error op to be \\\"parse\\\", got %q"))
-                                                    , (.field (.name "ue") "Op") ]))
-                                                .skip))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.unop "!" (.name "ok"))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit
+                                        (.str "expected error type to be \\\"*url.Error\\\", got %T"))
+                                        , (.field (.name "v") "Err") ]))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.field (.name "ue") "Op")
+                                        (.lit (.str "parse")))
+                                        (.expr
+                                        (.call
+                                        "Errorf"
+                                        [ (.lit
+                                        (.str "expected error op to be \\\"parse\\\", got %q"))
+                                        , (.field (.name "ue") "Op") ]))
+                                        .skip))))))))))))))))))) }
 
 /-- `envconfig.TestCheckDisallowedOnlyAllowed`  (from `envconfig_test.go`) -/
 def f_envconfig_TestCheckDisallowedOnlyAllowed : Func :=
@@ -3429,35 +3076,33 @@ def f_envconfig_BenchmarkGatherInfo : Func :=
                                     (.seq
                                       (.expr
                                         (.call
-                                          "Setenv"
-                                          [ (.lit (.str "ENV_CONFIG_OUTER_INNER"))
-                                          , (.lit (.str "iamnested")) ]))
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_OUTER_INNER"))
+                                        , (.lit (.str "iamnested")) ]))
                                       (.seq
                                         (.expr
-                                          (.call
-                                            "Setenv"
-                                            [ (.lit (.str "ENV_CONFIG_AFTERNESTED"))
-                                            , (.lit (.str "after")) ]))
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_AFTERNESTED"))
+                                        , (.lit (.str "after")) ]))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "Setenv"
-                                              [ (.lit (.str "ENV_CONFIG_HONOR"))
-                                              , (.lit (.str "honor")) ]))
-                                          (.seq
-                                            (.expr
-                                              (.call
-                                                "Setenv"
-                                                [ (.lit (.str "ENV_CONFIG_DATETIME"))
-                                                , (.lit (.str "2016-08-16T18:57:05Z")) ]))
-                                            (.seq
-                                              (.expr
-                                                (.call
-                                                  "Setenv"
-                                                  [ (.lit
-                                                      (.str "ENV_CONFIG_MULTI_WORD_VAR_WITH_AUTO_SPLIT"))
-                                                  , (.lit (.str "24")) ]))
-                                              (.hole "control:FOR"))))))))))))))))))) }
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [(.lit (.str "ENV_CONFIG_HONOR")), (.lit (.str "honor"))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_DATETIME"))
+                                        , (.lit (.str "2016-08-16T18:57:05Z")) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "Setenv"
+                                        [ (.lit (.str "ENV_CONFIG_MULTI_WORD_VAR_WITH_AUTO_SPLIT"))
+                                        , (.lit (.str "24")) ]))
+                                        (.hole "control:FOR"))))))))))))))))))) }
 
 /-- `envconfig_test.go:envconfig.envconfig_test.go`  (from `envconfig_test.go`) -/
 def f_envconfig_test_go_envconfig_envconfig_test_go : Func :=
@@ -3728,20 +3373,20 @@ def f_envconfig_TestMain : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.ifte
-                                            (.binop "!=" (.name "err") (.name "nil"))
-                                            (.expr (.call "Fatal" [(.name "err")]))
-                                            .skip)
-                                          (.seq
-                                            (.setField
-                                              (.name "envconfig")
-                                              "testUsageBadFormatResult"
-                                              (.call "string" [(.name "data")]))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.assign "retCode" (.call "Run" []))
-                                                (.expr (.call "Exit" [(.name "retCode")]))))))))))))))))))))) }
+                                        (.ifte
+                                        (.binop "!=" (.name "err") (.name "nil"))
+                                        (.expr (.call "Fatal" [(.name "err")]))
+                                        .skip)
+                                        (.seq
+                                        (.setField
+                                        (.name "envconfig")
+                                        "testUsageBadFormatResult"
+                                        (.call "string" [(.name "data")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "retCode" (.call "Run" []))
+                                        (.expr (.call "Exit" [(.name "retCode")]))))))))))))))))))))) }
 
 /-- `envconfig.compareUsage`  (from `usage_test.go`) -/
 def f_envconfig_compareUsage : Func :=
@@ -3831,23 +3476,21 @@ def f_envconfig_TestUsageDefault : Func :=
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign "out" (.hole "op:unknown"))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.ifte
-                                                (.binop "!=" (.name "err") (.name "nil"))
-                                                (.expr (.call "Error" [(.call "Error" [])]))
-                                                .skip)
-                                              (.expr
-                                                (.mcall
-                                                  (.name "envconfig")
-                                                  "testUsageTableResult"
-                                                  [ (.field
-                                                      (.name "envconfig")
-                                                      "testUsageTableResult")
-                                                  , (.name "out")
-                                                  , (.name "t") ])))))))))))))))))))) }
+                                        (.assign "out" (.hole "op:unknown"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "err") (.name "nil"))
+                                        (.expr (.call "Error" [(.call "Error" [])]))
+                                        .skip)
+                                        (.expr
+                                        (.mcall
+                                        (.name "envconfig")
+                                        "testUsageTableResult"
+                                        [ (.field (.name "envconfig") "testUsageTableResult")
+                                        , (.name "out")
+                                        , (.name "t") ])))))))))))))))))))) }
 
 /-- `envconfig.TestUsageTable`  (from `usage_test.go`) -/
 def f_envconfig_TestUsageTable : Func :=
@@ -4034,7 +3677,7 @@ def f_envconfig_TestUsageUnknownKeyFormat : Func :=
                                     (.call
                                       "Errorf"
                                       [ (.lit
-                                          (.str "expected 'unknown key' error, but got no error")) ]))
+                                        (.str "expected 'unknown key' error, but got no error")) ]))
                                   .skip)
                                 (.seq
                                   .skip

@@ -119,8 +119,8 @@ def f_com_google_gson_internal_ConstructorConstructor_get_com_google_gson_intern
                                     (.seq
                                       (.expr
                                         (.call
-                                          "com.google.gson.internal.ConstructorConstructor$InstanceCreatorConstructor.<init>:void(com.google.gson.InstanceCreator,java.lang.reflect.Type)"
-                                          [(.name "rawTypeCreator"), (.name "type")]))
+                                        "com.google.gson.internal.ConstructorConstructor$InstanceCreatorConstructor.<init>:void(com.google.gson.InstanceCreator,java.lang.reflect.Type)"
+                                        [(.name "rawTypeCreator"), (.name "type")]))
                                       (.ret (.name "$obj1")))))
                                 .skip)
                               (.seq
@@ -140,145 +140,127 @@ def f_com_google_gson_internal_ConstructorConstructor_get_com_google_gson_intern
                                       .skip
                                       (.seq
                                         (.assign
-                                          "filterResult"
-                                          (.call
-                                            "com.google.gson.internal.ReflectionAccessFilterHelper.getFilterResult:com.google.gson.ReflectionAccessFilter.FilterResult(java.util.List,java.lang.Class)"
-                                            [ (.field (.name "this") "reflectionFilters")
-                                            , (.name "rawType") ]))
+                                        "filterResult"
+                                        (.call
+                                        "com.google.gson.internal.ReflectionAccessFilterHelper.getFilterResult:com.google.gson.ReflectionAccessFilter.FilterResult(java.util.List,java.lang.Class)"
+                                        [ (.field (.name "this") "reflectionFilters")
+                                        , (.name "rawType") ]))
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign
-                                              "defaultConstructor"
-                                              (.call
-                                                "com.google.gson.internal.ConstructorConstructor.newDefaultConstructor:com.google.gson.internal.ObjectConstructor(java.lang.Class,com.google.gson.ReflectionAccessFilter.FilterResult)"
-                                                [(.name "rawType"), (.name "filterResult")]))
-                                            (.seq
-                                              (.ifte
-                                                (.binop
-                                                  "!="
-                                                  (.name "defaultConstructor")
-                                                  (.lit .unit))
-                                                (.ret (.name "defaultConstructor"))
-                                                .skip)
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign
-                                                    "defaultImplementation"
-                                                    (.call
-                                                      "com.google.gson.internal.ConstructorConstructor.newDefaultImplementationConstructor:com.google.gson.internal.ObjectConstructor(java.lang.Class)"
-                                                      [(.name "rawType")]))
-                                                  (.seq
-                                                    (.ifte
-                                                      (.binop
-                                                        "!="
-                                                        (.name "defaultImplementation")
-                                                        (.lit .unit))
-                                                      (.ret (.name "defaultImplementation"))
-                                                      .skip)
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        (.assign
-                                                          "exceptionMessage"
-                                                          (.call
-                                                            "com.google.gson.internal.ConstructorConstructor.checkInstantiable:java.lang.String(java.lang.Class)"
-                                                            [(.name "rawType")]))
-                                                        (.seq
-                                                          (.ifte
-                                                            (.binop
-                                                              "!="
-                                                              (.name "exceptionMessage")
-                                                              (.lit .unit))
-                                                            (.seq
-                                                              .skip
-                                                              (.seq
-                                                                (.assign "$obj2" (.hole "op:alloc"))
-                                                                (.seq
-                                                                  (.expr
-                                                                    (.call
-                                                                      "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
-                                                                      [(.name "exceptionMessage")]))
-                                                                  (.ret (.name "$obj2")))))
-                                                            .skip)
-                                                          (.seq
-                                                            (.ifte
-                                                              (.unop "!" (.name "allowUnsafe"))
-                                                              (.seq
-                                                                .skip
-                                                                (.seq
-                                                                  (.assign
-                                                                    "message"
-                                                                    (.binop
-                                                                      "+"
-                                                                      (.binop
-                                                                        "+"
-                                                                        (.lit
-                                                                          (.str "Unable to create instance of "))
-                                                                        (.name "rawType"))
-                                                                      (.lit
-                                                                        (.str "; Register an InstanceCreator or a TypeAdapter for this type."))))
-                                                                  (.seq
-                                                                    .skip
-                                                                    (.seq
-                                                                      (.assign
-                                                                        "$obj3"
-                                                                        (.hole "op:alloc"))
-                                                                      (.seq
-                                                                        (.expr
-                                                                          (.call
-                                                                            "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
-                                                                            [(.name "message")]))
-                                                                        (.ret (.name "$obj3")))))))
-                                                              .skip)
-                                                            (.seq
-                                                              (.ifte
-                                                                (.binop
-                                                                  "!="
-                                                                  (.name "filterResult")
-                                                                  (.field
-                                                                    (.name "FilterResult")
-                                                                    "ALLOW"))
-                                                                (.seq
-                                                                  .skip
-                                                                  (.seq
-                                                                    (.assign
-                                                                      "message"
-                                                                      (.binop
-                                                                        "+"
-                                                                        (.binop
-                                                                          "+"
-                                                                          (.binop
-                                                                            "+"
-                                                                            (.binop
-                                                                              "+"
-                                                                              (.lit
-                                                                                (.str "Unable to create instance of "))
-                                                                              (.name "rawType"))
-                                                                            (.lit
-                                                                              (.str "; ReflectionAccessFilter does not permit using reflection or Unsafe. Register an")))
-                                                                          (.lit
-                                                                            (.str " InstanceCreator or a TypeAdapter for this type or adjust the access filter to")))
-                                                                        (.lit
-                                                                          (.str " allow using reflection."))))
-                                                                    (.seq
-                                                                      .skip
-                                                                      (.seq
-                                                                        (.assign
-                                                                          "$obj4"
-                                                                          (.hole "op:alloc"))
-                                                                        (.seq
-                                                                          (.expr
-                                                                            (.call
-                                                                              "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
-                                                                              [(.name "message")]))
-                                                                          (.ret (.name "$obj4")))))))
-                                                                .skip)
-                                                              (.ret
-                                                                (.call
-                                                                  "com.google.gson.internal.ConstructorConstructor.newUnsafeAllocator:com.google.gson.internal.ObjectConstructor(java.lang.Class)"
-                                                                  [(.name "rawType")])))))))))))))))))))))))))))) }
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "defaultConstructor"
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor.newDefaultConstructor:com.google.gson.internal.ObjectConstructor(java.lang.Class,com.google.gson.ReflectionAccessFilter.FilterResult)"
+                                        [(.name "rawType"), (.name "filterResult")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "defaultConstructor") (.lit .unit))
+                                        (.ret (.name "defaultConstructor"))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "defaultImplementation"
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor.newDefaultImplementationConstructor:com.google.gson.internal.ObjectConstructor(java.lang.Class)"
+                                        [(.name "rawType")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "defaultImplementation") (.lit .unit))
+                                        (.ret (.name "defaultImplementation"))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "exceptionMessage"
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor.checkInstantiable:java.lang.String(java.lang.Class)"
+                                        [(.name "rawType")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "exceptionMessage") (.lit .unit))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj2" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
+                                        [(.name "exceptionMessage")]))
+                                        (.ret (.name "$obj2")))))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.unop "!" (.name "allowUnsafe"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "message"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.lit (.str "Unable to create instance of "))
+                                        (.name "rawType"))
+                                        (.lit
+                                        (.str "; Register an InstanceCreator or a TypeAdapter for this type."))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj3" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
+                                        [(.name "message")]))
+                                        (.ret (.name "$obj3")))))))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.name "filterResult")
+                                        (.field (.name "FilterResult") "ALLOW"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "message"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.lit (.str "Unable to create instance of "))
+                                        (.name "rawType"))
+                                        (.lit
+                                        (.str "; ReflectionAccessFilter does not permit using reflection or Unsafe. Register an")))
+                                        (.lit
+                                        (.str " InstanceCreator or a TypeAdapter for this type or adjust the access filter to")))
+                                        (.lit (.str " allow using reflection."))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj4" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
+                                        [(.name "message")]))
+                                        (.ret (.name "$obj4")))))))
+                                        .skip)
+                                        (.ret
+                                        (.call
+                                        "com.google.gson.internal.ConstructorConstructor.newUnsafeAllocator:com.google.gson.internal.ObjectConstructor(java.lang.Class)"
+                                        [(.name "rawType")])))))))))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.ConstructorConstructor.newSpecialCollectionConstructor:com.google.gson.internal.ObjectConstructor(java.lang.reflect.Type,java.lang.Class)`  (from `internal/ConstructorConstructor.java`) -/
 def f_com_google_gson_internal_ConstructorConstructor_newSpecialCollectionConstructor_com_google_gson_internal_ObjectConstru : Func :=
@@ -394,8 +376,8 @@ def f_com_google_gson_internal_ConstructorConstructor_newDefaultConstructor_com_
                                     (.seq
                                       (.expr
                                         (.call
-                                          "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
-                                          [(.name "exceptionMessage")]))
+                                        "com.google.gson.internal.ConstructorConstructor$ThrowingObjectConstructor.<init>:void(java.lang.String)"
+                                        [(.name "exceptionMessage")]))
                                       (.ret (.name "$obj11")))))
                                 .skip)))
                           .skip)
@@ -1395,9 +1377,9 @@ def f_com_google_gson_internal_GsonTypes_equals_boolean_java_lang_reflect_Type_j
                                       (.binop
                                         "&&"
                                         (.call
-                                          "equals"
-                                          [ (.call "getGenericDeclaration" [])
-                                          , (.call "getGenericDeclaration" []) ])
+                                        "equals"
+                                        [ (.call "getGenericDeclaration" [])
+                                        , (.call "getGenericDeclaration" []) ])
                                         (.call "equals" [(.call "getName" [])]))))))))
                           (.ret (.lit (.bool false))))))))))) }
 
@@ -1604,8 +1586,8 @@ def f_com_google_gson_internal_GsonTypes_resolve_java_lang_reflect_Type_java_lan
                                       .skip
                                       (.seq
                                         (.assign
-                                          "areSame"
-                                          (.binop "==" (.name "toResolve") (.name "typeVariable")))
+                                        "areSame"
+                                        (.binop "==" (.name "toResolve") (.name "typeVariable")))
                                         (.ifte (.name "areSame") .brk .skip)))))))))))
                     (.ifte
                       (.binop "&&" (.hole "op:instanceOf") (.call "isArray" []))
@@ -1633,12 +1615,12 @@ def f_com_google_gson_internal_GsonTypes_resolve_java_lang_reflect_Type_java_lan
                                       "toResolve"
                                       (.cond
                                         (.call
-                                          "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
-                                          [(.name "componentType"), (.name "newComponentType")])
+                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
+                                        [(.name "componentType"), (.name "newComponentType")])
                                         (.name "original")
                                         (.call
-                                          "com.google.gson.internal.GsonTypes.arrayOf:java.lang.reflect.GenericArrayType(java.lang.reflect.Type)"
-                                          [(.name "newComponentType")])))
+                                        "com.google.gson.internal.GsonTypes.arrayOf:java.lang.reflect.GenericArrayType(java.lang.reflect.Type)"
+                                        [(.name "newComponentType")])))
                                     .brk)))))))
                       (.ifte
                         (.hole "op:instanceOf")
@@ -1665,13 +1647,13 @@ def f_com_google_gson_internal_GsonTypes_resolve_java_lang_reflect_Type_java_lan
                                       (.assign
                                         "toResolve"
                                         (.cond
-                                          (.call
-                                            "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
-                                            [(.name "componentType"), (.name "newComponentType")])
-                                          (.name "original")
-                                          (.call
-                                            "com.google.gson.internal.GsonTypes.arrayOf:java.lang.reflect.GenericArrayType(java.lang.reflect.Type)"
-                                            [(.name "newComponentType")])))
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
+                                        [(.name "componentType"), (.name "newComponentType")])
+                                        (.name "original")
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.arrayOf:java.lang.reflect.GenericArrayType(java.lang.reflect.Type)"
+                                        [(.name "newComponentType")])))
                                       .brk)))))))
                         (.ifte
                           (.hole "op:instanceOf")
@@ -1689,46 +1671,43 @@ def f_com_google_gson_internal_GsonTypes_resolve_java_lang_reflect_Type_java_lan
                                       (.assign
                                         "newOwnerType"
                                         (.call
-                                          "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
-                                          [ (.name "context")
-                                          , (.name "contextRawType")
-                                          , (.name "ownerType")
-                                          , (.name "visitedTypeVariables") ]))
+                                        "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
+                                        [ (.name "context")
+                                        , (.name "contextRawType")
+                                        , (.name "ownerType")
+                                        , (.name "visitedTypeVariables") ]))
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "ownerChanged"
-                                            (.unop
-                                              "!"
-                                              (.call
-                                                "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
-                                                [(.name "newOwnerType"), (.name "ownerType")])))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "args" (.call "getActualTypeArguments" []))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign "argsChanged" (.lit (.bool false)))
-                                                  (.seq
-                                                    (.hole "control:FOR")
-                                                    (.seq
-                                                      (.assign
-                                                        "toResolve"
-                                                        (.cond
-                                                          (.binop
-                                                            "||"
-                                                            (.name "ownerChanged")
-                                                            (.name "argsChanged"))
-                                                          (.call
-                                                            "com.google.gson.internal.GsonTypes.newParameterizedTypeWithOwner:java.lang.reflect.ParameterizedType(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type[])"
-                                                            [ (.name "newOwnerType")
-                                                            , (.hole "op:cast")
-                                                            , (.hole "op:arrayInitializer") ])
-                                                          (.name "original")))
-                                                      .brk))))))))))))))
+                                        (.assign
+                                        "ownerChanged"
+                                        (.unop
+                                        "!"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
+                                        [(.name "newOwnerType"), (.name "ownerType")])))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "args" (.call "getActualTypeArguments" []))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "argsChanged" (.lit (.bool false)))
+                                        (.seq
+                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign
+                                        "toResolve"
+                                        (.cond
+                                        (.binop "||" (.name "ownerChanged") (.name "argsChanged"))
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.newParameterizedTypeWithOwner:java.lang.reflect.ParameterizedType(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type[])"
+                                        [ (.name "newOwnerType")
+                                        , (.hole "op:cast")
+                                        , (.hole "op:arrayInitializer") ])
+                                        (.name "original")))
+                                        .brk))))))))))))))
                           (.ifte
                             (.hole "op:instanceOf")
                             (.seq
@@ -1744,72 +1723,64 @@ def f_com_google_gson_internal_GsonTypes_resolve_java_lang_reflect_Type_java_lan
                                       (.seq
                                         (.assign "originalUpperBound" (.call "getUpperBounds" []))
                                         (.seq
-                                          (.ifte
-                                            (.binop "==" (.hole "op:sizeOf") (.lit (.int 1)))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.assign
-                                                  "lowerBound"
-                                                  (.call
-                                                    "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
-                                                    [ (.name "context")
-                                                    , (.name "contextRawType")
-                                                    , (.index
-                                                        (.name "originalLowerBound")
-                                                        (.lit (.int 0)))
-                                                    , (.name "visitedTypeVariables") ]))
-                                                (.ifte
-                                                  (.unop
-                                                    "!"
-                                                    (.call
-                                                      "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
-                                                      [ (.name "lowerBound")
-                                                      , (.index
-                                                          (.name "originalLowerBound")
-                                                          (.lit (.int 0))) ]))
-                                                  (.seq
-                                                    (.assign
-                                                      "toResolve"
-                                                      (.call
-                                                        "com.google.gson.internal.GsonTypes.supertypeOf:java.lang.reflect.WildcardType(java.lang.reflect.Type)"
-                                                        [(.name "lowerBound")]))
-                                                    .brk)
-                                                  .skip)))
-                                            (.ifte
-                                              (.binop "==" (.hole "op:sizeOf") (.lit (.int 1)))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign
-                                                    "upperBound"
-                                                    (.call
-                                                      "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
-                                                      [ (.name "context")
-                                                      , (.name "contextRawType")
-                                                      , (.index
-                                                          (.name "originalUpperBound")
-                                                          (.lit (.int 0)))
-                                                      , (.name "visitedTypeVariables") ]))
-                                                  (.ifte
-                                                    (.unop
-                                                      "!"
-                                                      (.call
-                                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
-                                                        [ (.name "upperBound")
-                                                        , (.index
-                                                            (.name "originalUpperBound")
-                                                            (.lit (.int 0))) ]))
-                                                    (.seq
-                                                      (.assign
-                                                        "toResolve"
-                                                        (.call
-                                                          "com.google.gson.internal.GsonTypes.subtypeOf:java.lang.reflect.WildcardType(java.lang.reflect.Type)"
-                                                          [(.name "upperBound")]))
-                                                      .brk)
-                                                    .skip)))
-                                              .skip))
-                                          (.seq (.assign "toResolve" (.name "original")) .brk))))))))
+                                        (.ifte
+                                        (.binop "==" (.hole "op:sizeOf") (.lit (.int 1)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "lowerBound"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
+                                        [ (.name "context")
+                                        , (.name "contextRawType")
+                                        , (.index (.name "originalLowerBound") (.lit (.int 0)))
+                                        , (.name "visitedTypeVariables") ]))
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
+                                        [ (.name "lowerBound")
+                                        , (.index (.name "originalLowerBound") (.lit (.int 0))) ]))
+                                        (.seq
+                                        (.assign
+                                        "toResolve"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.supertypeOf:java.lang.reflect.WildcardType(java.lang.reflect.Type)"
+                                        [(.name "lowerBound")]))
+                                        .brk)
+                                        .skip)))
+                                        (.ifte
+                                        (.binop "==" (.hole "op:sizeOf") (.lit (.int 1)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "upperBound"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type,java.util.Map)"
+                                        [ (.name "context")
+                                        , (.name "contextRawType")
+                                        , (.index (.name "originalUpperBound") (.lit (.int 0)))
+                                        , (.name "visitedTypeVariables") ]))
+                                        (.ifte
+                                        (.unop
+                                        "!"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.equal:boolean(java.lang.Object,java.lang.Object)"
+                                        [ (.name "upperBound")
+                                        , (.index (.name "originalUpperBound") (.lit (.int 0))) ]))
+                                        (.seq
+                                        (.assign
+                                        "toResolve"
+                                        (.call
+                                        "com.google.gson.internal.GsonTypes.subtypeOf:java.lang.reflect.WildcardType(java.lang.reflect.Type)"
+                                        [(.name "upperBound")]))
+                                        .brk)
+                                        .skip)))
+                                        .skip))
+                                        (.seq (.assign "toResolve" (.name "original")) .brk))))))))
                             .brk))))))
                 (.seq
                   (.ifte
@@ -2580,17 +2551,17 @@ def f_com_google_gson_internal_LinkedTreeMap_find_com_google_gson_internal_Linke
                                       .skip
                                       (.seq
                                         (.assign
-                                          "child"
-                                          (.cond
-                                            (.binop "<" (.name "comparison") (.lit (.int 0)))
-                                            (.field (.name "nearest") "left")
-                                            (.field (.name "nearest") "right")))
+                                        "child"
+                                        (.cond
+                                        (.binop "<" (.name "comparison") (.lit (.int 0)))
+                                        (.field (.name "nearest") "left")
+                                        (.field (.name "nearest") "right")))
                                         (.seq
-                                          (.ifte
-                                            (.binop "==" (.name "child") (.lit .unit))
-                                            .brk
-                                            .skip)
-                                          (.assign "nearest" (.name "child"))))))))))
+                                        (.ifte
+                                        (.binop "==" (.name "child") (.lit .unit))
+                                        .brk
+                                        .skip)
+                                        (.assign "nearest" (.name "child"))))))))))
                           .skip)
                         (.seq
                           (.ifte (.unop "!" (.name "create")) (.ret (.lit .unit)) .skip)
@@ -2606,43 +2577,43 @@ def f_com_google_gson_internal_LinkedTreeMap_find_com_google_gson_internal_Linke
                                     (.seq
                                       (.ifte
                                         (.binop
-                                          "&&"
-                                          (.binop "==" (.name "comparator") (.lit .unit))
-                                          (.unop "!" (.hole "op:instanceOf")))
+                                        "&&"
+                                        (.binop "==" (.name "comparator") (.lit .unit))
+                                        (.unop "!" (.hole "op:instanceOf")))
                                         (.hole "control:THROW")
                                         .skip)
                                       (.seq
                                         (.assign "created" (.hole "op:alloc"))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "com.google.gson.internal.LinkedTreeMap$Node.<init>:void(boolean,com.google.gson.internal.LinkedTreeMap$Node,java.lang.Object,com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
-                                              [ (.field (.name "this") "allowNullValues")
-                                              , (.name "nearest")
-                                              , (.name "key")
-                                              , (.name "header")
-                                              , (.field (.name "header") "prev") ]))
-                                          (.setField (.name "this") "root" (.name "created")))))
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.LinkedTreeMap$Node.<init>:void(boolean,com.google.gson.internal.LinkedTreeMap$Node,java.lang.Object,com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
+                                        [ (.field (.name "this") "allowNullValues")
+                                        , (.name "nearest")
+                                        , (.name "key")
+                                        , (.name "header")
+                                        , (.field (.name "header") "prev") ]))
+                                        (.setField (.name "this") "root" (.name "created")))))
                                     (.seq
                                       (.assign "created" (.hole "op:alloc"))
                                       (.seq
                                         (.expr
-                                          (.call
-                                            "com.google.gson.internal.LinkedTreeMap$Node.<init>:void(boolean,com.google.gson.internal.LinkedTreeMap$Node,java.lang.Object,com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
-                                            [ (.field (.name "this") "allowNullValues")
-                                            , (.name "nearest")
-                                            , (.name "key")
-                                            , (.name "header")
-                                            , (.field (.name "header") "prev") ]))
+                                        (.call
+                                        "com.google.gson.internal.LinkedTreeMap$Node.<init>:void(boolean,com.google.gson.internal.LinkedTreeMap$Node,java.lang.Object,com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
+                                        [ (.field (.name "this") "allowNullValues")
+                                        , (.name "nearest")
+                                        , (.name "key")
+                                        , (.name "header")
+                                        , (.field (.name "header") "prev") ]))
                                         (.seq
-                                          (.ifte
-                                            (.binop "<" (.name "comparison") (.lit (.int 0)))
-                                            (.setField (.name "nearest") "left" (.name "created"))
-                                            (.setField (.name "nearest") "right" (.name "created")))
-                                          (.expr
-                                            (.call
-                                              "com.google.gson.internal.LinkedTreeMap.rebalance:void(com.google.gson.internal.LinkedTreeMap$Node,boolean)"
-                                              [(.name "nearest"), (.lit (.bool true))]))))))
+                                        (.ifte
+                                        (.binop "<" (.name "comparison") (.lit (.int 0)))
+                                        (.setField (.name "nearest") "left" (.name "created"))
+                                        (.setField (.name "nearest") "right" (.name "created")))
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.LinkedTreeMap.rebalance:void(com.google.gson.internal.LinkedTreeMap$Node,boolean)"
+                                        [(.name "nearest"), (.lit (.bool true))]))))))
                                   (.seq
                                     (.expr (.hole "op:postIncrement"))
                                     (.seq
@@ -2753,66 +2724,47 @@ def f_com_google_gson_internal_LinkedTreeMap_removeInternal_void_com_google_gson
                                       (.seq
                                         (.assign "left" (.field (.name "node") "left"))
                                         (.seq
-                                          (.ifte
-                                            (.binop "!=" (.name "left") (.lit .unit))
-                                            (.seq
-                                              (.assign
-                                                "leftHeight"
-                                                (.field (.name "left") "height"))
-                                              (.seq
-                                                (.setField (.name "adjacent") "left" (.name "left"))
-                                                (.seq
-                                                  (.setField
-                                                    (.name "left")
-                                                    "parent"
-                                                    (.name "adjacent"))
-                                                  (.setField (.name "node") "left" (.lit .unit)))))
-                                            .skip)
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "rightHeight" (.lit (.int 0)))
-                                              (.seq
-                                                (.assign "right" (.field (.name "node") "right"))
-                                                (.seq
-                                                  (.ifte
-                                                    (.binop "!=" (.name "right") (.lit .unit))
-                                                    (.seq
-                                                      (.assign
-                                                        "rightHeight"
-                                                        (.field (.name "right") "height"))
-                                                      (.seq
-                                                        (.setField
-                                                          (.name "adjacent")
-                                                          "right"
-                                                          (.name "right"))
-                                                        (.seq
-                                                          (.setField
-                                                            (.name "right")
-                                                            "parent"
-                                                            (.name "adjacent"))
-                                                          (.setField
-                                                            (.name "node")
-                                                            "right"
-                                                            (.lit .unit)))))
-                                                    .skip)
-                                                  (.seq
-                                                    (.setField
-                                                      (.name "adjacent")
-                                                      "height"
-                                                      (.binop
-                                                        "+"
-                                                        (.call
-                                                          "max"
-                                                          [ (.name "leftHeight")
-                                                          , (.name "rightHeight") ])
-                                                        (.lit (.int 1))))
-                                                    (.seq
-                                                      (.expr
-                                                        (.call
-                                                          "com.google.gson.internal.LinkedTreeMap.replaceInParent:void(com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
-                                                          [(.name "node"), (.name "adjacent")]))
-                                                      (.ret (.lit .unit)))))))))))))))
+                                        (.ifte
+                                        (.binop "!=" (.name "left") (.lit .unit))
+                                        (.seq
+                                        (.assign "leftHeight" (.field (.name "left") "height"))
+                                        (.seq
+                                        (.setField (.name "adjacent") "left" (.name "left"))
+                                        (.seq
+                                        (.setField (.name "left") "parent" (.name "adjacent"))
+                                        (.setField (.name "node") "left" (.lit .unit)))))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "rightHeight" (.lit (.int 0)))
+                                        (.seq
+                                        (.assign "right" (.field (.name "node") "right"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "right") (.lit .unit))
+                                        (.seq
+                                        (.assign "rightHeight" (.field (.name "right") "height"))
+                                        (.seq
+                                        (.setField (.name "adjacent") "right" (.name "right"))
+                                        (.seq
+                                        (.setField (.name "right") "parent" (.name "adjacent"))
+                                        (.setField (.name "node") "right" (.lit .unit)))))
+                                        .skip)
+                                        (.seq
+                                        (.setField
+                                        (.name "adjacent")
+                                        "height"
+                                        (.binop
+                                        "+"
+                                        (.call "max" [(.name "leftHeight"), (.name "rightHeight")])
+                                        (.lit (.int 1))))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.LinkedTreeMap.replaceInParent:void(com.google.gson.internal.LinkedTreeMap$Node,com.google.gson.internal.LinkedTreeMap$Node)"
+                                        [(.name "node"), (.name "adjacent")]))
+                                        (.ret (.lit .unit)))))))))))))))
                             (.ifte
                               (.binop "!=" (.name "left") (.lit .unit))
                               (.seq
@@ -2939,31 +2891,31 @@ def f_com_google_gson_internal_LinkedTreeMap_rotateLeft_void_com_google_gson_int
                                         (.name "root")
                                         "height"
                                         (.binop
-                                          "+"
-                                          (.call
-                                            "max"
-                                            [ (.cond
-                                                (.binop "!=" (.name "left") (.lit .unit))
-                                                (.field (.name "left") "height")
-                                                (.lit (.int 0)))
-                                            , (.cond
-                                                (.binop "!=" (.name "pivotLeft") (.lit .unit))
-                                                (.field (.name "pivotLeft") "height")
-                                                (.lit (.int 0))) ])
-                                          (.lit (.int 1))))
+                                        "+"
+                                        (.call
+                                        "max"
+                                        [ (.cond
+                                        (.binop "!=" (.name "left") (.lit .unit))
+                                        (.field (.name "left") "height")
+                                        (.lit (.int 0)))
+                                        , (.cond
+                                        (.binop "!=" (.name "pivotLeft") (.lit .unit))
+                                        (.field (.name "pivotLeft") "height")
+                                        (.lit (.int 0))) ])
+                                        (.lit (.int 1))))
                                       (.setField
                                         (.name "pivot")
                                         "height"
                                         (.binop
-                                          "+"
-                                          (.call
-                                            "max"
-                                            [ (.field (.name "root") "height")
-                                            , (.cond
-                                                (.binop "!=" (.name "pivotRight") (.lit .unit))
-                                                (.field (.name "pivotRight") "height")
-                                                (.lit (.int 0))) ])
-                                          (.lit (.int 1)))))))))))))))))) }
+                                        "+"
+                                        (.call
+                                        "max"
+                                        [ (.field (.name "root") "height")
+                                        , (.cond
+                                        (.binop "!=" (.name "pivotRight") (.lit .unit))
+                                        (.field (.name "pivotRight") "height")
+                                        (.lit (.int 0))) ])
+                                        (.lit (.int 1)))))))))))))))))) }
 
 /-- `com.google.gson.internal.LinkedTreeMap.rotateRight:void(com.google.gson.internal.LinkedTreeMap$Node)`  (from `internal/LinkedTreeMap.java`) -/
 def f_com_google_gson_internal_LinkedTreeMap_rotateRight_void_com_google_gson_internal_LinkedTreeMap_Node_ : Func :=
@@ -3006,31 +2958,31 @@ def f_com_google_gson_internal_LinkedTreeMap_rotateRight_void_com_google_gson_in
                                         (.name "root")
                                         "height"
                                         (.binop
-                                          "+"
-                                          (.call
-                                            "max"
-                                            [ (.cond
-                                                (.binop "!=" (.name "right") (.lit .unit))
-                                                (.field (.name "right") "height")
-                                                (.lit (.int 0)))
-                                            , (.cond
-                                                (.binop "!=" (.name "pivotRight") (.lit .unit))
-                                                (.field (.name "pivotRight") "height")
-                                                (.lit (.int 0))) ])
-                                          (.lit (.int 1))))
+                                        "+"
+                                        (.call
+                                        "max"
+                                        [ (.cond
+                                        (.binop "!=" (.name "right") (.lit .unit))
+                                        (.field (.name "right") "height")
+                                        (.lit (.int 0)))
+                                        , (.cond
+                                        (.binop "!=" (.name "pivotRight") (.lit .unit))
+                                        (.field (.name "pivotRight") "height")
+                                        (.lit (.int 0))) ])
+                                        (.lit (.int 1))))
                                       (.setField
                                         (.name "pivot")
                                         "height"
                                         (.binop
-                                          "+"
-                                          (.call
-                                            "max"
-                                            [ (.field (.name "root") "height")
-                                            , (.cond
-                                                (.binop "!=" (.name "pivotLeft") (.lit .unit))
-                                                (.field (.name "pivotLeft") "height")
-                                                (.lit (.int 0))) ])
-                                          (.lit (.int 1)))))))))))))))))) }
+                                        "+"
+                                        (.call
+                                        "max"
+                                        [ (.field (.name "root") "height")
+                                        , (.cond
+                                        (.binop "!=" (.name "pivotLeft") (.lit .unit))
+                                        (.field (.name "pivotLeft") "height")
+                                        (.lit (.int 0))) ])
+                                        (.lit (.int 1)))))))))))))))))) }
 
 /-- `com.google.gson.internal.LinkedTreeMap.entrySet:java.util.Set()`  (from `internal/LinkedTreeMap.java`) -/
 def f_com_google_gson_internal_LinkedTreeMap_entrySet_java_util_Set__ : Func :=
@@ -4178,8 +4130,8 @@ def f_com_google_gson_internal_UnsafeAllocator_create_com_google_gson_internal_U
                                     (.seq
                                       (.expr
                                         (.call
-                                          "com.google.gson.internal.UnsafeAllocator.create.UnsafeAllocator$0.<init>:void()"
-                                          [(.name "allocateInstance"), (.name "unsafe")]))
+                                        "com.google.gson.internal.UnsafeAllocator.create.UnsafeAllocator$0.<init>:void()"
+                                        [(.name "allocateInstance"), (.name "unsafe")]))
                                       (.ret (.name "$obj1"))))))))))))))
               "__exc"
               .skip)
@@ -4218,8 +4170,8 @@ def f_com_google_gson_internal_UnsafeAllocator_create_com_google_gson_internal_U
                                     (.seq
                                       (.expr
                                         (.call
-                                          "com.google.gson.internal.UnsafeAllocator.create.UnsafeAllocator$1.<init>:void()"
-                                          [(.name "constructorId"), (.name "newInstance")]))
+                                        "com.google.gson.internal.UnsafeAllocator.create.UnsafeAllocator$1.<init>:void()"
+                                        [(.name "constructorId"), (.name "newInstance")]))
                                       (.ret (.name "$obj2")))))))))))))
                 "__exc"
                 .skip)
@@ -4539,23 +4491,22 @@ def f_com_google_gson_internal_bind_CollectionTypeAdapterFactory_create_com_goog
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "constructor"
-                                            (.mcall
-                                              (.name "this")
-                                              "constructorConstructor"
-                                              [(.name "typeToken"), (.name "allowUnsafe")]))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "result" (.hole "op:alloc"))
-                                              (.seq
-                                                (.expr
-                                                  (.call
-                                                    "<init>"
-                                                    [ (.name "wrappedTypeAdapter")
-                                                    , (.name "constructor") ]))
-                                                (.ret (.name "result"))))))))))))))))))))) }
+                                        (.assign
+                                        "constructor"
+                                        (.mcall
+                                        (.name "this")
+                                        "constructorConstructor"
+                                        [(.name "typeToken"), (.name "allowUnsafe")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "result" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [(.name "wrappedTypeAdapter"), (.name "constructor")]))
+                                        (.ret (.name "result"))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.CollectionTypeAdapterFactory$Adapter.<init>:void(com.google.gson.TypeAdapter,com.google.gson.internal.ObjectConstructor)`  (from `internal/bind/CollectionTypeAdapterFactory.java`) -/
 def f_com_google_gson_internal_bind_CollectionTypeAdapterFactory_Adapter__init__void_com_google_gson_TypeAdapter_com_google_ : Func :=
@@ -4951,16 +4902,16 @@ def f_com_google_gson_internal_bind_EnumTypeAdapter__init__void_java_lang_Class_
                                       (.setField (.name "this") "constantToName" (.hole "op:alloc"))
                                       (.seq
                                         (.expr
-                                          (.mcall
-                                            (.name "this")
-                                            "constantToName"
-                                            [(.name "hashMapCapacity")]))
+                                        (.mcall
+                                        (.name "this")
+                                        "constantToName"
+                                        [(.name "hashMapCapacity")]))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "setAccessible"
-                                              [(.name "fields"), (.lit (.bool true))]))
-                                          (.hole "control:FOR"))))))))))))))))
+                                        (.expr
+                                        (.call
+                                        "setAccessible"
+                                        [(.name "fields"), (.lit (.bool true))]))
+                                        (.hole "control:FOR"))))))))))))))))
             "__exc"
             (.hole "control:THROW")) }
 
@@ -5228,41 +5179,41 @@ def f_com_google_gson_internal_bind_JavaTimeTypeAdapters__clinit__void__ : Func 
                                     (.seq
                                       (.expr
                                         (.mcall
-                                          (.fnref
-                                            "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                          "YEAR"
-                                          [(.hole "op:arrayInitializer")]))
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "YEAR"
+                                        [(.hole "op:arrayInitializer")]))
                                       (.seq
                                         (.setField
-                                          (.fnref
-                                            "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                          "YEAR_MONTH"
-                                          (.hole "op:alloc"))
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "YEAR_MONTH"
+                                        (.hole "op:alloc"))
                                         (.seq
-                                          (.expr
-                                            (.mcall
-                                              (.fnref
-                                                "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                              "YEAR_MONTH"
-                                              [(.hole "op:arrayInitializer")]))
-                                          (.seq
-                                            (.setField
-                                              (.fnref
-                                                "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                              "ZONE_ID"
-                                              (.call "nullSafe" []))
-                                            (.seq
-                                              (.setField
-                                                (.fnref
-                                                  "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                                "JAVA_TIME_FACTORY"
-                                                (.hole "op:alloc"))
-                                              (.expr
-                                                (.mcall
-                                                  (.fnref
-                                                    "com.google.gson.internal.bind.JavaTimeTypeAdapters")
-                                                  "JAVA_TIME_FACTORY"
-                                                  [])))))))))))))))))))) }
+                                        (.expr
+                                        (.mcall
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "YEAR_MONTH"
+                                        [(.hole "op:arrayInitializer")]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "ZONE_ID"
+                                        (.call "nullSafe" []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "JAVA_TIME_FACTORY"
+                                        (.hole "op:alloc"))
+                                        (.expr
+                                        (.mcall
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JavaTimeTypeAdapters")
+                                        "JAVA_TIME_FACTORY"
+                                        [])))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.JavaTimeTypeAdapters.DURATION.IntegerFieldsTypeAdapter$0.create:java.time.Duration(long[])`  (from `internal/bind/JavaTimeTypeAdapters.java`) -/
 def f_com_google_gson_internal_bind_JavaTimeTypeAdapters_DURATION_IntegerFieldsTypeAdapter_0_create_java_time_Duration_long_ : Func :=
@@ -5555,46 +5506,43 @@ def f_com_google_gson_internal_bind_JavaTimeTypeAdapters_JAVA_TIME_FACTORY_TypeA
                                         (.mcall (.name "this") "outerClass" [(.name "gson")]))
                                       (.ifte
                                         (.binop
-                                          "=="
-                                          (.name "rawType")
-                                          (.field (.name "Period") "class"))
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "Period") "class"))
                                         (.assign "adapter" (.name "PERIOD"))
                                         (.ifte
-                                          (.binop
-                                            "=="
-                                            (.name "rawType")
-                                            (.field (.name "Year") "class"))
-                                          (.assign "adapter" (.name "YEAR"))
-                                          (.ifte
-                                            (.binop
-                                              "=="
-                                              (.name "rawType")
-                                              (.field (.name "YearMonth") "class"))
-                                            (.assign "adapter" (.name "YEAR_MONTH"))
-                                            (.ifte
-                                              (.binop
-                                                "||"
-                                                (.binop
-                                                  "=="
-                                                  (.name "rawType")
-                                                  (.field (.name "ZoneId") "class"))
-                                                (.binop
-                                                  "=="
-                                                  (.name "rawType")
-                                                  (.field (.name "ZoneOffset") "class")))
-                                              (.assign "adapter" (.name "ZONE_ID"))
-                                              (.ifte
-                                                (.binop
-                                                  "=="
-                                                  (.name "rawType")
-                                                  (.field (.name "ZonedDateTime") "class"))
-                                                (.assign
-                                                  "adapter"
-                                                  (.mcall
-                                                    (.name "this")
-                                                    "outerClass"
-                                                    [(.name "gson")]))
-                                                .skip)))))))))))))
+                                        (.binop
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "Year") "class"))
+                                        (.assign "adapter" (.name "YEAR"))
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "YearMonth") "class"))
+                                        (.assign "adapter" (.name "YEAR_MONTH"))
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "ZoneId") "class"))
+                                        (.binop
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "ZoneOffset") "class")))
+                                        (.assign "adapter" (.name "ZONE_ID"))
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.name "rawType")
+                                        (.field (.name "ZonedDateTime") "class"))
+                                        (.assign
+                                        "adapter"
+                                        (.mcall (.name "this") "outerClass" [(.name "gson")]))
+                                        .skip)))))))))))))
                       (.seq
                         .skip
                         (.seq (.assign "result" (.hole "op:cast")) (.ret (.name "result")))))))))) }
@@ -6030,36 +5978,36 @@ def f_com_google_gson_internal_bind_JsonAdapterAnnotationTypeAdapterFactory_getT
                                       .skip
                                       (.seq
                                         (.ifte
-                                          (.name "isClassAnnotation")
-                                          (.assign
-                                            "skipPast"
-                                            (.field
-                                              (.fnref
-                                                "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory")
-                                              "TREE_TYPE_CLASS_DUMMY_FACTORY"))
-                                          (.assign
-                                            "skipPast"
-                                            (.field
-                                              (.fnref
-                                                "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory")
-                                              "TREE_TYPE_FIELD_DUMMY_FACTORY")))
+                                        (.name "isClassAnnotation")
+                                        (.assign
+                                        "skipPast"
+                                        (.field
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory")
+                                        "TREE_TYPE_CLASS_DUMMY_FACTORY"))
+                                        (.assign
+                                        "skipPast"
+                                        (.field
+                                        (.fnref
+                                        "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory")
+                                        "TREE_TYPE_FIELD_DUMMY_FACTORY")))
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign "tempAdapter" (.hole "op:alloc"))
-                                            (.seq
-                                              (.expr
-                                                (.call
-                                                  "<init>"
-                                                  [ (.name "serializer")
-                                                  , (.name "deserializer")
-                                                  , (.name "gson")
-                                                  , (.name "type")
-                                                  , (.name "skipPast")
-                                                  , (.name "nullSafe") ]))
-                                              (.seq
-                                                (.assign "typeAdapter" (.name "tempAdapter"))
-                                                (.assign "nullSafe" (.lit (.bool false)))))))))))))
+                                        .skip
+                                        (.seq
+                                        (.assign "tempAdapter" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [ (.name "serializer")
+                                        , (.name "deserializer")
+                                        , (.name "gson")
+                                        , (.name "type")
+                                        , (.name "skipPast")
+                                        , (.name "nullSafe") ]))
+                                        (.seq
+                                        (.assign "typeAdapter" (.name "tempAdapter"))
+                                        (.assign "nullSafe" (.lit (.bool false)))))))))))))
                             (.hole "control:THROW"))))
                       (.seq
                         (.ifte
@@ -6134,37 +6082,37 @@ def f_com_google_gson_internal_bind_JsonAdapterAnnotationTypeAdapterFactory_isCl
                                     (.seq
                                       (.ifte
                                         (.unop
-                                          "!"
-                                          (.mcall
-                                            (.name "TypeAdapterFactory")
-                                            "class"
-                                            [(.name "adapterClass")]))
+                                        "!"
+                                        (.mcall
+                                        (.name "TypeAdapterFactory")
+                                        "class"
+                                        [(.name "adapterClass")]))
                                         (.ret (.lit (.bool false)))
                                         .skip)
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "adapter"
-                                            (.mcall
-                                              (.name "this")
-                                              "constructorConstructor"
-                                              [ (.field (.name "this") "constructorConstructor")
-                                              , (.name "adapterClass") ]))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "newFactory" (.hole "op:cast"))
-                                              (.seq
-                                                (.assign
-                                                  "newFactory"
-                                                  (.call
-                                                    "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.putFactoryAndGetCurrent:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapterFactory)"
-                                                    [(.name "rawType"), (.name "newFactory")]))
-                                                (.ret
-                                                  (.call
-                                                    "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.areSameFactories:boolean(com.google.gson.TypeAdapterFactory,com.google.gson.TypeAdapterFactory)"
-                                                    [(.name "newFactory"), (.name "factory")]))))))))))))))))))))) }
+                                        (.assign
+                                        "adapter"
+                                        (.mcall
+                                        (.name "this")
+                                        "constructorConstructor"
+                                        [ (.field (.name "this") "constructorConstructor")
+                                        , (.name "adapterClass") ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "newFactory" (.hole "op:cast"))
+                                        (.seq
+                                        (.assign
+                                        "newFactory"
+                                        (.call
+                                        "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.putFactoryAndGetCurrent:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapterFactory)"
+                                        [(.name "rawType"), (.name "newFactory")]))
+                                        (.ret
+                                        (.call
+                                        "com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.areSameFactories:boolean(com.google.gson.TypeAdapterFactory,com.google.gson.TypeAdapterFactory)"
+                                        [(.name "newFactory"), (.name "factory")]))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.JsonAdapterAnnotationTypeAdapterFactory.<clinit>:void()`  (from `<empty>`) -/
 def f_com_google_gson_internal_bind_JsonAdapterAnnotationTypeAdapterFactory__clinit__void__ : Func :=
@@ -6259,49 +6207,45 @@ def f_com_google_gson_internal_bind_JsonElementTypeAdapter_read_com_google_gson_
                                       (.assign "name" (.lit .unit))
                                       (.seq
                                         (.ifte
-                                          (.hole "op:instanceOf")
-                                          (.assign "name" (.call "nextName" []))
-                                          .skip)
+                                        (.hole "op:instanceOf")
+                                        (.assign "name" (.call "nextName" []))
+                                        .skip)
                                         (.seq
-                                          (.assign "peeked" (.call "peek" []))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign
-                                                "value"
-                                                (.call
-                                                  "com.google.gson.internal.bind.JsonElementTypeAdapter.tryBeginNesting:com.google.gson.JsonElement(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
-                                                  [(.name "in"), (.name "peeked")]))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign
-                                                    "isNesting"
-                                                    (.binop "!=" (.name "value") (.lit .unit)))
-                                                  (.seq
-                                                    (.ifte
-                                                      (.binop "==" (.name "value") (.lit .unit))
-                                                      (.assign
-                                                        "value"
-                                                        (.call
-                                                          "com.google.gson.internal.bind.JsonElementTypeAdapter.readTerminal:com.google.gson.JsonElement(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
-                                                          [(.name "in"), (.name "peeked")]))
-                                                      .skip)
-                                                    (.seq
-                                                      (.ifte
-                                                        (.hole "op:instanceOf")
-                                                        (.expr (.call "add" [(.name "value")]))
-                                                        (.expr
-                                                          (.call
-                                                            "add"
-                                                            [(.name "name"), (.name "value")])))
-                                                      (.ifte
-                                                        (.name "isNesting")
-                                                        (.seq
-                                                          (.expr
-                                                            (.call "addLast" [(.name "current")]))
-                                                          (.assign "current" (.name "value")))
-                                                        .skip))))))))))))
+                                        (.assign "peeked" (.call "peek" []))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "value"
+                                        (.call
+                                        "com.google.gson.internal.bind.JsonElementTypeAdapter.tryBeginNesting:com.google.gson.JsonElement(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
+                                        [(.name "in"), (.name "peeked")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "isNesting"
+                                        (.binop "!=" (.name "value") (.lit .unit)))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "value") (.lit .unit))
+                                        (.assign
+                                        "value"
+                                        (.call
+                                        "com.google.gson.internal.bind.JsonElementTypeAdapter.readTerminal:com.google.gson.JsonElement(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
+                                        [(.name "in"), (.name "peeked")]))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.hole "op:instanceOf")
+                                        (.expr (.call "add" [(.name "value")]))
+                                        (.expr (.call "add" [(.name "name"), (.name "value")])))
+                                        (.ifte
+                                        (.name "isNesting")
+                                        (.seq
+                                        (.expr (.call "addLast" [(.name "current")]))
+                                        (.assign "current" (.name "value")))
+                                        .skip))))))))))))
                                 (.seq
                                   (.ifte
                                     (.hole "op:instanceOf")
@@ -7597,60 +7541,52 @@ def f_com_google_gson_internal_bind_MapTypeAdapterFactory_create_com_google_gson
                                       (.seq
                                         (.assign "wrappedKeyAdapter" (.hole "op:alloc"))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "<init>"
-                                              [ (.name "gson")
-                                              , (.name "keyAdapter")
-                                              , (.name "keyType") ]))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign
-                                                "valueAdapter"
-                                                (.call
-                                                  "getAdapter"
-                                                  [(.call "get" [(.name "valueType")])]))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign "wrappedValueAdapter" (.hole "op:alloc"))
-                                                  (.seq
-                                                    (.expr
-                                                      (.call
-                                                        "<init>"
-                                                        [ (.name "gson")
-                                                        , (.name "valueAdapter")
-                                                        , (.name "valueType") ]))
-                                                    (.seq
-                                                      .skip
-                                                      (.seq
-                                                        (.assign "allowUnsafe" (.lit (.bool false)))
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            (.assign
-                                                              "constructor"
-                                                              (.mcall
-                                                                (.name "this")
-                                                                "constructorConstructor"
-                                                                [ (.name "typeToken")
-                                                                , (.name "allowUnsafe") ]))
-                                                            (.seq
-                                                              .skip
-                                                              (.seq
-                                                                (.assign
-                                                                  "result"
-                                                                  (.hole "op:alloc"))
-                                                                (.seq
-                                                                  (.expr
-                                                                    (.call
-                                                                      "<init>"
-                                                                      [ (.name "wrappedKeyAdapter")
-                                                                      , (.name
-                                                                          "wrappedValueAdapter")
-                                                                      , (.name "constructor") ]))
-                                                                  (.ret (.name "result")))))))))))))))))))))))))))))) }
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [(.name "gson"), (.name "keyAdapter"), (.name "keyType")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "valueAdapter"
+                                        (.call "getAdapter" [(.call "get" [(.name "valueType")])]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "wrappedValueAdapter" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [ (.name "gson")
+                                        , (.name "valueAdapter")
+                                        , (.name "valueType") ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "allowUnsafe" (.lit (.bool false)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "constructor"
+                                        (.mcall
+                                        (.name "this")
+                                        "constructorConstructor"
+                                        [(.name "typeToken"), (.name "allowUnsafe")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "result" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [ (.name "wrappedKeyAdapter")
+                                        , (.name "wrappedValueAdapter")
+                                        , (.name "constructor") ]))
+                                        (.ret (.name "result")))))))))))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.MapTypeAdapterFactory.getKeyAdapter:com.google.gson.TypeAdapter(com.google.gson.Gson,java.lang.reflect.Type)`  (from `internal/bind/MapTypeAdapterFactory.java`) -/
 def f_com_google_gson_internal_bind_MapTypeAdapterFactory_getKeyAdapter_com_google_gson_TypeAdapter_com_google_gson_Gson_jav : Func :=
@@ -7718,15 +7654,12 @@ def f_com_google_gson_internal_bind_MapTypeAdapterFactory_Adapter_read_java_util
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "value"
-                                            (.mcall
-                                              (.name "this")
-                                              "valueTypeAdapter"
-                                              [(.name "in")]))
-                                          (.seq
-                                            (.expr (.call "put" [(.name "key"), (.name "value")]))
-                                            (.expr (.call "endArray" []))))))))))
+                                        (.assign
+                                        "value"
+                                        (.mcall (.name "this") "valueTypeAdapter" [(.name "in")]))
+                                        (.seq
+                                        (.expr (.call "put" [(.name "key"), (.name "value")]))
+                                        (.expr (.call "endArray" []))))))))))
                             (.expr (.call "endArray" []))))
                         (.seq
                           (.expr (.call "beginObject" []))
@@ -7753,13 +7686,10 @@ def f_com_google_gson_internal_bind_MapTypeAdapterFactory_Adapter_read_java_util
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign
-                                            "value"
-                                            (.mcall
-                                              (.name "this")
-                                              "valueTypeAdapter"
-                                              [(.name "in")]))
-                                          (.expr (.call "put" [(.name "key"), (.name "value")])))))))))
+                                        (.assign
+                                        "value"
+                                        (.mcall (.name "this") "valueTypeAdapter" [(.name "in")]))
+                                        (.expr (.call "put" [(.name "key"), (.name "value")])))))))))
                             (.expr (.call "endObject" [])))))
                       (.ret (.name "map")))))))) }
 
@@ -7825,28 +7755,28 @@ def f_com_google_gson_internal_bind_MapTypeAdapterFactory_Adapter_write_void_com
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign "entry" (.call "next" []))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign
-                                                "keyElement"
-                                                (.mcall
-                                                  (.name "this")
-                                                  "keyTypeAdapter"
-                                                  [(.call "getKey" [])]))
-                                              (.seq
-                                                (.expr (.call "add" [(.name "keyElement")]))
-                                                (.seq
-                                                  (.expr (.call "add" [(.call "getValue" [])]))
-                                                  (.expr
-                                                    (.call
-                                                      "<operators>.assignmentOr"
-                                                      [ (.name "hasComplexKeys")
-                                                      , (.binop
-                                                          "||"
-                                                          (.call "isJsonArray" [])
-                                                          (.call "isJsonObject" [])) ])))))))))
+                                        (.assign "entry" (.call "next" []))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "keyElement"
+                                        (.mcall
+                                        (.name "this")
+                                        "keyTypeAdapter"
+                                        [(.call "getKey" [])]))
+                                        (.seq
+                                        (.expr (.call "add" [(.name "keyElement")]))
+                                        (.seq
+                                        (.expr (.call "add" [(.call "getValue" [])]))
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentOr"
+                                        [ (.name "hasComplexKeys")
+                                        , (.binop
+                                        "||"
+                                        (.call "isJsonArray" [])
+                                        (.call "isJsonObject" [])) ])))))))))
                                     (.ifte
                                       (.name "hasComplexKeys")
                                       (.seq
@@ -8060,51 +7990,47 @@ def f_com_google_gson_internal_bind_ObjectTypeAdapter_read_java_lang_Object_com_
                                       (.seq
                                         (.assign "peeked" (.call "peek" []))
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign
-                                              "value"
-                                              (.call
-                                                "com.google.gson.internal.bind.ObjectTypeAdapter.tryBeginNesting:java.lang.Object(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
-                                                [(.name "in"), (.name "peeked")]))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.assign
-                                                  "isNesting"
-                                                  (.binop "!=" (.name "value") (.lit .unit)))
-                                                (.seq
-                                                  (.ifte
-                                                    (.binop "==" (.name "value") (.lit .unit))
-                                                    (.assign
-                                                      "value"
-                                                      (.call
-                                                        "com.google.gson.internal.bind.ObjectTypeAdapter.readTerminal:java.lang.Object(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
-                                                        [(.name "in"), (.name "peeked")]))
-                                                    .skip)
-                                                  (.seq
-                                                    (.ifte
-                                                      (.hole "op:instanceOf")
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          (.assign "list" (.hole "op:cast"))
-                                                          (.expr (.call "add" [(.name "value")]))))
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          (.assign "map" (.hole "op:cast"))
-                                                          (.expr
-                                                            (.call
-                                                              "put"
-                                                              [(.name "name"), (.name "value")])))))
-                                                    (.ifte
-                                                      (.name "isNesting")
-                                                      (.seq
-                                                        (.expr
-                                                          (.call "addLast" [(.name "current")]))
-                                                        (.assign "current" (.name "value")))
-                                                      .skip))))))))))))
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "value"
+                                        (.call
+                                        "com.google.gson.internal.bind.ObjectTypeAdapter.tryBeginNesting:java.lang.Object(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
+                                        [(.name "in"), (.name "peeked")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "isNesting"
+                                        (.binop "!=" (.name "value") (.lit .unit)))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "value") (.lit .unit))
+                                        (.assign
+                                        "value"
+                                        (.call
+                                        "com.google.gson.internal.bind.ObjectTypeAdapter.readTerminal:java.lang.Object(com.google.gson.stream.JsonReader,com.google.gson.stream.JsonToken)"
+                                        [(.name "in"), (.name "peeked")]))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.hole "op:instanceOf")
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "list" (.hole "op:cast"))
+                                        (.expr (.call "add" [(.name "value")]))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "map" (.hole "op:cast"))
+                                        (.expr (.call "put" [(.name "name"), (.name "value")])))))
+                                        (.ifte
+                                        (.name "isNesting")
+                                        (.seq
+                                        (.expr (.call "addLast" [(.name "current")]))
+                                        (.assign "current" (.name "value")))
+                                        .skip))))))))))))
                               (.seq
                                 (.ifte
                                   (.hole "op:instanceOf")
@@ -8310,16 +8236,16 @@ def f_com_google_gson_internal_bind_ReflectiveTypeAdapterFactory_create_com_goog
                                       (.assign "$obj3" (.hole "op:alloc"))
                                       (.seq
                                         (.expr
-                                          (.call
-                                            "<init>"
-                                            [ (.name "constructor")
-                                            , (.call
-                                                "com.google.gson.internal.bind.ReflectiveTypeAdapterFactory.getBoundFields:com.google.gson.internal.bind.ReflectiveTypeAdapterFactory$FieldsData(com.google.gson.Gson,com.google.gson.reflect.TypeToken,java.lang.Class,boolean,boolean)"
-                                                [ (.name "gson")
-                                                , (.name "type")
-                                                , (.name "raw")
-                                                , (.name "blockInaccessible")
-                                                , (.lit (.bool false)) ]) ]))
+                                        (.call
+                                        "<init>"
+                                        [ (.name "constructor")
+                                        , (.call
+                                        "com.google.gson.internal.bind.ReflectiveTypeAdapterFactory.getBoundFields:com.google.gson.internal.bind.ReflectiveTypeAdapterFactory$FieldsData(com.google.gson.Gson,com.google.gson.reflect.TypeToken,java.lang.Class,boolean,boolean)"
+                                        [ (.name "gson")
+                                        , (.name "type")
+                                        , (.name "raw")
+                                        , (.name "blockInaccessible")
+                                        , (.lit (.bool false)) ]) ]))
                                         (.ret (.name "$obj3"))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.ReflectiveTypeAdapterFactory.checkAccessible:void(java.lang.Object,java.lang.reflect.AccessibleObject)`  (from `internal/bind/ReflectiveTypeAdapterFactory.java`) -/
@@ -8406,45 +8332,45 @@ def f_com_google_gson_internal_bind_ReflectiveTypeAdapterFactory_createBoundFiel
                                       (.ifte
                                         (.binop "==" (.name "mapped") (.lit .unit))
                                         (.assign
-                                          "mapped"
-                                          (.call "getAdapter" [(.name "fieldType")]))
+                                        "mapped"
+                                        (.call "getAdapter" [(.name "fieldType")]))
                                         .skip)
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign "typeAdapter" (.hole "op:cast"))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.ifte
-                                                (.name "serialize")
-                                                (.assign
-                                                  "writeTypeAdapter"
-                                                  (.cond
-                                                    (.name "jsonAdapterPresent")
-                                                    (.name "typeAdapter")
-                                                    (.hole "expr:BLOCK-impure")))
-                                                (.assign "writeTypeAdapter" (.name "typeAdapter")))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign "$obj6" (.hole "op:alloc"))
-                                                  (.seq
-                                                    (.expr
-                                                      (.call
-                                                        "<init>"
-                                                        [ (.name "serializedName")
-                                                        , (.name "field")
-                                                        , (.name "this")
-                                                        , (.name "isPrimitive")
-                                                        , (.name "isStaticFinalField")
-                                                        , (.name "typeAdapter")
-                                                        , (.name "writeTypeAdapter")
-                                                        , (.name "accessor")
-                                                        , (.name "blockInaccessible")
-                                                        , (.name "field")
-                                                        , (.name "serializedName") ]))
-                                                    (.ret (.name "$obj6"))))))))))))))))))))))) }
+                                        (.assign "typeAdapter" (.hole "op:cast"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.ifte
+                                        (.name "serialize")
+                                        (.assign
+                                        "writeTypeAdapter"
+                                        (.cond
+                                        (.name "jsonAdapterPresent")
+                                        (.name "typeAdapter")
+                                        (.hole "expr:BLOCK-impure")))
+                                        (.assign "writeTypeAdapter" (.name "typeAdapter")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj6" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [ (.name "serializedName")
+                                        , (.name "field")
+                                        , (.name "this")
+                                        , (.name "isPrimitive")
+                                        , (.name "isStaticFinalField")
+                                        , (.name "typeAdapter")
+                                        , (.name "writeTypeAdapter")
+                                        , (.name "accessor")
+                                        , (.name "blockInaccessible")
+                                        , (.name "field")
+                                        , (.name "serializedName") ]))
+                                        (.ret (.name "$obj6"))))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.ReflectiveTypeAdapterFactory$FieldsData.<init>:void(java.util.Map,java.util.List)`  (from `internal/bind/ReflectiveTypeAdapterFactory.java`) -/
 def f_com_google_gson_internal_bind_ReflectiveTypeAdapterFactory_FieldsData__init__void_java_util_Map_java_util_List_ : Func :=
@@ -8507,48 +8433,45 @@ def f_com_google_gson_internal_bind_ReflectiveTypeAdapterFactory_getBoundFields_
                                     (.seq
                                       (.ifte
                                         (.binop
-                                          "&&"
-                                          (.binop "!=" (.name "raw") (.name "originalRaw"))
-                                          (.binop ">" (.hole "op:sizeOf") (.lit (.int 0))))
+                                        "&&"
+                                        (.binop "!=" (.name "raw") (.name "originalRaw"))
+                                        (.binop ">" (.hole "op:sizeOf") (.lit (.int 0))))
                                         (.seq
-                                          .skip
-                                          (.seq
-                                            (.assign
-                                              "filterResult"
-                                              (.call
-                                                "com.google.gson.internal.ReflectionAccessFilterHelper.getFilterResult:com.google.gson.ReflectionAccessFilter.FilterResult(java.util.List,java.lang.Class)"
-                                                [ (.field (.name "this") "reflectionFilters")
-                                                , (.name "raw") ]))
-                                            (.seq
-                                              (.ifte
-                                                (.binop
-                                                  "=="
-                                                  (.name "filterResult")
-                                                  (.field (.name "FilterResult") "BLOCK_ALL"))
-                                                (.hole "control:THROW")
-                                                .skip)
-                                              (.assign
-                                                "blockInaccessible"
-                                                (.binop
-                                                  "=="
-                                                  (.name "filterResult")
-                                                  (.field
-                                                    (.name "FilterResult")
-                                                    "BLOCK_INACCESSIBLE"))))))
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "filterResult"
+                                        (.call
+                                        "com.google.gson.internal.ReflectionAccessFilterHelper.getFilterResult:com.google.gson.ReflectionAccessFilter.FilterResult(java.util.List,java.lang.Class)"
+                                        [(.field (.name "this") "reflectionFilters"), (.name "raw")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "=="
+                                        (.name "filterResult")
+                                        (.field (.name "FilterResult") "BLOCK_ALL"))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.assign
+                                        "blockInaccessible"
+                                        (.binop
+                                        "=="
+                                        (.name "filterResult")
+                                        (.field (.name "FilterResult") "BLOCK_INACCESSIBLE"))))))
                                         .skip)
                                       (.seq
                                         (.hole "control:FOR")
                                         (.seq
-                                          (.assign
-                                            "type"
-                                            (.call
-                                              "get"
-                                              [ (.call
-                                                  "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type)"
-                                                  [ (.call "getType" [])
-                                                  , (.name "raw")
-                                                  , (.call "getGenericSuperclass" []) ]) ]))
-                                          (.assign "raw" (.call "getRawType" []))))))))
+                                        (.assign
+                                        "type"
+                                        (.call
+                                        "get"
+                                        [ (.call
+                                        "com.google.gson.internal.GsonTypes.resolve:java.lang.reflect.Type(java.lang.reflect.Type,java.lang.Class,java.lang.reflect.Type)"
+                                        [ (.call "getType" [])
+                                        , (.name "raw")
+                                        , (.call "getGenericSuperclass" []) ]) ]))
+                                        (.assign "raw" (.call "getRawType" []))))))))
                               (.seq
                                 .skip
                                 (.seq
@@ -9744,8 +9667,8 @@ def f_com_google_gson_internal_bind_TypeAdapters__clinit__void__ : Func :=
                                       [ (.field (.name "byte") "class")
                                       , (.field (.name "Byte") "class")
                                       , (.field
-                                          (.fnref "com.google.gson.internal.bind.TypeAdapters")
-                                          "BYTE") ]))
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BYTE") ]))
                                   (.seq
                                     (.setField
                                       (.fnref "com.google.gson.internal.bind.TypeAdapters")
@@ -9754,620 +9677,456 @@ def f_com_google_gson_internal_bind_TypeAdapters__clinit__void__ : Func :=
                                     (.seq
                                       (.expr
                                         (.mcall
-                                          (.fnref "com.google.gson.internal.bind.TypeAdapters")
-                                          "SHORT"
-                                          []))
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "SHORT"
+                                        []))
                                       (.seq
                                         (.setField
-                                          (.fnref "com.google.gson.internal.bind.TypeAdapters")
-                                          "SHORT_FACTORY"
-                                          (.call
-                                            "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
-                                            [ (.field (.name "short") "class")
-                                            , (.field (.name "Short") "class")
-                                            , (.field
-                                                (.fnref
-                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                "SHORT") ]))
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "SHORT_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "short") "class")
+                                        , (.field (.name "Short") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "SHORT") ]))
                                         (.seq
-                                          (.setField
-                                            (.fnref "com.google.gson.internal.bind.TypeAdapters")
-                                            "INTEGER"
-                                            (.hole "op:alloc"))
-                                          (.seq
-                                            (.expr
-                                              (.mcall
-                                                (.fnref
-                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                "INTEGER"
-                                                []))
-                                            (.seq
-                                              (.setField
-                                                (.fnref
-                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                "INTEGER_FACTORY"
-                                                (.call
-                                                  "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
-                                                  [ (.field (.name "int") "class")
-                                                  , (.field (.name "Integer") "class")
-                                                  , (.field
-                                                      (.fnref
-                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                      "INTEGER") ]))
-                                              (.seq
-                                                (.setField
-                                                  (.fnref
-                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                  "ATOMIC_INTEGER"
-                                                  (.call "nullSafe" []))
-                                                (.seq
-                                                  (.setField
-                                                    (.fnref
-                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                    "ATOMIC_INTEGER_FACTORY"
-                                                    (.call
-                                                      "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                      [ (.field (.name "AtomicInteger") "class")
-                                                      , (.field
-                                                          (.name "TypeAdapters")
-                                                          "ATOMIC_INTEGER") ]))
-                                                  (.seq
-                                                    (.setField
-                                                      (.fnref
-                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                      "ATOMIC_BOOLEAN"
-                                                      (.call "nullSafe" []))
-                                                    (.seq
-                                                      (.setField
-                                                        (.fnref
-                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                        "ATOMIC_BOOLEAN_FACTORY"
-                                                        (.call
-                                                          "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                          [ (.field (.name "AtomicBoolean") "class")
-                                                          , (.field
-                                                              (.name "TypeAdapters")
-                                                              "ATOMIC_BOOLEAN") ]))
-                                                      (.seq
-                                                        (.setField
-                                                          (.fnref
-                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                          "ATOMIC_INTEGER_ARRAY"
-                                                          (.call "nullSafe" []))
-                                                        (.seq
-                                                          (.setField
-                                                            (.fnref
-                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                            "ATOMIC_INTEGER_ARRAY_FACTORY"
-                                                            (.call
-                                                              "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                              [ (.field
-                                                                  (.name "AtomicIntegerArray")
-                                                                  "class")
-                                                              , (.field
-                                                                  (.name "TypeAdapters")
-                                                                  "ATOMIC_INTEGER_ARRAY") ]))
-                                                          (.seq
-                                                            (.setField
-                                                              (.fnref
-                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                              "LONG"
-                                                              (.hole "op:alloc"))
-                                                            (.seq
-                                                              (.expr
-                                                                (.mcall
-                                                                  (.fnref
-                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                  "LONG"
-                                                                  []))
-                                                              (.seq
-                                                                (.setField
-                                                                  (.fnref
-                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                  "LONG_AS_STRING"
-                                                                  (.hole "op:alloc"))
-                                                                (.seq
-                                                                  (.expr
-                                                                    (.mcall
-                                                                      (.fnref
-                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                      "LONG_AS_STRING"
-                                                                      []))
-                                                                  (.seq
-                                                                    (.setField
-                                                                      (.fnref
-                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                      "FLOAT"
-                                                                      (.hole "op:alloc"))
-                                                                    (.seq
-                                                                      (.expr
-                                                                        (.mcall
-                                                                          (.fnref
-                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                          "FLOAT"
-                                                                          [(.lit (.bool false))]))
-                                                                      (.seq
-                                                                        (.setField
-                                                                          (.fnref
-                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                          "FLOAT_STRICT"
-                                                                          (.hole "op:alloc"))
-                                                                        (.seq
-                                                                          (.expr
-                                                                            (.mcall
-                                                                              (.fnref
-                                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                                              "FLOAT_STRICT"
-                                                                              [(.lit (.bool true))]))
-                                                                          (.seq
-                                                                            (.setField
-                                                                              (.fnref
-                                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                                              "DOUBLE"
-                                                                              (.hole "op:alloc"))
-                                                                            (.seq
-                                                                              (.expr
-                                                                                (.mcall
-                                                                                  (.fnref
-                                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                                  "DOUBLE"
-                                                                                  [ (.lit
-                                                                                      (.bool false)) ]))
-                                                                              (.seq
-                                                                                (.setField
-                                                                                  (.fnref
-                                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                                  "DOUBLE_STRICT"
-                                                                                  (.hole "op:alloc"))
-                                                                                (.seq
-                                                                                  (.expr
-                                                                                    (.mcall
-                                                                                      (.fnref
-                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                      "DOUBLE_STRICT"
-                                                                                      [ (.lit
-                                                                                          (.bool true)) ]))
-                                                                                  (.seq
-                                                                                    (.setField
-                                                                                      (.fnref
-                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                      "CHARACTER"
-                                                                                      (.hole
-                                                                                        "op:alloc"))
-                                                                                    (.seq
-                                                                                      (.expr
-                                                                                        (.mcall
-                                                                                          (.fnref
-                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                          "CHARACTER"
-                                                                                          []))
-                                                                                      (.seq
-                                                                                        (.setField
-                                                                                          (.fnref
-                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                          "CHARACTER_FACTORY"
-                                                                                          (.call
-                                                                                            "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                            [ (.field
-                                                                                                (.name
-                                                                                                  "char")
-                                                                                                "class")
-                                                                                            , (.field
-                                                                                                (.name
-                                                                                                  "Character")
-                                                                                                "class")
-                                                                                            , (.field
-                                                                                                (.fnref
-                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                "CHARACTER") ]))
-                                                                                        (.seq
-                                                                                          (.setField
-                                                                                            (.fnref
-                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                            "STRING"
-                                                                                            (.hole
-                                                                                              "op:alloc"))
-                                                                                          (.seq
-                                                                                            (.expr
-                                                                                              (.mcall
-                                                                                                (.fnref
-                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                "STRING"
-                                                                                                []))
-                                                                                            (.seq
-                                                                                              (.setField
-                                                                                                (.fnref
-                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                "BIG_DECIMAL"
-                                                                                                (.hole
-                                                                                                  "op:alloc"))
-                                                                                              (.seq
-                                                                                                (.expr
-                                                                                                  (.mcall
-                                                                                                    (.fnref
-                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                    "BIG_DECIMAL"
-                                                                                                    []))
-                                                                                                (.seq
-                                                                                                  (.setField
-                                                                                                    (.fnref
-                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                    "BIG_DECIMAL_FACTORY"
-                                                                                                    (.call
-                                                                                                      "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                      [ (.field
-                                                                                                          (.name
-                                                                                                            "BigDecimal")
-                                                                                                          "class")
-                                                                                                      , (.field
-                                                                                                          (.fnref
-                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                          "BIG_DECIMAL") ]))
-                                                                                                  (.seq
-                                                                                                    (.setField
-                                                                                                      (.fnref
-                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                      "BIG_INTEGER"
-                                                                                                      (.hole
-                                                                                                        "op:alloc"))
-                                                                                                    (.seq
-                                                                                                      (.expr
-                                                                                                        (.mcall
-                                                                                                          (.fnref
-                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                          "BIG_INTEGER"
-                                                                                                          []))
-                                                                                                      (.seq
-                                                                                                        (.setField
-                                                                                                          (.fnref
-                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                          "BIG_INTEGER_FACTORY"
-                                                                                                          (.call
-                                                                                                            "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                            [ (.field
-                                                                                                                (.name
-                                                                                                                  "BigInteger")
-                                                                                                                "class")
-                                                                                                            , (.field
-                                                                                                                (.fnref
-                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                "BIG_INTEGER") ]))
-                                                                                                        (.seq
-                                                                                                          (.setField
-                                                                                                            (.fnref
-                                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                            "LAZILY_PARSED_NUMBER"
-                                                                                                            (.hole
-                                                                                                              "op:alloc"))
-                                                                                                          (.seq
-                                                                                                            (.expr
-                                                                                                              (.mcall
-                                                                                                                (.fnref
-                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                "LAZILY_PARSED_NUMBER"
-                                                                                                                []))
-                                                                                                            (.seq
-                                                                                                              (.setField
-                                                                                                                (.fnref
-                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                "LAZILY_PARSED_NUMBER_FACTORY"
-                                                                                                                (.call
-                                                                                                                  "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                  [ (.field
-                                                                                                                      (.name
-                                                                                                                        "LazilyParsedNumber")
-                                                                                                                      "class")
-                                                                                                                  , (.field
-                                                                                                                      (.fnref
-                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                      "LAZILY_PARSED_NUMBER") ]))
-                                                                                                              (.seq
-                                                                                                                (.setField
-                                                                                                                  (.fnref
-                                                                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                  "STRING_FACTORY"
-                                                                                                                  (.call
-                                                                                                                    "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                    [ (.field
-                                                                                                                        (.name
-                                                                                                                          "String")
-                                                                                                                        "class")
-                                                                                                                    , (.field
-                                                                                                                        (.fnref
-                                                                                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                        "STRING") ]))
-                                                                                                                (.seq
-                                                                                                                  (.setField
-                                                                                                                    (.fnref
-                                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                    "STRING_BUILDER"
-                                                                                                                    (.hole
-                                                                                                                      "op:alloc"))
-                                                                                                                  (.seq
-                                                                                                                    (.expr
-                                                                                                                      (.mcall
-                                                                                                                        (.fnref
-                                                                                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                        "STRING_BUILDER"
-                                                                                                                        []))
-                                                                                                                    (.seq
-                                                                                                                      (.setField
-                                                                                                                        (.fnref
-                                                                                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                        "STRING_BUILDER_FACTORY"
-                                                                                                                        (.call
-                                                                                                                          "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                          [ (.field
-                                                                                                                              (.name
-                                                                                                                                "StringBuilder")
-                                                                                                                              "class")
-                                                                                                                          , (.field
-                                                                                                                              (.fnref
-                                                                                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                              "STRING_BUILDER") ]))
-                                                                                                                      (.seq
-                                                                                                                        (.setField
-                                                                                                                          (.fnref
-                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                          "STRING_BUFFER"
-                                                                                                                          (.hole
-                                                                                                                            "op:alloc"))
-                                                                                                                        (.seq
-                                                                                                                          (.expr
-                                                                                                                            (.mcall
-                                                                                                                              (.fnref
-                                                                                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                              "STRING_BUFFER"
-                                                                                                                              []))
-                                                                                                                          (.seq
-                                                                                                                            (.setField
-                                                                                                                              (.fnref
-                                                                                                                                "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                              "STRING_BUFFER_FACTORY"
-                                                                                                                              (.call
-                                                                                                                                "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                [ (.field
-                                                                                                                                    (.name
-                                                                                                                                      "StringBuffer")
-                                                                                                                                    "class")
-                                                                                                                                , (.field
-                                                                                                                                    (.fnref
-                                                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                    "STRING_BUFFER") ]))
-                                                                                                                            (.seq
-                                                                                                                              (.setField
-                                                                                                                                (.fnref
-                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                "URL"
-                                                                                                                                (.hole
-                                                                                                                                  "op:alloc"))
-                                                                                                                              (.seq
-                                                                                                                                (.expr
-                                                                                                                                  (.mcall
-                                                                                                                                    (.fnref
-                                                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                    "URL"
-                                                                                                                                    []))
-                                                                                                                                (.seq
-                                                                                                                                  (.setField
-                                                                                                                                    (.fnref
-                                                                                                                                      "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                    "URL_FACTORY"
-                                                                                                                                    (.call
-                                                                                                                                      "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                      [ (.field
-                                                                                                                                          (.name
-                                                                                                                                            "URL")
-                                                                                                                                          "class")
-                                                                                                                                      , (.field
-                                                                                                                                          (.fnref
-                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                          "URL") ]))
-                                                                                                                                  (.seq
-                                                                                                                                    (.setField
-                                                                                                                                      (.fnref
-                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                      "URI"
-                                                                                                                                      (.hole
-                                                                                                                                        "op:alloc"))
-                                                                                                                                    (.seq
-                                                                                                                                      (.expr
-                                                                                                                                        (.mcall
-                                                                                                                                          (.fnref
-                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                          "URI"
-                                                                                                                                          []))
-                                                                                                                                      (.seq
-                                                                                                                                        (.setField
-                                                                                                                                          (.fnref
-                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                          "URI_FACTORY"
-                                                                                                                                          (.call
-                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                            [ (.field
-                                                                                                                                                (.name
-                                                                                                                                                  "URI")
-                                                                                                                                                "class")
-                                                                                                                                            , (.field
-                                                                                                                                                (.fnref
-                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                "URI") ]))
-                                                                                                                                        (.seq
-                                                                                                                                          (.setField
-                                                                                                                                            (.fnref
-                                                                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                            "INET_ADDRESS"
-                                                                                                                                            (.hole
-                                                                                                                                              "op:alloc"))
-                                                                                                                                          (.seq
-                                                                                                                                            (.expr
-                                                                                                                                              (.mcall
-                                                                                                                                                (.fnref
-                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                "INET_ADDRESS"
-                                                                                                                                                []))
-                                                                                                                                            (.seq
-                                                                                                                                              (.setField
-                                                                                                                                                (.fnref
-                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                "INET_ADDRESS_FACTORY"
-                                                                                                                                                (.call
-                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters.newTypeHierarchyFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                  [ (.field
-                                                                                                                                                      (.name
-                                                                                                                                                        "InetAddress")
-                                                                                                                                                      "class")
-                                                                                                                                                  , (.field
-                                                                                                                                                      (.fnref
-                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                      "INET_ADDRESS") ]))
-                                                                                                                                              (.seq
-                                                                                                                                                (.setField
-                                                                                                                                                  (.fnref
-                                                                                                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                  "UUID"
-                                                                                                                                                  (.hole
-                                                                                                                                                    "op:alloc"))
-                                                                                                                                                (.seq
-                                                                                                                                                  (.expr
-                                                                                                                                                    (.mcall
-                                                                                                                                                      (.fnref
-                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                      "UUID"
-                                                                                                                                                      []))
-                                                                                                                                                  (.seq
-                                                                                                                                                    (.setField
-                                                                                                                                                      (.fnref
-                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                      "UUID_FACTORY"
-                                                                                                                                                      (.call
-                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                        [ (.field
-                                                                                                                                                            (.name
-                                                                                                                                                              "UUID")
-                                                                                                                                                            "class")
-                                                                                                                                                        , (.field
-                                                                                                                                                            (.fnref
-                                                                                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                            "UUID") ]))
-                                                                                                                                                    (.seq
-                                                                                                                                                      (.setField
-                                                                                                                                                        (.fnref
-                                                                                                                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                        "CURRENCY"
-                                                                                                                                                        (.call
-                                                                                                                                                          "nullSafe"
-                                                                                                                                                          []))
-                                                                                                                                                      (.seq
-                                                                                                                                                        (.setField
-                                                                                                                                                          (.fnref
-                                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                          "CURRENCY_FACTORY"
-                                                                                                                                                          (.call
-                                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                            [ (.field
-                                                                                                                                                                (.name
-                                                                                                                                                                  "Currency")
-                                                                                                                                                                "class")
-                                                                                                                                                            , (.field
-                                                                                                                                                                (.fnref
-                                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                "CURRENCY") ]))
-                                                                                                                                                        (.seq
-                                                                                                                                                          (.setField
-                                                                                                                                                            (.fnref
-                                                                                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                            "CALENDAR"
-                                                                                                                                                            (.hole
-                                                                                                                                                              "op:alloc"))
-                                                                                                                                                          (.seq
-                                                                                                                                                            (.expr
-                                                                                                                                                              (.mcall
-                                                                                                                                                                (.fnref
-                                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                "CALENDAR"
-                                                                                                                                                                [ (.hole
-                                                                                                                                                                    "op:arrayInitializer") ]))
-                                                                                                                                                            (.seq
-                                                                                                                                                              (.setField
-                                                                                                                                                                (.fnref
-                                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                "CALENDAR_FACTORY"
-                                                                                                                                                                (.call
-                                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters.newFactoryForMultipleTypes:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                                  [ (.field
-                                                                                                                                                                      (.name
-                                                                                                                                                                        "Calendar")
-                                                                                                                                                                      "class")
-                                                                                                                                                                  , (.field
-                                                                                                                                                                      (.name
-                                                                                                                                                                        "GregorianCalendar")
-                                                                                                                                                                      "class")
-                                                                                                                                                                  , (.field
-                                                                                                                                                                      (.fnref
-                                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                      "CALENDAR") ]))
-                                                                                                                                                              (.seq
-                                                                                                                                                                (.setField
-                                                                                                                                                                  (.fnref
-                                                                                                                                                                    "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                  "LOCALE"
-                                                                                                                                                                  (.hole
-                                                                                                                                                                    "op:alloc"))
-                                                                                                                                                                (.seq
-                                                                                                                                                                  (.expr
-                                                                                                                                                                    (.mcall
-                                                                                                                                                                      (.fnref
-                                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                      "LOCALE"
-                                                                                                                                                                      []))
-                                                                                                                                                                  (.seq
-                                                                                                                                                                    (.setField
-                                                                                                                                                                      (.fnref
-                                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                      "LOCALE_FACTORY"
-                                                                                                                                                                      (.call
-                                                                                                                                                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                                        [ (.field
-                                                                                                                                                                            (.name
-                                                                                                                                                                              "Locale")
-                                                                                                                                                                            "class")
-                                                                                                                                                                        , (.field
-                                                                                                                                                                            (.fnref
-                                                                                                                                                                              "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                            "LOCALE") ]))
-                                                                                                                                                                    (.seq
-                                                                                                                                                                      (.setField
-                                                                                                                                                                        (.fnref
-                                                                                                                                                                          "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                        "JSON_ELEMENT"
-                                                                                                                                                                        (.field
-                                                                                                                                                                          (.name
-                                                                                                                                                                            "JsonElementTypeAdapter")
-                                                                                                                                                                          "ADAPTER"))
-                                                                                                                                                                      (.seq
-                                                                                                                                                                        (.setField
-                                                                                                                                                                          (.fnref
-                                                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                          "JSON_ELEMENT_FACTORY"
-                                                                                                                                                                          (.call
-                                                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters.newTypeHierarchyFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
-                                                                                                                                                                            [ (.field
-                                                                                                                                                                                (.name
-                                                                                                                                                                                  "JsonElement")
-                                                                                                                                                                                "class")
-                                                                                                                                                                            , (.field
-                                                                                                                                                                                (.fnref
-                                                                                                                                                                                  "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                                "JSON_ELEMENT") ]))
-                                                                                                                                                                        (.setField
-                                                                                                                                                                          (.fnref
-                                                                                                                                                                            "com.google.gson.internal.bind.TypeAdapters")
-                                                                                                                                                                          "ENUM_FACTORY"
-                                                                                                                                                                          (.field
-                                                                                                                                                                            (.name
-                                                                                                                                                                              "EnumTypeAdapter")
-                                                                                                                                                                            "FACTORY"))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INTEGER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INTEGER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INTEGER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "int") "class")
+                                        , (.field (.name "Integer") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INTEGER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_INTEGER"
+                                        (.call "nullSafe" []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_INTEGER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "AtomicInteger") "class")
+                                        , (.field (.name "TypeAdapters") "ATOMIC_INTEGER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_BOOLEAN"
+                                        (.call "nullSafe" []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_BOOLEAN_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "AtomicBoolean") "class")
+                                        , (.field (.name "TypeAdapters") "ATOMIC_BOOLEAN") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_INTEGER_ARRAY"
+                                        (.call "nullSafe" []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ATOMIC_INTEGER_ARRAY_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "AtomicIntegerArray") "class")
+                                        , (.field (.name "TypeAdapters") "ATOMIC_INTEGER_ARRAY") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LONG"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LONG"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LONG_AS_STRING"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LONG_AS_STRING"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "FLOAT"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "FLOAT"
+                                        [(.lit (.bool false))]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "FLOAT_STRICT"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "FLOAT_STRICT"
+                                        [(.lit (.bool true))]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "DOUBLE"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "DOUBLE"
+                                        [(.lit (.bool false))]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "DOUBLE_STRICT"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "DOUBLE_STRICT"
+                                        [(.lit (.bool true))]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CHARACTER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CHARACTER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CHARACTER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "char") "class")
+                                        , (.field (.name "Character") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CHARACTER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_DECIMAL"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_DECIMAL"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_DECIMAL_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "BigDecimal") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_DECIMAL") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_INTEGER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_INTEGER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_INTEGER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "BigInteger") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "BIG_INTEGER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LAZILY_PARSED_NUMBER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LAZILY_PARSED_NUMBER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LAZILY_PARSED_NUMBER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "LazilyParsedNumber") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LAZILY_PARSED_NUMBER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "String") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUILDER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUILDER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUILDER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "StringBuilder") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUILDER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUFFER"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUFFER"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUFFER_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "StringBuffer") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "STRING_BUFFER") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URL"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URL"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URL_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "URL") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URL") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URI"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URI"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URI_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "URI") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "URI") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INET_ADDRESS"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INET_ADDRESS"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INET_ADDRESS_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newTypeHierarchyFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "InetAddress") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "INET_ADDRESS") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "UUID"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "UUID"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "UUID_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "UUID") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "UUID") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CURRENCY"
+                                        (.call "nullSafe" []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CURRENCY_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "Currency") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CURRENCY") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CALENDAR"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CALENDAR"
+                                        [(.hole "op:arrayInitializer")]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CALENDAR_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactoryForMultipleTypes:com.google.gson.TypeAdapterFactory(java.lang.Class,java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "Calendar") "class")
+                                        , (.field (.name "GregorianCalendar") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "CALENDAR") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LOCALE"
+                                        (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.mcall
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LOCALE"
+                                        []))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LOCALE_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "Locale") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "LOCALE") ]))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "JSON_ELEMENT"
+                                        (.field (.name "JsonElementTypeAdapter") "ADAPTER"))
+                                        (.seq
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "JSON_ELEMENT_FACTORY"
+                                        (.call
+                                        "com.google.gson.internal.bind.TypeAdapters.newTypeHierarchyFactory:com.google.gson.TypeAdapterFactory(java.lang.Class,com.google.gson.TypeAdapter)"
+                                        [ (.field (.name "JsonElement") "class")
+                                        , (.field
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "JSON_ELEMENT") ]))
+                                        (.setField
+                                        (.fnref "com.google.gson.internal.bind.TypeAdapters")
+                                        "ENUM_FACTORY"
+                                        (.field (.name "EnumTypeAdapter") "FACTORY"))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.TypeAdapters.CLASS.TypeAdapter$0.write:<unresolvedSignature>(2)`  (from `internal/bind/TypeAdapters.java`) -/
 def f_com_google_gson_internal_bind_TypeAdapters_CLASS_TypeAdapter_0_write__unresolvedSignature__2_ : Func :=
@@ -11262,45 +11021,41 @@ def f_com_google_gson_internal_bind_TypeAdapters_LOCALE_TypeAdapter_25_read_java
                                         .skip)
                                       (.seq
                                         (.ifte
-                                          (.call "hasMoreElements" [])
-                                          (.assign "variant" (.call "nextToken" []))
-                                          .skip)
+                                        (.call "hasMoreElements" [])
+                                        (.assign "variant" (.call "nextToken" []))
+                                        .skip)
                                         (.ifte
-                                          (.binop
-                                            "&&"
-                                            (.binop "==" (.name "country") (.lit .unit))
-                                            (.binop "==" (.name "variant") (.lit .unit)))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "$obj34" (.hole "op:alloc"))
-                                              (.seq
-                                                (.expr (.call "<init>" [(.name "language")]))
-                                                (.ret (.name "$obj34")))))
-                                          (.ifte
-                                            (.binop "==" (.name "variant") (.lit .unit))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.assign "$obj35" (.hole "op:alloc"))
-                                                (.seq
-                                                  (.expr
-                                                    (.call
-                                                      "<init>"
-                                                      [(.name "language"), (.name "country")]))
-                                                  (.ret (.name "$obj35")))))
-                                            (.seq
-                                              .skip
-                                              (.seq
-                                                (.assign "$obj36" (.hole "op:alloc"))
-                                                (.seq
-                                                  (.expr
-                                                    (.call
-                                                      "<init>"
-                                                      [ (.name "language")
-                                                      , (.name "country")
-                                                      , (.name "variant") ]))
-                                                  (.ret (.name "$obj36")))))))))))))))))))))) }
+                                        (.binop
+                                        "&&"
+                                        (.binop "==" (.name "country") (.lit .unit))
+                                        (.binop "==" (.name "variant") (.lit .unit)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj34" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<init>" [(.name "language")]))
+                                        (.ret (.name "$obj34")))))
+                                        (.ifte
+                                        (.binop "==" (.name "variant") (.lit .unit))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj35" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call "<init>" [(.name "language"), (.name "country")]))
+                                        (.ret (.name "$obj35")))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "$obj36" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [(.name "language"), (.name "country"), (.name "variant")]))
+                                        (.ret (.name "$obj36")))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.TypeAdapters.LOCALE.TypeAdapter$25.write:void(com.google.gson.stream.JsonWriter,java.util.Locale)`  (from `internal/bind/TypeAdapters.java`) -/
 def f_com_google_gson_internal_bind_TypeAdapters_LOCALE_TypeAdapter_25_write_void_com_google_gson_stream_JsonWriter_java_uti : Func :=
@@ -11705,165 +11460,121 @@ def f_com_google_gson_internal_bind_util_ISO8601Utils_format_java_lang_String_ja
                                     (.seq
                                       (.expr
                                         (.call
-                                          "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                          [ (.name "formatted")
-                                          , (.binop
-                                              "+"
-                                              (.call "get" [(.field (.name "Calendar") "MONTH")])
-                                              (.lit (.int 1)))
-                                          , (.call "length" []) ]))
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.binop
+                                        "+"
+                                        (.call "get" [(.field (.name "Calendar") "MONTH")])
+                                        (.lit (.int 1)))
+                                        , (.call "length" []) ]))
                                       (.seq
                                         (.expr (.call "append" [(.lit (.str "-"))]))
                                         (.seq
-                                          (.expr
-                                            (.call
-                                              "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                              [ (.name "formatted")
-                                              , (.call
-                                                  "get"
-                                                  [(.field (.name "Calendar") "DAY_OF_MONTH")])
-                                              , (.call "length" []) ]))
-                                          (.seq
-                                            (.expr (.call "append" [(.lit (.str "T"))]))
-                                            (.seq
-                                              (.expr
-                                                (.call
-                                                  "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                  [ (.name "formatted")
-                                                  , (.call
-                                                      "get"
-                                                      [(.field (.name "Calendar") "HOUR_OF_DAY")])
-                                                  , (.call "length" []) ]))
-                                              (.seq
-                                                (.expr (.call "append" [(.lit (.str ":"))]))
-                                                (.seq
-                                                  (.expr
-                                                    (.call
-                                                      "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                      [ (.name "formatted")
-                                                      , (.call
-                                                          "get"
-                                                          [(.field (.name "Calendar") "MINUTE")])
-                                                      , (.call "length" []) ]))
-                                                  (.seq
-                                                    (.expr (.call "append" [(.lit (.str ":"))]))
-                                                    (.seq
-                                                      (.expr
-                                                        (.call
-                                                          "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                          [ (.name "formatted")
-                                                          , (.call
-                                                              "get"
-                                                              [(.field (.name "Calendar") "SECOND")])
-                                                          , (.call "length" []) ]))
-                                                      (.seq
-                                                        (.ifte
-                                                          (.name "millis")
-                                                          (.seq
-                                                            (.expr
-                                                              (.call "append" [(.lit (.str "."))]))
-                                                            (.expr
-                                                              (.call
-                                                                "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                                [ (.name "formatted")
-                                                                , (.call
-                                                                    "get"
-                                                                    [ (.field
-                                                                        (.name "Calendar")
-                                                                        "MILLISECOND") ])
-                                                                , (.call "length" []) ])))
-                                                          .skip)
-                                                        (.seq
-                                                          .skip
-                                                          (.seq
-                                                            (.assign
-                                                              "offset"
-                                                              (.call
-                                                                "getOffset"
-                                                                [(.call "getTimeInMillis" [])]))
-                                                            (.seq
-                                                              (.ifte
-                                                                (.binop
-                                                                  "!="
-                                                                  (.name "offset")
-                                                                  (.lit (.int 0)))
-                                                                (.seq
-                                                                  .skip
-                                                                  (.seq
-                                                                    (.assign
-                                                                      "hours"
-                                                                      (.call
-                                                                        "abs"
-                                                                        [ (.binop
-                                                                            "/"
-                                                                            (.binop
-                                                                              "/"
-                                                                              (.name "offset")
-                                                                              (.binop
-                                                                                "*"
-                                                                                (.lit (.int 60))
-                                                                                (.lit (.int 1000))))
-                                                                            (.lit (.int 60))) ]))
-                                                                    (.seq
-                                                                      .skip
-                                                                      (.seq
-                                                                        (.assign
-                                                                          "minutes"
-                                                                          (.call
-                                                                            "abs"
-                                                                            [ (.binop
-                                                                                "%"
-                                                                                (.binop
-                                                                                  "/"
-                                                                                  (.name "offset")
-                                                                                  (.binop
-                                                                                    "*"
-                                                                                    (.lit (.int 60))
-                                                                                    (.lit
-                                                                                      (.int 1000))))
-                                                                                (.lit (.int 60))) ]))
-                                                                        (.seq
-                                                                          (.expr
-                                                                            (.call
-                                                                              "append"
-                                                                              [ (.cond
-                                                                                  (.binop
-                                                                                    "<"
-                                                                                    (.name "offset")
-                                                                                    (.lit (.int 0)))
-                                                                                  (.lit (.str "-"))
-                                                                                  (.lit (.str "+"))) ]))
-                                                                          (.seq
-                                                                            (.expr
-                                                                              (.call
-                                                                                "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                                                [ (.name
-                                                                                    "formatted")
-                                                                                , (.name "hours")
-                                                                                , (.call
-                                                                                    "length"
-                                                                                    []) ]))
-                                                                            (.seq
-                                                                              (.expr
-                                                                                (.call
-                                                                                  "append"
-                                                                                  [ (.lit
-                                                                                      (.str ":")) ]))
-                                                                              (.expr
-                                                                                (.call
-                                                                                  "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
-                                                                                  [ (.name
-                                                                                      "formatted")
-                                                                                  , (.name
-                                                                                      "minutes")
-                                                                                  , (.call
-                                                                                      "length"
-                                                                                      []) ])))))))))
-                                                                (.expr
-                                                                  (.call
-                                                                    "append"
-                                                                    [(.lit (.str "Z"))])))
-                                                              (.ret (.call "toString" [])))))))))))))))))))))))))))) }
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.call "get" [(.field (.name "Calendar") "DAY_OF_MONTH")])
+                                        , (.call "length" []) ]))
+                                        (.seq
+                                        (.expr (.call "append" [(.lit (.str "T"))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.call "get" [(.field (.name "Calendar") "HOUR_OF_DAY")])
+                                        , (.call "length" []) ]))
+                                        (.seq
+                                        (.expr (.call "append" [(.lit (.str ":"))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.call "get" [(.field (.name "Calendar") "MINUTE")])
+                                        , (.call "length" []) ]))
+                                        (.seq
+                                        (.expr (.call "append" [(.lit (.str ":"))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.call "get" [(.field (.name "Calendar") "SECOND")])
+                                        , (.call "length" []) ]))
+                                        (.seq
+                                        (.ifte
+                                        (.name "millis")
+                                        (.seq
+                                        (.expr (.call "append" [(.lit (.str "."))]))
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.call "get" [(.field (.name "Calendar") "MILLISECOND")])
+                                        , (.call "length" []) ])))
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "offset"
+                                        (.call "getOffset" [(.call "getTimeInMillis" [])]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "!=" (.name "offset") (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "hours"
+                                        (.call
+                                        "abs"
+                                        [ (.binop
+                                        "/"
+                                        (.binop
+                                        "/"
+                                        (.name "offset")
+                                        (.binop "*" (.lit (.int 60)) (.lit (.int 1000))))
+                                        (.lit (.int 60))) ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "minutes"
+                                        (.call
+                                        "abs"
+                                        [ (.binop
+                                        "%"
+                                        (.binop
+                                        "/"
+                                        (.name "offset")
+                                        (.binop "*" (.lit (.int 60)) (.lit (.int 1000))))
+                                        (.lit (.int 60))) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "append"
+                                        [ (.cond
+                                        (.binop "<" (.name "offset") (.lit (.int 0)))
+                                        (.lit (.str "-"))
+                                        (.lit (.str "+"))) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [(.name "formatted"), (.name "hours"), (.call "length" [])]))
+                                        (.seq
+                                        (.expr (.call "append" [(.lit (.str ":"))]))
+                                        (.expr
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.padInt:void(java.lang.StringBuilder,int,int)"
+                                        [ (.name "formatted")
+                                        , (.name "minutes")
+                                        , (.call "length" []) ])))))))))
+                                        (.expr (.call "append" [(.lit (.str "Z"))])))
+                                        (.ret (.call "toString" [])))))))))))))))))))))))))))) }
 
 /-- `com.google.gson.internal.bind.util.ISO8601Utils.parse:java.util.Date(java.lang.String,java.text.ParsePosition)`  (from `internal/bind/util/ISO8601Utils.java`) -/
 def f_com_google_gson_internal_bind_util_ISO8601Utils_parse_java_util_Date_java_lang_String_java_text_ParsePosition_ : Func :=
@@ -11915,527 +11626,300 @@ def f_com_google_gson_internal_bind_util_ISO8601Utils_parse_java_util_Date_java_
                                       (.assign
                                         "day"
                                         (.call
-                                          "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
-                                          [ (.name "date")
-                                          , (.name "offset")
-                                          , (.hole "op:assignmentPlus") ]))
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
+                                        [ (.name "date")
+                                        , (.name "offset")
+                                        , (.hole "op:assignmentPlus") ]))
                                       (.seq
                                         .skip
                                         (.seq
-                                          (.assign "hour" (.lit (.int 0)))
-                                          (.seq
-                                            .skip
-                                            (.seq
-                                              (.assign "minutes" (.lit (.int 0)))
-                                              (.seq
-                                                .skip
-                                                (.seq
-                                                  (.assign "seconds" (.lit (.int 0)))
-                                                  (.seq
-                                                    .skip
-                                                    (.seq
-                                                      (.assign "milliseconds" (.lit (.int 0)))
-                                                      (.seq
-                                                        .skip
-                                                        (.seq
-                                                          (.assign
-                                                            "hasT"
-                                                            (.call
-                                                              "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
-                                                              [ (.name "date")
-                                                              , (.name "offset")
-                                                              , (.lit (.str "T")) ]))
-                                                          (.seq
-                                                            (.ifte
-                                                              (.binop
-                                                                "&&"
-                                                                (.unop "!" (.name "hasT"))
-                                                                (.binop
-                                                                  "<="
-                                                                  (.call "length" [])
-                                                                  (.name "offset")))
-                                                              (.seq
-                                                                .skip
-                                                                (.seq
-                                                                  (.assign
-                                                                    "calendar"
-                                                                    (.hole "op:alloc"))
-                                                                  (.seq
-                                                                    (.expr
-                                                                      (.call
-                                                                        "<init>"
-                                                                        [ (.name "year")
-                                                                        , (.binop
-                                                                            "-"
-                                                                            (.name "month")
-                                                                            (.lit (.int 1)))
-                                                                        , (.name "day") ]))
-                                                                    (.seq
-                                                                      (.expr
-                                                                        (.call
-                                                                          "setLenient"
-                                                                          [(.lit (.bool false))]))
-                                                                      (.seq
-                                                                        (.expr
-                                                                          (.call
-                                                                            "setIndex"
-                                                                            [(.name "offset")]))
-                                                                        (.ret (.call "getTime" [])))))))
-                                                              .skip)
-                                                            (.seq
-                                                              (.ifte
-                                                                (.name "hasT")
-                                                                (.seq
-                                                                  (.assign
-                                                                    "hour"
-                                                                    (.call
-                                                                      "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
-                                                                      [ (.name "date")
-                                                                      , (.hole "op:assignmentPlus")
-                                                                      , (.hole "op:assignmentPlus") ]))
-                                                                  (.seq
-                                                                    (.ifte
-                                                                      (.call
-                                                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
-                                                                        [ (.name "date")
-                                                                        , (.name "offset")
-                                                                        , (.lit (.str ":")) ])
-                                                                      (.assign
-                                                                        "offset"
-                                                                        (.binop
-                                                                          "+"
-                                                                          (.name "offset")
-                                                                          (.lit (.int 1))))
-                                                                      .skip)
-                                                                    (.seq
-                                                                      (.assign
-                                                                        "minutes"
-                                                                        (.call
-                                                                          "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
-                                                                          [ (.name "date")
-                                                                          , (.name "offset")
-                                                                          , (.hole
-                                                                              "op:assignmentPlus") ]))
-                                                                      (.seq
-                                                                        (.ifte
-                                                                          (.call
-                                                                            "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
-                                                                            [ (.name "date")
-                                                                            , (.name "offset")
-                                                                            , (.lit (.str ":")) ])
-                                                                          (.assign
-                                                                            "offset"
-                                                                            (.binop
-                                                                              "+"
-                                                                              (.name "offset")
-                                                                              (.lit (.int 1))))
-                                                                          .skip)
-                                                                        (.ifte
-                                                                          (.binop
-                                                                            ">"
-                                                                            (.call "length" [])
-                                                                            (.name "offset"))
-                                                                          (.seq
-                                                                            .skip
-                                                                            (.seq
-                                                                              (.assign
-                                                                                "c"
-                                                                                (.call
-                                                                                  "charAt"
-                                                                                  [(.name "offset")]))
-                                                                              (.ifte
-                                                                                (.binop
-                                                                                  "&&"
-                                                                                  (.binop
-                                                                                    "&&"
-                                                                                    (.binop
-                                                                                      "!="
-                                                                                      (.name "c")
-                                                                                      (.lit
-                                                                                        (.str "Z")))
-                                                                                    (.binop
-                                                                                      "!="
-                                                                                      (.name "c")
-                                                                                      (.lit
-                                                                                        (.str "+"))))
-                                                                                  (.binop
-                                                                                    "!="
-                                                                                    (.name "c")
-                                                                                    (.lit
-                                                                                      (.str "-"))))
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "seconds"
-                                                                                    (.call
-                                                                                      "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
-                                                                                      [ (.name
-                                                                                          "date")
-                                                                                      , (.name
-                                                                                          "offset")
-                                                                                      , (.hole
-                                                                                          "op:assignmentPlus") ]))
-                                                                                  (.seq
-                                                                                    (.ifte
-                                                                                      (.binop
-                                                                                        "&&"
-                                                                                        (.binop
-                                                                                          ">"
-                                                                                          (.name
-                                                                                            "seconds")
-                                                                                          (.lit
-                                                                                            (.int 59)))
-                                                                                        (.binop
-                                                                                          "<"
-                                                                                          (.name
-                                                                                            "seconds")
-                                                                                          (.lit
-                                                                                            (.int 63))))
-                                                                                      (.assign
-                                                                                        "seconds"
-                                                                                        (.lit
-                                                                                          (.int 59)))
-                                                                                      .skip)
-                                                                                    (.ifte
-                                                                                      (.call
-                                                                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
-                                                                                        [ (.name
-                                                                                            "date")
-                                                                                        , (.name
-                                                                                            "offset")
-                                                                                        , (.lit
-                                                                                            (.str ".")) ])
-                                                                                      (.seq
-                                                                                        (.assign
-                                                                                          "offset"
-                                                                                          (.binop
-                                                                                            "+"
-                                                                                            (.name
-                                                                                              "offset")
-                                                                                            (.lit
-                                                                                              (.int 1))))
-                                                                                        (.seq
-                                                                                          .skip
-                                                                                          (.seq
-                                                                                            (.assign
-                                                                                              "endOffset"
-                                                                                              (.call
-                                                                                                "com.google.gson.internal.bind.util.ISO8601Utils.indexOfNonDigit:int(java.lang.String,int)"
-                                                                                                [ (.name
-                                                                                                    "date")
-                                                                                                , (.binop
-                                                                                                    "+"
-                                                                                                    (.name
-                                                                                                      "offset")
-                                                                                                    (.lit
-                                                                                                      (.int 1))) ]))
-                                                                                            (.seq
-                                                                                              .skip
-                                                                                              (.seq
-                                                                                                (.assign
-                                                                                                  "parseEndOffset"
-                                                                                                  (.call
-                                                                                                    "min"
-                                                                                                    [ (.name
-                                                                                                        "endOffset")
-                                                                                                    , (.binop
-                                                                                                        "+"
-                                                                                                        (.name
-                                                                                                          "offset")
-                                                                                                        (.lit
-                                                                                                          (.int 3))) ]))
-                                                                                                (.seq
-                                                                                                  .skip
-                                                                                                  (.seq
-                                                                                                    (.assign
-                                                                                                      "fraction"
-                                                                                                      (.call
-                                                                                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
-                                                                                                        [ (.name
-                                                                                                            "date")
-                                                                                                        , (.name
-                                                                                                            "offset")
-                                                                                                        , (.name
-                                                                                                            "parseEndOffset") ]))
-                                                                                                    (.seq
-                                                                                                      (.hole
-                                                                                                        "control:SWITCH")
-                                                                                                      (.assign
-                                                                                                        "offset"
-                                                                                                        (.name
-                                                                                                          "endOffset"))))))))))
-                                                                                      .skip)))
-                                                                                .skip)))
-                                                                          .skip)))))
-                                                                .skip)
-                                                              (.seq
-                                                                (.ifte
-                                                                  (.binop
-                                                                    "<="
-                                                                    (.call "length" [])
-                                                                    (.name "offset"))
-                                                                  (.hole "control:THROW")
-                                                                  .skip)
-                                                                (.seq
-                                                                  .skip
-                                                                  (.seq
-                                                                    (.assign
-                                                                      "timezone"
-                                                                      (.lit .unit))
-                                                                    (.seq
-                                                                      .skip
-                                                                      (.seq
-                                                                        (.assign
-                                                                          "timezoneIndicator"
-                                                                          (.call
-                                                                            "charAt"
-                                                                            [(.name "offset")]))
-                                                                        (.seq
-                                                                          (.ifte
-                                                                            (.binop
-                                                                              "=="
-                                                                              (.name
-                                                                                "timezoneIndicator")
-                                                                              (.lit (.str "Z")))
-                                                                            (.seq
-                                                                              (.assign
-                                                                                "timezone"
-                                                                                (.field
-                                                                                  (.fnref
-                                                                                    "com.google.gson.internal.bind.util.ISO8601Utils")
-                                                                                  "TIMEZONE_UTC"))
-                                                                              (.assign
-                                                                                "offset"
-                                                                                (.binop
-                                                                                  "+"
-                                                                                  (.name "offset")
-                                                                                  (.lit (.int 1)))))
-                                                                            (.ifte
-                                                                              (.binop
-                                                                                "||"
-                                                                                (.binop
-                                                                                  "=="
-                                                                                  (.name
-                                                                                    "timezoneIndicator")
-                                                                                  (.lit (.str "+")))
-                                                                                (.binop
-                                                                                  "=="
-                                                                                  (.name
-                                                                                    "timezoneIndicator")
-                                                                                  (.lit (.str "-"))))
-                                                                              (.seq
-                                                                                .skip
-                                                                                (.seq
-                                                                                  (.assign
-                                                                                    "timezoneOffset"
-                                                                                    (.call
-                                                                                      "substring"
-                                                                                      [ (.name
-                                                                                          "offset") ]))
-                                                                                  (.seq
-                                                                                    (.assign
-                                                                                      "timezoneOffset"
-                                                                                      (.cond
-                                                                                        (.binop
-                                                                                          ">="
-                                                                                          (.call
-                                                                                            "length"
-                                                                                            [])
-                                                                                          (.lit
-                                                                                            (.int 5)))
-                                                                                        (.name
-                                                                                          "timezoneOffset")
-                                                                                        (.binop
-                                                                                          "+"
-                                                                                          (.name
-                                                                                            "timezoneOffset")
-                                                                                          (.lit
-                                                                                            (.str "00")))))
-                                                                                    (.seq
-                                                                                      (.assign
-                                                                                        "offset"
-                                                                                        (.binop
-                                                                                          "+"
-                                                                                          (.name
-                                                                                            "offset")
-                                                                                          (.call
-                                                                                            "length"
-                                                                                            [])))
-                                                                                      (.ifte
-                                                                                        (.binop
-                                                                                          "||"
-                                                                                          (.call
-                                                                                            "equals"
-                                                                                            [ (.lit
-                                                                                                (.str "+0000")) ])
-                                                                                          (.call
-                                                                                            "equals"
-                                                                                            [ (.lit
-                                                                                                (.str "+00:00")) ]))
-                                                                                        (.assign
-                                                                                          "timezone"
-                                                                                          (.field
-                                                                                            (.fnref
-                                                                                              "com.google.gson.internal.bind.util.ISO8601Utils")
-                                                                                            "TIMEZONE_UTC"))
-                                                                                        (.seq
-                                                                                          .skip
-                                                                                          (.seq
-                                                                                            (.assign
-                                                                                              "timezoneId"
-                                                                                              (.binop
-                                                                                                "+"
-                                                                                                (.lit
-                                                                                                  (.str "GMT"))
-                                                                                                (.name
-                                                                                                  "timezoneOffset")))
-                                                                                            (.seq
-                                                                                              (.assign
-                                                                                                "timezone"
-                                                                                                (.call
-                                                                                                  "getTimeZone"
-                                                                                                  [ (.name
-                                                                                                      "timezoneId") ]))
-                                                                                              (.seq
-                                                                                                .skip
-                                                                                                (.seq
-                                                                                                  (.assign
-                                                                                                    "act"
-                                                                                                    (.call
-                                                                                                      "getID"
-                                                                                                      []))
-                                                                                                  (.ifte
-                                                                                                    (.unop
-                                                                                                      "!"
-                                                                                                      (.call
-                                                                                                        "equals"
-                                                                                                        [ (.name
-                                                                                                            "timezoneId") ]))
-                                                                                                    (.seq
-                                                                                                      .skip
-                                                                                                      (.seq
-                                                                                                        (.assign
-                                                                                                          "cleaned"
-                                                                                                          (.call
-                                                                                                            "replace"
-                                                                                                            [ (.lit
-                                                                                                                (.str ":"))
-                                                                                                            , (.lit
-                                                                                                                (.str "")) ]))
-                                                                                                        (.ifte
-                                                                                                          (.unop
-                                                                                                            "!"
-                                                                                                            (.call
-                                                                                                              "equals"
-                                                                                                              [ (.name
-                                                                                                                  "timezoneId") ]))
-                                                                                                          (.hole
-                                                                                                            "control:THROW")
-                                                                                                          .skip)))
-                                                                                                    .skip)))))))))))
-                                                                              (.hole
-                                                                                "control:THROW")))
-                                                                          (.seq
-                                                                            .skip
-                                                                            (.seq
-                                                                              (.assign
-                                                                                "calendar"
-                                                                                (.hole "op:alloc"))
-                                                                              (.seq
-                                                                                (.expr
-                                                                                  (.call
-                                                                                    "<init>"
-                                                                                    [ (.name
-                                                                                        "timezone") ]))
-                                                                                (.seq
-                                                                                  (.expr
-                                                                                    (.call
-                                                                                      "setLenient"
-                                                                                      [ (.lit
-                                                                                          (.bool false)) ]))
-                                                                                  (.seq
-                                                                                    (.expr
-                                                                                      (.call
-                                                                                        "set"
-                                                                                        [ (.field
-                                                                                            (.name
-                                                                                              "Calendar")
-                                                                                            "YEAR")
-                                                                                        , (.name
-                                                                                            "year") ]))
-                                                                                    (.seq
-                                                                                      (.expr
-                                                                                        (.call
-                                                                                          "set"
-                                                                                          [ (.field
-                                                                                              (.name
-                                                                                                "Calendar")
-                                                                                              "MONTH")
-                                                                                          , (.binop
-                                                                                              "-"
-                                                                                              (.name
-                                                                                                "month")
-                                                                                              (.lit
-                                                                                                (.int 1))) ]))
-                                                                                      (.seq
-                                                                                        (.expr
-                                                                                          (.call
-                                                                                            "set"
-                                                                                            [ (.field
-                                                                                                (.name
-                                                                                                  "Calendar")
-                                                                                                "DAY_OF_MONTH")
-                                                                                            , (.name
-                                                                                                "day") ]))
-                                                                                        (.seq
-                                                                                          (.expr
-                                                                                            (.call
-                                                                                              "set"
-                                                                                              [ (.field
-                                                                                                  (.name
-                                                                                                    "Calendar")
-                                                                                                  "HOUR_OF_DAY")
-                                                                                              , (.name
-                                                                                                  "hour") ]))
-                                                                                          (.seq
-                                                                                            (.expr
-                                                                                              (.call
-                                                                                                "set"
-                                                                                                [ (.field
-                                                                                                    (.name
-                                                                                                      "Calendar")
-                                                                                                    "MINUTE")
-                                                                                                , (.name
-                                                                                                    "minutes") ]))
-                                                                                            (.seq
-                                                                                              (.expr
-                                                                                                (.call
-                                                                                                  "set"
-                                                                                                  [ (.field
-                                                                                                      (.name
-                                                                                                        "Calendar")
-                                                                                                      "SECOND")
-                                                                                                  , (.name
-                                                                                                      "seconds") ]))
-                                                                                              (.seq
-                                                                                                (.expr
-                                                                                                  (.call
-                                                                                                    "set"
-                                                                                                    [ (.field
-                                                                                                        (.name
-                                                                                                          "Calendar")
-                                                                                                        "MILLISECOND")
-                                                                                                    , (.name
-                                                                                                        "milliseconds") ]))
-                                                                                                (.seq
-                                                                                                  (.expr
-                                                                                                    (.call
-                                                                                                      "setIndex"
-                                                                                                      [ (.name
-                                                                                                          "offset") ]))
-                                                                                                  (.ret
-                                                                                                    (.call
-                                                                                                      "getTime"
-                                                                                                      []))))))))))))))))))))))))))))))))))))))))))
+                                        (.assign "hour" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "minutes" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "seconds" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "milliseconds" (.lit (.int 0)))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "hasT"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
+                                        [(.name "date"), (.name "offset"), (.lit (.str "T"))]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.unop "!" (.name "hasT"))
+                                        (.binop "<=" (.call "length" []) (.name "offset")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "calendar" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<init>"
+                                        [ (.name "year")
+                                        , (.binop "-" (.name "month") (.lit (.int 1)))
+                                        , (.name "day") ]))
+                                        (.seq
+                                        (.expr (.call "setLenient" [(.lit (.bool false))]))
+                                        (.seq
+                                        (.expr (.call "setIndex" [(.name "offset")]))
+                                        (.ret (.call "getTime" [])))))))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.name "hasT")
+                                        (.seq
+                                        (.assign
+                                        "hour"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
+                                        [ (.name "date")
+                                        , (.hole "op:assignmentPlus")
+                                        , (.hole "op:assignmentPlus") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
+                                        [(.name "date"), (.name "offset"), (.lit (.str ":"))])
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.lit (.int 1))))
+                                        .skip)
+                                        (.seq
+                                        (.assign
+                                        "minutes"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
+                                        [ (.name "date")
+                                        , (.name "offset")
+                                        , (.hole "op:assignmentPlus") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
+                                        [(.name "date"), (.name "offset"), (.lit (.str ":"))])
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.lit (.int 1))))
+                                        .skip)
+                                        (.ifte
+                                        (.binop ">" (.call "length" []) (.name "offset"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "c" (.call "charAt" [(.name "offset")]))
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.binop
+                                        "&&"
+                                        (.binop "!=" (.name "c") (.lit (.str "Z")))
+                                        (.binop "!=" (.name "c") (.lit (.str "+"))))
+                                        (.binop "!=" (.name "c") (.lit (.str "-"))))
+                                        (.seq
+                                        (.assign
+                                        "seconds"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
+                                        [ (.name "date")
+                                        , (.name "offset")
+                                        , (.hole "op:assignmentPlus") ]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "&&"
+                                        (.binop ">" (.name "seconds") (.lit (.int 59)))
+                                        (.binop "<" (.name "seconds") (.lit (.int 63))))
+                                        (.assign "seconds" (.lit (.int 59)))
+                                        .skip)
+                                        (.ifte
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.checkOffset:boolean(java.lang.String,int,char)"
+                                        [(.name "date"), (.name "offset"), (.lit (.str "."))])
+                                        (.seq
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.lit (.int 1))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "endOffset"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.indexOfNonDigit:int(java.lang.String,int)"
+                                        [ (.name "date")
+                                        , (.binop "+" (.name "offset") (.lit (.int 1))) ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "parseEndOffset"
+                                        (.call
+                                        "min"
+                                        [ (.name "endOffset")
+                                        , (.binop "+" (.name "offset") (.lit (.int 3))) ]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "fraction"
+                                        (.call
+                                        "com.google.gson.internal.bind.util.ISO8601Utils.parseInt:int(java.lang.String,int,int)"
+                                        [(.name "date"), (.name "offset"), (.name "parseEndOffset")]))
+                                        (.seq
+                                        (.hole "control:SWITCH")
+                                        (.assign "offset" (.name "endOffset"))))))))))
+                                        .skip)))
+                                        .skip)))
+                                        .skip)))))
+                                        .skip)
+                                        (.seq
+                                        (.ifte
+                                        (.binop "<=" (.call "length" []) (.name "offset"))
+                                        (.hole "control:THROW")
+                                        .skip)
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "timezone" (.lit .unit))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "timezoneIndicator"
+                                        (.call "charAt" [(.name "offset")]))
+                                        (.seq
+                                        (.ifte
+                                        (.binop "==" (.name "timezoneIndicator") (.lit (.str "Z")))
+                                        (.seq
+                                        (.assign
+                                        "timezone"
+                                        (.field
+                                        (.fnref "com.google.gson.internal.bind.util.ISO8601Utils")
+                                        "TIMEZONE_UTC"))
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.lit (.int 1)))))
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.binop "==" (.name "timezoneIndicator") (.lit (.str "+")))
+                                        (.binop "==" (.name "timezoneIndicator") (.lit (.str "-"))))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "timezoneOffset"
+                                        (.call "substring" [(.name "offset")]))
+                                        (.seq
+                                        (.assign
+                                        "timezoneOffset"
+                                        (.cond
+                                        (.binop ">=" (.call "length" []) (.lit (.int 5)))
+                                        (.name "timezoneOffset")
+                                        (.binop "+" (.name "timezoneOffset") (.lit (.str "00")))))
+                                        (.seq
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.call "length" [])))
+                                        (.ifte
+                                        (.binop
+                                        "||"
+                                        (.call "equals" [(.lit (.str "+0000"))])
+                                        (.call "equals" [(.lit (.str "+00:00"))]))
+                                        (.assign
+                                        "timezone"
+                                        (.field
+                                        (.fnref "com.google.gson.internal.bind.util.ISO8601Utils")
+                                        "TIMEZONE_UTC"))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "timezoneId"
+                                        (.binop "+" (.lit (.str "GMT")) (.name "timezoneOffset")))
+                                        (.seq
+                                        (.assign
+                                        "timezone"
+                                        (.call "getTimeZone" [(.name "timezoneId")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "act" (.call "getID" []))
+                                        (.ifte
+                                        (.unop "!" (.call "equals" [(.name "timezoneId")]))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "cleaned"
+                                        (.call "replace" [(.lit (.str ":")), (.lit (.str ""))]))
+                                        (.ifte
+                                        (.unop "!" (.call "equals" [(.name "timezoneId")]))
+                                        (.hole "control:THROW")
+                                        .skip)))
+                                        .skip)))))))))))
+                                        (.hole "control:THROW")))
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign "calendar" (.hole "op:alloc"))
+                                        (.seq
+                                        (.expr (.call "<init>" [(.name "timezone")]))
+                                        (.seq
+                                        (.expr (.call "setLenient" [(.lit (.bool false))]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.field (.name "Calendar") "YEAR"), (.name "year")]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [ (.field (.name "Calendar") "MONTH")
+                                        , (.binop "-" (.name "month") (.lit (.int 1))) ]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.field (.name "Calendar") "DAY_OF_MONTH"), (.name "day")]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.field (.name "Calendar") "HOUR_OF_DAY"), (.name "hour")]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.field (.name "Calendar") "MINUTE"), (.name "minutes")]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.field (.name "Calendar") "SECOND"), (.name "seconds")]))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [ (.field (.name "Calendar") "MILLISECOND")
+                                        , (.name "milliseconds") ]))
+                                        (.seq
+                                        (.expr (.call "setIndex" [(.name "offset")]))
+                                        (.ret (.call "getTime" []))))))))))))))))))))))))))))))))))))))))))
                   "__exc"
                   (.assign "fail" (.name "e")))
                 (.seq
@@ -12478,12 +11962,12 @@ def f_com_google_gson_internal_bind_util_ISO8601Utils_parse_java_util_Date_java_
                                     [ (.binop
                                         "+"
                                         (.binop
-                                          "+"
-                                          (.binop
-                                            "+"
-                                            (.lit (.str "Failed to parse date ["))
-                                            (.name "input"))
-                                          (.lit (.str "]: ")))
+                                        "+"
+                                        (.binop
+                                        "+"
+                                        (.lit (.str "Failed to parse date ["))
+                                        (.name "input"))
+                                        (.lit (.str "]: ")))
                                         (.name "msg"))
                                     , (.call "getIndex" []) ]))
                                 (.seq
@@ -12696,9 +12180,9 @@ def f_com_google_gson_internal_reflect_ReflectionHelper_getAccessibleObjectDescr
                                       (.binop
                                         "+"
                                         (.binop
-                                          "+"
-                                          (.binop "+" (.lit (.str "method '")) (.call "getName" []))
-                                          (.lit (.str "#")))
+                                        "+"
+                                        (.binop "+" (.lit (.str "method '")) (.call "getName" []))
+                                        (.lit (.str "#")))
                                         (.name "methodSignature"))
                                       (.lit (.str "'"))))))))))))
                   (.ifte

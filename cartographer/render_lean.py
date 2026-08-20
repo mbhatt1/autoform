@@ -15,13 +15,22 @@ Two invariants this file exists to protect:
 
 Usage: render_lean.py ast.json Out.lean [ModuleName]
 """
-import json, sys, re, os
+import json
+import threading, sys, re, os
 
 # Break a term across lines once its flat form would push past this column. Purely
 # cosmetic: the layout below is whitespace-insensitive because every term is
 # parenthesised or bracketed, so wrapping can never change what Lean parses.
 WIDTH = 100
 INDENT = 2
+# Indentation stops growing past this column. Without a cap, a right-nested `seq` chain
+# of n statements indents 2n spaces at its deepest line, so the OUTPUT is O(n^2)
+# characters -- 2000 statements produced a 20 MB module, and the cost is in the file, not
+# the algorithm. Real code nests: V8 has functions with thousands of statements in a
+# single body. Past ~20 levels the staircase has stopped conveying structure anyway, and
+# this is generated code that says "do not edit" at the top. Capping makes the output
+# linear; it changes only where the continuation lines sit, never the term.
+MAX_INDENT = 40
 
 # ---------------------------------------------------------------------------
 # Lean literals
@@ -165,6 +174,90 @@ def flat(node, kind) -> str:
         return head
     return "(" + head + " " + " ".join(flat_child(c) for c in children) + ")"
 
+class _RawNewline(Exception):
+    """An atom contained a literal newline — fall back to the uncapped path.
+
+    `render` returns the flat form unconditionally when it contains a newline, so the
+    capped variant must not silently disagree. JSON escapes newlines, so this should be
+    unreachable; it exists so that "should be" is not load-bearing."""
+
+
+def flat_capped(node, kind, cap):
+    """`flat(node, kind)` if it is at most `cap` characters, else `None`.
+
+    Why this exists: `render` computed `flat()` over the WHOLE subtree at every level
+    just to ask whether it fit in `WIDTH` columns, then threw the string away when it did
+    not. On a chain of n nested statements that is O(n^2) characters built and discarded,
+    and measured it was worse than that -- 250 statements rendered in 0.33 s, 2000 in
+    42 s, and 5000 did not finish. V8 has functions far deeper than 2000.
+
+    Since a flat form is only ever *used* when it fits in `WIDTH` (100) columns, anything
+    longer need never be constructed. This short-circuits as soon as the budget is blown,
+    so each node costs O(cap) instead of O(subtree), and the whole render is linear.
+    """
+    if cap < 0:
+        return None
+    head, children = SHAPE[kind](node)
+    if not children:
+        return head if len(head) <= cap else None
+    # "(" + head + " " + ... + ")"
+    budget = cap - (len(head) + 3)
+    if budget < 0:
+        return None
+    parts = []
+    for c in children:
+        piece = flat_child_capped(c, budget)
+        if piece is None:
+            return None
+        budget -= len(piece) + 1          # the separating space
+        if budget < -1:
+            return None
+        parts.append(piece)
+    out = "(" + head + " " + " ".join(parts) + ")"
+    return out if len(out) <= cap else None
+
+
+def flat_child_capped(c, cap):
+    tag, val = c
+    if tag == "atom":
+        if "\n" in val:
+            raise _RawNewline
+        return val if len(val) <= cap else None
+    if tag in ("e", "s"):
+        return flat_capped(val, tag, cap)
+    if tag in ("es", "ps"):
+        items = _seq(val)
+        budget = cap - 2                  # the brackets
+        if budget < 0:
+            return None
+        parts = []
+        for x in items:
+            piece = (flat_capped(x, "e", budget) if tag == "es"
+                     else _flat_pair_capped(x, budget))
+            if piece is None:
+                return None
+            budget -= len(piece) + 2      # ", "
+            if budget < -2:
+                return None
+            parts.append(piece)
+        out = "[" + ", ".join(parts) + "]"
+        return out if len(out) <= cap else None
+    raise AssertionError(tag)
+
+
+def _flat_pair_capped(p, cap):
+    if not (isinstance(p, list) and len(p) == 2):
+        raise ValueError(f"dictE pair must be a 2-element array, got {p!r}")
+    a = flat_capped(p[0], "e", cap - 4)
+    if a is None:
+        return None
+    b = flat_capped(p[1], "e", cap - 4 - len(a))
+    if b is None:
+        return None
+    out = "(" + a + ", " + b + ")"
+    return out if len(out) <= cap else None
+
+
 def flat_child(c) -> str:
     tag, val = c
     if tag == "atom":
@@ -195,13 +288,22 @@ def render(node, kind, col) -> str:
     The returned string's first line is *not* indented (the caller has already placed the
     cursor at `col`); continuation lines carry their own indentation.
     """
-    one = flat(node, kind)
-    if col + len(one) <= WIDTH or "\n" in one:
-        return one
+    try:
+        one = flat_capped(node, kind, WIDTH - col)
+        if one is not None:
+            return one
+    except _RawNewline:
+        one = flat(node, kind)
+        if col + len(one) <= WIDTH or "\n" in one:
+            return one
     head, children = SHAPE[kind](node)
     if not children:
-        return one
-    inner = col + INDENT
+        # A nullary constructor's flat form IS its head. The capped flatten returns None
+        # when the head alone overruns the column budget, and returning that None here
+        # was a real regression: it propagated into a string join several frames up and
+        # surfaced as a TypeError, not as a wrong render. Caught by check_render.
+        return head
+    inner = min(col + INDENT, MAX_INDENT)
     pad = " " * inner
     parts = [render_child(c, inner) for c in children]
     return "(" + head + "\n" + "\n".join(pad + p for p in parts) + ")"
@@ -222,8 +324,9 @@ def render_child(c, col) -> str:
         # Leading-comma layout: every element starts at the same column, so the block
         # stays readable and each line is independently diffable.
         pad = " " * col
-        rendered = ([render(x, "e", col + INDENT) for x in items] if tag == "es"
-                    else [render_pair(p, col + INDENT) for p in items])
+        deeper = min(col + INDENT, MAX_INDENT)
+        rendered = ([render(x, "e", deeper) for x in items] if tag == "es"
+                    else [render_pair(p, deeper) for p in items])
         body = ("\n" + pad + ", ").join(rendered)
         return "[ " + body + " ]"
     raise AssertionError(tag)
@@ -232,7 +335,7 @@ def render_pair(p, col) -> str:
     one = _flat_pair(p)
     if col + len(one) <= WIDTH:
         return one
-    inner = col + INDENT
+    inner = min(col + INDENT, MAX_INDENT)
     return ("(" + render(p[0], "e", inner) + ",\n" + " " * inner
             + render(p[1], "e", inner) + ")")
 
@@ -290,7 +393,7 @@ def render_func(f, nm) -> list:
         "",
     ]
 
-def main():
+def _run_main():
     src, dst = sys.argv[1], sys.argv[2]
     module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
     with open(src) as fh:
@@ -345,6 +448,43 @@ def main():
     with open(dst, "w") as fh:
         fh.write("\n".join(out))
     print(f"rendered {len(funcs)} functions -> {dst}")
+
+def main():
+    """Render on a thread with a large stack.
+
+    The emitters are mutually recursive over the AST, so depth is the source's nesting
+    depth, not a constant. Python's default limit is 1000 frames and this file never
+    raised it -- `scripts/lang_matrix.py` set it to 100000 before calling in, but
+    `autoform.sh` invokes this script directly, so the default applied to every real run.
+    It failed at 247 consecutive top-level statements.
+
+    Raising `setrecursionlimit` alone is not enough and is actively dangerous: the limit
+    is a guard against overrunning the *C* stack, and lifting it without a bigger stack
+    turns a clean RecursionError into a segfault. A thread with an explicit stack size is
+    the portable way to get both.
+    """
+    sys.setrecursionlimit(300_000)
+    try:
+        threading.stack_size(512 * 1024 * 1024)
+    except (ValueError, RuntimeError):
+        try:
+            threading.stack_size(64 * 1024 * 1024)   # some platforms cap this
+        except (ValueError, RuntimeError):
+            pass
+    box = {}
+
+    def go():
+        try:
+            _run_main()
+        except BaseException as e:        # noqa: BLE001 - re-raised on the main thread
+            box["e"] = e
+
+    t = threading.Thread(target=go)
+    t.start()
+    t.join()
+    if "e" in box:
+        raise box["e"]
+
 
 if __name__ == "__main__":
     main()
