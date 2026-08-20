@@ -1,5 +1,13 @@
 import Autoform.Lang.Core.Semantics
 
+-- Lean's default `maxRecDepth` (512) is a guard against runaway elaboration, not
+-- a statement about reasonable programs. A deep-embedded function body is one
+-- term, so the elaborator's recursion depth tracks the *source's* nesting depth:
+-- Linux `lib/` hit the limit at two declarations and the whole module failed to
+-- type-check. Raising it costs nothing for shallow modules and is the difference
+-- between compiling a real codebase and not.
+set_option maxRecDepth 8000
+
 /-!
 # LangC — machine-generated
 
