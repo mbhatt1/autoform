@@ -44,6 +44,48 @@ and every Joern-supported front end is covered. Compared with the alternative (c
 everything to Wasm and write one Wasm semantics), source-level structure survives, which
 keeps the deep≈shallow refinement tractable.
 
+### The CPG front end is a pinned dependency
+
+Because the whole system is downstream of the CPG, **the neutral AST is a function of the
+Joern version**. The node vocabulary, the resolved `fullName`s, whether `IS_VARIADIC` is
+set on a parameter, whether an absent `for` clause is elided rather than empty — all of it
+is the front end's choice, and all of it changes what the generated Lean means. Two
+machines with different Joern builds can produce different `ast-*.json` from identical
+source.
+
+`lake-manifest.json` pins every Lean dependency to a revision and `lean-toolchain` pins
+the compiler. **`joern-version` does the same job for the front end**, and
+`scripts/provenance.py joern-version --check` compares it to what is installed. See
+"Provenance" below.
+
+### The exporter requires the source tree, not only the CPG
+
+`cartographer/export_ast.sc` reads the original source text. This is a **precondition, not
+an optimization**: CPG-only analysis is no longer possible, and a CPG whose source tree
+has moved away cannot be exported.
+
+The reason is `*args` / `**kwargs`. Joern's `pysrc2cpg` sets `IS_VARIADIC` on `*args` and
+sets **nothing** on `**kwargs` — by every graph property, `**kwargs` is indistinguishable
+from an ordinary positional parameter. No CPG property records the stars. What the CPG
+does carry is `OFFSET`, the parameter name's byte offset in its file, so the exporter
+reads the source at that offset and counts the `*`s immediately before the name.
+
+The alternative was to treat `**kwargs` as positional, which is a silent mistranslation of
+exactly the kind the hole mechanism exists to prevent. So the exporter **aborts** when it
+cannot read a source file it needs, naming the file, the CPG's recorded root and the
+parameter, rather than guessing. `docs/running.md` §1 states the operational consequence.
+
+Two details worth knowing:
+
+* The star-count is **gated to `.py` files**. In C and C++ a `*` before a parameter name is
+  a pointer, and reading it as a splat would be a mistranslation rather than a hole. It is
+  also why the gate must come first: because the source read is a hard error by design, an
+  ungated version aborted the export of every non-Python corpus.
+* The path it reads is `cpg.metaData.root` joined with the file's relative path. Move or
+  delete the tree after `joern-parse` and the export fails — which is why
+  `scripts/provenance.py` records `source_path` and `source_revision` alongside every
+  artifact.
+
 The cost falls in one place: **constructs that look alike across languages are the
 dangerous ones.** Integer division rounds toward negative infinity in Python and toward
 zero in C. `char*` arithmetic is not string concatenation. `<operator>.and` is bitwise,
@@ -90,6 +132,72 @@ Two properties of this arrangement are load-bearing:
   hole counting is computed from the same AST it describes. The execution oracle
   (`core_oracle.py`) and the differential oracle (`differential.py`) exist to disagree
   with it. See `docs/trust-model.md`.
+
+## Provenance
+
+An artifact that cannot be traced to what produced it is not evidence. Three gaps had the
+same root, and one mechanism closes them.
+
+**The `.cpg` files are not tracked.** They are hundreds of megabytes; tracking them is not
+on the table. But `ast-*.json` **is** tracked, which used to mean a committed AST could
+drift arbitrarily far from the exporter committed beside it with nothing complaining —
+the only thing that compares them is a Lean module rendered from the same AST at the same
+time, which agrees with it by construction.
+
+The fix is to record what a regeneration needs, and then to check the record:
+
+```
+provenance/<artifact>.prov.json
+    artifact_sha256    the artifact this record describes
+    joern_version      the front end, checked against ./joern-version
+    exporter           + exporter_sha256 of the .sc that produced it
+    source_path        + source_revision (git commit, or `tree-sha256:…` content
+                       digest for a tree that is not a checkout)
+    command            the exact command line
+```
+
+Sidecar files rather than a field inside the artifact, because `export_ast.sc` writes a
+bare JSON array and `render_lean.py`, `check_docs.py` and `differential.py` all index it as
+one. An envelope is the better end state; see "Merge-phase changes this asks for
+elsewhere".
+
+Two checks, one cheap and one expensive:
+
+* **`scripts/check_provenance.py`** runs on a clean clone with **no Joern installed and no
+  CPG anywhere**, because every question it asks is answerable from tracked bytes:
+  coverage (every artifact has a record or is a named entry in the backlog), integrity
+  (the record's digest is the file's digest), the Joern pin, required fields, orphans, and
+  — the one that closes the "cannot re-verify without the CPG" gap — **exporter drift**.
+  The moment `export_ast.sc` changes, every AST that predates the change is mechanically
+  known to be stale, and the record holds the command that regenerates it.
+* **`scripts/reproduce_ast.py`** is the independent recomputation: rebuild the CPG from the
+  recorded source tree with the pinned Joern, re-run the committed exporter, diff. It does
+  not read the committed AST to decide what to expect. Minutes per corpus, so it is a
+  command rather than a build step.
+
+`provenance/unattributed.json` is a **named backlog**, not an exemption. The eleven
+`ast-*.json` files that predate this mechanism are listed there with a reason, printed by
+name on every run of the checker, and an entry expires the moment its artifact's digest
+changes — regenerate one and you must record real provenance. `--strict` refuses the
+backlog entirely. Three of the eleven were re-exported to find out rather than assumed;
+all three differ from a fresh export (module-initializer entries and integer-literal
+representation postdate them), which is recorded as the finding it is.
+
+### Merge-phase changes this asks for elsewhere
+
+Neither is made here — `cartographer/export_ast.sc` and `autoform.sh` are owned elsewhere
+this round — and until they are, an AST produced by `./autoform.sh` is unattributed and
+the checker says so by name. Use `scripts/export_with_provenance.sh` to produce an
+attributed one.
+
+1. **`autoform.sh`**: call `python3 scripts/provenance.py joern-version --check` before
+   stage 1, and `python3 scripts/provenance.py record --artifact ast-$MOD.json --source
+   "$SRC" --exporter cartographer/export_ast.sc --command "…"` after stage 3.
+2. **`cartographer/export_ast.sc`**: emit `joern.metaData.version` and the CPG root into
+   the artifact itself, so provenance survives a file copied out of the repository. This
+   requires changing the top-level JSON from an array to
+   `{"provenance": {...}, "functions": [...]}` and updating the three readers; the sidecar
+   is the interim.
 
 ## Module layout
 
@@ -149,6 +257,10 @@ subject.
 | `scale_test.py` | Runs the pipeline stage by stage on arbitrary source trees, recording wall-clock, peak RSS and artefact sizes per stage. See `docs/scale.md`. |
 | `prover/smt.py` | External solver driver. Produces **evidence**, never a proof: an `unsat` verdict is recorded on an open obligation because no Lean proof is reconstructed from it. |
 | `prover/propose.py` | Local (ollama) neural whole-proof proposer, off unless `AUTOFORM_NEURAL=1`. Output is untrusted text; every candidate is re-elaborated and screened. |
+| `provenance.py` | The CPG front end's pin (`joern-version`, read from the distribution's jar names rather than by booting a JVM) and the writer of `provenance/<artifact>.prov.json`. Refuses to record an artifact whose Joern version or source revision it cannot determine. |
+| `check_provenance.py` | The enforcement half: coverage, integrity, pin, exporter drift, required fields, orphans, backlog expiry. Runs on a clean clone with no Joern and no CPG. |
+| `reproduce_ast.py` | Rebuilds an artifact's CPG from its recorded source tree and re-exports it, diffing against the committed file. The independent recomputation that makes discarding the CPG acceptable. |
+| `export_with_provenance.sh` | `joern-parse` → `export_ast.sc` → `provenance.py record`, refusing to start on an unpinned Joern. The way to produce an attributed AST until `autoform.sh` does it itself. |
 | `ledger.lean.tmpl` | The `#eval` script `autoform.sh` instantiates per module to print the ledger and write `ledger-<Module>.json`. |
 
 ## Out of scope by design

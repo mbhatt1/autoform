@@ -1,0 +1,97 @@
+{
+ "_": [
+  "Artifacts that predate provenance recording. This file is a NAMED BACKLOG, not an",
+  "exemption: scripts/check_provenance.py prints every entry, by name, on every run, and",
+  "an entry stops applying the moment its artifact's digest changes -- regenerate one and",
+  "you must record real provenance for it. scripts/check_provenance.py --strict refuses",
+  "the backlog entirely.",
+  "",
+  "The three entries with reproduction_attempted=true were checked, not assumed: each was",
+  "re-exported from its source tree with the pinned Joern and the committed exporter, and",
+  "each DIFFERS. That is the finding, and it is why this file says `unattributed` rather",
+  "than quietly recording today's exporter digest against yesterday's artifact -- which",
+  "would have made a false claim look like a green check.",
+  "",
+  "source_hint paths are per-session scratch directories. They are a lead for whoever",
+  "regenerates these, not a stable location, and check_provenance.py does not read them."
+ ],
+ "artifacts": {
+  "ast-CMath.json": {
+   "artifact_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
+   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/ctest",
+   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Same 6 functions, but every integer literal is \"v\": 0 here and \"v\": \"0\" in a fresh export -- the literal representation changed and this artifact predates it. 23 diff lines.",
+   "reproduction_attempted": true,
+   "reproduced": false
+  },
+  "ast-Cachetools.json": {
+   "artifact_sha256": "368bf5615c24ea1fecdff4bafe94694340f1ce06a396f0afd32fbb89625f28fd",
+   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/cachetools",
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangC.json": {
+   "artifact_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangGo.json": {
+   "artifact_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangJS.json": {
+   "artifact_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangJava.json": {
+   "artifact_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangKt.json": {
+   "artifact_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-LangTS.json": {
+   "artifact_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
+   "source_hint": null,
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
+  "ast-Sample.json": {
+   "artifact_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
+   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/sample",
+   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 7 entries to the committed 5 -- the two module-initializer entries (`lib.py:<module>`, `<module-objects>:<module>`) postdate this artifact. 387 diff lines.",
+   "reproduction_attempted": true,
+   "reproduced": false
+  },
+  "ast-Stress.json": {
+   "artifact_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/stress",
+   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`.",
+   "reproduction_attempted": true,
+   "reproduced": false
+  },
+  "ast-V8Numbers.json": {
+   "artifact_sha256": "9742832f6f8eeff1b64102635129f4fe70926d0b724c0cc54fc6ae865a38564e",
+   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/v8/src/numbers (a git checkout; revision not recorded at export time)",
+   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  }
+ }
+}
