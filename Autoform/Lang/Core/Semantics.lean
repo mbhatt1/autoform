@@ -420,6 +420,102 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
       | (k, _) :: ps, some f   => if k.endsWith suffix then none else go ps (some f)
     go ctx.table none
 
+/-! ## The calling convention
+
+`f(*xs, k=v, **d)` and `def f(a, *args, **kwargs)` are one mechanism, split across two
+places: `evalList` turns an argument list into a **positional list plus a keyword list**,
+and `bindParams` turns those two lists plus a `Func`'s parameter description into an
+environment.
+
+Both halves are ordinary total functions — `bindParams` is not even recursive on fuel —
+so the interpreter's seven-way mutual recursion is unchanged in shape and
+`Autoform/FuelMono.lean` still covers exactly the same functions. -/
+
+/-- View a value as keyword bindings, for `**e`. Only a `dict` whose keys are *all*
+strings qualifies: CPython raises `TypeError: keywords must be strings` otherwise, and
+`argument after ** must be a mapping` for a non-`dict`, so `none` here means "raise",
+never "ignore". -/
+def strKeyed : Val → Option (List (String × Val))
+  | .dict kvs =>
+      kvs.foldr (fun kv acc =>
+        match kv.1, acc with
+        | .str k, some rest => some ((k, kv.2) :: rest)
+        | _,      _         => none) (some [])
+  | _ => none
+
+/-- The parameters that receive positional arguments: every parameter except the
+variadic ones. -/
+def Func.posParams (fn : Func) : List String :=
+  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p
+
+/-- Bind a call's arguments into the callee's environment.
+
+The rule is CPython's, minus default values (which Core does not model):
+
+* positional arguments fill `posParams` left to right;
+* leftovers go to `vararg` as a `tuple` — an empty one when there are none, which is
+  why `def f(*a)` called with no arguments binds `a` to `()` rather than to `unit`;
+* a keyword argument naming a positional parameter binds that parameter;
+* every other keyword argument goes to `kwarg` as a `dict` with `str` keys.
+
+Two deliberate departures, both recorded rather than hidden:
+
+* **Surplus positional arguments are dropped when there is no `*args`.** CPython raises
+  `TypeError`. This is the behaviour `applyFunc` already had (`params.zip vs` truncates),
+  and it is left alone here so that this change is about starred arguments only.
+* **A keyword argument matching no parameter is dropped here** when there is no
+  `**kwargs`. `bindParams` is only the binding half; `kwargsRejected` below detects that
+  case and `applyFunc` turns it into CPython's `TypeError` before the body ever runs, so
+  the drop is never observable. Nothing previously produced keyword arguments, so this
+  cannot change any existing behaviour. -/
+def bindParams (fn : Func) (base : Env) (vs : List Val)
+    (kws : List (String × Val)) : Env :=
+  let ps    := fn.posParams
+  let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
+  let rest  := vs.drop ps.length
+  let ρ₁    := match fn.vararg with
+               | some a => Env.set ρ₀ a (.tuple rest)
+               | none   => ρ₀
+  let named := kws.filter (fun kv => ps.contains kv.1)
+  let extra := kws.filter (fun kv => !ps.contains kv.1)
+  let ρ₂    := named.foldl (fun (e : Env) (x, v) => Env.set e x v) ρ₁
+  match fn.kwarg with
+  | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
+  | none   => ρ₂
+
+/-- Does this call pass a keyword argument the callee cannot accept? CPython raises
+`TypeError: f() got an unexpected keyword argument 'k'`; `bindParams` alone would silently
+drop it, which is the silently-wrong shape this project keeps catching, so the check is
+separate and `applyFunc` turns it into the exception. -/
+def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
+  fn.kwarg.isNone && kws.any (fun kv => !fn.posParams.contains kv.1)
+
+/-- A call with no keyword arguments can never be rejected. -/
+@[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
+  simp [kwargsRejected]
+
+/-- A function with no variadic parameters, called with no keyword arguments, binds
+exactly what `applyFunc` bound before the calling convention existed. This is the
+compatibility equation: every corpus rendered before starred arguments were modelled has
+`vararg = none` and `kwarg = none`, so nothing about it changed. -/
+theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
+    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    bindParams fn base vs [] =
+      (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
+  have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
+    simp [List.filter_eq_self]
+  simp [bindParams, Func.posParams, h1, h2, this]
+
+/-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
+with both variadic fields at their `none` defaults. Stated separately because the
+hypothesis form of `bindParams_plain` cannot fire on a literal without first deciding
+which `fn` it is about. -/
+@[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
+    (base : Env) (vs : List Val) :
+    bindParams ⟨name, params, body, none, none⟩ base vs [] =
+      (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
+  bindParams_plain base vs rfl rfl
+
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
@@ -506,6 +602,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
   | _+1, h, ρ, .classClosure c => (h, .val (.clsClos c ρ))
   | _+1, h, _, .hole l        => (h, .hole l)
+  -- The three argument forms are only meaningful inside a call's argument list, where
+  -- `evalList` intercepts them before `evalExpr` is ever reached. Anywhere else they have
+  -- no value, and saying so is the honest answer.
+  | _+1, h, _, .starred _     => (h, .hole "op:starred-outside-call")
+  | _+1, h, _, .kwargE _ _    => (h, .hole "op:starred-outside-call")
+  | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
@@ -592,14 +694,19 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | none => (h₁, .val .unit)
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
+  -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
+  -- here (a dict display is `dictE`), so a keyword group in a list/tuple literal is a
+  -- shape we do not model and it says so.
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
-      | (h₁, .inr vs) => (h₁, .val (.list vs))
-      | (h₁, .inl r)  => (h₁, r)
+      | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
+      | (h₁, .inr (_,  _))   => (h₁, .hole "op:keyword-in-literal")
+      | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .tupleE es =>
       match evalList ctx n h ρ es with
-      | (h₁, .inr vs) => (h₁, .val (.tuple vs))
-      | (h₁, .inl r)  => (h₁, r)
+      | (h₁, .inr (vs, []))  => (h₁, .val (.tuple vs))
+      | (h₁, .inr (_,  _))   => (h₁, .hole "op:keyword-in-literal")
+      | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .dictE kvs =>
       match evalPairs ctx n h ρ kvs with
       | (h₁, .inr ps) => (h₁, .val (.dict ps))
@@ -607,60 +714,69 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | n+1, h, ρ, .call f args =>
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
-      | (h₁, .inr vs) =>
+      | (h₁, .inr (vs, kws)) =>
         match ctx.resolve f with
-        | some fn => applyFunc ctx n h₁ fn none vs
+        | some fn => applyFunc ctx n h₁ fn none vs kws
         | none    =>
           -- Not a statically known function: it may be a function value or closure held
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
           match ρ.get f with
           | .fn g      => match ctx.resolve g with
-                          | some fn => applyFunc ctx n h₁ fn none vs
+                          | some fn => applyFunc ctx n h₁ fn none vs kws
                           | none    => (h₁, .hole s!"call:{g}")
           | .clos g cap => match ctx.resolve g with
-                          | some fn => applyClosure ctx n h₁ fn cap vs
+                          | some fn => applyClosure ctx n h₁ fn cap vs kws
                           | none    => (h₁, .hole s!"call:{g}")
           | _          =>
             -- Modelled stdlib is consulted LAST, so a user function of the same name
             -- always wins. `builtin` returns `none` for anything it cannot model
             -- faithfully, which falls through to a visible hole.
-            match Stdlib.builtin ctx.dialect h₁ f vs with
-            | some (h₂, r) => (h₂, r)
-            | none         => (h₁, .hole s!"call:{f}")
+            -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
+            -- builtin is *not* passed silently, it is a named hole.
+            if kws.isEmpty then
+              match Stdlib.builtin ctx.dialect h₁ f vs with
+              | some (h₂, r) => (h₂, r)
+              | none         => (h₁, .hole s!"call:{f}")
+            else (h₁, .hole s!"call:{f}:keyword-to-builtin")
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr vs) =>
+        | (h₂, .inr (vs, kws)) =>
           match h₂.get r with
           | none   => (h₂, .hole "mcall:dangling-ref")
           | some o =>
             match ctx.resolveMethod o.cls m with
             | none    => (h₂, .hole s!"mcall:{o.cls}.{m}")
             | some fn =>
-              if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs
-              else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs
+              if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+              else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
       | (h₁, .val (.bobj bcls pay)) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr vs) =>
+        | (h₂, .inr (vs, kws)) =>
           -- Method dispatch on a builtin-based instance: the class's own methods first
           -- (`self` is bound to the whole instance, so `self` still compares as the
           -- builtin), then the builtin's own methods on the payload.
           if ctx.classDefines bcls m then
             match ctx.resolveMethod bcls m with
-            | some fn => applyFunc ctx n h₂ fn (some (.bobj bcls pay)) vs
+            | some fn => applyFunc ctx n h₂ fn (some (.bobj bcls pay)) vs kws
             | none    => (h₂, .hole s!"mcall:{bcls}.{m}")
-          else
+          else if kws.isEmpty then
             match Stdlib.method ctx.dialect h₂ pay m vs with
             | some (h₃, .pure r)       => (h₃, r)
             | some (h₃, .mutating _ _) => (h₃, .hole s!"mcall:{m}:unboxed-container")
             | none                     => (h₂, .hole s!"mcall:{bcls}.{m}")
+          -- `Stdlib.method` has no keyword-argument calling convention, so a keyword
+          -- call on a builtin payload is refused rather than silently dropped — the
+          -- silent-drop of nine keyword arguments is what the varargs work just fixed.
+          else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
       | (h₁, .val recv) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr vs) =>
+        | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+        | (h₂, .inr (vs, [])) =>
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -673,7 +789,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | n+1, h, ρ, .alloc cls args =>
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
-      | (h₁, .inr vs) =>
+      | (h₁, .inr (vs, kws)) =>
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
         -- reference. See `Val.bobj`.
@@ -688,19 +804,24 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match ctx.resolveMethod cls "__init__" with
         | none    => (h₂, .val (.ref r))
         | some fn =>
-          match applyFunc ctx n h₂ fn (some (.ref r)) vs with
+          match applyFunc ctx n h₂ fn (some (.ref r)) vs kws with
           | (h₃, .val _)  => (h₃, .val (.ref r))
           | (h₃, .hole l) => (h₃, .hole l)
           | (h₃, e)       => (h₃, e)
 
-/-- Apply a resolved function, optionally with a receiver bound to `self`. -/
-def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val → Heap × EResult
-  | 0,   h, _,  _,     _  => (h, .outOfFuel)
-  | n+1, h, fn, self?, vs =>
+/-- Apply a resolved function, optionally with a receiver bound to `self`.
+
+`kws` carries the keyword arguments — `[]` for every call that has none, which is every
+call this interpreter could express before starred arguments existed. -/
+def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val →
+    List (String × Val) → Heap × EResult
+  | 0,   h, _,  _,     _,  _   => (h, .outOfFuel)
+  | n+1, h, fn, self?, vs, kws =>
       let base : Env := match self? with
                         | some s => [("self", s)]
                         | none   => []
-      let ρ := (fn.params.zip vs).foldl (fun e (x, v) => e.set x v) base
+      let ρ := bindParams fn base vs kws
+      if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v)    => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
@@ -716,11 +837,12 @@ Capture is by value. Reads of enclosing variables therefore work, which covers d
 and factory functions; a `nonlocal` **write** would need the binding to be a shared
 mutable cell, so the transpiler keeps it as an explicit hole rather than pretending. -/
 def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) → List Val →
-    Heap × EResult
-  | 0,   h, _,  _,   _  => (h, .outOfFuel)
-  | n+1, h, fn, cap, vs =>
+    List (String × Val) → Heap × EResult
+  | 0,   h, _,  _,   _,  _   => (h, .outOfFuel)
+  | n+1, h, fn, cap, vs, kws =>
       let base : Env := cap
-      let ρ : Env := (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
+      let ρ : Env := bindParams fn base vs kws
+      if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v)     => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
@@ -729,17 +851,57 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
       | (h₁, _)          => (h₁, .hole "call:stray-control-flow")
 
-/-- Evaluate a list of expressions left to right, short-circuiting on the first
-non-value. -/
-def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr → Heap × Sum EResult (List Val)
+/-- Evaluate an argument list left to right, short-circuiting on the first non-value, and
+return the **positional** values together with the **keyword** bindings.
+
+This is the one place the three argument forms of `Expr` mean anything:
+
+* `*e` splices `e`'s elements into the positional list. A non-iterable `e` raises
+  `TypeError`, as in CPython (`f(*1)`).
+* `k = e` appends one keyword binding.
+* `**e` splices a `dict` into the keyword bindings. A non-`dict`, or a `dict` with a
+  non-string key, raises `TypeError`, as in CPython.
+
+Every other expression contributes exactly one positional value, so the `kws` component is
+`[]` for every argument list that predates this change and the whole of the previous
+behaviour is recovered by projecting on the first component. -/
+def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
+    Heap × Sum EResult (List Val × List (String × Val))
   | 0,   h, _, _       => (h, .inl .outOfFuel)
-  | _+1, h, _, []      => (h, .inr [])
+  | _+1, h, _, []      => (h, .inr ([], []))
+  | n+1, h, ρ, .starred e :: as =>
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val v) =>
+        match v.iterable with
+        | none    => (h₁, .inl (.exn (.str "TypeError")))
+        | some xs =>
+          match evalList ctx n h₁ ρ as with
+          | (h₂, .inr (vs, kws)) => (h₂, .inr (xs ++ vs, kws))
+          | (h₂, .inl r)         => (h₂, .inl r)
+      | (h₁, r) => (h₁, .inl r)
+  | n+1, h, ρ, .kwargE k e :: as =>
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val v) =>
+        match evalList ctx n h₁ ρ as with
+        | (h₂, .inr (vs, kws)) => (h₂, .inr (vs, (k, v) :: kws))
+        | (h₂, .inl r)         => (h₂, .inl r)
+      | (h₁, r) => (h₁, .inl r)
+  | n+1, h, ρ, .dstarred e :: as =>
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val v) =>
+        match strKeyed v with
+        | none    => (h₁, .inl (.exn (.str "TypeError")))
+        | some ks =>
+          match evalList ctx n h₁ ρ as with
+          | (h₂, .inr (vs, kws)) => (h₂, .inr (vs, ks ++ kws))
+          | (h₂, .inl r)         => (h₂, .inl r)
+      | (h₁, r) => (h₁, .inl r)
   | n+1, h, ρ, a :: as =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val v) =>
         match evalList ctx n h₁ ρ as with
-        | (h₂, .inr vs) => (h₂, .inr (v :: vs))
-        | (h₂, .inl r)  => (h₂, .inl r)
+        | (h₂, .inr (vs, kws)) => (h₂, .inr (v :: vs, kws))
+        | (h₂, .inl r)         => (h₂, .inl r)
       | (h₁, r) => (h₁, .inl r)
 
 /-- Evaluate a list of key/value expression pairs. -/
@@ -879,6 +1041,22 @@ def execFor (ctx : Ctx) : Nat → Heap → Env → String → List Val → Stmt 
 
 end
 
+/-- A one-element argument list, when that argument is an ordinary one. Stated because a
+*symbolic* expression cannot be dispatched on: `evalList` looks at the argument's syntax
+before evaluating it, so knowing what `evalExpr` does to `e` is not by itself enough to
+know what `evalList` does to `[e]`. -/
+theorem evalList_singleton (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) {e : Expr}
+    (hp : e.plainArg = true) :
+    evalList ctx (n+2) h ρ [e] =
+      (match evalExpr ctx (n+1) h ρ e with
+       | (h₁, .val v) => (h₁, .inr ([v], []))
+       | (h₁, r)      => (h₁, .inl r)) := by
+  cases e
+  case starred _ => exact absurd hp (by simp [Expr.plainArg])
+  case kwargE _ _ => exact absurd hp (by simp [Expr.plainArg])
+  case dstarred _ => exact absurd hp (by simp [Expr.plainArg])
+  all_goals rfl
+
 /-- Run a named entry point against argument values, with **no** module-level state.
 
 Deliberately unchanged: it starts from the empty heap, so `Heap.get ctx.globals` finds
@@ -890,7 +1068,7 @@ def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResu
                      builtinBases := p.builtinBases }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
-  | some fn => (applyFunc ctx fuel [] fn none args).2
+  | some fn => (applyFunc ctx fuel [] fn none args []).2
 
 /-- Run the module initializers and return the resulting heap plus the globals address.
 
@@ -905,7 +1083,7 @@ def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
-    | n+1, h, f :: fs => go n (applyFunc ctx fuel h f none []).1 fs
+    | n+1, h, f :: fs => go n (applyFunc ctx fuel h f none [] []).1 fs
   (go (inits.length + 1) h₀ inits, g)
 
 /-- Run module initializers into a shared globals frame, then call an entry point.
@@ -928,7 +1106,7 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)
     | n+1, h, f :: fs =>
-        match applyFunc ctx fuel h f none [] with
+        match applyFunc ctx fuel h f none [] [] with
         | (h₁, .val _)     => runInits n h₁ fs
         | (h₁, .hole l)    => (h₁, some l)
         | (h₁, .exn _)     => runInits n h₁ fs   -- an initializer that raises still bound
@@ -939,6 +1117,6 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
   | (h₁, none)   =>
     match ctx.resolve name with
     | none    => .hole s!"entry:{name}"
-    | some fn => (applyFunc ctx fuel h₁ fn none args).2
+    | some fn => (applyFunc ctx fuel h₁ fn none args []).2
 
 end Autoform.Core

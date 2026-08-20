@@ -263,7 +263,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 
 | Label family | Meaning | Status |
 |---|---|---|
-| `op:starredUnpack` | `*args` / `**kwargs` splicing. Has no Core representation — splicing changes arity, which cannot be expressed by a fixed parameter list. | **Permanent** without variadic functions in Core. |
+| ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
 | `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
 | `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]`, slice deletion, attribute deletion. | Blocked on boxed containers (index/slice); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
@@ -317,7 +317,9 @@ boundary.
   honest boundary.
 * `cstr:*` and `str:pointer-*`. Core has one `Val.str` for Python strings and C `char*`.
   Rather than model addresses, the operations that differ are refused.
-* `op:starredUnpack`. Variadic arity is not expressible against a fixed `params` list.
+* `op:starred-outside-call`. A starred form outside an argument list (`a, *b = xs`) is
+  a *destructuring* pattern, not a call, and Core has no pattern binding. The calling
+  convention (§35) covers the call side only.
 * `import:*` for genuinely external modules — this is the effect boundary itself, and the
   SACM case declares it as an assumption rather than pretending it away.
 * `ub:*`. Not a gap at all: it is the semantics correctly refusing to commit where the

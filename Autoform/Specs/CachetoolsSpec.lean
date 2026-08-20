@@ -160,7 +160,7 @@ theorem Cache_getsizeof_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, Marshal.toVal]
 
 /-! ### `_DefaultSize.__getitem__` / `.pop` — the degenerate size table
@@ -176,7 +176,7 @@ theorem DefaultSize_getitem_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, Marshal.toVal]
 
 theorem DefaultSize_pop_refines :
@@ -187,7 +187,7 @@ theorem DefaultSize_pop_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, Marshal.toVal]
 
 /-- `_DefaultSize.__setitem__` is a no-op **on the heap as well as on the result**: this
@@ -200,7 +200,7 @@ theorem DefaultSize_setitem_mrefines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___DefaultSize___setitem__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___setitem__, ctxOf, P]
 
 /-! ### `Cache.maxsize` / `Cache.currsize` — the two accessors must read *different* fields
@@ -220,7 +220,7 @@ theorem Cache_maxsize_mrefines :
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
 
 theorem Cache_currsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.currsize" 10
@@ -232,7 +232,7 @@ theorem Cache_currsize_mrefines :
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
 
 /-- A concrete cache object whose capacity and occupancy differ. -/
 def sampleCache : Heap :=
@@ -259,7 +259,7 @@ theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
       runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
   refine ⟨?_, ?_, ?_⟩ <;>
-    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
           f_cachetools___init___py__module__Cache_maxsize,
           f_cachetools___init___py__module__Cache_currsize]
 
@@ -283,7 +283,7 @@ theorem Cache_contains_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
         hg, hfld]
 
@@ -299,7 +299,7 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
-    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
           f_cachetools___init___py__module__Cache___contains__]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
@@ -323,7 +323,7 @@ theorem TLRUItem_lt_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TLRUCache__Item___lt__, ctxOf, P,
         applyBinop_int_lt, readField, hg, hfld, hg', hfld']
 
@@ -334,7 +334,7 @@ theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
       = .val (.bool false) := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
         f_cachetools___init___py__module__TLRUCache__Item___lt__]
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
@@ -357,7 +357,7 @@ theorem Timer_exit_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___exit__, ctxOf, P,
         P_dialect, readField, hg, hfld]
 
@@ -368,7 +368,7 @@ theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
         "_Timer__nesting" = .int 0 := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
         f_cachetools___init___py__module___TimedCache__Timer___exit__]
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
@@ -389,7 +389,7 @@ theorem Timer_init_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P]
 
 /-- Both fields are actually written, with the right values in the right places. -/
@@ -403,7 +403,7 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
-    simp [applyFunc, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
           f_cachetools___init___py__module___TimedCache__Timer___init__]
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
@@ -419,7 +419,7 @@ theorem TTLLink_init_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link___init__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
@@ -434,7 +434,7 @@ theorem TTLSetstate_lambda_mrefines :
   refine forall_ge_of_forall_add (N := 10) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache___setstate____lambda_0 rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P,
         readField, hg, hfld]
 
@@ -466,7 +466,7 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
   obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
   refine ⟨v, ?_⟩
-  simp only [applyFunc, execStmt, f_cachetools___init___py__module___TimedCache_expire,
+  simp only [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set]
   rw [hv]
 
@@ -479,7 +479,7 @@ theorem cachedmethod_none_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro m
   rw [runFunc_of_resolve _ _ _ _ f_cachetools__cachedmethod_py__module___none rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
         f_cachetools__cachedmethod_py__module___none, ctxOf, P]
 
 /-! ## 3. A negative result on the translated module
@@ -498,7 +498,7 @@ theorem cache_clear_reaches_hole (k : Nat) (h : Heap) (self : Val) :
     (runMethod (k + 4) h "cachetools/_cached.py:<module>._uncached_info.cache_clear"
       self []).2 = .hole "scope:nonlocal-write" := by
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools__cached_py__module___uncached_info_cache_clear rfl]
-  simp [applyFunc, execStmt, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, Env.set,
         f_cachetools__cached_py__module___uncached_info_cache_clear]
 
 theorem cache_clear_not_refinable (N : Nat)

@@ -137,7 +137,7 @@ Every link is mechanically checked, and each check is a different kind of oracle
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
-| untranslated code is declared | hole counting + SACM assumptions | 78 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 42 holes, all named |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
 not a property of the specifications: `scripts/mutate.py`'s `error_lines` regex matched
@@ -181,8 +181,9 @@ Boxed mutable containers (`Stmt.setIndex` is still an honest hole — design in
 `docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
 contracts at holes, so partially-translated functions can be reasoned about under stated
 assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
-is **not yet wired into the semantics**, so floats still hole); `op:starredUnpack`, which
-needs a variadic calling convention.
+is **not yet wired into the semantics**, so floats still hole). `op:starredUnpack` is
+**closed** (STRATEGY.md §35) — Core now has a variadic calling convention; what is left of
+it is default parameter values, keyword-only parameters, and starred *destructuring*.
 
 ## Dependencies
 

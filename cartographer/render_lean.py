@@ -128,6 +128,12 @@ def expr_shape(n):
     if k == "cond":   return ".cond", [("e", f('c')), ("e", f('t')), ("e", f('e'))]
     if k == "isOp":   return ".isOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
     if k == "inOp":   return ".inOp", [("atom", lean_bool(f('neg'))), ("e", f('a')), ("e", f('b'))]
+    # --- the calling convention: `f(*xs, k=v, **d)` ---
+    # Only meaningful directly inside a call's argument list; `Semantics.evalList` is the
+    # only consumer, and anywhere else the interpreter holes rather than inventing a value.
+    if k == "starred":  return ".starred", [("e", f('a'))]
+    if k == "kwargE":   return ".kwargE", [("atom", lean_str(f('n'))), ("e", f('a'))]
+    if k == "dstarred": return ".dstarred", [("e", f('a'))]
     raise ValueError(f"unknown expr node kind {k!r} (node: {json.dumps(n)[:200]})")
 
 def stmt_shape(n):
@@ -384,11 +390,20 @@ def infer_dialect(funcs) -> str:
 def render_func(f, nm) -> list:
     params = ", ".join(lean_str(p) for p in f.get("params", []))
     body = render(f["body"], "s", 10)  # "  , body := " is 12 wide; 10 keeps a margin
+    # `vararg`/`kwarg` are emitted only when the AST records them, so a corpus with no
+    # variadic parameters renders byte-identically to the way it did before the calling
+    # convention existed. Both fields default to `none` in `Core.Func`.
+    variadic = []
+    if f.get("vararg") is not None:
+        variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
+    if f.get("kwarg") is not None:
+        variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",
         f"  {{ name := {lean_str(f['name'])}",
         f"  , params := [{params}]",
+        *variadic,
         f"  , body := {body} }}",
         "",
     ]

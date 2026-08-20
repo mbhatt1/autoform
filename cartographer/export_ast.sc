@@ -65,6 +65,42 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "!"
   )
 
+  // ---- parameter star-ness ---------------------------------------------------
+  //
+  // `def f(*args, **kwargs)` is only half visible in the CPG: pysrc2cpg sets IS_VARIADIC
+  // on `*args` and sets **nothing** on `**kwargs`, whose node is indistinguishable from an
+  // ordinary parameter by any graph property. What *is* present is OFFSET, the parameter
+  // name's byte offset in its source file, and the stars sit immediately before it. So the
+  // discriminator is read from the source text rather than guessed at.
+  //
+  // This makes the exporter require the source tree that the CPG was built from. That is
+  // a real new precondition, and it fails loudly (below) rather than quietly emitting a
+  // `**kwargs` as a positional parameter -- which would be a silent mistranslation of
+  // exactly the kind the hole mechanism exists to prevent.
+  val srcRoot = cpg.metaData.root.l.headOption.getOrElse("")
+  val fileTextCache = collection.mutable.Map.empty[String, Option[String]]
+  def fileText(fn: String): Option[String] = fileTextCache.getOrElseUpdate(fn, {
+    val cands = List(os.Path(srcRoot, os.pwd) / os.RelPath(fn), os.Path(fn, os.pwd))
+    cands.find(p => os.exists(p) && os.isFile(p)).map(os.read(_))
+  })
+
+  /** How many `*`s immediately precede this parameter's name in the source. */
+  def paramStars(p: MethodParameterIn, file: String): Int =
+    (for {
+       off <- p.offset
+       txt <- fileText(file)
+       if off <= txt.length
+     } yield {
+       var i = off - 1
+       var n = 0
+       while (i >= 0 && txt.charAt(i) == '*') { n += 1; i -= 1 }
+       n
+     }).getOrElse {
+       sys.error(s"export_ast: cannot read source for $file (root='$srcRoot') to decide "
+               + s"whether parameter '${p.name}' is `*args` or `**kwargs`. Run the "
+               + "exporter against the tree the CPG was built from.")
+     }
+
   def hole(label: String): ujson.Obj  = ujson.Obj("k" -> "hole", "label" -> label)
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
   val skip = ujson.Obj("k" -> "skip")
@@ -594,6 +630,55 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   def exprs(ns: List[AstNode]): ujson.Arr = ujson.Arr.from(ns.map(expr))
 
+  // ---- the calling convention ------------------------------------------------
+  //
+  // Three argument shapes that a flat positional list cannot express, and that this
+  // exporter previously either holed or -- worse -- dropped in silence:
+  //
+  //   f(*xs)     `<operator>.starredUnpack` wrapping the operand. Was `op:starredUnpack`,
+  //              36 holes on `cachetools`, the largest single category.
+  //   f(**d)     an argument carrying ARGUMENT_NAME `<keyword_dict>` and ARGUMENT_INDEX
+  //              -1. Because the old code selected arguments by `argumentIndex >= 1`,
+  //              this was **silently discarded**: `hashkey(*args, **kwargs)` translated
+  //              to a call that passed no keywords at all, and nothing counted it.
+  //   f(k = v)   an argument carrying its parameter's name. Discarded the same way --
+  //              `_wrapper(..., info = make_info)` lost `info`.
+  //
+  // The last two are the §31 category exactly: well-typed output that type-checked,
+  // counted as translated, and did the wrong thing. They are now expressed.
+
+  /** The ARGUMENT_NAME a keyword argument carries, if it is one. */
+  def argName(n: AstNode): Option[String] = n match {
+    case e: Expression => e.argumentName
+    case _             => None
+  }
+
+  def isKeywordArg(n: AstNode): Boolean = argName(n).isDefined
+
+  /** One positional argument, recognising `*e`. Outside an argument list a starred
+    * unpack has no Core form and stays the hole it was. */
+  def argExpr(n: AstNode): ujson.Value = n match {
+    case c: Call if c.methodFullName == "<operator>.starredUnpack" =>
+      kidsOf(c) match {
+        case one :: Nil => ujson.Obj("k" -> "starred", "a" -> expr(one))
+        // A starred unpack is unary in every frontend we have seen; a different arity is
+        // a shape we have not seen and must not guess at.
+        case _          => hole("op:starredUnpack-arity")
+      }
+    case other => expr(other)
+  }
+
+  /** A call's arguments: positional (recognising `*e`) followed by keyword (`k = e` and
+    * `**e`), in CPG order. */
+  def argExprs(pos: List[AstNode], kw: List[AstNode]): ujson.Arr =
+    ujson.Arr.from(pos.map(argExpr) ++ kw.map { a =>
+      argName(a) match {
+        case Some("<keyword_dict>") => ujson.Obj("k" -> "dstarred", "a" -> expr(a))
+        case Some(k)                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> expr(a))
+        case None                   => expr(a)
+      }
+    })
+
   /** Substitute `name` occurrences in an already-translated tree. Used only for the
     * frontend's own `tmpN` temporaries, whose definitions we proved re-evaluable. */
   def substNames(v: ujson.Value, m: Map[String, ujson.Value]): ujson.Value = v match {
@@ -687,7 +772,8 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       m   <- boundMethods.get(t).collect { case (br, bm) if br == r => bm }
                .orElse(if (attrsOf.getOrElse(r, Set.empty).contains(t)) Some(t) else None)
     } yield ujson.Obj("k" -> "mcall", "recv" -> ujson.Obj("k" -> "name", "v" -> r),
-                      "m" -> mangleName(m, currentClass), "args" -> exprs(args))
+                      "m" -> mangleName(m, currentClass),
+                      "args" -> argExprs(args.filterNot(isKeywordArg), args.filter(isKeywordArg)))
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
@@ -742,8 +828,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     else {
       // A real call. Arguments are the children with argumentIndex >= 1; the callee sits
       // at -1 and the Python frontend repeats the receiver at 0.
-      val args   = kids.filter(aidx(_) >= 1)
-      val callee = kids.find(aidx(_) == -1).orElse(kids.headOption)
+      // Keyword arguments carry ARGUMENT_NAME and ARGUMENT_INDEX -1, which is also the
+      // callee's index -- so they must be split off *before* the callee is chosen, or a
+      // `**kwargs` could be mistaken for the thing being called.
+      val kwArgs = kids.filter(isKeywordArg)
+      val args   = kids.filter(k => aidx(k) >= 1 && !isKeywordArg(k))
+      val callee = kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption)
       // Construction: Joern resolves `Cls(...)` to `...Cls.__init__` while keeping the
       // call's name as the class. An explicit `super().__init__(...)` keeps name
       // `__init__` and is a method call, not an allocation.
@@ -766,14 +856,15 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           m.methodFullName.stripSuffix(".<body>")
       }
       if (fakeNew.isDefined)
-        ujson.Obj("k" -> "alloc", "cls" -> fakeNew.get, "args" -> exprs(args))
+        ujson.Obj("k" -> "alloc", "cls" -> fakeNew.get, "args" -> argExprs(args, kwArgs))
       else if (classBody.isDefined) typeValue(classBody.get + "<meta>")
       else ctor match {
-        case Some(cls) => ujson.Obj("k" -> "alloc", "cls" -> cls, "args" -> exprs(args))
+        case Some(cls) => ujson.Obj("k" -> "alloc", "cls" -> cls, "args" -> argExprs(args, kwArgs))
         case None =>
           callee.flatMap(asField) match {
             case Some((recv, m)) =>
-              ujson.Obj("k" -> "mcall", "recv" -> expr(recv), "m" -> m, "args" -> exprs(args))
+              ujson.Obj("k" -> "mcall", "recv" -> expr(recv), "m" -> m,
+                        "args" -> argExprs(args, kwArgs))
             // Only a call the frontend left *unnamed* can be one of these; a named call
             // already says what it invokes, and rerouting it on a name coincidence would
             // be a guess.
@@ -794,8 +885,9 @@ import io.shiftleft.codepropertygraph.generated.nodes._
               // `Ctx.resolve` matches the full name exactly, where its short-name fallback
               // needs a *unique* suffix and so resolved neither.
               else if (methodByName.contains(mfn))
-                ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn), "args" -> exprs(args))
-              else ujson.Obj("k" -> "call", "f" -> c.name, "args" -> exprs(args))
+                ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
+                          "args" -> argExprs(args, kwArgs))
+              else ujson.Obj("k" -> "call", "f" -> c.name, "args" -> argExprs(args, kwArgs))
             }
           }
       }
@@ -1106,10 +1198,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     declaredGlobals = Set.empty
     boundMethods = Map.empty
     attrsOf = Map.empty
+    val ps = m.parameter.l.sortBy(_.index).filterNot(_.name == "self")
+    val stars = ps.map(p => p.name -> paramStars(p, m.filename)).toMap
     val obj = ujson.Obj(
       "name"   -> mangledFullName(m.fullName),
       "file"   -> m.filename,
-      "params" -> ujson.Arr.from(m.parameter.name.l.filterNot(_ == "self")),
+      "params" -> ujson.Arr.from(ps.map(_.name)),
       "body"   -> body
     )
     // Builtin bases ride on the module *initializer* entry — the function that runs the
@@ -1123,6 +1217,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           k -> (ujson.Str(v): ujson.Value)
         })
     }
+    // Emitted only when present, so an AST with no variadic parameters renders exactly
+    // as it did before this existed.
+    ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
+      .foreach(p => obj("vararg") = p.name)
+    ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
     obj
   }
 

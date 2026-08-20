@@ -1857,3 +1857,145 @@ not use it.
 against 208, §34's standing hazard). Re-rendering it would delete declarations
 `Autoform/SpecsGen/Cachetools.lean` depends on, so it stays a separate change and
 `scripts/check_render.py` keeps failing on exactly that one module, as it did before.
+
+## §36 — `op:starredUnpack` closed: a calling convention, not a hole-filler
+
+`f(*args, **kwargs)` and `def f(*args, **kwargs)` had no translation. `Expr.call` took a
+fixed list of expressions and `Func.params` was a `List String`, so every starred call
+became `Expr.hole "op:starredUnpack"` — **36 holes on `cachetools`, the largest single
+category**, 46% of all holes in the corpus.
+
+### What was added
+
+Three `Expr` constructors and two `Func` fields:
+
+| addition | meaning |
+|---|---|
+| `Expr.starred e` | `*e` in an argument list: splice an iterable into the positional arguments |
+| `Expr.kwargE k e` | `k = e`: one keyword argument |
+| `Expr.dstarred e` | `**e`: splice a `dict` into the keyword arguments |
+| `Func.vararg : Option String` | which parameter is `*args` |
+| `Func.kwarg : Option String` | which parameter is `**kwargs` |
+
+Both `Func` fields default to `none`, so every already-rendered corpus keeps its exact
+meaning (`bindParams_plain` is the compatibility equation, proved).
+
+**Argument forms rather than a new call constructor, deliberately.** Replacing
+`List Expr` with an `Arg` type would have made every one of the ~110 dialect matches and
+every `Expr` recursion non-exhaustive at once; three leaf constructors disturbed only the
+four matches that are exhaustive over `Expr` (`Contracts.substE`, its `substE_nil` proof,
+`FuelMono`'s `evalExpr` case split, `Overflow`'s inexact-operator list).
+
+The interpreter change is confined to two places: `evalList` now returns *positional
+values plus keyword bindings* and dispatches on the argument's syntax before evaluating
+it, and `bindParams` — an ordinary total function, not part of the mutual recursion —
+implements CPython's binding rule. `applyFunc`/`applyClosure` gained a `kws` argument.
+
+### Result
+
+| label | before | after |
+|---|--:|--:|
+| `op:starredUnpack` | **36** | **0** |
+| `import:module-value` | 15 | 15 |
+| `scope:nonlocal-write` | 8 | 8 |
+| `op:delete-index` | 6 | 6 |
+| `call:computed-callee` | 6 | 6 |
+| `expr:genExp` | 2 | 2 |
+| `op:delete-slice` | 2 | 2 |
+| `op:stringExpressionList` | 1 | 1 |
+| `control:TRY-multiCatch` | 1 | 1 |
+| `import:unresolved` | 1 | 1 |
+| **total** | **78** | **42** |
+
+Hole-free **159 → 179** of 208; verifiable core **94 → 100**. No other label rose — the
+outcome §29/§31 warn about (a category that moves rather than closes) did not happen here.
+
+`Autoform/Contracts.lean`'s `methodkey_refinesUnder_value` is now
+**`methodkey_refines`, unconditional** (`Γ = []`, an ordinary `Refine.Refines`), on
+`[propext, Classical.choice, Quot.sound]`. The contract machinery is kept and re-pointed
+at `keysProgramHoled` — `methodkey` *as the transpiler used to emit it* — so the
+worked example is now explicitly historical.
+
+### The part that is not a win: nine arguments were being dropped in silence
+
+`**kwargs` and `k = v` arrive from `pysrc2cpg` with `ARGUMENT_INDEX = -1` and an
+`ARGUMENT_NAME`. The exporter selected arguments with `argumentIndex >= 1`, so **every
+keyword argument in the corpus was discarded without a hole and without a count** — the
+§31 category exactly: well-typed output that type-checked, counted as translated, and did
+the wrong thing. Nine sites, including `sorted(..., key = ...)` in `TTLCache.__setstate__`
+(sorted by the wrong key, silently) and `_wrapper(..., info = make_info)` in both
+`cached.decorator` and `cachedmethod.decorator`, where `_wrapper` really does have an
+`info` parameter and simply never received it.
+
+Those nine are now expressed. Two consequences are honest losses, not gains: a keyword
+argument to a *modelled builtin* is now the named hole `call:<f>:keyword-to-builtin`
+rather than a silent drop, and `Consistent` gained a clause forbidding a hole
+implementation from being a bare argument form (see below), which narrows `RefinesUnder`.
+
+### An exporter precondition that is new and fails loudly
+
+`pysrc2cpg` marks `*args` with `IS_VARIADIC` and marks `**kwargs` with **nothing at all** —
+its parameter node is indistinguishable from an ordinary one by any graph property. What
+is present is `OFFSET`, so the exporter reads the source text at that offset and counts
+the `*`s. That makes `export_ast.sc` require the source tree the CPG was built from, and
+it `sys.error`s rather than falling back, because the fallback would be "treat `**kwargs`
+as a positional parameter", which is a silent mistranslation.
+
+### Fuel monotonicity: no new exclusion
+
+`FuelMono` still proves all seven functions, with `Stmt.tryFinally` remaining the only
+exclusion. The starred forms propagate `outOfFuel` like every other argument, so the
+seven-way induction extends mechanically (three new `evalExpr` leaf cases, three new
+`evalList` head cases, and one `if` split in `applyFunc`/`applyClosure`).
+
+### One place the mechanism genuinely could not be stretched
+
+An `Impl` may not replace a hole with `starred`/`kwargE`/`dstarred`. Those are not
+expressions that produce a value — `f(*xs)` passes several arguments and `f(**d)` passes
+none positionally — so substituting one changes a call's *arity*, and a `Contract.post`,
+being a predicate on `evalExpr`'s single `Heap × EResult`, cannot describe that.
+`Consistent` therefore carries `∀ l e, σ.lookup l = some e → e.plainArg`. This makes
+`RefinesUnder` quantify over strictly fewer implementations than before, i.e. every
+contract-relative theorem now says slightly less. Admitting the forms instead would have
+been unsound, not merely imprecise.
+
+### Still unexpressible after this
+
+* **Default parameter values.** `def k(a=None, **kw)` binds `a` to `None`; Core leaves it
+  unbound and reads `unit`. Not modelled, and `unit` is not `None`.
+* **Surplus positional arguments.** `f(1,2,3)` into `def f(a,b)` is a `TypeError` in
+  CPython; `applyFunc` truncates, as it always has.
+  `CallingConvention.surplusPositional_is_a_known_divergence` states the disagreement as a
+  theorem rather than omitting the case.
+* **Keyword-only parameters** (`def f(*, a)`) are not distinguished from positional ones.
+* **A starred form outside an argument list** (`a, *b = xs`) is the narrower hole
+  `op:starred-outside-call`. It does not occur in `cachetools`; the label exists so that
+  when it does occur it is counted rather than guessed at.
+* **Keyword arguments to modelled builtins** — `Stdlib.builtin`/`Stdlib.method` take
+  positional arguments only, so these are the named holes `call:<f>:keyword-to-builtin`
+  and `mcall:<m>:keyword-to-builtin`.
+* **Two measured divergences, both recorded as theorems rather than omitted.**
+  `g(*"ab")` is `('a','b')` in CPython and `TypeError` in Core, because `Val.iterable` has
+  no `str` case — a gap that already affected `for c in "ab"` and predates this work
+  (`str_is_not_iterable_in_core`). And `h(1, a=2)` where `a` is also positional is
+  `TypeError: got multiple values for argument 'a'` in CPython, while Core lets the
+  keyword shadow the positional (`duplicate_argument_is_not_detected`).
+
+### The anti-vacuity evidence
+
+`Autoform/CallingConvention.lean` is 20 `#eval`s against CPython 3.9.6, each carrying the
+value CPython actually printed, plus ten kernel-checked theorems. It covers `f(*[1,2])`,
+`f(1,*[2])`, `def g(*a)` at 0/1/3 arguments, `def h(a,*rest)` (the interaction with a
+positional parameter, including the empty remainder), `k(**{'a':1})` vs `k(**{'z':9})`,
+all four forms in one call, `*` on a tuple and on a dict (which iterates keys), and the
+four `TypeError` cases. Every one agrees. Without it, a construct that always returned
+`unit` would have produced exactly the same hole table.
+
+### What is *not* established
+
+`scripts/differential.py` on this corpus produced **0 COMPARED cases** — the recorded
+test suite yielded nothing and 142 hole-free methods had no reachable instance. So there
+is no conformance evidence either way from that oracle for this change, and none is
+claimed. The evidence for the semantics is the CPython-paired `#eval`s above; the evidence
+for the exporter is that a re-export reproduces the committed AST byte-for-byte and
+`scripts/check_render.py` passes on all 10 modules.

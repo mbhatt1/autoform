@@ -260,6 +260,28 @@ inductive Expr where
   | isOp   : Bool → Expr → Expr → Expr
   /-- Membership. `true` means negated (`not in`). -/
   | inOp   : Bool → Expr → Expr → Expr
+  -- ### Argument forms
+  --
+  -- Python's calling convention needs three argument *shapes* that a fixed positional
+  -- list cannot express. They are added as `Expr` constructors rather than by changing
+  -- `call`'s argument type, because replacing `List Expr` with a new `Arg` type makes
+  -- every one of the ~110 existing `Expr` matches non-exhaustive at once, while three new
+  -- leaf constructors only disturb the handful of matches that are exhaustive.
+  --
+  -- They are only meaningful directly inside a call's argument list. `evalList` -- the
+  -- one place an argument list is evaluated -- dispatches on them; `evalExpr` reached on
+  -- one of them anywhere else yields the hole `op:starred-outside-call`, which is an
+  -- honest admission rather than a silently wrong value.
+  /-- `*e` in an argument list: splice the elements of an iterable into the positional
+  arguments. A non-iterable operand raises `TypeError`, as in CPython. -/
+  | starred : Expr → Expr
+  /-- `k = e` in an argument list: one keyword argument. Before this existed the exporter
+  dropped such arguments **silently** — `_wrapper(..., info = make_info)` translated to a
+  call that simply did not pass `info`. -/
+  | kwargE  : String → Expr → Expr
+  /-- `**e` in an argument list: splice a `dict` into the keyword arguments. Non-`dict`
+  operands, and `dict`s with non-string keys, raise `TypeError`, as in CPython. -/
+  | dstarred : Expr → Expr
   /-- Unmapped expression, tagged with the originating CPG node label. -/
   | hole   : String → Expr
   deriving Repr, Inhabited
@@ -299,11 +321,21 @@ inductive Stmt where
   | hole     : String → Stmt
   deriving Repr, Inhabited
 
-/-- A function: name, parameters, body. -/
+/-- A function: name, parameters, body.
+
+`params` lists **every** parameter name in source order, including the variadic ones.
+`vararg` and `kwarg` say which of those names — if any — are `*args` and `**kwargs`; they
+are `Option`al fields with `none` defaults, so every existing `Func` literal and every
+already-rendered corpus keeps its meaning unchanged. See `bindParams` in `Semantics.lean`
+for the binding rule. -/
 structure Func where
   name   : String
   params : List String
   body   : Stmt
+  /-- The `*args` parameter's name, if the function has one. -/
+  vararg : Option String := none
+  /-- The `**kwargs` parameter's name, if the function has one. -/
+  kwarg  : Option String := none
   deriving Repr, Inhabited
 
 /-- A whole translated codebase, tagged with the dialect it came from. -/
@@ -322,6 +354,15 @@ structure Program where
   deriving Repr, Inhabited
 
 namespace Expr
+
+/-- Is this an ordinary argument — one that contributes exactly one positional value —
+rather than one of the three starred forms? Used as the side condition on the reasoning
+lemmas about argument lists. -/
+def plainArg : Expr → Bool
+  | .starred _  => false
+  | .kwargE _ _ => false
+  | .dstarred _ => false
+  | _           => true
 
 /-!
 Nested inductives (`List Expr`, `List (Expr × Expr)`) need explicit list helpers for
@@ -344,6 +385,9 @@ def holes : Expr → List String
   | .cond c a b   => holes c ++ holes a ++ holes b
   | .isOp _ a b   => holes a ++ holes b
   | .inOp _ a b   => holes a ++ holes b
+  | .starred a    => holes a
+  | .kwargE _ a   => holes a
+  | .dstarred a   => holes a
   | _             => []
 
 /-- Holes across a list of expressions. -/
@@ -373,6 +417,9 @@ def size : Expr → Nat
   | .cond c a b   => 1 + size c + size a + size b
   | .isOp _ a b   => 1 + size a + size b
   | .inOp _ a b   => 1 + size a + size b
+  | .starred a    => 1 + size a
+  | .kwargE _ a   => 1 + size a
+  | .dstarred a   => 1 + size a
   | _             => 1
 
 /-- Node count across a list of expressions. -/
