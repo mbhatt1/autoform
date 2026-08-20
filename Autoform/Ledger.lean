@@ -138,7 +138,7 @@ def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
 
 /-- Hole-free **and** every call target resolves inside the program. -/
 def Program.callClosed (p : Program) : List Func :=
-  let ctx : Ctx := ⟨p.dialect, p.table⟩
+  let ctx : Ctx := { dialect := p.dialect, table := p.table }
   p.verifiableCore.filter (fun f => f.calls.all (fun n => (ctx.resolve n).isSome))
 
 /-- Per-program translation evidence. -/

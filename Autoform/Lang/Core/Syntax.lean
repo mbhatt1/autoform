@@ -145,6 +145,10 @@ inductive Stmt where
   | raise    : Expr → Stmt
   /-- `del x` -/
   | del      : String → Stmt
+  /-- Write a module-level binding: `x = e` at module scope, or under `global x`. -/
+  | setGlobal   : String → Expr → Stmt
+  /-- `global x` — subsequent assignments to `x` in this function target module scope. -/
+  | declGlobal  : String → Stmt
   /-- Unmapped statement, tagged with the originating CPG node label. -/
   | hole     : String → Stmt
   deriving Repr, Inhabited
@@ -245,6 +249,7 @@ def holes : Stmt → List String
   | .ret e           => e.holes
   | .tryCatch b _ h  => b.holes ++ h.holes
   | .raise e         => e.holes
+  | .setGlobal _ e   => e.holes
   | _                => []
 
 /-- Total node count. -/
@@ -260,6 +265,7 @@ def size : Stmt → Nat
   | .ret e           => 1 + e.size
   | .tryCatch b _ h  => 1 + b.size + h.size
   | .raise e         => 1 + e.size
+  | .setGlobal _ e   => 1 + e.size
   | _                => 1
 
 end Stmt

@@ -1108,3 +1108,58 @@ downgrading.
 
 Current audit state: **PASS**, axiom sweep clean over 1,696 declarations
 (`propext`, `Quot.sound`, `Classical.choice` only), kernel re-verification **VERIFIED**.
+
+## 24. Globals, closures, and a coverage number that moved the honest way
+
+The CPG side of item 5 landed, and the exporter's findings sharpened the design.
+
+### What the CPG actually says
+
+* **`Method.local` is a *reference*, not a binding.** pysrc2cpg emits a `LOCAL` in the
+  *inner* method for every name it closes over and for every module global it reads. A
+  free-variable analysis that treats `LOCAL` as a binder concludes nothing ever captures —
+  it reported 0 closures on cachetools. Bindings must come from parameters and assignment
+  targets, which is Python's own rule.
+* **`fullName` is the lexical nesting path**, so the scope chain is recoverable by prefix
+  — but it **cannot be split on `.`**, because `cachetools/keys.py:<module>` itself ends in
+  the dot-segment `py:<module>`. String surgery classifies module scope as an ordinary
+  function and concludes every module-level `def` captures the module.
+* **Module-level `def`/`class` are assignments**: `hashkey = def hashkey(...)`,
+  `Cache = class Cache<meta>(...)`. So one rewrite of module-scope assignment to
+  `setGlobal` makes constants, classes and functions resolvable together.
+* **C `typeFullName` gives `char*` directly**, including on literals, so item 6 needed no
+  inference.
+
+### The numbers moved down, and that is the finding
+
+| | before | after |
+|---|--:|--:|
+| real functions hole-free | 166 | **148** |
+| holes on real functions | 102 | **120** |
+
+The 18 new holes are `scope:class-closure`. `cachetools/_cachedmethod.py` defines classes
+*inside* functions, and their methods read the enclosing function's parameters. Those six
+functions previously counted as hole-free while returning a class whose methods reference
+names that exist nowhere in the translated program. `Expr.closure` names a *function*;
+there is no constructor for a class-valued closure, and `fnref` would have been the
+silently-wrong answer.
+
+The C string result is starker: on a purpose-built C corpus, **5/5 functions were reported
+hole-free before and 1/5 after** — because four of the five were being mistranslated,
+`s + n` concatenating a pointer and `a < b` comparing contents instead of addresses.
+
+Both movements are the metric getting *more honest*, not the tool getting worse. This is
+now the fourth instance of §17's rule: a number computed without an oracle that disagrees
+with the artifact will flatter itself.
+
+### Open, and deliberately not guessed
+
+* **Cross-file initializer ordering.** The transpiler emits one zero-argument `Func` per
+  source module and `runMain` executes them in list order. The CPG does not give a
+  cross-file dependency order, so a module reading another module's globals depends on
+  list order. Recorded rather than resolved by a guessed topological sort.
+* **`Expr.classClosure`** — the constructor that would close the 18 `scope:class-closure`
+  holes.
+* **`<metaClassCallHandler>` synthetics** pad the function count; the `synthetic` filter
+  excludes `<metaClassAdapter>` but not these. Left alone so that this pass's numbers move
+  for one reason only.

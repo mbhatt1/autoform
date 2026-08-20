@@ -3309,11 +3309,7 @@ def f_cachetools__cachedmethod_py__module___condition_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info"
   , params := ["method", "cache", "key", "lock", "cond", "info"]
   , body := (.seq
-            (.seq
-              (.assign
-                "Descriptor"
-                (.fnref "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor<meta>"))
-              (.expr (.call "" [])))
+            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip (.seq .skip (.seq .skip .skip))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3525,33 +3521,20 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_ca
 def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref
-                "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_info_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info"
   , params := ["method", "cache", "key", "lock", "info"]
   , body := (.seq
-            (.seq
-              (.assign
-                "Descriptor"
-                (.fnref "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor<meta>"))
-              (.expr (.call "" [])))
+            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip (.seq .skip .skip)))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3685,32 +3668,20 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache
 def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_info_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info"
   , params := ["method", "cache", "key", "info"]
   , body := (.seq
-            (.seq
-              (.assign
-                "Descriptor"
-                (.fnref "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor<meta>"))
-              (.expr (.call "" [])))
+            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip .skip))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3810,22 +3781,13 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cac
 def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref
-                "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition : Func :=
@@ -3847,9 +3809,7 @@ def f_cachetools__cachedmethod_py__module___condition : Func :=
                     (.closure "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"))
                   (.seq
                     (.seq
-                      (.assign
-                        "Descriptor"
-                        (.fnref "cachetools/_cachedmethod.py:<module>._condition.Descriptor<meta>"))
+                      (.assign "Descriptor" (.hole "scope:class-closure"))
                       (.expr (.call "" [])))
                     (.seq
                       (.ret
@@ -4066,21 +4026,13 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper_cache_c
 def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._condition.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked : Func :=
@@ -4093,11 +4045,7 @@ def f_cachetools__cachedmethod_py__module___locked : Func :=
                 "cache_clear"
                 (.closure "cachetools/_cachedmethod.py:<module>._locked.cache_clear"))
               (.seq
-                (.seq
-                  (.assign
-                    "Descriptor"
-                    (.fnref "cachetools/_cachedmethod.py:<module>._locked.Descriptor<meta>"))
-                  (.expr (.call "" [])))
+                (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
                 (.seq
                   (.ret (.alloc "Descriptor" [(.name "wrapper"), (.name "cache_clear")]))
                   (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))) }
@@ -4219,21 +4167,13 @@ def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper_cache_clea
 def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._locked.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked : Func :=
@@ -4246,11 +4186,7 @@ def f_cachetools__cachedmethod_py__module___unlocked : Func :=
                 "cache_clear"
                 (.closure "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"))
               (.seq
-                (.seq
-                  (.assign
-                    "Descriptor"
-                    (.fnref "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor<meta>"))
-                  (.expr (.call "" [])))
+                (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
                 (.seq
                   (.ret (.alloc "Descriptor" [(.name "wrapper"), (.name "cache_clear")]))
                   (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
@@ -4326,21 +4262,13 @@ def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper_cache_cl
 def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.<metaClassCallHandler>"
   , params := ["obj"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper<meta>")
-              "<fakeNew>"
-              [(.name "obj")])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_Descriptor__metaClassCallHandler_ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.<metaClassCallHandler>"
   , params := []
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor<meta>")
-              "<fakeNew>"
-              [])) }
+  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___wrapper : Func :=

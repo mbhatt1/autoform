@@ -288,6 +288,9 @@ abbrev FuncTable := List (String × Func)
 structure Ctx where
   dialect : Dialect
   table   : FuncTable
+  /-- Heap address of the module-level bindings frame. Globals must be mutable and must
+  outlive any single call, so they live on the heap rather than in `Env`. -/
+  globals : Ref := 0
 
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -326,9 +329,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- Item 5: a bare name that is not a local may still be a module-level function.
         -- Resolving it to a function value is what lets higher-order code (decorators,
         -- callbacks) be translated instead of holed.
-        match ctx.resolve x with
-        | some _ => (h, .val (.fn x))
-        | none   => (h, .val .unit)
+        match h.get ctx.globals with
+        | some g =>
+          match g.fields.find? (·.1 == x) with
+          | some (_, v) => (h, .val v)
+          | none        => match ctx.resolve x with
+                           | some _ => (h, .val (.fn x))
+                           | none   => (h, .val .unit)
+        | none => match ctx.resolve x with
+                  | some _ => (h, .val (.fn x))
+                  | none   => (h, .val .unit)
   | _+1, h, _, .fnref f       => (h, .val (.fn f))
   | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
   | _+1, h, _, .hole l        => (h, .hole l)
@@ -530,15 +540,26 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | _+1, h, ρ, .cont   => (h, .cont ρ)
   | _+1, h, _, .hole l => (h, .hole l)
   | _+1, h, ρ, .del x  => (h, .normal (ρ.del x))
+  -- `global x` records a marker; `assign` consults it so that `global x; x = 1` writes
+  -- module scope rather than silently creating a local and losing the update.
+  | _+1, h, ρ, .declGlobal x => (h, .normal (ρ.set ("<glob>" ++ x) (.bool true)))
   | n+1, h, ρ, .expr e =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val _)     => (h₁, .normal ρ)
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .setGlobal x e =>
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val v)     => (h₁.setField ctx.globals x v, .normal ρ)
+      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .assign x e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .normal (ρ.set x v))
+      | (h₁, .val v)     =>
+          if (ρ.get ("<glob>" ++ x)).truthy then (h₁.setField ctx.globals x v, .normal ρ)
+          else (h₁, .normal (ρ.set x v))
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
@@ -620,11 +641,63 @@ def execFor (ctx : Ctx) : Nat → Heap → Env → String → List Val → Stmt 
 
 end
 
-/-- Run a named entry point against argument values. -/
+/-- Run a named entry point against argument values, with **no** module-level state.
+
+Deliberately unchanged: it starts from the empty heap, so `Heap.get ctx.globals` finds
+nothing and a free name falls through to the function table. This is the right entry point
+for a self-contained function, and keeping it stable keeps the refinement layer's
+theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
-  let ctx : Ctx := ⟨p.dialect, p.table⟩
+  let ctx : Ctx := { dialect := p.dialect, table := p.table }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args).2
+
+/-- Run the module initializers and return the resulting heap plus the globals address.
+
+Exposed separately from `runMain` so that a harness which builds its own heap (e.g. the
+differential oracle, which materialises receiver objects) can start from an initialised
+globals frame instead of the empty heap. Fresh objects must be allocated at indices from
+`heap.length` onward. -/
+def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
+  let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g }
+  let rec go : Nat → Heap → List Func → Heap
+    | 0,   h, _       => h
+    | _+1, h, []      => h
+    | n+1, h, f :: fs => go n (applyFunc ctx fuel h f none []).1 fs
+  (go (inits.length + 1) h₀ inits, g)
+
+/-- Run module initializers into a shared globals frame, then call an entry point.
+
+Module-level bindings are mutable and outlive any single call, so they live in a heap
+object rather than in `Env`. The transpiler emits one zero-argument `Func` per source
+module (`moduleInits`); running them in order is what makes module constants, classes and
+functions resolvable.
+
+Initializer order is the caller's responsibility: the transpiler cannot recover a
+cross-file dependency order from the CPG, so a module that reads another module's globals
+must be listed after it. That is a real limitation, not a detail — it is recorded as an
+open item rather than papered over with a guessed ordering. -/
+def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
+    (args : List Val) : EResult :=
+  let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g }
+  let rec runInits : Nat → Heap → List Func → Heap × Option String
+    | 0,   h, _       => (h, some "initializers:outOfFuel")
+    | _+1, h, []      => (h, none)
+    | n+1, h, f :: fs =>
+        match applyFunc ctx fuel h f none [] with
+        | (h₁, .val _)     => runInits n h₁ fs
+        | (h₁, .hole l)    => (h₁, some l)
+        | (h₁, .exn _)     => runInits n h₁ fs   -- an initializer that raises still bound
+                                                  -- whatever it bound before raising
+        | (h₁, .outOfFuel) => (h₁, some "initializers:outOfFuel")
+  match runInits (inits.length + 1) h₀ inits with
+  | (_,  some l) => .hole l
+  | (h₁, none)   =>
+    match ctx.resolve name with
+    | none    => .hole s!"entry:{name}"
+    | some fn => (applyFunc ctx fuel h₁ fn none args).2
 
 end Autoform.Core

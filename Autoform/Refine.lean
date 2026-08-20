@@ -256,9 +256,10 @@ theorem evalExpr_name (x : String) {v : Val} (hx : ρ.find? (·.1 == x) = some (
 
 /-- A name that is neither local nor a known function evaluates to `unit`. -/
 theorem evalExpr_name_free (x : String)
-    (hx : ρ.find? (·.1 == x) = none) (hf : ctx.resolve x = none) :
+    (hx : ρ.find? (·.1 == x) = none) (hf : ctx.resolve x = none)
+    (hg : h.get ctx.globals = none) :
     evalExpr ctx (k+1) h ρ (.name x) = (h, .val .unit) := by
-  simp [evalExpr, hx, hf]
+  simp [evalExpr, hx, hf, hg]
 theorem evalExpr_fnref (f : String) :
     evalExpr ctx (k+1) h ρ (.fnref f) = (h, .val (.fn f)) := rfl
 theorem evalExpr_hole (l : String) :
@@ -339,10 +340,14 @@ theorem execStmt_ret_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
     execStmt ctx (k+1) h ρ (.ret e) = (h₁, .ret v) := by simp [execStmt, he]
 
+/-- Assignment binds locally, provided `x` was not declared `global` in this scope.
+The hypothesis is not decoration: `declGlobal` installs a marker that redirects the write
+to the module frame, and a lemma that ignored it would be unsound for such functions. -/
 theorem execStmt_assign_val {x : String} {e : Expr} {h₁ : Heap} {v : Val}
-    (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
+    (he : evalExpr ctx k h ρ e = (h₁, .val v))
+    (hg : (ρ.get ("<glob>" ++ x)).truthy = false) :
     execStmt ctx (k+1) h ρ (.assign x e) = (h₁, .normal (ρ.set x v)) := by
-  simp [execStmt, he]
+  simp [execStmt, he, hg]
 
 theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
@@ -439,7 +444,7 @@ theorem applyUnop_int_neg (x : Int) :
 
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
-def ctxOf (p : Program) : Ctx := ⟨p.dialect, p.table⟩
+def ctxOf (p : Program) : Ctx := { dialect := p.dialect, table := p.table }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -566,9 +571,7 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           -- The name case now branches on local lookup then on table resolution; the
           -- heap is returned unchanged on every branch.
           simp only [evalExpr]
-          split
-          · rfl
-          · split <;> rfl
+          repeat' (first | rfl | split)
   | fnref f => intro k h ρ; cases k <;> rfl
   | unop op _ ih =>
       intro k h ρ; cases k with
