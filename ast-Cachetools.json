@@ -9,7 +9,7 @@
    "k": "ret",
    "e": {
     "k": "int",
-    "v": 1
+    "v": "1"
    }
   }
  },
@@ -34,7 +34,7 @@
    "k": "ret",
    "e": {
     "k": "int",
-    "v": 1
+    "v": "1"
    }
   }
  },
@@ -160,7 +160,7 @@
        "f": "_Cache__currsize",
        "v": {
         "k": "int",
-        "v": 0
+        "v": "0"
        }
       },
       "b": {
@@ -385,7 +385,7 @@
          },
          "b": {
           "k": "int",
-          "v": 0
+          "v": "0"
          }
         },
         "t": {
@@ -1222,7 +1222,7 @@
        "f": "_Cache__currsize",
        "v": {
         "k": "int",
-        "v": 0
+        "v": "0"
        }
       }
      }
@@ -1301,7 +1301,7 @@
     "k": "ret",
     "e": {
      "k": "int",
-     "v": 1
+     "v": "1"
     }
    }
   }
@@ -1902,7 +1902,7 @@
        "args": [
         {
          "k": "int",
-         "v": 0
+         "v": "0"
         }
        ]
       }
@@ -2260,7 +2260,7 @@
              },
              "b": {
               "k": "int",
-              "v": 1
+              "v": "1"
              }
             },
             "t": {
@@ -2278,7 +2278,7 @@
                "args": [
                 {
                  "k": "int",
-                 "v": 1
+                 "v": "1"
                 }
                ]
               }
@@ -2998,7 +2998,7 @@
             },
             "b": {
              "k": "int",
-             "v": 1
+             "v": "1"
             }
            }
           },
@@ -3025,7 +3025,7 @@
              },
              "b": {
               "k": "int",
-              "v": 1
+              "v": "1"
              }
             },
             "t": {
@@ -3050,7 +3050,7 @@
                },
                "b": {
                 "k": "int",
-                "v": 1
+                "v": "1"
                }
               }
              },
@@ -3091,7 +3091,7 @@
                 },
                 "b": {
                  "k": "int",
-                 "v": 1
+                 "v": "1"
                 }
                }
               ]
@@ -4222,7 +4222,7 @@
           },
           "b": {
            "k": "int",
-           "v": 1
+           "v": "1"
           }
          }
         },
@@ -4246,7 +4246,7 @@
             "op": "-",
             "a": {
              "k": "int",
-             "v": 1
+             "v": "1"
             }
            }
           }
@@ -4599,7 +4599,7 @@
     "f": "_Timer__nesting",
     "v": {
      "k": "int",
-     "v": 0
+     "v": "0"
     }
    }
   }
@@ -4623,7 +4623,7 @@
     },
     "b": {
      "k": "int",
-     "v": 0
+     "v": "0"
     }
    },
    "t": {
@@ -4672,7 +4672,7 @@
      },
      "b": {
       "k": "int",
-      "v": 0
+      "v": "0"
      }
     },
     "t": {
@@ -4754,7 +4754,7 @@
        },
        "b": {
         "k": "int",
-        "v": 1
+        "v": "1"
        }
       }
      },
@@ -4801,7 +4801,7 @@
     },
     "b": {
      "k": "int",
-     "v": 1
+     "v": "1"
     }
    }
   },
@@ -10348,7 +10348,7 @@
                         },
                         "b": {
                          "k": "int",
-                         "v": 0
+                         "v": "0"
                         }
                        },
                        "f": "removed"
@@ -10373,7 +10373,7 @@
                           },
                           "b": {
                            "k": "int",
-                           "v": 0
+                           "v": "0"
                           }
                          },
                          "f": "expires"
@@ -11560,11 +11560,11 @@
       },
       {
        "k": "int",
-       "v": 0
+       "v": "0"
       },
       {
        "k": "int",
-       "v": 0
+       "v": "0"
       }
      ]
     }
@@ -12030,7 +12030,7 @@
      "x": "tmp0",
      "e": {
       "k": "int",
-      "v": 0
+      "v": "0"
      }
     },
     "b": {
@@ -12339,7 +12339,7 @@
                 },
                 "b": {
                  "k": "int",
-                 "v": 1
+                 "v": "1"
                 }
                }
               },
@@ -12384,7 +12384,7 @@
                },
                "b": {
                 "k": "int",
-                "v": 1
+                "v": "1"
                }
               }
              }
@@ -12921,7 +12921,7 @@
              "x": "tmp0",
              "e": {
               "k": "int",
-              "v": 0
+              "v": "0"
              }
             },
             "b": {
@@ -13184,7 +13184,7 @@
      "x": "tmp0",
      "e": {
       "k": "int",
-      "v": 0
+      "v": "0"
      }
     },
     "b": {
@@ -13460,7 +13460,7 @@
                  },
                  "b": {
                   "k": "int",
-                  "v": 1
+                  "v": "1"
                  }
                 }
                },
@@ -13486,7 +13486,7 @@
                },
                "b": {
                 "k": "int",
-                "v": 1
+                "v": "1"
                }
               }
              }
@@ -13836,7 +13836,7 @@
              "x": "tmp0",
              "e": {
               "k": "int",
-              "v": 0
+              "v": "0"
              }
             },
             "b": {
@@ -14098,7 +14098,7 @@
      "x": "tmp0",
      "e": {
       "k": "int",
-      "v": 0
+      "v": "0"
      }
     },
     "b": {
@@ -14313,7 +14313,7 @@
             },
             "b": {
              "k": "int",
-             "v": 1
+             "v": "1"
             }
            }
           },
@@ -14339,7 +14339,7 @@
           },
           "b": {
            "k": "int",
-           "v": 1
+           "v": "1"
           }
          }
         }
@@ -14490,7 +14490,7 @@
          "x": "tmp0",
          "e": {
           "k": "int",
-          "v": 0
+          "v": "0"
          }
         },
         "b": {
@@ -14582,7 +14582,7 @@
     "x": "misses",
     "e": {
      "k": "int",
-     "v": 0
+     "v": "0"
     }
    },
    "b": {
@@ -14696,7 +14696,7 @@
        },
        "b": {
         "k": "int",
-        "v": 1
+        "v": "1"
        }
       }
      },
@@ -14755,7 +14755,7 @@
      "x": "misses",
      "e": {
       "k": "int",
-      "v": 0
+      "v": "0"
      }
     }
    }
@@ -14775,7 +14775,7 @@
      "args": [
       {
        "k": "int",
-       "v": 0
+       "v": "0"
       },
       {
        "k": "name",
@@ -17235,7 +17235,7 @@
         "n": "stacklevel",
         "a": {
          "k": "int",
-         "v": 5
+         "v": "5"
         }
        }
       ]
@@ -17927,7 +17927,7 @@
        "n": "stacklevel",
        "a": {
         "k": "int",
-        "v": 3
+        "v": "3"
        }
       }
      ]
@@ -17989,7 +17989,7 @@
        "n": "stacklevel",
        "a": {
         "k": "int",
-        "v": 3
+        "v": "3"
        }
       }
      ]
@@ -18159,7 +18159,7 @@
       "x": "tmp1",
       "e": {
        "k": "int",
-       "v": 0
+       "v": "0"
       }
      },
      "b": {
@@ -18456,7 +18456,7 @@
                   },
                   "b": {
                    "k": "int",
-                   "v": 1
+                   "v": "1"
                   }
                  }
                 },
@@ -18524,7 +18524,7 @@
                  },
                  "b": {
                   "k": "int",
-                  "v": 1
+                  "v": "1"
                  }
                 }
                }
@@ -19086,7 +19086,7 @@
            "x": "tmp1",
            "e": {
             "k": "int",
-            "v": 0
+            "v": "0"
            }
           },
           "b": {
@@ -19454,7 +19454,7 @@
       "x": "tmp1",
       "e": {
        "k": "int",
-       "v": 0
+       "v": "0"
       }
      },
      "b": {
@@ -19690,7 +19690,7 @@
                 },
                 "b": {
                  "k": "int",
-                 "v": 1
+                 "v": "1"
                 }
                }
               },
@@ -19724,7 +19724,7 @@
               },
               "b": {
                "k": "int",
-               "v": 1
+               "v": "1"
               }
              }
             }
@@ -20087,7 +20087,7 @@
            "x": "tmp1",
            "e": {
             "k": "int",
-            "v": 0
+            "v": "0"
            }
           },
           "b": {
@@ -20440,7 +20440,7 @@
       "x": "tmp1",
       "e": {
        "k": "int",
-       "v": 0
+       "v": "0"
       }
      },
      "b": {
@@ -20601,7 +20601,7 @@
           },
           "b": {
            "k": "int",
-           "v": 1
+           "v": "1"
           }
          }
         },
@@ -20635,7 +20635,7 @@
         },
         "b": {
          "k": "int",
-         "v": 1
+         "v": "1"
         }
        }
       }
@@ -20790,7 +20790,7 @@
        "x": "tmp1",
        "e": {
         "k": "int",
-        "v": 0
+        "v": "0"
        }
       },
       "b": {
@@ -25554,6 +25554,809 @@
   "kwarg": "kwargs"
  },
  {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>cachetools/__init__.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>cachetools/__init__.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "<module>cachetools/_cached.py",
+     "e": {
+      "k": "alloc",
+      "cls": "<module>cachetools/_cached.py",
+      "args": []
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setGlobal",
+      "x": "<module>cachetools/_cachedmethod.py",
+      "e": {
+       "k": "alloc",
+       "cls": "<module>cachetools/_cachedmethod.py",
+       "args": []
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setGlobal",
+       "x": "<module>cachetools/func.py",
+       "e": {
+        "k": "alloc",
+        "cls": "<module>cachetools/func.py",
+        "args": []
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setGlobal",
+        "x": "<module>cachetools/keys.py",
+        "e": {
+         "k": "alloc",
+         "cls": "<module>cachetools/keys.py",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>cachetools/__init__.py"
+         },
+         "f": "cached",
+         "v": {
+          "k": "fnref",
+          "v": "cachetools/__init__.py:<module>.cached"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>cachetools/__init__.py"
+          },
+          "f": "cachedmethod",
+          "v": {
+           "k": "fnref",
+           "v": "cachetools/__init__.py:<module>.cachedmethod"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "<module>cachetools/__init__.py"
+           },
+           "f": "Cache",
+           "v": {
+            "k": "fnref",
+            "v": "cachetools/__init__.py:<module>.Cache<meta>"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>cachetools/__init__.py"
+            },
+            "f": "FIFOCache",
+            "v": {
+             "k": "fnref",
+             "v": "cachetools/__init__.py:<module>.FIFOCache<meta>"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setField",
+             "r": {
+              "k": "name",
+              "v": "<module>cachetools/__init__.py"
+             },
+             "f": "LFUCache",
+             "v": {
+              "k": "fnref",
+              "v": "cachetools/__init__.py:<module>.LFUCache<meta>"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "<module>cachetools/__init__.py"
+              },
+              "f": "LRUCache",
+              "v": {
+               "k": "fnref",
+               "v": "cachetools/__init__.py:<module>.LRUCache<meta>"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "<module>cachetools/__init__.py"
+               },
+               "f": "RRCache",
+               "v": {
+                "k": "fnref",
+                "v": "cachetools/__init__.py:<module>.RRCache<meta>"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setField",
+                "r": {
+                 "k": "name",
+                 "v": "<module>cachetools/__init__.py"
+                },
+                "f": "TLRUCache",
+                "v": {
+                 "k": "fnref",
+                 "v": "cachetools/__init__.py:<module>.TLRUCache<meta>"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "<module>cachetools/__init__.py"
+                 },
+                 "f": "TTLCache",
+                 "v": {
+                  "k": "fnref",
+                  "v": "cachetools/__init__.py:<module>.TTLCache<meta>"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setField",
+                  "r": {
+                   "k": "name",
+                   "v": "<module>cachetools/__init__.py"
+                  },
+                  "f": "_DefaultSize",
+                  "v": {
+                   "k": "fnref",
+                   "v": "cachetools/__init__.py:<module>._DefaultSize<meta>"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setField",
+                   "r": {
+                    "k": "name",
+                    "v": "<module>cachetools/__init__.py"
+                   },
+                   "f": "_TimedCache",
+                   "v": {
+                    "k": "fnref",
+                    "v": "cachetools/__init__.py:<module>._TimedCache<meta>"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setField",
+                    "r": {
+                     "k": "name",
+                     "v": "<module>cachetools/__init__.py"
+                    },
+                    "f": "_cached",
+                    "v": {
+                     "k": "name",
+                     "v": "<module>cachetools/_cached.py"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setField",
+                     "r": {
+                      "k": "name",
+                      "v": "<module>cachetools/__init__.py"
+                     },
+                     "f": "_cachedmethod",
+                     "v": {
+                      "k": "name",
+                      "v": "<module>cachetools/_cachedmethod.py"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setField",
+                      "r": {
+                       "k": "name",
+                       "v": "<module>cachetools/__init__.py"
+                      },
+                      "f": "func",
+                      "v": {
+                       "k": "name",
+                       "v": "<module>cachetools/func.py"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setField",
+                       "r": {
+                        "k": "name",
+                        "v": "<module>cachetools/__init__.py"
+                       },
+                       "f": "keys",
+                       "v": {
+                        "k": "name",
+                        "v": "<module>cachetools/keys.py"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setField",
+                        "r": {
+                         "k": "name",
+                         "v": "<module>cachetools/_cached.py"
+                        },
+                        "f": "_condition",
+                        "v": {
+                         "k": "fnref",
+                         "v": "cachetools/_cached.py:<module>._condition"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setField",
+                         "r": {
+                          "k": "name",
+                          "v": "<module>cachetools/_cached.py"
+                         },
+                         "f": "_condition_info",
+                         "v": {
+                          "k": "fnref",
+                          "v": "cachetools/_cached.py:<module>._condition_info"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setField",
+                          "r": {
+                           "k": "name",
+                           "v": "<module>cachetools/_cached.py"
+                          },
+                          "f": "_locked",
+                          "v": {
+                           "k": "fnref",
+                           "v": "cachetools/_cached.py:<module>._locked"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setField",
+                           "r": {
+                            "k": "name",
+                            "v": "<module>cachetools/_cached.py"
+                           },
+                           "f": "_locked_info",
+                           "v": {
+                            "k": "fnref",
+                            "v": "cachetools/_cached.py:<module>._locked_info"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setField",
+                            "r": {
+                             "k": "name",
+                             "v": "<module>cachetools/_cached.py"
+                            },
+                            "f": "_uncached",
+                            "v": {
+                             "k": "fnref",
+                             "v": "cachetools/_cached.py:<module>._uncached"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setField",
+                             "r": {
+                              "k": "name",
+                              "v": "<module>cachetools/_cached.py"
+                             },
+                             "f": "_uncached_info",
+                             "v": {
+                              "k": "fnref",
+                              "v": "cachetools/_cached.py:<module>._uncached_info"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setField",
+                              "r": {
+                               "k": "name",
+                               "v": "<module>cachetools/_cached.py"
+                              },
+                              "f": "_unlocked",
+                              "v": {
+                               "k": "fnref",
+                               "v": "cachetools/_cached.py:<module>._unlocked"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setField",
+                               "r": {
+                                "k": "name",
+                                "v": "<module>cachetools/_cached.py"
+                               },
+                               "f": "_unlocked_info",
+                               "v": {
+                                "k": "fnref",
+                                "v": "cachetools/_cached.py:<module>._unlocked_info"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setField",
+                                "r": {
+                                 "k": "name",
+                                 "v": "<module>cachetools/_cached.py"
+                                },
+                                "f": "_wrapper",
+                                "v": {
+                                 "k": "fnref",
+                                 "v": "cachetools/_cached.py:<module>._wrapper"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setField",
+                                 "r": {
+                                  "k": "name",
+                                  "v": "<module>cachetools/_cachedmethod.py"
+                                 },
+                                 "f": "_condition",
+                                 "v": {
+                                  "k": "fnref",
+                                  "v": "cachetools/_cachedmethod.py:<module>._condition"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setField",
+                                  "r": {
+                                   "k": "name",
+                                   "v": "<module>cachetools/_cachedmethod.py"
+                                  },
+                                  "f": "_condition_info",
+                                  "v": {
+                                   "k": "fnref",
+                                   "v": "cachetools/_cachedmethod.py:<module>._condition_info"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setField",
+                                   "r": {
+                                    "k": "name",
+                                    "v": "<module>cachetools/_cachedmethod.py"
+                                   },
+                                   "f": "_locked",
+                                   "v": {
+                                    "k": "fnref",
+                                    "v": "cachetools/_cachedmethod.py:<module>._locked"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setField",
+                                    "r": {
+                                     "k": "name",
+                                     "v": "<module>cachetools/_cachedmethod.py"
+                                    },
+                                    "f": "_locked_info",
+                                    "v": {
+                                     "k": "fnref",
+                                     "v": "cachetools/_cachedmethod.py:<module>._locked_info"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setField",
+                                     "r": {
+                                      "k": "name",
+                                      "v": "<module>cachetools/_cachedmethod.py"
+                                     },
+                                     "f": "_none",
+                                     "v": {
+                                      "k": "fnref",
+                                      "v": "cachetools/_cachedmethod.py:<module>._none"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setField",
+                                      "r": {
+                                       "k": "name",
+                                       "v": "<module>cachetools/_cachedmethod.py"
+                                      },
+                                      "f": "_unlocked",
+                                      "v": {
+                                       "k": "fnref",
+                                       "v": "cachetools/_cachedmethod.py:<module>._unlocked"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setField",
+                                       "r": {
+                                        "k": "name",
+                                        "v": "<module>cachetools/_cachedmethod.py"
+                                       },
+                                       "f": "_unlocked_info",
+                                       "v": {
+                                        "k": "fnref",
+                                        "v": "cachetools/_cachedmethod.py:<module>._unlocked_info"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setField",
+                                        "r": {
+                                         "k": "name",
+                                         "v": "<module>cachetools/_cachedmethod.py"
+                                        },
+                                        "f": "_warn_classmethod",
+                                        "v": {
+                                         "k": "fnref",
+                                         "v": "cachetools/_cachedmethod.py:<module>._warn_classmethod"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setField",
+                                         "r": {
+                                          "k": "name",
+                                          "v": "<module>cachetools/_cachedmethod.py"
+                                         },
+                                         "f": "_warn_instance_dict",
+                                         "v": {
+                                          "k": "fnref",
+                                          "v": "cachetools/_cachedmethod.py:<module>._warn_instance_dict"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setField",
+                                          "r": {
+                                           "k": "name",
+                                           "v": "<module>cachetools/_cachedmethod.py"
+                                          },
+                                          "f": "_wrapper",
+                                          "v": {
+                                           "k": "fnref",
+                                           "v": "cachetools/_cachedmethod.py:<module>._wrapper"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setField",
+                                           "r": {
+                                            "k": "name",
+                                            "v": "<module>cachetools/_cachedmethod.py"
+                                           },
+                                           "f": "_DeprecatedDescriptorBase",
+                                           "v": {
+                                            "k": "fnref",
+                                            "v": "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setField",
+                                            "r": {
+                                             "k": "name",
+                                             "v": "<module>cachetools/_cachedmethod.py"
+                                            },
+                                            "f": "_DescriptorBase",
+                                            "v": {
+                                             "k": "fnref",
+                                             "v": "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setField",
+                                             "r": {
+                                              "k": "name",
+                                              "v": "<module>cachetools/_cachedmethod.py"
+                                             },
+                                             "f": "_WrapperBase",
+                                             "v": {
+                                              "k": "fnref",
+                                              "v": "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setField",
+                                              "r": {
+                                               "k": "name",
+                                               "v": "<module>cachetools/func.py"
+                                              },
+                                              "f": "_cache",
+                                              "v": {
+                                               "k": "fnref",
+                                               "v": "cachetools/func.py:<module>._cache"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setField",
+                                               "r": {
+                                                "k": "name",
+                                                "v": "<module>cachetools/func.py"
+                                               },
+                                               "f": "fifo_cache",
+                                               "v": {
+                                                "k": "fnref",
+                                                "v": "cachetools/func.py:<module>.fifo_cache"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setField",
+                                                "r": {
+                                                 "k": "name",
+                                                 "v": "<module>cachetools/func.py"
+                                                },
+                                                "f": "lfu_cache",
+                                                "v": {
+                                                 "k": "fnref",
+                                                 "v": "cachetools/func.py:<module>.lfu_cache"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "setField",
+                                                 "r": {
+                                                  "k": "name",
+                                                  "v": "<module>cachetools/func.py"
+                                                 },
+                                                 "f": "lru_cache",
+                                                 "v": {
+                                                  "k": "fnref",
+                                                  "v": "cachetools/func.py:<module>.lru_cache"
+                                                 }
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "setField",
+                                                  "r": {
+                                                   "k": "name",
+                                                   "v": "<module>cachetools/func.py"
+                                                  },
+                                                  "f": "rr_cache",
+                                                  "v": {
+                                                   "k": "fnref",
+                                                   "v": "cachetools/func.py:<module>.rr_cache"
+                                                  }
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "setField",
+                                                   "r": {
+                                                    "k": "name",
+                                                    "v": "<module>cachetools/func.py"
+                                                   },
+                                                   "f": "ttl_cache",
+                                                   "v": {
+                                                    "k": "fnref",
+                                                    "v": "cachetools/func.py:<module>.ttl_cache"
+                                                   }
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "setField",
+                                                    "r": {
+                                                     "k": "name",
+                                                     "v": "<module>cachetools/func.py"
+                                                    },
+                                                    "f": "_UnboundTTLCache",
+                                                    "v": {
+                                                     "k": "fnref",
+                                                     "v": "cachetools/func.py:<module>._UnboundTTLCache<meta>"
+                                                    }
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "setField",
+                                                     "r": {
+                                                      "k": "name",
+                                                      "v": "<module>cachetools/keys.py"
+                                                     },
+                                                     "f": "hashkey",
+                                                     "v": {
+                                                      "k": "fnref",
+                                                      "v": "cachetools/keys.py:<module>.hashkey"
+                                                     }
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "setField",
+                                                      "r": {
+                                                       "k": "name",
+                                                       "v": "<module>cachetools/keys.py"
+                                                      },
+                                                      "f": "methodkey",
+                                                      "v": {
+                                                       "k": "fnref",
+                                                       "v": "cachetools/keys.py:<module>.methodkey"
+                                                      }
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "setField",
+                                                       "r": {
+                                                        "k": "name",
+                                                        "v": "<module>cachetools/keys.py"
+                                                       },
+                                                       "f": "typedkey",
+                                                       "v": {
+                                                        "k": "fnref",
+                                                        "v": "cachetools/keys.py:<module>.typedkey"
+                                                       }
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "setField",
+                                                        "r": {
+                                                         "k": "name",
+                                                         "v": "<module>cachetools/keys.py"
+                                                        },
+                                                        "f": "typedmethodkey",
+                                                        "v": {
+                                                         "k": "fnref",
+                                                         "v": "cachetools/keys.py:<module>.typedmethodkey"
+                                                        }
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "setField",
+                                                         "r": {
+                                                          "k": "name",
+                                                          "v": "<module>cachetools/keys.py"
+                                                         },
+                                                         "f": "_HashedTuple",
+                                                         "v": {
+                                                          "k": "fnref",
+                                                          "v": "cachetools/keys.py:<module>._HashedTuple<meta>"
+                                                         }
+                                                        },
+                                                        "b": {
+                                                         "k": "skip"
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
   "name": "cachetools/__init__.py:<module>",
   "file": "cachetools/__init__.py",
   "params": [],
@@ -25760,7 +26563,7 @@
                     "x": "collections",
                     "e": {
                      "k": "hole",
-                     "label": "import:module-value"
+                     "label": "import:absent:external"
                     }
                    },
                    "b": {
@@ -25770,7 +26573,7 @@
                      "x": "collections",
                      "e": {
                       "k": "hole",
-                      "label": "import:module-value"
+                      "label": "import:absent:external"
                      }
                     },
                     "b": {
@@ -25780,7 +26583,7 @@
                       "x": "functools",
                       "e": {
                        "k": "hole",
-                       "label": "import:module-value"
+                       "label": "import:absent:external"
                       }
                      },
                      "b": {
@@ -25790,7 +26593,7 @@
                        "x": "heapq",
                        "e": {
                         "k": "hole",
-                        "label": "import:module-value"
+                        "label": "import:absent:external"
                        }
                       },
                       "b": {
@@ -25800,7 +26603,7 @@
                         "x": "random",
                         "e": {
                          "k": "hole",
-                         "label": "import:module-value"
+                         "label": "import:absent:external"
                         }
                        },
                        "b": {
@@ -25810,7 +26613,7 @@
                          "x": "time",
                          "e": {
                           "k": "hole",
-                          "label": "import:module-value"
+                          "label": "import:absent:external"
                          }
                         },
                         "b": {
@@ -25819,8 +26622,8 @@
                           "k": "setGlobal",
                           "x": "keys",
                           "e": {
-                           "k": "hole",
-                           "label": "import:module-value"
+                           "k": "name",
+                           "v": "<module>cachetools/keys.py"
                           }
                          },
                          "b": {
@@ -26383,7 +27186,7 @@
        "x": "functools",
        "e": {
         "k": "hole",
-        "label": "import:module-value"
+        "label": "import:absent:external"
        }
       },
       "b": {
@@ -26651,7 +27454,7 @@
            "x": "functools",
            "e": {
             "k": "hole",
-            "label": "import:module-value"
+            "label": "import:absent:external"
            }
           },
           "b": {
@@ -26661,7 +27464,7 @@
             "x": "warnings",
             "e": {
              "k": "hole",
-             "label": "import:module-value"
+             "label": "import:absent:external"
             }
            },
            "b": {
@@ -26671,7 +27474,7 @@
              "x": "weakref",
              "e": {
               "k": "hole",
-              "label": "import:module-value"
+              "label": "import:absent:external"
              }
             },
             "b": {
@@ -27088,7 +27891,7 @@
         "x": "math",
         "e": {
          "k": "hole",
-         "label": "import:module-value"
+         "label": "import:absent:external"
         }
        },
        "b": {
@@ -27098,7 +27901,7 @@
          "x": "random",
          "e": {
           "k": "hole",
-          "label": "import:module-value"
+          "label": "import:absent:external"
          }
         },
         "b": {
@@ -27108,7 +27911,7 @@
           "x": "time",
           "e": {
            "k": "hole",
-           "label": "import:module-value"
+           "label": "import:absent:external"
           }
          },
          "b": {
@@ -27118,7 +27921,7 @@
            "x": "Condition",
            "e": {
             "k": "hole",
-            "label": "import:unresolved"
+            "label": "import:absent:external"
            }
           },
           "b": {
@@ -27187,8 +27990,8 @@
                   "k": "setGlobal",
                   "x": "keys",
                   "e": {
-                   "k": "hole",
-                   "label": "import:module-value"
+                   "k": "name",
+                   "v": "<module>cachetools/keys.py"
                   }
                  }
                 }
@@ -27652,6 +28455,9 @@
      }
     }
    }
+  },
+  "classBases": {
+   "_HashedTuple": "tuple"
   }
  }
 ]
