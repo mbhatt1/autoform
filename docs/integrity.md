@@ -17,11 +17,16 @@ Stated in `STRATEGY.md` §17 and re-derived the hard way in §19, §27, §30, §
 and **an independent recomputation**. No amount of care inside a single artifact
 substitutes for either.
 
-## `scripts/check_render.py` — is the module a render of the AST?
+## What is tracked, and why (policy decided 2026-08-19)
 
-**Incident.** A mutation-gate mutant reached git and survived four commits.
-`_DefaultSize.__getitem__` returned `0` where the cachetools docstring says *"a constant
-size 1 for any key"* and `ast-Cachetools.json` says `int 1`:
+> **The AST is the tracked source of truth. `Autoform/Generated/<M>.lean` is a build
+> product and is not tracked.** The one exception is `Cachetools.lean`; see below.
+
+This reverses the earlier policy, and the reversal is the point of the section.
+
+**The incident that set the old policy.** A mutation-gate mutant reached git and survived
+four commits. `_DefaultSize.__getitem__` returned `0` where the cachetools docstring says
+*"a constant size 1 for any key"* and `ast-Cachetools.json` says `int 1`:
 
 | commit | value | |
 |---|---|---|
@@ -31,25 +36,98 @@ size 1 for any key"* and `ast-Cachetools.json` says `int 1`:
 | `919ab2f` | `int 1` | self-healed |
 
 **Every proof about that module still passed, because a mutant is a perfectly well-typed
-program.** Nothing derived from the module could have seen it. Separately, a concurrent
-pipeline left the module and the AST 30 functions apart (238 against 208), so measurements
-described a build that corresponded to no checked-in AST.
+program.** Separately, a concurrent pipeline left the module and the AST 30 functions
+apart (238 against 208). Neither is visible from anything derived from the module; both
+are visible to an independent re-render. That argument is still correct and
+`check_render.py` still rests on it.
 
-**The check.** `render_lean.py` is deterministic — verified byte-identical across runs —
-so `render(AST)` is a *total specification* of what the module must contain. The check
-re-renders and compares, and prints the differing declarations.
+**The incident that reversed it.** A `git add -A` during a merge committed
+`Autoform/Generated/Ansible.lean` (21 MB) and `LinuxLib.lean` (6 MB); a 35 MB generated
+module went in the same way earlier. Cleaning them up forced the question the first
+incident had obscured: *what does tracking the module buy, given the AST is tracked?*
+
+`render_lean.py` is a deterministic function of the JSON alone — verified byte-identical
+across runs. So a tracked module carries **no information the tracked AST does not already
+determine**. What it carries instead is a write channel, and the mutant used it: the
+mutant reached git *because* the module was tracked. A 21 MB machine-generated file has no
+reviewable diff, so a one-token change inside it passes every human gate. Untracking the
+module does not remove a defence; it removes the hole the defence was patching. A mutant
+now has to enter through `ast-<M>.json`, where it is a small, reviewable JSON diff.
+
+**The cost, stated honestly.** A clean clone can no longer `lake build
+Autoform.Generated.<M>` without running the renderer first (`autoform.sh` and
+`scripts/check_render.py --typecheck` both do). `Autoform.lean` imports no generated
+module, so the root build is unaffected. For the four large corpora — Ansible, LinuxLib,
+LinuxCrypto, V8Base — the AST is itself 15–55 MB, *larger* than the module it renders to,
+so tracking the AST by bytes would trade one blob for a bigger one. Those four are tracked
+by **sha256 + provenance** in `artifact-manifest.json` and are otherwise reproducible only
+by re-exporting from the corpus CPG. That is a real reduction in what a clean clone can
+check on its own, and it is recorded here rather than papered over.
+
+**The exception.** `Autoform/Generated/Cachetools.lean` stays tracked. Two conditions make
+tracking a render worth its drift risk, and only Cachetools meets both: hand-written
+theorems refer to it by name (all 108 of them), and at 300 KB its diff is still something
+a person can read. `check_render.py` diffs it against a fresh render on every run — the
+original check, kept exactly where it has teeth.
+
+`Autoform/Generated/SC.lean` is a second, less comfortable exception: there is no
+`ast-SC.json` anywhere in the repo, so the AST-only policy has nothing to regenerate it
+from and untracking it would delete it rather than move it upstream. It stays tracked, and
+`check_render.py` can say nothing about it at all. That is a gap, named here so it is not
+mistaken for coverage.
+
+## `artifact-manifest.json` — the identity of both halves
+
+One entry per module: `ast_sha256`, `ast_bytes`, `render_sha256`, `render_bytes`,
+`ast_tracked`, and for the untracked-AST corpora an `ast_hint` path and a `provenance`
+note. It is written by `scripts/check_render.py --record`, which should only ever be run
+*after* reviewing the change it is about to bless. Re-recording a hash you have not looked
+at converts this file from evidence into a rubber stamp.
+
+## `scripts/check_render.py` — three claims that can still be false
+
+Untracking the module did not turn this check into a no-op. It made it check different
+things, each independently falsifiable:
+
+1. **AST integrity** — `sha256(ast-<M>.json)` equals the recorded hash. Under the new
+   policy the AST is the only place a mutant can enter.
+2. **Render stability** — `sha256(render(AST))` equals the recorded render hash. This is
+   what byte-comparing against the tracked module bought (the pinned identity of the
+   artifact every downstream number describes) without the megabytes and without the
+   write channel. A renderer change that silently alters output is caught here.
+3. **Local materialisation** — if the module exists in the working tree, it must be
+   byte-identical to the fresh render. The original mutant check, now over a working tree
+   instead of an index.
+
+With `--typecheck` it materialises the render and runs `lake build
+Autoform.Generated.<M>`: the claim that the AST renders to a program the Lean kernel
+accepts. Weaker than "the committed module is correct", stronger than "the bytes match",
+and checked against the toolchain rather than against a hash we wrote ourselves.
 
 ```bash
-scripts/check_render.py            # every module that has both an AST and a .lean
-scripts/check_render.py Cachetools
+scripts/check_render.py                    # every module in the manifest
+scripts/check_render.py --typecheck V8Base
+scripts/check_render.py --record LangGo    # only after reviewing the change
 ```
 
-On first run it found three distinct problems: the live mutant, the 238/208 gap, and — new
-information — that `Sample` and `Stress` had **quietly drifted** from their ASTs, predating
-`moduleInits`. Nobody was working on them and nobody knew.
+Exit codes: `0` all verified, `1` a mismatch, `2` nothing checkable at all, `3` some
+verified and some **UNVERIFIABLE**. A missing AST, a missing manifest entry or a failed
+render is reported with a reason and a non-zero exit — this check must never pass by
+having stopped looking.
 
-This is why `ast-*.json` is tracked in git. It was ignored while the module rendered from
-it was committed; half a pair, and the half that makes the other checkable.
+**Open finding, recorded rather than laundered.** On the first run under the new policy,
+`Cachetools` came back MISMATCH: the tracked module was rendered by an older
+`render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and is ~1148 lines
+different from a fresh render, though whitespace-insensitively the terms agree. It was not
+re-rendered here, because the 108 theorems that depend on it were being edited
+concurrently. `check_render.py` therefore exits 1 today, on purpose. The fix is to
+re-render Cachetools and re-run its proofs; suppressing the verdict until then would be
+the exact failure mode this document exists to prevent.
+
+**Still in history.** Untracking removes these blobs from the *tip*, not from the object
+graph. The 35 MB module and today's 27 MB are still reachable from old commits and would
+need a history rewrite and a force-push to clear — which needs the repository owner's
+explicit consent and has not been done.
 
 ## `scripts/check_docs.py` — do the documented figures match the artifacts?
 
