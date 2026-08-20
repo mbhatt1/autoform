@@ -1,5 +1,6 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.Stdlib
 
 /-!
 # Core — semantics
@@ -42,57 +43,8 @@ def del (ρ : Env) (x : String) : Env := ρ.filter (·.1 != x)
 
 end Env
 
-/-!
-Structural equality on values is written by hand: the nested `List`/`Prod` occurrences
-block `deriving DecidableEq`.
--/
-mutual
-/-- Structural equality on values. -/
-def Val.beq : Val → Val → Bool
-  | .int a,   .int b   => a == b
-  | .str a,   .str b   => a == b
-  | .bool a,  .bool b  => a == b
-  | .unit,    .unit    => true
-  | .ref a,   .ref b   => a == b
-  | .fn a,    .fn b    => a == b
-  | .clos a _, .clos b _ => a == b
-  | .list a,  .list b  => Val.beqL a b
-  | .tuple a, .tuple b => Val.beqL a b
-  | .dict a,  .dict b  => Val.beqP a b
-  | _,        _        => false
-/-- Structural equality on value lists. -/
-def Val.beqL : List Val → List Val → Bool
-  | [],      []      => true
-  | a :: as, b :: bs => Val.beq a b && Val.beqL as bs
-  | _,       _       => false
-/-- Structural equality on key/value lists. -/
-def Val.beqP : List (Val × Val) → List (Val × Val) → Bool
-  | [],           []           => true
-  | (a,b) :: as, (c,d) :: bs   => Val.beq a c && Val.beq b d && Val.beqP as bs
-  | _,           _             => false
-end
 
-instance : BEq Val := ⟨Val.beq⟩
 
-/-- Truthiness, in the permissive sense shared by most dynamic languages. -/
-def Val.truthy : Val → Bool
-  | .bool b   => b
-  | .int i    => i != 0
-  | .str s    => s != ""
-  | .unit     => false
-  | .list vs  => !vs.isEmpty
-  | .tuple vs => !vs.isEmpty
-  | .dict kvs => !kvs.isEmpty
-  | .ref _    => true
-  | .fn _     => true
-  | .clos _ _ => true
-
-/-- What a value iterates over, if anything. -/
-def Val.iterable : Val → Option (List Val)
-  | .list vs  => some vs
-  | .tuple vs => some vs
-  | .dict kvs => some (kvs.map (·.1))
-  | _         => none
 
 /-!
 ## Dialect-sensitive arithmetic
@@ -116,14 +68,6 @@ def Dialect.imod : Dialect → Int → Int → Int
   | .python, a, b => Int.fmod a b
   | .cLike,  a, b => Int.tmod a b
 
-/-- Result of evaluating an expression. -/
-inductive EResult where
-  | val       : Val → EResult
-  /-- A raised exception carrying its payload. -/
-  | exn       : Val → EResult
-  | hole      : String → EResult
-  | outOfFuel : EResult
-  deriving Repr, Inhabited
 
 /-- Result of executing a statement: how control left it. -/
 inductive Ctl where
@@ -341,6 +285,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                   | none   => (h, .val .unit)
   | _+1, h, _, .fnref f       => (h, .val (.fn f))
   | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
+  | _+1, h, ρ, .classClosure c => (h, .val (.clsClos c ρ))
   | _+1, h, _, .hole l        => (h, .hole l)
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
@@ -408,7 +353,15 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .field a f =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val (.ref r)) => (h₁, .val (h₁.getField r f))
+      | (h₁, .val (.ref r)) =>
+        match h₁.get r with
+        | some o =>
+          match o.fields.find? (·.1 == f) with
+          | some (_, v) => (h₁, .val v)
+          | none        => match o.captured.find? (·.1 == f) with
+                           | some (_, v) => (h₁, .val v)
+                           | none        => (h₁, .val .unit)
+        | none => (h₁, .val .unit)
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   | n+1, h, ρ, .listE es =>
@@ -439,7 +392,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs
                           | none    => (h₁, .hole s!"call:{g}")
-          | _          => (h₁, .hole s!"call:{f}")
+          | _          =>
+            -- Modelled stdlib is consulted LAST, so a user function of the same name
+            -- always wins. `builtin` returns `none` for anything it cannot model
+            -- faithfully, which falls through to a visible hole.
+            match Stdlib.builtin ctx.dialect h₁ f vs with
+            | some (h₂, r) => (h₂, r)
+            | none         => (h₁, .hole s!"call:{f}")
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
@@ -451,14 +410,32 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | some o =>
             match ctx.resolveMethod o.cls m with
             | none    => (h₂, .hole s!"mcall:{o.cls}.{m}")
-            | some fn => applyFunc ctx n h₂ fn (some (.ref r)) vs
-      | (h₁, .val _) => (h₁, .hole s!"mcall:{m}:non-object")
+            | some fn =>
+              if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs
+              else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs
+      | (h₁, .val recv) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl e)  => (h₂, e)
+        | (h₂, .inr vs) =>
+          match Stdlib.method ctx.dialect h₂ recv m vs with
+          | some (h₃, .pure r)       => (h₃, r)
+          -- A mutating container method cannot be honoured while containers are values:
+          -- writing back through the receiver *expression* updates a temporary, because
+          -- the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`.
+          -- An honest hole until containers are boxed (see docs/boxed-containers.md).
+          | some (h₃, .mutating _ _) => (h₃, .hole s!"mcall:{m}:unboxed-container")
+          | none                     => (h₂, .hole s!"mcall:{m}:non-object")
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .alloc cls args =>
       match evalList ctx n h ρ args with
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr vs) =>
-        let (h₂, r) := h₁.alloc { cls := cls, fields := [] }
+        -- A class defined inside a function is a *value*; instances carry the bindings it
+        -- captured, so its methods can read the enclosing scope.
+        let cap := match ρ.get cls with
+                   | .clsClos _ c => c
+                   | _            => []
+        let (h₂, r) := h₁.alloc { cls := cls, fields := [], captured := cap }
         match ctx.resolveMethod cls "__init__" with
         | none    => (h₂, .val (.ref r))
         | some fn =>
@@ -601,6 +578,18 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn v)     => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .tryFinally body fin =>
+      match execStmt ctx n h ρ body with
+      | (h₁, .normal ρ') => execStmt ctx n h₁ ρ' fin
+      | (h₁, r) =>
+          -- The finalizer runs on every path. If it exits abnormally it *discards* the
+          -- body's pending outcome: `try: return 1 finally: return 2` returns 2.
+          let ρ' := match r with
+                    | .normal e | .brk e | .cont e => e
+                    | _                            => ρ
+          match execStmt ctx n h₁ ρ' fin with
+          | (h₂, .normal _) => (h₂, r)
+          | (h₂, r')        => (h₂, r')
   | n+1, h, ρ, .tryCatch body x handler =>
       match execStmt ctx n h ρ body with
       | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler

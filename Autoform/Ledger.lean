@@ -136,10 +136,24 @@ def Func.calls (f : Func) : List String := Analysis.sCalls f.body
 /-- How many constructs in this function could hole at runtime. -/
 def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
 
+/-- Can the interpreter resolve this callee?
+
+Must mirror what `evalExpr` actually does, not something stricter. `Ctx.resolve` requires
+a **unique** suffix match, but the `mcall` path uses `Ctx.resolveMethod`, which takes the
+first match — so names like `clear` (9 candidate methods), `__init__` (22) or `pop` (3)
+were being reported unresolvable while the interpreter dispatches them fine. That
+discrepancy alone understated the verifiable core by 14 functions on `cachetools`.
+
+A ledger that is stricter than the artifact it describes is wrong in the *safe*
+direction, which makes it easy to leave unnoticed — but it is still wrong, and it hides
+where the real gap is. -/
+def Ctx.resolvable (ctx : Ctx) (n : String) : Bool :=
+  (ctx.resolve n).isSome || ctx.table.any (fun q => q.1.endsWith ("." ++ n))
+
 /-- Hole-free **and** every call target resolves inside the program. -/
 def Program.callClosed (p : Program) : List Func :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table }
-  p.verifiableCore.filter (fun f => f.calls.all (fun n => (ctx.resolve n).isSome))
+  p.verifiableCore.filter (fun f => f.calls.all ctx.resolvable)
 
 /-- Per-program translation evidence. -/
 structure Coverage where

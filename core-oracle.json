@@ -1,0 +1,937 @@
+{
+ "module": "Cachetools",
+ "ast": "/Users/mbhatt/autoform/ast-Cachetools.json",
+ "source_root": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/cachetools/src",
+ "fuel": 5000,
+ "synthetic_inputs_per_function": 24,
+ "claim": {
+  "functions": 238,
+  "hole_free": 149,
+  "verifiable_core_static": 45
+ },
+ "executed": {
+  "cases": 1222,
+  "answered": 1222,
+  "core_functions_exercised": 44,
+  "core_functions_with_real_inputs": 27
+ },
+ "result": {
+  "verifiable_core_executed": 24,
+  "verifiable_core_executed_real_inputs_only": 18,
+  "holed_on_some_input": 20,
+  "holed_on_a_real_input": 8,
+  "inconclusive_never_exercised": 1
+ },
+ "holed_functions": [
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.get",
+   "cases": 30,
+   "answered": 30,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 30
+   },
+   "real_input_holes": 6,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 4, unit)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 5, unit)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 5, int 25)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 4, unit)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.setdefault",
+   "cases": 30,
+   "answered": 30,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 30
+   },
+   "real_input_holes": 6,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 1, unit)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 1, int 1)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 2, int 4)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "test-suite",
+     "self": "ref 0",
+     "args": "(int 2, unit)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._locked",
+   "cases": 30,
+   "answered": 30,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 30
+   },
+   "real_input_holes": 6,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1)"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1)"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1)"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._unlocked",
+   "cases": 30,
+   "answered": 30,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 30
+   },
+   "real_input_holes": 6,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'typedkey')"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._unlocked_info",
+   "cases": 27,
+   "answered": 27,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 27
+   },
+   "real_input_holes": 3,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', {}, fn 'hashkey', fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._uncached",
+   "cases": 27,
+   "answered": 27,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 27
+   },
+   "real_input_holes": 3,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'NoneWrapperTest.func')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'NoneWrapperTest.func')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'NoneWrapperTest.func')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._locked_info",
+   "cases": 26,
+   "answered": 26,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 26
+   },
+   "real_input_holes": 2,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1, fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'DecoratorTestMixin.func', ref 0, fn 'hashkey', ref 1, fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k')"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._uncached_info",
+   "cases": 25,
+   "answered": 25,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:cache_clear:non-object": 25
+   },
+   "real_input_holes": 1,
+   "examples": [
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "test-suite",
+     "self": null,
+     "args": "(fn 'NoneWrapperTest.func', fn 'cached.<locals>.decorator.<locals>.make_info')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "setField:cache_clear:non-object",
+     "origin": "synthetic",
+     "self": null,
+     "args": "({}, {})"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.__getitem__",
+   "cases": 30,
+   "answered": 30,
+   "clean": 6,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:KeyError": 5,
+    "index:unsupported": 19
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:KeyError",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[])"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:expires:non-object": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__",
+   "cases": 30,
+   "answered": 30,
+   "clean": 6,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:expires:non-object": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:expires:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._condition_info.wrapper.<lambda>0",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._condition.wrapper.<lambda>2",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._condition.wrapper.<lambda>1",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/func.py:<module>._cache.decorator.<lambda>0",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setIndex:immutable-containers": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setIndex:immutable-containers",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setIndex:immutable-containers",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setIndex:immutable-containers",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setIndex:immutable-containers",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__",
+   "cases": 24,
+   "answered": 24,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:-": 22
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.LFUCache._Link.unlink",
+   "cases": 24,
+   "answered": 24,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:next:non-object": 20
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TTLCache._Link.unlink",
+   "cases": 30,
+   "answered": 30,
+   "clean": 11,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "setField:next:non-object": 18,
+    "setField:prev:non-object": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "setField:next:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0",
+   "cases": 24,
+   "answered": 24,
+   "clean": 10,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 14
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.__contains__",
+   "cases": 30,
+   "answered": 30,
+   "clean": 20,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "in:non-container": 9,
+    "in:non-str-in-str": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    },
+    {
+     "label": "in:non-container",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    }
+   ]
+  }
+ ],
+ "verified_functions": [
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.__init__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.currsize",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.getsizeof",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.Cache.maxsize",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.RRCache.choice",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TLRUCache._Item.__init__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TLRUCache.ttu",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TTLCache._Link.__init__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TTLCache._Link.__reduce__",
+   "inputs": 25,
+   "real_inputs": 1
+  },
+  {
+   "name": "cachetools/__init__.py:<module>.TTLCache.ttl",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._DefaultSize.__getitem__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._DefaultSize.__setitem__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._DefaultSize.clear",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._DefaultSize.pop",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._TimedCache._Timer.__init__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._TimedCache.expire",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/__init__.py:<module>._TimedCache.timer",
+   "inputs": 30,
+   "real_inputs": 6
+  },
+  {
+   "name": "cachetools/_cached.py:<module>._uncached.<lambda>4",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._DescriptorBase.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_key",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/_cachedmethod.py:<module>._none",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/func.py:<module>._UnboundTTLCache.maxsize",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "cachetools/keys.py:<module>._HashedTuple.__getstate__",
+   "inputs": 24,
+   "real_inputs": 0
+  }
+ ],
+ "inconclusive_functions": [
+  {
+   "name": "cachetools/func.py:<module>._cache",
+   "cases": 30,
+   "no_answer": 30,
+   "outOfFuel": 0
+  }
+ ],
+ "hole_labels": {
+  "setField:cache_clear:non-object": 165,
+  "in:non-container": 155,
+  "field:expires:non-object": 48,
+  "setField:next:non-object": 38,
+  "setIndex:immutable-containers": 24,
+  "binop:-": 22,
+  "index:unsupported": 19,
+  "call:KeyError": 5,
+  "in:non-str-in-str": 1,
+  "setField:prev:non-object": 1
+ },
+ "skipped": {
+  "skip_varargs": 12762,
+  "skip_unencodable_args": 6350,
+  "skip_unencodable_ret": 0,
+  "skip_no_instance": 0,
+  "skip_self_not_object": 4
+ },
+ "unencodable_reasons": {
+  "_DescriptorBase.__init__: callable": 28,
+  "_locked_info: opaque": 1,
+  "_WrapperBase.cache_key: callable": 69,
+  "_none: callable": 6,
+  "LFUCache._Link.unlink: set": 57,
+  "_TimedCache.timer: float": 30,
+  "_TimedCache.timer: object-as-dict-key": 6,
+  "_UnboundTTLCache.maxsize: float": 4,
+  "_TimedCache.timer: opaque": 3,
+  "RRCache.choice: callable": 2,
+  "TLRUCache._Item.__init__: float": 2055,
+  "TLRUCache._Item.__lt__: float": 2044,
+  "TLRUCache.ttu: callable": 2,
+  "TTLCache._Link.unlink: float": 31,
+  "TTLCache._Link.__reduce__: float": 2009,
+  "TTLCache.ttl: callable": 3
+ }
+}

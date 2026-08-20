@@ -358,7 +358,32 @@ def f_cachetools___init___py__module__FIFOCache_popitem : Func :=
               (.lit (.str "\"\"Remove and return the `(key, value)` pair first inserted.\"\"")))
             (.seq
               .skip
-              (.seq (.hole "control:TRY-else") (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
+              (.seq
+                (.seq
+                  (.assign "__else_ok1" (.lit (.bool true)))
+                  (.seq
+                    (.tryCatch
+                      (.assign
+                        "key"
+                        (.call
+                          "next"
+                          [(.call "iter" [(.field (.name "self") "_FIFOCache__order")])]))
+                      "__exc"
+                      (.seq
+                        (.assign "__else_ok1" (.lit (.bool false)))
+                        (.raise
+                          (.call
+                            "KeyError"
+                            [ (.binop
+                                "%"
+                                (.lit (.str "%s is empty"))
+                                (.field (.call "type" [(.name "self")]) "__name__")) ]))))
+                    (.ifte
+                      (.name "__else_ok1")
+                      (.ret
+                        (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
+                      .skip)))
+                (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>.FIFOCache.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__FIFOCache_clear : Func :=
@@ -754,7 +779,30 @@ def f_cachetools___init___py__module__LRUCache_popitem : Func :=
               (.lit (.str "\"\"Remove and return the `(key, value)` pair least recently used.\"\"")))
             (.seq
               .skip
-              (.seq (.hole "control:TRY-else") (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
+              (.seq
+                (.seq
+                  (.assign "__else_ok2" (.lit (.bool true)))
+                  (.seq
+                    (.tryCatch
+                      (.assign
+                        "key"
+                        (.call "next" [(.call "iter" [(.field (.name "self") "_LRUCache__order")])]))
+                      "__exc"
+                      (.seq
+                        (.assign "__else_ok2" (.lit (.bool false)))
+                        (.raise
+                          (.call
+                            "KeyError"
+                            [ (.binop
+                                "%"
+                                (.lit (.str "%s is empty"))
+                                (.field (.call "type" [(.name "self")]) "__name__")) ]))))
+                    (.ifte
+                      (.name "__else_ok2")
+                      (.ret
+                        (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
+                      .skip)))
+                (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>.LRUCache.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LRUCache_clear : Func :=
@@ -896,7 +944,35 @@ def f_cachetools___init___py__module__RRCache_popitem : Func :=
   , params := []
   , body := (.seq
             (.expr (.lit (.str "\"\"Remove and return a random `(key, value)` pair.\"\"")))
-            (.seq .skip (.seq (.hole "control:TRY-else") (.seq .skip .skip)))) }
+            (.seq
+              .skip
+              (.seq
+                (.seq
+                  (.assign "__else_ok3" (.lit (.bool true)))
+                  (.seq
+                    (.tryCatch
+                      (.assign
+                        "key"
+                        (.mcall
+                          (.name "self")
+                          "_RRCache__choice"
+                          [(.field (.name "self") "_RRCache__keys")]))
+                      "__exc"
+                      (.seq
+                        (.assign "__else_ok3" (.lit (.bool false)))
+                        (.raise
+                          (.call
+                            "KeyError"
+                            [ (.binop
+                                "%"
+                                (.lit (.str "%s is empty"))
+                                (.field (.call "type" [(.name "self")]) "__name__")) ]))))
+                    (.ifte
+                      (.name "__else_ok3")
+                      (.ret
+                        (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
+                      .skip)))
+                (.seq .skip .skip)))) }
 
 /-- `cachetools/__init__.py:<module>.RRCache.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__RRCache_clear : Func :=
@@ -1205,14 +1281,49 @@ def f_cachetools___init___py__module__TTLCache___init__ : Func :=
 def f_cachetools___init___py__module__TTLCache___contains__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__contains__"
   , params := ["key"]
-  , body := (.seq (.hole "control:TRY-else") .skip) }
+  , body := (.seq
+            (.seq
+              (.assign "__else_ok4" (.lit (.bool true)))
+              (.seq
+                (.tryCatch
+                  (.assign "link" (.index (.field (.name "self") "_TTLCache__links") (.name "key")))
+                  "__exc"
+                  (.seq (.assign "__else_ok4" (.lit (.bool false))) (.ret (.lit (.bool false)))))
+                (.ifte
+                  (.name "__else_ok4")
+                  (.ret
+                    (.binop
+                      "<"
+                      (.mcall (.name "self") "timer" [])
+                      (.field (.name "link") "expires")))
+                  .skip)))
+            .skip) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.__getitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__getitem__"
   , params := ["key", "cache_getitem"]
   , body := (.seq
-            (.hole "control:TRY-else")
+            (.seq
+              (.assign "__else_ok5" (.lit (.bool true)))
+              (.seq
+                (.tryCatch
+                  (.assign "link" (.mcall (.name "self") "_TTLCache__getlink" [(.name "key")]))
+                  "__exc"
+                  (.seq
+                    (.assign "__else_ok5" (.lit (.bool false)))
+                    (.assign "expired" (.lit (.bool false)))))
+                (.ifte
+                  (.name "__else_ok5")
+                  (.assign
+                    "expired"
+                    (.unop
+                      "!"
+                      (.binop
+                        "<"
+                        (.mcall (.name "self") "timer" [])
+                        (.field (.name "link") "expires"))))
+                  .skip)))
             (.seq
               .skip
               (.seq
@@ -1249,7 +1360,23 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
                         (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
                       (.expr (.call "" [])))))))
             (.seq
-              (.hole "control:TRY-else")
+              (.seq
+                (.assign "__else_ok6" (.lit (.bool true)))
+                (.seq
+                  (.tryCatch
+                    (.assign "link" (.mcall (.name "self") "_TTLCache__getlink" [(.name "key")]))
+                    "__exc"
+                    (.seq
+                      (.assign "__else_ok6" (.lit (.bool false)))
+                      (.seq
+                        (.assign "tmp0" (.mcall (.name "TTLCache") "_Link" [(.name "key")]))
+                        (.seq
+                          (.setIndex
+                            (.field (.name "self") "_TTLCache__links")
+                            (.name "key")
+                            (.name "tmp0"))
+                          (.assign "link" (.name "tmp0"))))))
+                  (.ifte (.name "__else_ok6") (.expr (.mcall (.name "link") "unlink" [])) .skip)))
               (.seq
                 .skip
                 (.seq
@@ -1367,7 +1494,11 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
                     (.setField (.name "root") "next" (.name "tmp1"))))
                 (.seq
                   (.seq
-                    (.assign "tmp5" (.call "sorted" [(.hole "expr:BLOCK")]))
+                    (.assign
+                      "tmp5"
+                      (.call
+                        "sorted"
+                        [(.mcall (.field (.name "self") "_TTLCache__links") "values" [])]))
                     (.forIn
                       "link"
                       (.name "tmp5")
@@ -1516,16 +1647,7 @@ def f_cachetools___init___py__module__TTLCache_popitem : Func :=
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
                         (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
-                            (.seq
-                              (.assign "time" (.name "value_tmp0"))
-                              (.seq
-                                (.expr (.mcall (.name "self") "expire" [(.name "time")]))
-                                (.hole "control:TRY-else")))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                        (.hole "control:TRY-finally-escaping")))))
                 (.seq
                   .skip
                   (.seq
@@ -1632,14 +1754,51 @@ def f_cachetools___init___py__module__TLRUCache___init__ : Func :=
 def f_cachetools___init___py__module__TLRUCache___contains__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__contains__"
   , params := ["key"]
-  , body := (.seq (.hole "control:TRY-else") .skip) }
+  , body := (.seq
+            (.seq
+              (.assign "__else_ok8" (.lit (.bool true)))
+              (.seq
+                (.tryCatch
+                  (.assign
+                    "item"
+                    (.index (.field (.name "self") "_TLRUCache__items") (.name "key")))
+                  "__exc"
+                  (.seq (.assign "__else_ok8" (.lit (.bool false))) (.ret (.lit (.bool false)))))
+                (.ifte
+                  (.name "__else_ok8")
+                  (.ret
+                    (.binop
+                      "<"
+                      (.mcall (.name "self") "timer" [])
+                      (.field (.name "item") "expires")))
+                  .skip)))
+            .skip) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache.__getitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache___getitem__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache.__getitem__"
   , params := ["key", "cache_getitem"]
   , body := (.seq
-            (.hole "control:TRY-else")
+            (.seq
+              (.assign "__else_ok9" (.lit (.bool true)))
+              (.seq
+                (.tryCatch
+                  (.assign "item" (.mcall (.name "self") "_TLRUCache__getitem" [(.name "key")]))
+                  "__exc"
+                  (.seq
+                    (.assign "__else_ok9" (.lit (.bool false)))
+                    (.assign "expired" (.lit (.bool false)))))
+                (.ifte
+                  (.name "__else_ok9")
+                  (.assign
+                    "expired"
+                    (.unop
+                      "!"
+                      (.binop
+                        "<"
+                        (.mcall (.name "self") "timer" [])
+                        (.field (.name "item") "expires"))))
+                  .skip)))
             (.seq
               .skip
               (.seq
@@ -1920,16 +2079,7 @@ def f_cachetools___init___py__module__TLRUCache_popitem : Func :=
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
                         (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
-                            (.seq
-                              (.assign "time" (.name "value_tmp0"))
-                              (.seq
-                                (.expr (.mcall (.name "self") "expire" [(.name "time")]))
-                                (.hole "control:TRY-else")))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                        (.hole "control:TRY-finally-escaping")))))
                 (.seq
                   .skip
                   (.seq
@@ -1972,7 +2122,22 @@ def f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem : Func :=
 def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache._TLRUCache__delitem"
   , params := ["key", "cache_delitem"]
-  , body := (.seq (.hole "control:TRY-else") .skip) }
+  , body := (.seq
+            (.seq
+              (.assign "__else_ok11" (.lit (.bool true)))
+              (.seq
+                (.tryCatch
+                  (.setField
+                    (.mcall (.field (.name "self") "_TLRUCache__items") "pop" [(.name "key")])
+                    "removed"
+                    (.lit (.bool true)))
+                  "__exc"
+                  (.seq (.assign "__else_ok11" (.lit (.bool false))) .skip))
+                (.ifte
+                  (.name "__else_ok11")
+                  (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
+                  .skip)))
+            .skip) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache__metaClassCallHandler_ : Func :=
@@ -1993,7 +2158,7 @@ def f_cachetools___init___py__module__cached : Func :=
               (.lit
                 (.str "\"\"Decorator to wrap a function with a memoizing callable that saves\n    results in a cache.\n\n    \"\"")))
             (.seq
-              (.assign "_wrapper" (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+              (.assign "_wrapper" (.fnref "cachetools/_cached.py:<module>._wrapper"))
               (.seq
                 (.assign "decorator" (.closure "cachetools/__init__.py:<module>.cached.decorator"))
                 (.seq
@@ -2104,7 +2269,7 @@ def f_cachetools___init___py__module__cachedmethod : Func :=
               (.lit
                 (.str "\"\"Decorator to wrap a method with a memoizing callable that saves\n    results in a cache.\n\n    \"\"")))
             (.seq
-              (.assign "_wrapper" (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+              (.assign "_wrapper" (.fnref "cachetools/_cachedmethod.py:<module>._wrapper"))
               (.seq
                 (.assign
                   "decorator"
@@ -4504,7 +4669,7 @@ def f_cachetools_func_py__module__fifo_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.hole "expr:BLOCK"), (.lit .unit), (.name "typed")]))
+                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
                     (.ret (.call "" [(.name "maxsize")]))
@@ -4529,7 +4694,7 @@ def f_cachetools_func_py__module__lfu_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.hole "expr:BLOCK"), (.lit .unit), (.name "typed")]))
+                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
                     (.ret (.call "" [(.name "maxsize")]))
@@ -4554,7 +4719,7 @@ def f_cachetools_func_py__module__lru_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.hole "expr:BLOCK"), (.lit .unit), (.name "typed")]))
+                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
                     (.ret (.call "" [(.name "maxsize")]))
@@ -4579,7 +4744,7 @@ def f_cachetools_func_py__module__rr_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.hole "expr:BLOCK"), (.lit .unit), (.name "typed")]))
+                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
                     (.ret (.call "" [(.name "maxsize")]))
@@ -4724,14 +4889,14 @@ def f_cachetools_keys_py__module__typedkey : Func :=
                               (.name "sorted_kwargs")) ]))
                       (.assign
                         "key"
-                        (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:BLOCK")])))))
+                        (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:genExp")])))))
                   (.assign "key" (.alloc "_HashedTuple" [(.name "args")])))
                 (.seq
                   .skip
                   (.seq
                     (.assign
                       "key"
-                      (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:BLOCK")])))
+                      (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:genExp")])))
                     (.seq
                       .skip
                       (.seq
@@ -4802,48 +4967,29 @@ def f_cachetools___init___py__module_ : Func :=
                                         (.seq
                                           (.setGlobal "__version__" (.lit (.str "7.1.7")))
                                           (.seq
-                                            (.setGlobal
-                                              "collections"
-                                              (.call
-                                                "import"
-                                                [(.lit .unit), (.hole "lit:unquoted")]))
+                                            (.setGlobal "collections" (.hole "import:module-value"))
                                             (.seq
                                               (.setGlobal
                                                 "collections"
-                                                (.call
-                                                  "import"
-                                                  [(.lit .unit), (.hole "lit:unquoted")]))
+                                                (.hole "import:module-value"))
                                               (.seq
                                                 (.setGlobal
                                                   "functools"
-                                                  (.call
-                                                    "import"
-                                                    [(.lit .unit), (.hole "lit:unquoted")]))
+                                                  (.hole "import:module-value"))
                                                 (.seq
-                                                  (.setGlobal
-                                                    "heapq"
-                                                    (.call
-                                                      "import"
-                                                      [(.lit .unit), (.hole "lit:unquoted")]))
+                                                  (.setGlobal "heapq" (.hole "import:module-value"))
                                                   (.seq
                                                     (.setGlobal
                                                       "random"
-                                                      (.call
-                                                        "import"
-                                                        [(.lit .unit), (.hole "lit:unquoted")]))
+                                                      (.hole "import:module-value"))
                                                     (.seq
                                                       (.setGlobal
                                                         "time"
-                                                        (.call
-                                                          "import"
-                                                          [(.lit .unit), (.hole "lit:unquoted")]))
+                                                        (.hole "import:module-value"))
                                                       (.seq
                                                         (.setGlobal
                                                           "keys"
-                                                          (.call
-                                                            "import"
-                                                            [ (.hole "lit:unquoted")
-                                                            , (.hole "lit:unquoted") ]))
+                                                          (.hole "import:module-value"))
                                                         (.seq
                                                           .skip
                                                           (.seq
@@ -5042,7 +5188,7 @@ def f_cachetools__cached_py__module_ : Func :=
               (.seq
                 (.setGlobal "__all__" (.tupleE []))
                 (.seq
-                  (.setGlobal "functools" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                  (.setGlobal "functools" (.hole "import:module-value"))
                   (.seq
                     (.setGlobal
                       "_condition_info"
@@ -5120,17 +5266,11 @@ def f_cachetools__cachedmethod_py__module_ : Func :=
                       (.seq
                         (.setGlobal "__all__" (.tupleE []))
                         (.seq
-                          (.setGlobal
-                            "functools"
-                            (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                          (.setGlobal "functools" (.hole "import:module-value"))
                           (.seq
-                            (.setGlobal
-                              "warnings"
-                              (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                            (.setGlobal "warnings" (.hole "import:module-value"))
                             (.seq
-                              (.setGlobal
-                                "weakref"
-                                (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                              (.setGlobal "weakref" (.hole "import:module-value"))
                               (.seq
                                 (.setGlobal
                                   "_warn_classmethod"
@@ -5276,53 +5416,39 @@ def f_cachetools_func_py__module_ : Func :=
                       , (.lit (.str "rr_cache"))
                       , (.lit (.str "ttl_cache")) ]))
                   (.seq
-                    (.setGlobal "math" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                    (.setGlobal "math" (.hole "import:module-value"))
                     (.seq
-                      (.setGlobal "random" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                      (.setGlobal "random" (.hole "import:module-value"))
                       (.seq
-                        (.setGlobal "time" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                        (.setGlobal "time" (.hole "import:module-value"))
                         (.seq
-                          (.setGlobal
-                            "Condition"
-                            (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                          (.setGlobal "Condition" (.hole "import:unresolved"))
                           (.seq
                             (.seq
                               (.setGlobal
                                 "FIFOCache"
-                                (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                (.fnref "cachetools/__init__.py:<module>.FIFOCache<meta>"))
                               (.seq
                                 (.setGlobal
                                   "LFUCache"
-                                  (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                  (.fnref "cachetools/__init__.py:<module>.LFUCache<meta>"))
                                 (.seq
                                   (.setGlobal
                                     "LRUCache"
-                                    (.call
-                                      "import"
-                                      [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                    (.fnref "cachetools/__init__.py:<module>.LRUCache<meta>"))
                                   (.seq
                                     (.setGlobal
                                       "RRCache"
-                                      (.call
-                                        "import"
-                                        [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                      (.fnref "cachetools/__init__.py:<module>.RRCache<meta>"))
                                     (.seq
                                       (.setGlobal
                                         "TTLCache"
-                                        (.call
-                                          "import"
-                                          [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                        (.fnref "cachetools/__init__.py:<module>.TTLCache<meta>"))
                                       (.seq
                                         (.setGlobal
                                           "cached"
-                                          (.call
-                                            "import"
-                                            [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
-                                        (.setGlobal
-                                          "keys"
-                                          (.call
-                                            "import"
-                                            [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))))))))
+                                          (.fnref "cachetools/__init__.py:<module>.cached"))
+                                        (.setGlobal "keys" (.hole "import:module-value"))))))))
                             (.seq
                               (.seq
                                 (.setGlobal

@@ -620,6 +620,155 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
             exact ihe (k := m) (h := hC') (ρ := ρ)
         | _ => rfl
 
+/-! ## 3b. A loop rule, and a heap representation predicate
+
+Sections 1–3 handle straight-line pure code. Everything a real library does — iteration
+and mutable objects — needs two more pieces, and they are the two open obligations this
+section closes.
+
+### The loop rule
+
+`execStmt_loop_step` unrolls a loop *once*. Unrolling `n` times by hand only works when
+`n` is a numeral, which is exactly the case that does not matter. What is needed is the
+Hoare while-rule, adapted to a fuel-indexed interpreter, which means it must carry two
+things a textbook while-rule does not:
+
+* a **termination measure**, because the interpreter is total and a loop that does not
+  provably terminate simply reports `outOfFuel` — and `Outcome` cannot denote that; and
+* a **fuel bound derived from the measure**, because the conclusion is an equation about
+  a concrete fuel budget, not about a partial-correctness judgement.
+
+Both are folded into one index: the invariant `I : Nat → Heap → Env → Prop` is indexed by
+a `Nat` that must **strictly decrease** at every iteration. The rule then says a loop
+started in `I m` needs `B + m + 1` fuel and stops in the postcondition `Q`. Note what
+`m = 0` forces: the step obligation would have to produce `m' < 0`, so an invariant at
+index `0` can only exit. Partial correctness and termination are proved together, which
+is the honest packaging — a "loop refinement" that did not prove termination would be
+satisfiable by a program that hangs.
+-/
+
+/-- **The while-rule.** `I` is the loop invariant indexed by a decreasing measure, `Q`
+the postcondition, `B` the per-iteration fuel cost.
+
+The single step obligation covers both the test and the body: evaluating the test must
+yield a value (never a hole, never `outOfFuel`); if it is truthy the body must complete
+normally and re-establish the invariant at a *strictly smaller* index; if it is falsy the
+postcondition must hold. -/
+theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
+    (I : Nat → Heap → Env → Prop) (Q : Heap → Env → Prop)
+    (hstep : ∀ m h ρ k, B ≤ k → I m h ρ →
+      ∃ h₁ v, evalExpr ctx k h ρ c = (h₁, .val v) ∧
+        (v.truthy = true →
+          ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k h₁ ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
+        (v.truthy = false → Q h₁ ρ)) :
+    ∀ k m h ρ, I m h ρ → B + m + 1 ≤ k →
+      ∃ h' ρ', execStmt ctx k h ρ (.loop c body) = (h', .normal ρ') ∧ Q h' ρ' := by
+  intro k
+  induction k with
+  | zero => intro m h ρ _ hk; omega
+  | succ k ih =>
+    intro m h ρ hI hk
+    obtain ⟨h₁, v, hc, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
+    cases hv : v.truthy with
+    | false =>
+      refine ⟨h₁, ρ, ?_, hfalse hv⟩
+      simp [execStmt, hc, hv]
+    | true =>
+      obtain ⟨m', h₂, ρ', hm', hb, hI'⟩ := htrue hv
+      have hstep' : execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
+        simp [execStmt, hc, hv, hb]
+      rw [hstep']
+      exact ih m' h₂ ρ' hI' (by omega)
+
+/-- The same rule for `for`-loops. Here the measure is not invented: it is the length of
+the remaining sequence, which the interpreter itself consumes. -/
+theorem execFor_rule (ctx : Ctx) (x : String) (body : Stmt) (B : Nat)
+    (I : List Val → Heap → Env → Prop)
+    (hstep : ∀ v vs h ρ k, B ≤ k → I (v :: vs) h ρ →
+      ∃ h' ρ', execStmt ctx k h (ρ.set x v) body = (h', .normal ρ') ∧ I vs h' ρ') :
+    ∀ k vs h ρ, I vs h ρ → B + vs.length + 1 ≤ k →
+      ∃ h' ρ', execFor ctx k h ρ x vs body = (h', .normal ρ') ∧ I [] h' ρ' := by
+  intro k
+  induction k with
+  | zero => intro vs h ρ _ hk; omega
+  | succ k ih =>
+    intro vs h ρ hI hk
+    cases vs with
+    | nil => exact ⟨h, ρ, rfl, hI⟩
+    | cons v vs =>
+      obtain ⟨h', ρ', hb, hI'⟩ := hstep v vs h ρ k (by simp at hk; omega) hI
+      have hstep' : execFor ctx (k+1) h ρ x (v :: vs) body = execFor ctx k h' ρ' x vs body := by
+        simp [execFor, hb]
+      rw [hstep']
+      exact ih vs h' ρ' hI' (by simp at hk ⊢; omega)
+
+/-! ### Heap representation
+
+`evalExpr_pure_heap_inert` says the pure fragment does not touch the heap. That is the
+easy half. The other half — what it means for a *heap object* to stand for an abstract
+Lean value, and what survives a field write — is what a method that mutates its receiver
+needs, and it is the second obligation this section closes.
+
+A `HeapRep α` is an abstraction function from a heap object to an `α`, tagged with the
+class the object must belong to. `Represents R h r a` then says "at address `r` the heap
+holds an object of class `R.cls` whose abstraction is `a`". Two lemmas make it usable,
+and they are the two halves of the separation-logic story in their simplest concrete
+form:
+
+* `Represents.frame` — a write to a *different* address preserves the representation.
+  This is what makes mutation local; without it every method call would invalidate every
+  fact about every object.
+* `Represents.update` — a write to *this* address re-establishes the representation at
+  the new abstract value.
+
+`Heap.get_setField` is the single computational fact both rest on, and it is proved once
+against the real `Heap.setField` (a `List.mapIdx`) rather than assumed.
+-/
+
+/-- How a heap object is read as an abstract Lean value. `abs` is partial on purpose: an
+object whose fields are missing or ill-typed represents *nothing*, and a representation
+predicate that quietly defaulted such an object to some value would be the same class of
+vacuity `Outcome` was designed to exclude. -/
+structure HeapRep (α : Type) where
+  /-- The class name an object must carry to be read at this type. -/
+  cls : String
+  /-- The abstraction function, partial. -/
+  abs : Obj → Option α
+
+/-- `Represents R h r a`: the heap `h` holds, at address `r`, an object of class `R.cls`
+which abstracts to the Lean value `a`. -/
+def Represents {α : Type} (R : HeapRep α) (h : Heap) (r : Ref) (a : α) : Prop :=
+  ∃ o, h.get r = some o ∧ o.cls = R.cls ∧ R.abs o = some a
+
+/-- What a field write does to the heap, at every address at once. Everything below is a
+corollary of this one equation. -/
+theorem Heap.get_setField {h : Heap} {r s : Ref} {f : String} {v : Val} :
+    (h.setField r f v).get s
+      = (h.get s).map (fun o => if s == r then { o with fields := (f, v) :: o.fields } else o) := by
+  simp [Heap.setField, Heap.get, List.getElem?_mapIdx]
+
+/-- **Frame rule.** Mutating one object leaves the representation of every other object
+intact. -/
+theorem Represents.frame {α : Type} {R : HeapRep α} {h : Heap} {r : Ref} {a : α}
+    {s : Ref} {f : String} {v : Val} (hs : s ≠ r) (hR : Represents R h r a) :
+    Represents R (h.setField s f v) r a := by
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  refine ⟨o, ?_, hc, ha⟩
+  simp only [Heap.get_setField, ho, Option.map_some]
+  simp [Ne.symm hs]
+
+/-- **Update rule.** A write to the represented object re-establishes the representation
+at whatever the new fields abstract to. -/
+theorem Represents.update {α : Type} {R : HeapRep α} {h : Heap} {r : Ref} {a a' : α}
+    {f : String} {v : Val} {o : Obj}
+    (hR : Represents R h r a) (ho : h.get r = some o)
+    (ha : R.abs { o with fields := (f, v) :: o.fields } = some a') :
+    Represents R (h.setField r f v) r a' := by
+  obtain ⟨o', ho', hc, _⟩ := hR
+  rw [ho] at ho'; cases ho'
+  refine ⟨{ o with fields := (f, v) :: o.fields }, ?_, hc, ha⟩
+  simp [Heap.get_setField, ho]
+
 /-! ## 4. End-to-end: real translated functions
 
 Entry points are named by their **fully-qualified CPG name** (`ops.py:<module>.absval`,

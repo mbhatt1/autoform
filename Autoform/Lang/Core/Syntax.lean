@@ -47,6 +47,9 @@ inductive Val where
   | ref   : Ref → Val
   /-- A function or method used as a value (`METHOD_REF`), or a class (`TYPE_REF`). -/
   | fn    : String → Val
+  /-- A class together with the bindings it captured, for classes defined inside a
+  function whose methods read the enclosing scope. -/
+  | clsClos : String → List (String × Val) → Val
   /-- A closure: a function together with the bindings it captured. Capture is **by
   value**, which is why `nonlocal` *writes* remain a hole — see `Semantics.lean`. -/
   | clos  : String → List (String × Val) → Val
@@ -56,6 +59,9 @@ inductive Val where
 structure Obj where
   cls    : String
   fields : List (String × Val)
+  /-- Bindings captured by the class that produced this object, if it was defined inside
+  a function. Resolved after the object's own fields and before globals. -/
+  captured : List (String × Val) := []
   deriving Repr, Inhabited
 
 /-- The heap. Index into the list is the `Ref`; allocation appends. -/
@@ -110,6 +116,9 @@ inductive Expr where
   /-- A function value that captures the enclosing scope: decorators, factories, and
   nested functions that read outer variables. -/
   | closure : String → Expr
+  /-- A *class* value that captures the enclosing scope. Distinct from `closure` because
+  a class is not a function: its methods, not it, read the captured bindings. -/
+  | classClosure : String → Expr
   | listE  : List Expr → Expr
   | tupleE : List Expr → Expr
   | dictE  : List (Expr × Expr) → Expr
@@ -140,8 +149,13 @@ inductive Stmt where
   | ret      : Expr → Stmt
   | brk      : Stmt
   | cont     : Stmt
-  /-- `try: body except as x: handler` -/
+  /-- `try: body except as x: handler`. Catches exceptions only — `ret`/`brk`/`cont`
+  pass straight through, or every `try/except` containing a `return` would break. -/
   | tryCatch : Stmt → String → Stmt → Stmt
+  /-- `try: body finally: fin`. The finalizer runs on **every** exit path, and an
+  abnormal exit from the finalizer discards the pending outcome of the body — Python's
+  rule, so `try: return 1 finally: return 2` returns 2. -/
+  | tryFinally : Stmt → Stmt → Stmt
   | raise    : Expr → Stmt
   /-- `del x` -/
   | del      : String → Stmt
@@ -248,6 +262,7 @@ def holes : Stmt → List String
   | .forIn _ e b     => e.holes ++ b.holes
   | .ret e           => e.holes
   | .tryCatch b _ h  => b.holes ++ h.holes
+  | .tryFinally b f  => b.holes ++ f.holes
   | .raise e         => e.holes
   | .setGlobal _ e   => e.holes
   | _                => []
@@ -264,6 +279,7 @@ def size : Stmt → Nat
   | .forIn _ e b     => 1 + e.size + b.size
   | .ret e           => 1 + e.size
   | .tryCatch b _ h  => 1 + b.size + h.size
+  | .tryFinally b f  => 1 + b.size + f.size
   | .raise e         => 1 + e.size
   | .setGlobal _ e   => 1 + e.size
   | _                => 1
@@ -288,5 +304,68 @@ def size (p : Program) : Nat := (p.funcs.map Func.size).sum
 /-- Functions with no holes — the verifiable core. -/
 def verifiableCore (p : Program) : List Func := p.funcs.filter Func.total
 end Program
+
+/-!
+Structural equality on values is written by hand: the nested `List`/`Prod` occurrences
+block `deriving DecidableEq`.
+-/
+mutual
+/-- Structural equality on values. -/
+def Val.beq : Val → Val → Bool
+  | .int a,   .int b   => a == b
+  | .str a,   .str b   => a == b
+  | .bool a,  .bool b  => a == b
+  | .unit,    .unit    => true
+  | .ref a,   .ref b   => a == b
+  | .fn a,    .fn b    => a == b
+  | .clos a _, .clos b _ => a == b
+  | .clsClos a _, .clsClos b _ => a == b
+  | .list a,  .list b  => Val.beqL a b
+  | .tuple a, .tuple b => Val.beqL a b
+  | .dict a,  .dict b  => Val.beqP a b
+  | _,        _        => false
+/-- Structural equality on value lists. -/
+def Val.beqL : List Val → List Val → Bool
+  | [],      []      => true
+  | a :: as, b :: bs => Val.beq a b && Val.beqL as bs
+  | _,       _       => false
+/-- Structural equality on key/value lists. -/
+def Val.beqP : List (Val × Val) → List (Val × Val) → Bool
+  | [],           []           => true
+  | (a,b) :: as, (c,d) :: bs   => Val.beq a c && Val.beq b d && Val.beqP as bs
+  | _,           _             => false
+end
+
+instance : BEq Val := ⟨Val.beq⟩
+
+/-- Truthiness, in the permissive sense shared by most dynamic languages. -/
+def Val.truthy : Val → Bool
+  | .bool b   => b
+  | .int i    => i != 0
+  | .str s    => s != ""
+  | .unit     => false
+  | .list vs  => !vs.isEmpty
+  | .tuple vs => !vs.isEmpty
+  | .dict kvs => !kvs.isEmpty
+  | .ref _    => true
+  | .fn _     => true
+  | .clos _ _ => true
+  | .clsClos _ _ => true
+
+/-- What a value iterates over, if anything. -/
+def Val.iterable : Val → Option (List Val)
+  | .list vs  => some vs
+  | .tuple vs => some vs
+  | .dict kvs => some (kvs.map (·.1))
+  | _         => none
+
+/-- Result of evaluating an expression. -/
+inductive EResult where
+  | val       : Val → EResult
+  /-- A raised exception carrying its payload. -/
+  | exn       : Val → EResult
+  | hole      : String → EResult
+  | outOfFuel : EResult
+  deriving Repr, Inhabited
 
 end Autoform.Core

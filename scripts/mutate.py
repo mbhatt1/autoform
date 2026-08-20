@@ -180,6 +180,166 @@ def gen_mutants(lines, decls):
 
 
 # ---------------------------------------------------------------------------
+# mutation operators for *translated* modules (`Autoform/Generated/*.lean`)
+# ---------------------------------------------------------------------------
+#
+# A generated module is not code in the usual sense: it is a giant data literal,
+#
+#     def f_x : Func := { name := "...", params := [...], body := (.seq (.assign ...) ...) }
+#
+# so the operators above (which swap Lean-level `+`/`<`/`&&` tokens) find almost nothing
+# to do. The interesting perturbations are perturbations of the *embedded program*: the
+# operator string inside `Expr.binop`, the polarity flag of `Expr.inOp`/`Expr.isOp`, the
+# choice of field or variable name, whether a statement returns or merely evaluates, and
+# whether a branch of a `Stmt.seq` happens at all.
+#
+# These are exactly the bugs a specification about translated code is supposed to notice,
+# and they are the reason G4 could not previously be supported for a translated module:
+# the gate had no operator that could touch one.
+
+# `.binop "OP"` — the embedded operator. Swaps stay inside an equivalence class
+# (arithmetic for arithmetic, comparison for comparison) so the mutant remains
+# type-correct in the object language and the failure is behavioural, not syntactic.
+AST_BINOP_SWAPS = {
+    "+": "-", "-": "+", "*": "+", "/": "*", "%": "/",
+    "<": "<=", "<=": "<", ">": ">=", ">=": ">",
+    "==": "!=", "!=": "==",
+    "&&": "||", "||": "&&",
+}
+AST_BINOP = re.compile(r'(\.binop\s+")([^"]+)(")')
+AST_UNOP = re.compile(r'(\.unop\s+")([^"]+)(")')
+AST_UNOP_SWAPS = {"-": "+", "!": "-", "~": "-"}
+
+# `.inOp neg` / `.isOp neg` — the negation flag. Flipping it inverts every membership or
+# identity test, which is a silent wrong answer rather than a crash.
+AST_POLARITY = re.compile(r'(\.(?:inOp|isOp)\s+)(true|false)\b')
+
+# `.ret e` vs `.expr e`: evaluate-and-return versus evaluate-and-discard. The classic
+# "forgot the return statement" bug, and invisible to any specification that only talks
+# about the shape of the AST.
+AST_RET = re.compile(r'\(\.ret\b')
+AST_EXPR = re.compile(r'\(\.expr\b')
+
+# literals inside the embedded program
+AST_INT = re.compile(r'\(\.int\s+(-?\d+)\)')
+AST_BOOL = re.compile(r'\(\.bool\s+(true|false)\)')
+
+# field access / mutation: `(.field (.name "self") "F")`, `(.setField _ "F" _)`
+AST_FIELD = re.compile(r'(\.field\s+\([^()]*\)\s+")([^"]+)(")')
+AST_SETFIELD = re.compile(r'(\.setField\s+\([^()]*\)\s+")([^"]+)(")')
+AST_NAME = re.compile(r'(\.name\s+")([^"]+)(")')
+AST_ASSIGN = re.compile(r'(\.assign\s+")([^"]+)(")')
+
+# a line that is a self-contained, balanced statement term — the unit the `seq`-deletion
+# operator can remove without disturbing the surrounding parenthesis structure.
+STMT_HEADS = ("(.assign ", "(.setField ", "(.expr ", "(.ret ", "(.raise ", "(.del ",
+              "(.setIndex ")
+
+
+def _balanced(text):
+    depth = 0
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _decl_strings(lines, d, pat, group=2):
+    """Every distinct value of capture `group` of `pat` inside declaration `d`."""
+    seen = []
+    for ln in range(d.start, d.end + 1):
+        for m in pat.finditer(lines[ln - 1]):
+            v = m.group(group)
+            if v not in seen:
+                seen.append(v)
+    return seen
+
+
+def gen_mutants_generated(lines, decls):
+    """Mutants of a machine-generated module: perturb the *embedded program*."""
+    mutants = []
+    defs = [d for d in decls if d.kind in DEF_KINDS]
+
+    for d in defs:
+        # alternative names available for the name/field-swap operators, taken from the
+        # same declaration so the mutant stays plausible rather than obviously broken.
+        params = []
+        for ln in range(d.start, d.end + 1):
+            m = re.search(r'params := \[(.*?)\]', lines[ln - 1])
+            if m:
+                params = re.findall(r'"([^"]*)"', m.group(1))
+        fields = _decl_strings(lines, d, AST_FIELD) + _decl_strings(lines, d, AST_SETFIELD)
+        names = _decl_strings(lines, d, AST_NAME)
+
+        for ln in range(d.start, d.end + 1):
+            raw = lines[ln - 1]
+            if raw.lstrip().startswith("--") or raw.lstrip().startswith("/-"):
+                continue
+            cand = []
+
+            def sub_at(m, repl, op):
+                cand.append((raw[:m.start()] + repl + raw[m.end():], op))
+
+            for m in AST_BINOP.finditer(raw):
+                nw = AST_BINOP_SWAPS.get(m.group(2))
+                if nw:
+                    sub_at(m, m.group(1) + nw + m.group(3), f"ast-binop:{m.group(2)}->{nw}")
+            for m in AST_UNOP.finditer(raw):
+                nw = AST_UNOP_SWAPS.get(m.group(2))
+                if nw:
+                    sub_at(m, m.group(1) + nw + m.group(3), f"ast-unop:{m.group(2)}->{nw}")
+            for m in AST_POLARITY.finditer(raw):
+                nw = "false" if m.group(2) == "true" else "true"
+                sub_at(m, m.group(1) + nw, f"ast-polarity:{m.group(2)}->{nw}")
+            for m in AST_RET.finditer(raw):
+                sub_at(m, "(.expr", "ast-ret->expr")
+            for m in AST_EXPR.finditer(raw):
+                sub_at(m, "(.ret", "ast-expr->ret")
+            for m in AST_INT.finditer(raw):
+                v = int(m.group(1))
+                for nv in (v + 1, v - 1):
+                    sub_at(m, f"(.int {nv})", f"ast-int:{v}->{nv}")
+            for m in AST_BOOL.finditer(raw):
+                nw = "false" if m.group(1) == "true" else "true"
+                sub_at(m, f"(.bool {nw})", f"ast-bool:{m.group(1)}->{nw}")
+            for pat, tag in ((AST_FIELD, "ast-field"), (AST_SETFIELD, "ast-setfield")):
+                for m in pat.finditer(raw):
+                    alt = next((f for f in fields if f != m.group(2)), None)
+                    if alt is None:
+                        alt = m.group(2) + "__mutated"
+                    sub_at(m, m.group(1) + alt + m.group(3), f"{tag}:{m.group(2)}->{alt}")
+            for m in AST_NAME.finditer(raw):
+                pool = [n for n in (params + names) if n != m.group(2)]
+                if pool:
+                    sub_at(m, m.group(1) + pool[0] + m.group(3),
+                           f"ast-name:{m.group(2)}->{pool[0]}")
+            for m in AST_ASSIGN.finditer(raw):
+                pool = [n for n in (params + names) if n != m.group(2)]
+                if pool:
+                    sub_at(m, m.group(1) + pool[0] + m.group(3),
+                           f"ast-assign:{m.group(2)}->{pool[0]}")
+
+            # `seq`-branch deletion: a whole statement on its own line, replaced by `.skip`.
+            body = raw.strip().rstrip(",")
+            trail = ""
+            while body.endswith(")") and not _balanced(body):
+                body, trail = body[:-1], ")" + trail
+            if any(body.startswith(hd) for hd in STMT_HEADS) and _balanced(body):
+                indent = raw[:len(raw) - len(raw.lstrip())]
+                comma = "," if raw.rstrip().endswith(",") else ""
+                cand.append((indent + ".skip" + trail + comma + "\n", "ast-seq-delete"))
+
+            for new, op in cand:
+                if new != raw:
+                    mutants.append(Mutant(op, ln, raw, new, d.name))
+    return mutants
+
+
+# ---------------------------------------------------------------------------
 # build harness
 # ---------------------------------------------------------------------------
 
@@ -233,6 +393,22 @@ def main():
     ap.add_argument("lean_file")
     ap.add_argument("module")
     ap.add_argument("--theorems", default=None, help="comma-separated theorem names")
+    ap.add_argument("--spec-file", default=None,
+                    help="file holding the THEOREMS, if different from the file being "
+                         "mutated (the translated-module case: mutate "
+                         "Autoform/Generated/X.lean, gate Autoform/Specs/XSpec.lean)")
+    ap.add_argument("--spec-module", default=None,
+                    help="module to rebuild; defaults to <module>. With --spec-file this "
+                         "must be the module that CONTAINS the theorems, so that a "
+                         "surviving mutant means the theorem really did not notice.")
+    ap.add_argument("--decls", default=None,
+                    help="comma-separated definition names to restrict the mutation "
+                         "population to. Use it to point the gate at the functions the "
+                         "theorems are ABOUT: mutants of other functions survive by "
+                         "construction and measure coverage, not vacuity.")
+    ap.add_argument("--generated", action="store_true",
+                    help="force the translated-module operators (auto-enabled for files "
+                         "under Autoform/Generated/)")
     ap.add_argument("--max-mutants", type=int, default=20)
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--json", dest="json_path", default="mutation.json")
@@ -249,32 +425,56 @@ def main():
     lines = original.splitlines(keepends=True)
     decls = parse_decls(lines)
 
+    # Where do the theorems live? Same file by default; a separate file when the subject
+    # is a machine-generated module, which by construction contains no theorems at all.
+    spec_path = os.path.abspath(args.spec_file) if args.spec_file else path
+    spec_base = os.path.basename(spec_path)
+    if spec_path == path:
+        spec_lines, spec_decls = lines, decls
+    else:
+        with open(spec_path, "r", encoding="utf-8") as f:
+            spec_lines = f.read().splitlines(keepends=True)
+        spec_decls = parse_decls(spec_lines)
+    build_module = args.spec_module or args.module
+    generated = args.generated or ("Autoform/Generated/" in path.replace(os.sep, "/"))
+
     if args.theorems:
         targets = [t.strip() for t in args.theorems.split(",") if t.strip()]
     else:
-        targets = [d.name for d in decls if d.kind in THEOREM_KINDS]
+        targets = [d.name for d in spec_decls if d.kind in THEOREM_KINDS]
     if not targets:
         print("no theorems found; nothing to gate."); return 2
 
-    tmap = {d.name: d for d in decls if d.kind in THEOREM_KINDS and d.name in targets}
+    tmap = {d.name: d for d in spec_decls if d.kind in THEOREM_KINDS and d.name in targets}
     missing = [t for t in targets if t not in tmap]
     for t in missing:
-        print(f"warning: theorem {t!r} not found in {base}")
+        print(f"warning: theorem {t!r} not found in {spec_base}")
     targets = [t for t in targets if t in tmap]
     if not targets:
         return 2
 
-    all_mutants = gen_mutants(lines, decls)
+    all_mutants = (gen_mutants_generated(lines, decls) if generated
+                   else gen_mutants(lines, decls))
+    if args.decls:
+        keep = {d.strip() for d in args.decls.split(",") if d.strip()}
+        all_mutants = [m for m in all_mutants if m.decl in keep]
+        missing = keep - {m.decl for m in all_mutants}
+        for d in sorted(missing):
+            print(f"warning: no mutant generated for declaration {d!r}")
     random.shuffle(all_mutants)
     mutants = all_mutants[:args.max_mutants]
 
     print(f"file      : {path}")
     print(f"module    : {args.module}")
+    print(f"operators : {'translated-module (AST literal)' if generated else 'Lean definition'}")
+    if spec_path != path:
+        print(f"spec file : {spec_path}")
+        print(f"built     : {build_module}")
     print(f"theorems  : {', '.join(targets)}")
     print(f"mutants   : {len(mutants)} of {len(all_mutants)} generated\n")
 
     print("baseline build ...", flush=True)
-    rc, out, to = run_build(root, args.module, args.timeout)
+    rc, out, to = run_build(root, build_module, args.timeout)
     if rc != 0:
         print("BASELINE FAILS TO BUILD -- fix the file first.")
         print(out[-2000:])
@@ -291,12 +491,17 @@ def main():
             with open(path, "w", encoding="utf-8") as f:
                 f.write("".join(new_lines))
 
-            rc, out, timed_out = run_build(root, args.module, args.timeout)
+            rc, out, timed_out = run_build(root, build_module, args.timeout)
+            # Errors in the *mutated* file mean the mutant is not well-typed; errors in
+            # the *spec* file mean a theorem noticed. When the two are the same file
+            # these collapse to the original behaviour.
             errs = error_lines(out, base)
+            spec_errs = errs if spec_path == path else error_lines(out, spec_base)
             hit_defs = {decl_at(decls, l).name for l in errs
                         if decl_at(decls, l) and decl_at(decls, l).kind in DEF_KINDS}
-            hit_thms = {decl_at(decls, l).name for l in errs
-                        if decl_at(decls, l) and decl_at(decls, l).kind in THEOREM_KINDS}
+            hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
+                        if decl_at(spec_decls, l)
+                        and decl_at(spec_decls, l).kind in THEOREM_KINDS}
 
             rec = mut.to_json()
             if rc != 0 and hit_defs and not hit_thms:
@@ -324,10 +529,17 @@ def main():
         with open(path, "w", encoding="utf-8") as f:
             f.write(original)
         # make sure the restored file is what the build cache sees next time
-        run_build(root, args.module, args.timeout)
+        run_build(root, build_module, args.timeout)
 
     print("\n=== mutation score ===")
+    # `module` is the module that was MUTATED, not the one that was rebuilt: scripts/sacm.py
+    # attributes G4 (specification non-vacuity) by this field, and the claim being supported
+    # is a claim about the subject of the mutations.
     report = {"file": path, "module": args.module, "seed": args.seed,
+              "operators": "generated-ast" if generated else "lean-def",
+              "spec_file": spec_path if spec_path != path else None,
+              "spec_module": build_module,
+              "decls": sorted({m.decl for m in mutants}),
               "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
               "invalid": invalid, "theorems": {}, "mutants": records}
     exit_code = 0

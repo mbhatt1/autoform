@@ -188,6 +188,17 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case _ => false
   }
 
+  /** `pureNode`, plus the container displays. Core's lists/tuples/dicts are *values*
+    * (`Val.list`/`Val.tuple`/`Val.dict`), not heap objects, so building one allocates
+    * nothing observable and re-evaluating `{}` is indistinguishable from evaluating it
+    * once. This is what makes the frontend's `tmp0 = {}; tmp0` blocks removable. */
+  def pureExpr(n: AstNode): Boolean = pureNode(n) || (n match {
+    case c: Call if c.methodFullName == "<operator>.listLiteral" ||
+                    c.methodFullName == "<operator>.tupleLiteral" ||
+                    c.methodFullName == "<operator>.dictLiteral" => kidsOf(c).forall(pureExpr)
+    case _ => false
+  })
+
   // Classes declared in the analysed code. A call to one of these is construction, not
   // a plain function call. Joern usually marks it by resolving to `...Cls.__init__`, but
   // not always (unresolved bases, decorated classes), so we keep the name set as a
@@ -275,6 +286,21 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     go(fn, Set.empty)
   }
 
+  /** Every file-level pseudo-method, keyed by its `fullName` (`pkg/mod.py:<module>`).
+    * This is the import resolver's whole notion of "a module in the analysed program". */
+  val moduleFullNames: Set[String] =
+    allMethods.filter(m => m.name == "<module>" || m.name == "<global>").map(_.fullName).toSet
+
+  /** The file-level pseudo-method for a slash-separated module path, if the analysed
+    * program contains it — either `p.py` or the package `p/__init__.py`. */
+  def moduleAt(path: String): Option[String] = {
+    val a = path + ".py:<module>"
+    val b = path + "/__init__.py:<module>"
+    if (moduleFullNames.contains(a)) Some(a)
+    else if (moduleFullNames.contains(b)) Some(b)
+    else None
+  }
+
   /** A function value that reads a variable of an enclosing function is a *closure*;
     * one that does not is an `fnref`, which is cheaper and needs no captured frame. */
   val capturesEnv: Map[String, Boolean] = allMethods.map { m =>
@@ -321,6 +347,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // Set while translating a method from a C-family file, where a `char*` is an address,
   // not a string value.
   var cLikeFile       = false
+  // The source file of the method being translated. `import` is resolved relative to it.
+  var currentFile     = ""
+  // Serial number for the flag variable `try/except/else` needs; nested `try`s in one
+  // function must not share it, or the inner one's flag would drive the outer's `else`.
+  var elseFlagSeq     = 0
 
   /** Static evidence that an operand is a C string/array-of-char. Joern's C frontend
     * types both `char *s` and `"abc"` as `char*`, including on literals. */
@@ -334,6 +365,51 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     }
     val ty = t(n).replace(" ", "")
     ty.matches("""(const|volatile|signed|unsigned)*char(\*|\[.*\]).*""")
+  }
+
+  /** `import p.q` / `from <prefix> import <name>`.
+    *
+    * The Python frontend emits this as a call named `import` with two synthetic literals
+    * — the (possibly dot-prefixed, possibly empty) package prefix and the imported name —
+    * wrapped in an assignment that binds the resulting value. Those literals are unquoted
+    * source fragments, not values, so translating them as expressions produced
+    * `lit:unquoted` holes that said nothing about what the statement actually was.
+    *
+    * What the *statement* means is a binding, and sometimes the bound value is one we
+    * already have: `from ._cached import _wrapper` names a function of this program, and
+    * `from . import LRUCache` names a class of it. Those become the same `fnref`/`closure`
+    * a direct reference would, so the binding is real and cross-module names resolve.
+    *
+    * What we refuse to invent is a **module object**. `import functools` binds a module,
+    * and Core has no module value — `Val.fn` is a function or a class, so pointing a name
+    * at `fnref "functools"` would claim `functools.reduce` is an attribute of a function.
+    * That is the `fnref`-for-a-capturing-class mistake again, so it stays a hole; only the
+    * label improves, from "an unquoted literal" to "a module value we cannot represent".
+    *
+    * Resolution is lexical and purely syntactic: leading dots count package levels up from
+    * the importing file's directory, and the remainder is a path. No sys.path search, no
+    * guessing — if the target is not a method or class of the analysed program, we say so. */
+  def importValue(prefix: String, name: String): ujson.Obj = {
+    val dots = prefix.takeWhile(_ == '.').length
+    val rest = prefix.drop(dots)
+    // `import x` / `import x.y` binds the *module* `x`, never a member.
+    if (dots == 0 && rest.isEmpty) hole("import:module-value")
+    else {
+      val dir  = currentFile.split('/').dropRight(1).dropRight(math.max(dots - 1, 0)).toList
+      val base = if (dots == 0) Nil else dir
+      val segs = base ++ rest.split('.').filter(_.nonEmpty).toList
+      val path = segs.mkString("/")
+      moduleAt(path) match {
+        case None => hole("import:unresolved")
+        case Some(mod) =>
+          val target = mod + "." + name
+          if (methodByName.contains(target))        fnValue(target)
+          else if (classByFullName.contains(target)) typeValue(target + "<meta>")
+          // `from . import keys` where `keys` is a sibling *module*, not a member.
+          else if (moduleAt(path + "/" + name).isDefined) hole("import:module-value")
+          else hole("import:unresolved")
+      }
+    }
   }
 
   // ---- expressions ----------------------------------------------------------
@@ -365,10 +441,70 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case m: MethodRef         => fnValue(m.methodFullName)
     case t: TypeRef           => typeValue(t.typeFullName)
     case c: Call              => callExpr(c)
+    case b: Block             => blockExpr(b)
     case other                => hole("expr:" + other.label)
   }
 
   def exprs(ns: List[AstNode]): ujson.Arr = ujson.Arr.from(ns.map(expr))
+
+  /** Substitute `name` occurrences in an already-translated tree. Used only for the
+    * frontend's own `tmpN` temporaries, whose definitions we proved re-evaluable. */
+  def substNames(v: ujson.Value, m: Map[String, ujson.Value]): ujson.Value = v match {
+    case o: ujson.Obj =>
+      val nm = for { k <- o.value.get("k") if k.str == "name"
+                     x <- o.value.get("v"); r <- m.get(x.str) } yield r
+      nm.getOrElse(ujson.Obj.from(o.value.map { case (k, x) => k -> substNames(x, m) }.toSeq))
+    case a: ujson.Arr => ujson.Arr.from(a.value.map(substNames(_, m)))
+    case other        => other
+  }
+
+  /** A BLOCK in *expression* position.
+    *
+    * pysrc2cpg lowers several expressions into a statement sequence ending in its value —
+    * `d.pop(k)` becomes `tmp0 = d; tmp0.pop(k)`, `{}` becomes `tmp0 = {}; tmp0`. In
+    * statement position `valueOf` splits that into a prelude plus a value, but an argument
+    * has nowhere to put statements, so these were `expr:BLOCK` holes.
+    *
+    * They can be recovered exactly when the prelude is *inlinable*: every preceding
+    * statement binds one of the frontend's own `tmpN` names to a re-evaluable expression.
+    * Then substituting the definitions into the value is a pure renaming — no statement is
+    * dropped (a pure binding has no effect) and no evaluation is reordered (the substituted
+    * expression is evaluated exactly where the temporary was read, and evaluating it
+    * earlier or later is unobservable). Hoisting an *impure* prelude out to the enclosing
+    * statement would reorder it past the arguments evaluated before it, so anything that
+    * does not fit the inlinable shape — generator expressions, most notably — stays a hole
+    * with a label naming what defeated it. */
+  def blockExpr(b: Block): ujson.Obj = {
+    val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    if (ks.isEmpty) hole("expr:empty-block")
+    else {
+      var subst = Map.empty[String, ujson.Value]
+      var bad   = ""
+      ks.init.foreach {
+        case c: Call if c.methodFullName == "<operator>.assignment" =>
+          kidsOf(c) match {
+            case (i: Identifier) :: rhs :: Nil
+                if i.name.matches("tmp\\d+") && pureExpr(rhs) =>
+              subst += (i.name -> substNames(expr(rhs), subst))
+            case (_: Identifier) :: rhs :: Nil => if (bad.isEmpty) bad = "expr:BLOCK-impure"
+            case _                             => if (bad.isEmpty) bad = "expr:BLOCK-prelude"
+          }
+        // `tmp0 = <operator>.genExp` plus the loop that fills it: a generator expression,
+        // which is lazy and has no Core representation at all.
+        case n if n.isInstanceOf[Block] || n.isInstanceOf[ControlStructure] =>
+          if (bad.isEmpty) bad = "expr:BLOCK-prelude"
+        case _ => if (bad.isEmpty) bad = "expr:BLOCK-prelude"
+      }
+      val isGenExp = ks.exists(k => k.isInstanceOf[Call] &&
+        k.asInstanceOf[Call].code.contains("<operator>.genExp"))
+      if (isGenExp) hole("expr:genExp")
+      else if (bad.nonEmpty) hole(bad)
+      else substNames(expr(ks.last), subst) match {
+        case o: ujson.Obj => o
+        case _            => hole("expr:BLOCK")
+      }
+    }
+  }
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
@@ -412,6 +548,14 @@ import io.shiftleft.codepropertygraph.generated.nodes._
        else hole("op:dictLiteral-nonempty"))
     else if (mfn.startsWith("<operator>"))
       hole("op:" + mfn.stripPrefix("<operator>."))
+    // `import x` / `from p import x`: a binding, not a call. See `importValue`.
+    else if (c.name == "import" && mfn == "<unknownFullName>" &&
+             (kids match {
+               case (_: Identifier) :: (_: Literal) :: (_: Literal) :: Nil => true
+               case _                                                     => false
+             }))
+      importValue(kids(1).asInstanceOf[Literal].code.trim,
+                  kids(2).asInstanceOf[Literal].code.trim)
     else {
       // A real call. Arguments are the children with argumentIndex >= 1; the callee sits
       // at -1 and the Python frontend repeats the receiver at 0.
@@ -658,8 +802,36 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     val bodyNodes = kids.filterNot(_.isInstanceOf[ControlStructure])
     val body      = seqOf(bodyNodes.map(stmt))
     if (bodyNodes.isEmpty) holeS("control:TRY-shape")
-    // `else` runs only when the body did not raise, and its own exceptions must not be
-    // caught. Neither is expressible with one tryCatch.
+    // `try: B except: H else: E`.
+    //
+    // `E` must run only when `B` raised nothing, and `E`'s own exceptions must not reach
+    // `H`. One `tryCatch` cannot say that — but a flag can, and the flag is not an
+    // invention: it is exactly the "did we reach the end of the body" bit the construct
+    // is about.
+    //
+    //     ok = true; tryCatch(B, e, { ok = false; H }); if ok then E
+    //
+    // `E` sits outside the tryCatch, so its exceptions propagate rather than being caught.
+    // Every other way out of `B` — return, break, continue, or an exception the handler
+    // re-raises — leaves before the `if`, which is Python's rule: `else` is skipped
+    // whenever the body did not complete normally. The flag is per-`try`, because a nested
+    // `try/else` completing normally would otherwise re-arm the enclosing one's `else`.
+    else if (elses.nonEmpty && catches.size == 1 && finallys.isEmpty) {
+      elseFlagSeq += 1
+      val flag = "__else_ok" + elseFlagSeq
+      val elseBody = seqOf(elses.map(stmt))
+      seqOf(List(
+        ujson.Obj("k" -> "assign", "x" -> flag, "e" -> ujson.Obj("k" -> "bool", "v" -> true)),
+        ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
+                  "handler" -> ujson.Obj("k" -> "seq",
+                    "a" -> ujson.Obj("k" -> "assign", "x" -> flag,
+                                     "e" -> ujson.Obj("k" -> "bool", "v" -> false)),
+                    "b" -> stmt(catches.head))),
+        ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> flag),
+                  "t" -> elseBody, "e" -> skip)))
+    }
+    // `else` alongside `finally`, or alongside a handler choice we cannot make, is not
+    // covered by the encoding above.
     else if (elses.nonEmpty) holeS("control:TRY-else")
     // Which handler runs depends on the exception type, which the CPG discarded.
     else if (catches.size > 1) holeS("control:TRY-multiCatch")
@@ -697,6 +869,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     moduleScope  = isModule
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    currentFile  = m.filename
     declaredGlobals =
       m.body.ast.collect { case u: Unknown if u.code.trim.startsWith("global ") => u }
         .flatMap(globalDeclNames).toSet
