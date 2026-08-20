@@ -82,6 +82,10 @@ def f_lib_py__module__sample_id : Func :=
             (.assign "random" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
             (.seq .skip (.seq (.ret (.mcall (.name "random") "random" [])) .skip))) }
 
+/-- Module-level initializers: run these to populate the globals frame
+before calling any entry point. -/
+def moduleInits : List Func := []
+
 /-- Source dialect: `.python` (integer division/modulo convention). -/
 def program : Program := { dialect := .python, funcs := [
   f_lib_py__module__add,

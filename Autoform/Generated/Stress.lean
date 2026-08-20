@@ -64,6 +64,10 @@ def f_ops_py__module__gcdish : Func :=
                 (.seq (.assign "b" (.binop "%" (.name "a") (.name "b"))) (.assign "a" (.name "t")))))
             (.seq .skip (.ret (.name "a")))) }
 
+/-- Module-level initializers: run these to populate the globals frame
+before calling any entry point. -/
+def moduleInits : List Func := []
+
 /-- Source dialect: `.python` (integer division/modulo convention). -/
 def program : Program := { dialect := .python, funcs := [
   f_ops_py__module__fdiv,

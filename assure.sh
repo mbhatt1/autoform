@@ -61,6 +61,13 @@ hdr "5/5 assurance case"
 # is the same defect class as a metric computed from the artifact it describes -- and
 # this repo had three documents quoting three different verifiable-core numbers, none
 # current, because nothing checked.
+# Is the module we are about to measure actually a render of the AST we checked in?
+# Nothing else asks this, and both failure modes have happened: a mutation-gate mutant
+# reached git and survived four commits, and a concurrent pipeline left the module and the
+# AST 30 functions apart. Every proof still passed in both cases -- a mutant is a
+# well-typed program, and no check derived from the module can see either problem.
+python3 scripts/check_render.py || true
+
 python3 scripts/check_docs.py || true
 
 python3 scripts/emit_contracts.py "$MOD"
