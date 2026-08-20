@@ -65,7 +65,7 @@ contention is the Django ledger at 363 s (see below).
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 238 | 165 (69%) | 69 (29%) | 118 | 5,072 | 1,014 |
+| `cachetools` (published) | 208 | 179 (86%) | 100 (48%) | 118 | 5,416 | 1,014 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |

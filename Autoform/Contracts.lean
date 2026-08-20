@@ -122,6 +122,9 @@ def substE (σ : Impl) : Expr → Expr
   | .cond c a b    => .cond (substE σ c) (substE σ a) (substE σ b)
   | .isOp n a b    => .isOp n (substE σ a) (substE σ b)
   | .inOp n a b    => .inOp n (substE σ a) (substE σ b)
+  | .starred a     => .starred (substE σ a)
+  | .kwargE k a    => .kwargE k (substE σ a)
+  | .dstarred a    => .dstarred (substE σ a)
   | .lit l         => .lit l
   | .name x        => .name x
   | .fnref f       => .fnref f
@@ -197,6 +200,9 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .tupleE as     => by rw [substE, substEL_nil as]
   | .dictE kvs     => by rw [substE, substEP_nil kvs]
   | .cond c a b    => by rw [substE, substE_nil c, substE_nil a, substE_nil b]
+  | .starred a     => by rw [substE, substE_nil a]
+  | .kwargE k a    => by rw [substE, substE_nil a]
+  | .dstarred a    => by rw [substE, substE_nil a]
   | .isOp n a b    => by rw [substE, substE_nil a, substE_nil b]
   | .inOp n a b    => by rw [substE, substE_nil a, substE_nil b]
 
@@ -244,11 +250,25 @@ Two clauses, both load-bearing:
 * **Every filled hole really behaves as its contract says**, at every fuel budget at or
   above the contract's declared `fuel`, in every heap and every environment. Universal
   quantification over `h` and `ρ` is what makes a contract a statement about the
-  *construct* rather than about one call site. -/
+  *construct* rather than about one call site.
+* **Every replacement is an ordinary expression**, i.e. not one of the three argument
+  *forms* `starred` / `kwargE` / `dstarred`. Those are not expressions that produce a
+  value: `f(*xs)` passes several arguments and `f(**d)` passes none positionally, so
+  substituting one into an argument list changes the call's **arity**, which no `post` —
+  a predicate on `evalExpr`'s single `Heap × EResult` — can describe. Admitting them
+  would make `Consistent` claim to constrain something it does not.
+
+  This is a genuine narrowing of `RefinesUnder`: it now quantifies over strictly fewer
+  implementations than before argument forms existed, so a contract-relative theorem
+  says slightly less. It is recorded here rather than hidden because the alternative —
+  quantifying over implementations whose behaviour the contract cannot state — would be
+  unsound, not merely imprecise. Every witness in this file (`.hole l`, `.lit`, `.binop`)
+  is plain, so nothing below is weakened in practice. -/
 def Consistent (Γ : ContractEnv) (p : Program) (σ : Impl) : Prop :=
   (∀ l ∈ σ.labels, l ∈ Γ.labels) ∧
   (∀ c ∈ Γ, ∀ e, σ.lookup c.label = some e →
-     ∀ k, c.fuel ≤ k → ∀ h ρ, c.post h ρ (evalExpr (ctxOf (σ.onProgram p)) k h ρ e))
+     ∀ k, c.fuel ≤ k → ∀ h ρ, c.post h ρ (evalExpr (ctxOf (σ.onProgram p)) k h ρ e)) ∧
+  (∀ l e, σ.lookup l = some e → e.plainArg = true)
 
 /-- `σ` fills every hole `Γ` speaks about. A partial witness would leave a contracted
 hole in place and the "refinement" would be about a program that still holes. -/
@@ -294,9 +314,10 @@ theorem refinesUnder_nil_iff (p : Program) (name : String) (N : Nat)
   constructor
   · intro h
     have hcons : Consistent [] p [] := by
-      refine ⟨?_, ?_⟩
+      refine ⟨?_, ?_, ?_⟩
       · intro l hl; cases hl
       · intro c hc; cases hc
+      · intro l e hl; cases hl
     have htot : Total [] [] := by intro c hc; cases hc
     simpa using h [] hcons htot
   · intro h σ hc _
@@ -355,7 +376,7 @@ theorem unsatisfiable_of_false_post {Γ : ContractEnv} {p : Program} {c : Contra
   match hlk : σ.lookup c.label with
   | none   => rw [hlk] at hs; exact absurd hs (by simp)
   | some e =>
-    exact hfalse [] [] _ (hc.2 c hmem e hlk c.fuel (Nat.le_refl _) [] [])
+    exact hfalse [] [] _ (hc.2.1 c hmem e hlk c.fuel (Nat.le_refl _) [] [])
 
 /-- **Satisfiable contracts still cannot prove two different things.**
 
@@ -425,7 +446,12 @@ theorem satisfiable_top (l : String) (p : Program) :
     Satisfiable [topContract l] p :=
   ⟨[(l, .hole l)],
    ⟨by intro l' hl'; simp [Impl.labels] at hl'; simp [ContractEnv.labels, topContract, hl'],
-    by intro c hc e _ k _ h ρ; simp at hc; subst hc; trivial⟩,
+    by intro c hc e _ k _ h ρ; simp at hc; subst hc; trivial,
+    by intro l' e he
+       simp only [List.lookup] at he
+       split at he
+       · cases he; rfl
+       · simp_all⟩,
    by intro c hc; simp at hc; subst hc; simp [topContract]⟩
 
 /-! ## 5. Extracting the assumptions
@@ -479,16 +505,37 @@ def methodkey(self, *args, **kwargs):
     return hashkey(*args, **kwargs)
 ```
 
-and the transpiler emits it with exactly one hole:
+and until the calling convention was modelled the transpiler emitted it with exactly one
+hole:
 
 ```lean
 body := .seq (.expr (.lit (.str "…docstring…")))
           (.seq .skip (.ret (.call "hashkey" [(.hole "op:starredUnpack")])))
 ```
 
-`op:starredUnpack` is the most common hole label in the corpus (33 occurrences), and this
-single node is the entire reason `methodkey` is outside the verifiable core today. The
-`Func` values below are **the generated ones, imported unedited** from
+`op:starredUnpack` was the most common hole label in the corpus (36 occurrences on the
+committed AST), and this single node was the entire reason `methodkey` sat outside the
+verifiable core.
+
+**It no longer does.** `Core.Expr` now has `starred`/`kwargE`/`dstarred`, `Core.Func` has
+`vararg`/`kwarg`, and the exporter emits them, so the generated body is
+
+```lean
+.ret (.call "cachetools/keys.py:<module>.hashkey"
+        [(.starred (.name "args")), (.dstarred (.name "kwargs"))])
+```
+
+with no hole at all. `methodkey_refines` below is therefore **unconditional** — the same
+conclusion the contract-relative theorem reached, now with an empty `Γ`.
+
+That would leave this section with nothing to demonstrate contracts *on*, so the
+contract-relative theorems are kept and re-pointed at `keysProgramHoled`: `methodkey`
+**exactly as the transpiler used to emit it**, with the starred call replaced by
+`Expr.hole "op:starredUnpack"`. Nothing about the mechanism changed; what changed is that
+the worked example is now a historical program rather than the current one, and this
+paragraph is the only thing standing between a reader and mistaking one for the other.
+
+The `Func` values below are **the generated ones, imported unedited** from
 `Autoform/Generated/Cachetools.lean`.
 
 **Scope, stated rather than glossed.** The theorems are about a two-function program, not
@@ -518,24 +565,31 @@ here as four named lemmas rather than buried inside an evaluation proof. -/
 
 /-- `methodkey` with its single hole implemented by `e`. -/
 def methodkeyWith (e : Expr) : Func :=
-  { f_cachetools_keys_py__module__methodkey with
-    body := (.seq (.expr (.lit (.str "\"\"Return a cache key for use with cached methods.\"\"")))
+  { name   := "cachetools/keys.py:<module>.methodkey"
+  , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg  := some "kwargs"
+  , body := (.seq (.expr (.lit (.str "\"\"Return a cache key for use with cached methods.\"\"")))
               (.seq .skip (.ret (.call "hashkey" [e])))) }
 
 /-- The instantiated program. -/
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
 
-/-- Any implementation of the one contracted label turns `keysProgram` into
+/-- `methodkey` **as the transpiler used to emit it**: the starred call replaced by the
+hole it produced before `Expr.starred`/`Expr.dstarred` existed. This is the subject of the
+contract-relative theorems below; `keysProgram` above is the current program. -/
+def keysProgramHoled : Program := keysProgramWith (.hole "op:starredUnpack")
+
+/-- Any implementation of the one contracted label turns `keysProgramHoled` into
 `keysProgramWith`. Note that names and parameters are untouched — which is why the
 resolution lemmas below are about the instantiated program and still describe the
 original. -/
-theorem onProgram_keysProgram {σ : Impl} {e : Expr}
+theorem onProgram_keysProgramHoled {σ : Impl} {e : Expr}
     (he : σ.lookup "op:starredUnpack" = some e) :
-    σ.onProgram keysProgram = keysProgramWith e := by
-  simp [Impl.onProgram, Impl.onFunc, keysProgram, keysProgramWith, methodkeyWith,
-    substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey]
+    σ.onProgram keysProgramHoled = keysProgramWith e := by
+  simp [Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, keysProgramWith, methodkeyWith,
+    substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey]
 
 theorem table_keysProgramWith (e : Expr) : (keysProgramWith e).table =
     [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
@@ -560,8 +614,10 @@ theorem resolve_hashkey (e : Expr) :
   rw [show ("." ++ "hashkey") = ".hashkey" from by rfl]
   simp +decide [Ctx.resolve.go, String.endsWith]
 
-/-- `kwargs` is not a function: `hashkey`'s `if kwargs:` reads an unbound name, which is
-`unit`, hence falsy. That is why the `**kwargs` branch is not taken. -/
+/-- `kwargs` is not a function. `hashkey`'s `if kwargs:` reads its own `**kwargs`
+parameter, which the call `hashkey(e)` leaves as the empty `dict` — falsy — so the
+`**kwargs` branch is not taken. (Before the calling convention existed the name was
+unbound and read as `unit`, also falsy; the branch taken is the same either way.) -/
 theorem resolve_kwargs (e : Expr) : (ctxOf (keysProgramWith e)).resolve "kwargs" = none := by
   simp only [Ctx.resolve, ctxOf, table_keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
@@ -596,8 +652,8 @@ constructive: each exhibits an implementation. -/
 /-- `pureValueContract` is satisfiable here: an integer literal is a hole implementation
 that terminates, returns, raises nothing and leaves the heap alone. -/
 theorem satisfiable_pureValue :
-    Satisfiable [pureValueContract "op:starredUnpack"] keysProgram := by
-  refine ⟨[("op:starredUnpack", .lit (.int 0))], ⟨?_, ?_⟩, ?_⟩
+    Satisfiable [pureValueContract "op:starredUnpack"] keysProgramHoled := by
+  refine ⟨[("op:starredUnpack", .lit (.int 0))], ⟨?_, ?_, ?_⟩, ?_⟩
   · intro l hl
     simp [Impl.labels] at hl
     simp [ContractEnv.labels, pureValueContract, hl]
@@ -609,6 +665,11 @@ theorem satisfiable_pureValue :
     subst he'
     obtain ⟨m, rfl⟩ : ∃ m, k = m + 1 := ⟨k - 1, by omega⟩
     exact ⟨rfl, ⟨.int 0, rfl⟩⟩
+  · intro l e he
+    simp only [List.lookup] at he
+    split at he
+    · cases he; rfl
+    · simp_all
   · intro c hc
     simp at hc; subst hc
     simp [pureValueContract]
@@ -620,8 +681,9 @@ This is a real limitation and it is the mechanism working: an assumption that th
 raises `MyCustomError` is not automatically meetable, and the obligation surfaces here
 rather than being smuggled in. -/
 theorem satisfiable_raises_zeroDiv :
-    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram := by
-  refine ⟨[("op:starredUnpack", .binop "/" (.lit (.int 1)) (.lit (.int 0)))], ⟨?_, ?_⟩, ?_⟩
+    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled := by
+  refine ⟨[("op:starredUnpack", .binop "/" (.lit (.int 1)) (.lit (.int 0)))],
+    ⟨?_, ?_, ?_⟩, ?_⟩
   · intro l hl
     simp [Impl.labels] at hl
     simp [ContractEnv.labels, raisesContract, hl]
@@ -633,6 +695,11 @@ theorem satisfiable_raises_zeroDiv :
     subst he'
     obtain ⟨m, rfl⟩ : ∃ m, k = m + 2 := ⟨k - 2, by omega⟩
     rfl
+  · intro l e he
+    simp only [List.lookup] at he
+    split at he
+    · cases he; rfl
+    · simp_all
   · intro c hc
     simp at hc; subst hc
     simp [raisesContract]
@@ -655,7 +722,7 @@ mechanism can deliver — and here it happens to be available, because `_HashedT
 `__init__` in the translated program, so the unpacked arguments are not observable in the
 result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
 theorem methodkey_refinesUnder_value :
-    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" 14
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .ret (.ref 0)) := by
   intro σ hc ht
   have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
@@ -663,30 +730,40 @@ theorem methodkey_refinesUnder_value :
   obtain ⟨e, he⟩ : ∃ e, σ.lookup "op:starredUnpack" = some e := by
     have h1 : (σ.lookup "op:starredUnpack").isSome := ht _ hmem
     exact Option.isSome_iff_exists.mp h1
-  have hpost := hc.2 _ hmem e he
+  have hpost := hc.2.1 _ hmem e he
   simp only [pureValueContract] at hpost
   -- The contract fixes the *shape* of the hole's outcome, not its value; that is enough
   -- to rewrite past it.
   obtain ⟨vf, hvf⟩ : ∃ vf : Nat → Heap → Env → Val, ∀ k h ρ, 1 ≤ k →
-      evalExpr (ctxOf (σ.onProgram keysProgram)) k h ρ e = (h, .val (vf k h ρ)) := by
-    refine ⟨fun k h ρ => match (evalExpr (ctxOf (σ.onProgram keysProgram)) k h ρ e).2 with
+      evalExpr (ctxOf (σ.onProgram keysProgramHoled)) k h ρ e = (h, .val (vf k h ρ)) := by
+    refine ⟨fun k h ρ => match (evalExpr (ctxOf (σ.onProgram keysProgramHoled)) k h ρ e).2 with
                          | .val v => v | _ => .unit, ?_⟩
     intro k h ρ hk
     obtain ⟨h1, v, h2⟩ := hpost k hk h ρ
     simp only []
     rw [h2]
     exact Prod.ext h1 h2
-  rw [onProgram_keysProgram he] at hvf
+  rw [onProgram_keysProgramHoled he] at hvf
+  have hplain : e.plainArg = true := hc.2.2 _ _ he
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  rw [onProgram_keysProgram he]
+  rw [onProgram_keysProgramHoled he]
+  -- `evalList` dispatches on the *syntax* of an argument before evaluating it, so the
+  -- contract's statement about `evalExpr e` is not on its own enough to say what the
+  -- argument list does. `Consistent`'s plainness clause supplies the missing half.
+  have hvl : ∀ (h : Heap) (ρ : Env),
+      evalList (ctxOf (keysProgramWith e)) (k+9) h ρ [e]
+        = (h, .inr ([vf (k+8) h ρ], [])) := by
+    intro h ρ
+    rw [show k+9 = (k+7)+2 from rfl, evalList_singleton _ _ _ _ hplain,
+        show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
-    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvf]
+    Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -700,7 +777,7 @@ Taken with `methodkey_refinesUnder_value` this is also the sharpest illustration
 because they are relative to different `Γ`s. Reading either one without its `Γ` is reading
 it wrong. -/
 theorem methodkey_refinesUnder_raise (payload : Val) :
-    RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgram "cachetools/keys.py:<module>.methodkey" 14
+    RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .raise payload) := by
   intro σ hc ht
   have hmem : raisesContract "op:starredUnpack" payload ∈
@@ -708,15 +785,19 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   obtain ⟨e, he⟩ : ∃ e, σ.lookup "op:starredUnpack" = some e := by
     have h1 : (σ.lookup "op:starredUnpack").isSome := ht _ hmem
     exact Option.isSome_iff_exists.mp h1
-  have hpost := hc.2 _ hmem e he
+  have hpost := hc.2.1 _ hmem e he
   simp only [raisesContract] at hpost
-  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, substS, substE, substEL,
     he, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
+  have hplain : e.plainArg = true := hc.2.2 _ _ he
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+  -- As in the value theorem: the plainness clause of `Consistent` is what lets a fact
+  -- about `evalExpr e` become a fact about the argument list `[e]`.
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected,
+    evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
@@ -724,8 +805,8 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
 theorem methodkey_value_result :
-    Satisfiable [pureValueContract "op:starredUnpack"] keysProgram ∧
-    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" 14
+    Satisfiable [pureValueContract "op:starredUnpack"] keysProgramHoled ∧
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
       (fun _ => True) (fun _ => .ret (.ref 0)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
 
@@ -733,11 +814,84 @@ theorem methodkey_value_result :
 The general `methodkey_refinesUnder_raise` holds for *any* payload; only this instance
 comes with a witness that the assumption can be met. -/
 theorem methodkey_raise_result :
-    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram ∧
-    RefinesUnder [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram
+    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled ∧
+    RefinesUnder [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled
       "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True)
       (fun _ => .raise (.str "ZeroDivisionError")) :=
   ⟨satisfiable_raises_zeroDiv, methodkey_refinesUnder_raise _⟩
+
+/-- The same resolution facts, for the *current* program rather than the holed one.
+`_HashedTuple` has no translated `__init__` here either. -/
+theorem table_keysProgram : keysProgram.table =
+    [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+    , ("cachetools/keys.py:<module>.methodkey", f_cachetools_keys_py__module__methodkey) ] := by
+  simp [Program.table, keysProgram, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey]
+
+theorem resolve_methodkey' :
+    (ctxOf keysProgram).resolve "cachetools/keys.py:<module>.methodkey"
+      = some f_cachetools_keys_py__module__methodkey := by
+  simp +decide [Ctx.resolve, ctxOf, table_keysProgram,
+    f_cachetools_keys_py__module__methodkey]
+
+/-- The generated `methodkey` calls `hashkey` by its **fully qualified** name (§31), so
+this resolution is an exact table hit rather than the unique-suffix fallback. -/
+theorem resolve_hashkey' :
+    (ctxOf keysProgram).resolve "cachetools/keys.py:<module>.hashkey"
+      = some f_cachetools_keys_py__module__hashkey := by
+  simp +decide [Ctx.resolve, ctxOf, table_keysProgram,
+    f_cachetools_keys_py__module__hashkey]
+
+theorem resolveMethod_hashedTuple_init' :
+    (ctxOf keysProgram).resolveMethod "_HashedTuple" "__init__" = none := by
+  simp only [Ctx.resolveMethod, ctxOf, table_keysProgram,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
+  simp +decide [List.filter_cons, String.endsWith]
+  simp only [Ctx.resolve, ctxOf, table_keysProgram]
+  rw [show ("." ++ "__init__") = ".__init__" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+
+/-! ### The unconditional theorem
+
+The point of the whole section: with the calling convention modelled, the contract is no
+longer needed. -/
+
+set_option maxHeartbeats 4000000 in
+/-- **`methodkey` refines a total Lean specification, unconditionally.**
+
+Same entry point, same fuel bound, same domain and same conclusion as
+`methodkey_refinesUnder_value` — with `Γ = []`. By `refinesUnder_nil_iff` a theorem is
+unconditional exactly when its contract environment is literally empty, and this one has
+no contract environment at all: it is an ordinary `Refine.Refines`.
+
+What closed it was language modelling, not proof automation: `Expr.starred`/`Expr.dstarred`
+and `Func.vararg`/`Func.kwarg`, plus an exporter that emits them. The hole
+`op:starredUnpack` no longer occurs anywhere in the corpus.
+
+The conclusion is still `_HashedTuple` at address 0 and still does not depend on the
+unpacked arguments, for the reason the contract-relative proof already found: the
+translated `_HashedTuple` has no `__init__`. That is the builtin-base-class gap
+STRATEGY.md §31/§34 records, and it is unchanged by this theorem. -/
+theorem methodkey_refines :
+    Refines keysProgram "cachetools/keys.py:<module>.methodkey" 14
+      (fun _ => True) (fun _ => .ret (.ref 0)) := by
+  intro args _
+  apply forall_ge_of_forall_add
+  intro k
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, ctx_fold,
+    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
+    Val.iterable, strKeyed, Heap.get, Heap.alloc]
+
+/-- The unconditional theorem needs no satisfiability obligation — there is nothing to
+satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is
+mechanical rather than a matter of reading the prose. -/
+theorem methodkey_unconditional : RefinesUnder [] keysProgram
+    "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True) (fun _ => .ret (.ref 0)) :=
+  (refinesUnder_nil_iff _ _ _ _ _).mpr methodkey_refines
 
 /-! ### The negative result
 
@@ -746,16 +900,16 @@ Without it the section above would be advocacy. -/
 /-- Leaving the hole in place is a legal implementation of `topContract`. -/
 def idImpl : Impl := [("op:starredUnpack", .hole "op:starredUnpack")]
 
-theorem idImpl_onProgram : idImpl.onProgram keysProgram = keysProgram := by
-  simp [idImpl, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+theorem idImpl_onProgram : idImpl.onProgram keysProgramHoled = keysProgramHoled := by
+  simp [idImpl, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, substS, substE, substEL,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
 
 set_option maxHeartbeats 1000000 in
 /-- Untouched, `methodkey` reports the hole, at any adequate fuel — the situation this
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
-    runFunc keysProgram (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, keysProgram, f_cachetools_keys_py__module__hashkey,
+    runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, keysProgramHoled, keysProgramWith, methodkeyWith, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,
@@ -773,15 +927,20 @@ that say something. A `Γ` full of `topContract`s is detectably worthless rather
 quietly worthless. -/
 theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
     (spec : List Val → Outcome) (args : List Val) (hd : dom args) :
-    ¬ RefinesUnder [topContract "op:starredUnpack"] keysProgram "cachetools/keys.py:<module>.methodkey" N dom spec := by
+    ¬ RefinesUnder [topContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" N dom spec := by
   intro h
-  have hcons : Consistent [topContract "op:starredUnpack"] keysProgram idImpl := by
-    refine ⟨?_, ?_⟩
+  have hcons : Consistent [topContract "op:starredUnpack"] keysProgramHoled idImpl := by
+    refine ⟨?_, ?_, ?_⟩
     · intro l hl
       simp [idImpl, Impl.labels] at hl
       simp [ContractEnv.labels, topContract, hl]
     · intro c hc e' _ k _ h' ρ
       simp at hc; subst hc; trivial
+    · intro l e he
+      simp only [idImpl, List.lookup] at he
+      split at he
+      · cases he; rfl
+      · simp_all
   have htot : Total [topContract "op:starredUnpack"] idImpl := by
     intro c hc; simp at hc; subst hc; simp [topContract, idImpl]
   have hR := h idImpl hcons htot
@@ -792,17 +951,38 @@ theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
 /-! ### Cross-checks against the full program
 
 `keysProgram` is a two-function slice. These evaluate the *whole* translated `cachetools`
-(238 functions) and confirm the slice did not change the answer — the same
+(208 functions) and confirm the slice did not change the answer — the same
 oracle-not-sharing-the-artifact's-assumptions discipline as §17. They are `#eval`, so they
 are evidence for a reader, not part of any proof. -/
 
--- The untouched full program holes, exactly as the slice does.
+-- The full program agrees with `methodkey_refines`: `_HashedTuple` at address 0, with no
+-- hole and no contract. This is the line that used to print `hole "op:starredUnpack"`.
 #eval reprStr (runFunc Autoform.Generated.program 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
 
--- With the hole implemented, the full program returns `_HashedTuple` at address 0 —
--- agreeing with `methodkey_refinesUnder_value`.
-#eval reprStr (runFunc (Impl.onProgram [("op:starredUnpack", Expr.lit (.int 0))]
-  Autoform.Generated.program) 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
+-- Re-holing the starred call reproduces the old behaviour on the full program, which is
+-- what `keysProgramHoled` is a slice of.
+def reholed : Program :=
+  { Autoform.Generated.program with
+    funcs := Autoform.Generated.program.funcs.map fun f =>
+      if f.name == "cachetools/keys.py:<module>.methodkey" then
+        methodkeyWith (.hole "op:starredUnpack") else f }
+
+#eval reprStr (runFunc reholed 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
+
+-- `hashkey` on the full program, showing the `**kwargs` branch is reachable: passing a
+-- keyword argument takes the `if kwargs:` branch that the empty call does not.
+#eval reprStr (runFunc Autoform.Generated.program 40 "cachetools/keys.py:<module>.hashkey" [.int 1])
+
+/-! ### Axiom audit
+
+The headline of this section is now the unconditional theorem, so it is the one whose
+axiom base a reader should check. -/
+
+#print axioms methodkey_refines
+#print axioms methodkey_unconditional
+#print axioms methodkey_refinesUnder_value
+#print axioms methodkey_refinesUnder_raise
+#print axioms methodkey_not_refinable_under_top
 
 /-! ### The assumption record this theorem exports -/
 

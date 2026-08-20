@@ -324,14 +324,19 @@ theorem evalExpr_cond_false {c t e : Expr} {h₁ : Heap} {v : Val}
   simp [evalExpr, hc, hv]
 
 theorem evalList_nil :
-    evalList ctx (k+1) h ρ [] = (h, .inr []) := rfl
+    evalList ctx (k+1) h ρ [] = (h, .inr ([], [])) := rfl
 
+/-- One ordinary (non-starred) argument. `plainArg` is the side condition that makes this
+true: `*e`, `k = e` and `**e` are dispatched on syntactically by `evalList`, so they do
+*not* contribute one value each and this equation would be false for them. Every use site
+supplies a concrete argument, so the condition is discharged by `rfl`. -/
 theorem evalList_cons_val {a : Expr} {as : List Expr} {h₁ h₂ : Heap} {v : Val}
-    {vs : List Val}
+    {vs : List Val} {kws : List (String × Val)}
+    (hp : a.plainArg = true)
     (ha : evalExpr ctx k h ρ a = (h₁, .val v))
-    (has : evalList ctx k h₁ ρ as = (h₂, .inr vs)) :
-    evalList ctx (k+1) h ρ (a :: as) = (h₂, .inr (v :: vs)) := by
-  simp [evalList, ha, has]
+    (has : evalList ctx k h₁ ρ as = (h₂, .inr (vs, kws))) :
+    evalList ctx (k+1) h ρ (a :: as) = (h₂, .inr (v :: vs, kws)) := by
+  cases a <;> simp_all [evalList, Expr.plainArg]
 
 theorem execStmt_zero (s : Stmt) :
     execStmt ctx 0 h ρ s = (h, .outOfFuel) := rfl
@@ -409,10 +414,12 @@ theorem execFor_nil (x : String) (body : Stmt) :
 /-- `applyFunc` at successor fuel: bind parameters, run the body, and map the control
 outcome back into a result. Stray `break`/`continue` escaping a function body becomes a
 hole, not a silent success. -/
-theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val) :
-    applyFunc ctx (k+1) h fn self? vs =
+theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
+    (kws : List (String × Val)) :
+    applyFunc ctx (k+1) h fn self? vs kws =
       (let base : Env := match self? with | some s => [("self", s)] | none => []
-       let ρ' := (fn.params.zip vs).foldl (fun e (x, v) => e.set x v) base
+       let ρ' := bindParams fn base vs kws
+       if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
        match execStmt ctx k h ρ' fn.body with
        | (h₁, .ret v)     => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
@@ -461,7 +468,7 @@ def ctxOf (p : Program) : Ctx := { dialect := p.dialect, table := p.table }
 by computation, so it never becomes a proof obligation. -/
 theorem runFunc_of_resolve (p : Program) (fuel : Nat) (name : String) (args : List Val)
     (fn : Func) (hres : (ctxOf p).resolve name = some fn) :
-    runFunc p fuel name args = (applyFunc (ctxOf p) fuel [] fn none args).2 := by
+    runFunc p fuel name args = (applyFunc (ctxOf p) fuel [] fn none args []).2 := by
   unfold runFunc
   simp only [ctxOf] at hres ⊢
   rw [hres]
@@ -806,23 +813,24 @@ theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
 
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
-    {m : String} {args : List Expr} {vs : List Val}
+    {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
     (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
-    (has : evalList ctx k h₁ ρ args = (h₂, .inr vs))
+    (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
     (ho : h₂.get r = some o)
     (hcap : o.captured = [])
     (hm : ctx.resolveMethod o.cls m = some fn) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
-      = applyFunc ctx k h₂ fn (some (.ref r)) vs := by
+      = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
   simp [evalExpr, hr, has, ho, hm, hcap]
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
-    {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val} {fn : Func} {w : Val}
-    (has : evalList ctx k h ρ args = (h₁, .inr vs))
+    {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
+    {kws : List (String × Val)} {fn : Func} {w : Val}
+    (has : evalList ctx k h ρ args = (h₁, .inr (vs, kws)))
     (hcap : (∀ c cap, ρ.get cls ≠ .clsClos c cap))
     (hm : ctx.resolveMethod cls "__init__" = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
-        (some (.ref h₁.length)) vs = (h₃, .val w)) :
+        (some (.ref h₁.length)) vs kws = (h₃, .val w)) :
     evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by
   have hc : (match ρ.get cls with | .clsClos _ c => c | _ => []) = ([] : List (String × Val)) := by
     cases hg : ρ.get cls <;> simp [hg]
@@ -1097,7 +1105,7 @@ theorem poly_refines :
   refine forall_ge_of_forall_add (N := 9) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
         CMathProgram, Marshal.toVal, applyBinop_c_mul h1, applyBinop_c_add h2,
         applyBinop_c_sub h3]
 
@@ -1115,7 +1123,7 @@ theorem poly_overflows (k : Nat) :
     runFunc CMathProgram (k + 9) "poly" [.int 100000, .int 100000, .int 0]
       = .val (.int 1409965408) := by
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp only [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
+  simp only [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
   rfl
 
 /-- No fuel bound makes `poly` refine its mathematical model on the full domain. -/
@@ -1149,13 +1157,13 @@ theorem clamp_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_clamp rfl]
   by_cases h1 : x < lo
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, h1]
   · by_cases h2 : hi < x
-    · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
-    · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
 
@@ -1176,9 +1184,9 @@ theorem cdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_cdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
           applyBinop_c_div hb hdom, hb]
 
@@ -1195,7 +1203,7 @@ theorem add_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__add rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
         SampleProgram, Marshal.toVal]
 
 /-! ### Python: `absval` from `ops.py` -/
@@ -1209,10 +1217,10 @@ theorem absval_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__absval rfl]
   by_cases h1 : x < 0
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
 
@@ -1227,14 +1235,14 @@ theorem cmpchain_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__cmpchain rfl]
   by_cases h1 : x < y
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
   · by_cases h2 : y < x
-    · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
-    · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
 
@@ -1255,9 +1263,9 @@ theorem fmod_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fmod rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
           applyBinop_py_mod a b hb, hb]
 
@@ -1280,9 +1288,9 @@ theorem fdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
-  · simp [applyFunc, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
           applyBinop_py_div a b hb, hb]
 
@@ -1303,7 +1311,7 @@ theorem sample_id_reaches_hole (k : Nat) :
     runFunc SampleProgram (k + 10) "lib.py:<module>.sample_id" []
       = .hole "lit:unquoted" := by
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__sample_id rfl]
-  simp [applyFunc, execStmt, evalExpr, evalList, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, evalList, Env.set,
         f_lib_py__module__sample_id, ctxOf, SampleProgram]
 
 /-- No shallow specification refines `sample_id`, at any fuel bound, on any domain that
@@ -1528,7 +1536,7 @@ theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
         hret]
   rw [triN_closed hn] at hbody
   simp only [f_sumto, ctxC] at hbody
-  simp [applyFunc, f_sumto, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_sumto, Env.set, hbody]
 
 theorem sumto_refines :
     Refines₁ (α := Int) (β := Int)
@@ -1677,7 +1685,7 @@ theorem gcdish_run (a b : Int) (ha : 0 ≤ a) (hb : 0 ≤ b) (fuel : Nat)
         execStmt_seq_normal ctxS (G+3) [] _ hskip,
         hret]
   simp only [f_ops_py__module__gcdish, ctxS] at hbody
-  simp [applyFunc, f_ops_py__module__gcdish, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_ops_py__module__gcdish, Env.set, hbody]
 
 theorem gcdish_refines :
     Refines₂ (α := Int) (β := Int) (γ := Int)
@@ -1852,16 +1860,18 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     simp only [f_counter_bump]
     rw [execStmt_seq_normal ctxT (j+4) h _ hsf]
     exact hret
-  have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv]
+  have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv] []
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
-    rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv]]
-    simp only [f_counter_bump, List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+    rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv] []]
+    simp only [f_counter_bump, kwargsRejected_nil, Bool.false_eq_true, if_false,
+      bindParams_mk,
+      List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
     rw [evalExpr_mcall_obj ctxT (j+6) h ρ
       (evalExpr_name ctxT (j+5) h ρ "c" hc)
-      (evalList_cons_val ctxT (j+5) h ρ (evalExpr_name ctxT (j+4) h ρ "x" hx)
+      (evalList_cons_val ctxT (j+5) h ρ rfl (evalExpr_name ctxT (j+4) h ρ "x" hx)
         (evalList_nil ctxT (j+4) h ρ))
       ho hcap (by rw [hcls]; exact resolve_bump)]
     exact happ
@@ -1924,16 +1934,18 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     rw [execStmt_seq_normal ctxT (G+7) _ _ hsf]
     exact execStmt_skip ctxT (G+6) _ _
   have hinit : applyFunc ctxT (G+9) [{ cls := "Counter", fields := [], captured := [] }]
-        f_counter_init (some (.ref 0)) [Val.int 0]
+        f_counter_init (some (.ref 0)) [Val.int 0] []
       = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val .unit) := by
-    rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0]]
-    simp only [f_counter_init, List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
+    rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0] []]
+    simp only [f_counter_init, kwargsRejected_nil, Bool.false_eq_true, if_false,
+      bindParams_mk,
+      List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
     rw [hinitbody]
   have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
         (.alloc "Counter" [(.lit (.int 0))])
       = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val (.ref 0)) := by
     have h := evalExpr_alloc_obj ctxT (G+9) [] [("xs", Val.list (ys.map Val.int))]
-      (evalList_cons_val ctxT (G+8) [] _ (evalExpr_lit_int ctxT (G+7) [] _ 0)
+      (evalList_cons_val ctxT (G+8) [] _ rfl (evalExpr_lit_int ctxT (G+7) [] _ 0)
         (evalList_nil ctxT (G+7) [] _))
       (by intro c cap; simp [Env.get])
       resolve_init hinit
@@ -1982,8 +1994,10 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     rw [execStmt_seq_normal ctxT (G+11) [] _ hassign,
         execStmt_seq_normal ctxT (G+10) _ _ hforIn]
     exact hret
-  rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)]]
-  simp only [f_counter_total, List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+  rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)] []]
+  simp only [f_counter_total, kwargsRejected_nil, Bool.false_eq_true, if_false,
+    bindParams_mk,
+    List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
   rw [hbody]
 
 /-- The concrete run the project history records: `total([5,7,9]) = 21`, through object

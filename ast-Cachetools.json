@@ -4804,7 +4804,8 @@
      "v": 1
     }
    }
-  }
+  },
+  "vararg": "exc"
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__",
@@ -5548,8 +5549,18 @@
             "v": "self"
            },
            {
-            "k": "hole",
-            "label": "op:starredUnpack"
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
            }
           ]
          }
@@ -5604,7 +5615,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.pop",
@@ -5689,8 +5702,18 @@
             "v": "self"
            },
            {
-            "k": "hole",
-            "label": "op:starredUnpack"
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
            }
           ]
          }
@@ -5745,7 +5768,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.setdefault",
@@ -5830,8 +5855,18 @@
             "v": "self"
            },
            {
-            "k": "hole",
-            "label": "op:starredUnpack"
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
            }
           ]
          }
@@ -5886,7 +5921,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.clear",
@@ -7523,6 +7560,14 @@
            },
            "k": "mcall",
            "m": "values"
+          },
+          {
+           "k": "kwargE",
+           "n": "key",
+           "a": {
+            "k": "fnref",
+            "v": "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0"
+           }
           }
          ]
         }
@@ -11267,6 +11312,14 @@
         {
          "k": "name",
          "v": "condition"
+        },
+        {
+         "k": "kwargE",
+         "n": "info",
+         "a": {
+          "k": "name",
+          "v": "make_info"
+         }
         }
        ]
       }
@@ -11674,6 +11727,14 @@
         {
          "k": "name",
          "v": "condition"
+        },
+        {
+         "k": "kwargE",
+         "n": "info",
+         "a": {
+          "k": "name",
+          "v": "make_info"
+         }
         }
        ]
       }
@@ -12153,8 +12214,18 @@
       "f": "key",
       "args": [
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
@@ -12356,8 +12427,18 @@
            "f": "func",
            "args": [
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -12711,7 +12792,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._condition_info.wrapper.<lambda>0",
@@ -13266,8 +13349,18 @@
        "f": "key",
        "args": [
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -13430,8 +13523,18 @@
            "f": "func",
            "args": [
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -13636,7 +13739,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._locked_info.cache_clear",
@@ -14152,8 +14257,18 @@
        "f": "key",
        "args": [
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -14244,8 +14359,18 @@
            "f": "func",
            "args": [
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -14318,7 +14443,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._unlocked_info.cache_clear",
@@ -14585,8 +14712,18 @@
         "f": "func",
         "args": [
          {
-          "k": "hole",
-          "label": "op:starredUnpack"
+          "k": "starred",
+          "a": {
+           "k": "name",
+           "v": "args"
+          }
+         },
+         {
+          "k": "dstarred",
+          "a": {
+           "k": "name",
+           "v": "kwargs"
+          }
          }
         ]
        }
@@ -14594,7 +14731,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._uncached_info.cache_clear",
@@ -14770,8 +14909,18 @@
      "f": "key",
      "args": [
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -14930,8 +15079,18 @@
          "f": "func",
          "args": [
           {
-           "k": "hole",
-           "label": "op:starredUnpack"
+           "k": "starred",
+           "a": {
+            "k": "name",
+            "v": "args"
+           }
+          },
+          {
+           "k": "dstarred",
+           "a": {
+            "k": "name",
+            "v": "kwargs"
+           }
           }
          ]
         }
@@ -15277,7 +15436,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._condition.wrapper.<lambda>2",
@@ -15531,8 +15692,18 @@
      "f": "key",
      "args": [
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -15652,8 +15823,18 @@
          "f": "func",
          "args": [
           {
-           "k": "hole",
-           "label": "op:starredUnpack"
+           "k": "starred",
+           "a": {
+            "k": "name",
+            "v": "args"
+           }
+          },
+          {
+           "k": "dstarred",
+           "a": {
+            "k": "name",
+            "v": "kwargs"
+           }
           }
          ]
         }
@@ -15844,7 +16025,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._locked.cache_clear",
@@ -16042,8 +16225,18 @@
      "f": "key",
      "args": [
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -16091,8 +16284,18 @@
          "f": "func",
          "args": [
           {
-           "k": "hole",
-           "label": "op:starredUnpack"
+           "k": "starred",
+           "a": {
+            "k": "name",
+            "v": "args"
+           }
+          },
+          {
+           "k": "dstarred",
+           "a": {
+            "k": "name",
+            "v": "kwargs"
+           }
           }
          ]
         }
@@ -16151,7 +16354,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._unlocked.<lambda>3",
@@ -16238,8 +16443,18 @@
      "f": "func",
      "args": [
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -16247,7 +16462,9 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cached.py:<module>._uncached.<lambda>4",
@@ -16893,6 +17110,14 @@
       {
        "k": "name",
        "v": "DeprecationWarning"
+      },
+      {
+       "k": "kwargE",
+       "n": "stacklevel",
+       "a": {
+        "k": "name",
+        "v": "stacklevel"
+       }
       }
      ]
     }
@@ -16934,6 +17159,14 @@
       {
        "k": "name",
        "v": "DeprecationWarning"
+      },
+      {
+       "k": "kwargE",
+       "n": "stacklevel",
+       "a": {
+        "k": "name",
+        "v": "stacklevel"
+       }
       }
      ]
     }
@@ -16996,7 +17229,16 @@
      "e": {
       "k": "call",
       "f": "cachetools/_cachedmethod.py:<module>._warn_classmethod",
-      "args": []
+      "args": [
+       {
+        "k": "kwargE",
+        "n": "stacklevel",
+        "a": {
+         "k": "int",
+         "v": 5
+        }
+       }
+      ]
      }
     },
     "e": {
@@ -17201,7 +17443,9 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_clear",
@@ -17609,7 +17853,16 @@
        "v": "tmp0"
       },
       "m": "__init__",
-      "args": []
+      "args": [
+       {
+        "k": "kwargE",
+        "n": "deprecated",
+        "a": {
+         "k": "bool",
+         "v": true
+        }
+       }
+      ]
      }
     }
    },
@@ -17668,7 +17921,16 @@
     "e": {
      "k": "call",
      "f": "cachetools/_cachedmethod.py:<module>._warn_classmethod",
-     "args": []
+     "args": [
+      {
+       "k": "kwargE",
+       "n": "stacklevel",
+       "a": {
+        "k": "int",
+        "v": 3
+       }
+      }
+     ]
     }
    },
    "b": {
@@ -17687,14 +17949,26 @@
       "m": "_DeprecatedDescriptorBase__wrapper",
       "args": [
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear",
@@ -17709,7 +17983,16 @@
     "e": {
      "k": "call",
      "f": "cachetools/_cachedmethod.py:<module>._warn_classmethod",
-     "args": []
+     "args": [
+      {
+       "k": "kwargE",
+       "n": "stacklevel",
+       "a": {
+        "k": "int",
+        "v": 3
+       }
+      }
+     ]
     }
    },
    "b": {
@@ -18040,8 +18323,18 @@
         "m": "cache_key",
         "args": [
          {
-          "k": "hole",
-          "label": "op:starredUnpack"
+          "k": "starred",
+          "a": {
+           "k": "name",
+           "v": "args"
+          }
+         },
+         {
+          "k": "dstarred",
+          "a": {
+           "k": "name",
+           "v": "kwargs"
+          }
          }
         ]
        }
@@ -18277,8 +18570,18 @@
               "f": "_obj"
              },
              {
-              "k": "hole",
-              "label": "op:starredUnpack"
+              "k": "starred",
+              "a": {
+               "k": "name",
+               "v": "args"
+              }
+             },
+             {
+              "k": "dstarred",
+              "a": {
+               "k": "name",
+               "v": "kwargs"
+              }
              }
             ]
            }
@@ -18642,7 +18945,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0",
@@ -19271,8 +19576,18 @@
        "m": "cache_key",
        "args": [
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -19454,8 +19769,18 @@
             "f": "_obj"
            },
            {
-            "k": "hole",
-            "label": "op:starredUnpack"
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
            }
           ]
          }
@@ -19657,7 +19982,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_clear",
@@ -20215,8 +20542,18 @@
       "m": "cache_key",
       "args": [
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
@@ -20326,8 +20663,18 @@
            "f": "_obj"
           },
           {
-           "k": "hole",
-           "label": "op:starredUnpack"
+           "k": "starred",
+           "a": {
+            "k": "name",
+            "v": "args"
+           }
+          },
+          {
+           "k": "dstarred",
+           "a": {
+            "k": "name",
+            "v": "kwargs"
+           }
           }
          ]
         }
@@ -20392,7 +20739,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_clear",
@@ -20709,8 +21058,18 @@
         "v": "self"
        },
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
@@ -20890,8 +21249,18 @@
              "v": "self"
             },
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -21268,7 +21637,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition.wrapper.<lambda>1",
@@ -21516,8 +21887,18 @@
          "v": "p"
         },
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -21539,7 +21920,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.__init__",
@@ -21701,8 +22084,18 @@
        "f": "_Wrapper__pending"
       },
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -21710,7 +22103,9 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.cache_clear",
@@ -21884,8 +22279,18 @@
          "v": "self"
         },
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -22015,8 +22420,18 @@
              "v": "self"
             },
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -22215,7 +22630,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked.cache_clear",
@@ -22497,8 +22914,18 @@
        "f": "_obj"
       },
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -22506,7 +22933,9 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.cache_clear",
@@ -22673,8 +23102,18 @@
          "v": "self"
         },
         {
-         "k": "hole",
-         "label": "op:starredUnpack"
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
         }
        ]
       }
@@ -22726,8 +23165,18 @@
              "v": "self"
             },
             {
-             "k": "hole",
-             "label": "op:starredUnpack"
+             "k": "starred",
+             "a": {
+              "k": "name",
+              "v": "args"
+             }
+            },
+            {
+             "k": "dstarred",
+             "a": {
+              "k": "name",
+              "v": "kwargs"
+             }
             }
            ]
           }
@@ -22788,7 +23237,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear",
@@ -22942,8 +23393,18 @@
        "f": "_obj"
       },
       {
-       "k": "hole",
-       "label": "op:starredUnpack"
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
       }
      ]
     }
@@ -22951,7 +23412,9 @@
    "b": {
     "k": "skip"
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.cache_clear",
@@ -24757,7 +25220,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/keys.py:<module>.methodkey",
@@ -24787,14 +25252,26 @@
       "f": "cachetools/keys.py:<module>.hashkey",
       "args": [
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/keys.py:<module>.typedkey",
@@ -25023,7 +25500,9 @@
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/keys.py:<module>.typedmethodkey",
@@ -25053,14 +25532,26 @@
       "f": "cachetools/keys.py:<module>.typedkey",
       "args": [
        {
-        "k": "hole",
-        "label": "op:starredUnpack"
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
        }
       ]
      }
     }
    }
-  }
+  },
+  "vararg": "args",
+  "kwarg": "kwargs"
  },
  {
   "name": "cachetools/__init__.py:<module>",

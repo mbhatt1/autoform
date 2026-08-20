@@ -71,15 +71,17 @@ private def FuelStep (k : Nat) : Prop :=
       evalExpr ctx k h ρ e = (h', r) → r ≠ .outOfFuel →
       evalExpr ctx (k+1) h ρ e = (h', r))
   ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (fn : Func), tfFreeS fn.body = true →
-        ∀ (s : Option Val) (vs : List Val) (h' : Heap) (r : EResult),
-      applyFunc ctx k h fn s vs = (h', r) → r ≠ .outOfFuel →
-      applyFunc ctx (k+1) h fn s vs = (h', r))
+        ∀ (s : Option Val) (vs : List Val) (kws : List (String × Val))
+          (h' : Heap) (r : EResult),
+      applyFunc ctx k h fn s vs kws = (h', r) → r ≠ .outOfFuel →
+      applyFunc ctx (k+1) h fn s vs kws = (h', r))
   ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (fn : Func), tfFreeS fn.body = true →
-        ∀ (cap : List (String × Val)) (vs : List Val) (h' : Heap) (r : EResult),
-      applyClosure ctx k h fn cap vs = (h', r) → r ≠ .outOfFuel →
-      applyClosure ctx (k+1) h fn cap vs = (h', r))
+        ∀ (cap : List (String × Val)) (vs : List Val) (kws : List (String × Val))
+          (h' : Heap) (r : EResult),
+      applyClosure ctx k h fn cap vs kws = (h', r) → r ≠ .outOfFuel →
+      applyClosure ctx (k+1) h fn cap vs kws = (h', r))
   ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (es : List Expr) (h' : Heap)
-        (r : Sum EResult (List Val)),
+        (r : Sum EResult (List Val × List (String × Val))),
       evalList ctx k h ρ es = (h', r) → r ≠ .inl .outOfFuel →
       evalList ctx (k+1) h ρ es = (h', r))
   ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (ps : List (Expr × Expr))
@@ -116,6 +118,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         | closure f => exact hy
         | classClosure c => exact hy
         | hole l => exact hy
+        | starred a => exact hy
+        | kwargE k a => exact hy
+        | dstarred a => exact hy
         | unop op a =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
@@ -257,7 +262,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
                 cases hres : Ctx.resolve ctx f with
-                | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ hy hne
+                | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
                 | none =>
                     rw [hres] at hy
                     dsimp only at hy ⊢
@@ -266,13 +271,13 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         rw [hg] at hy
                         dsimp only at hy ⊢
                         cases hres2 : Ctx.resolve ctx g with
-                        | some fn2 => rw [hres2] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ hy hne
+                        | some fn2 => rw [hres2] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
                         | none => rw [hres2] at hy; exact hy
                     case clos g cap =>
                         rw [hg] at hy
                         dsimp only at hy ⊢
                         cases hres2 : Ctx.resolve ctx g with
-                        | some fn2 => rw [hres2] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ hy hne
+                        | some fn2 => rw [hres2] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
                         | none => rw [hres2] at hy; exact hy
                     all_goals (rw [hg] at hy; exact hy)
         | mcall recv m args =>
@@ -310,9 +315,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 dsimp only at hy ⊢
                                 by_cases hcap : o.captured.isEmpty = true
                                 · rw [if_pos hcap] at hy ⊢
-                                  exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hy hne
+                                  exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
                                 · rw [if_neg hcap] at hy ⊢
-                                  exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hy hne
+                                  exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
                 all_goals
                   (dsimp only at hy ⊢
                    rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
@@ -347,11 +352,11 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         dsimp only at hy ⊢
                         rcases hC : applyFunc ctx k
                             (h₁ ++ [{ cls := cls, fields := [], captured := cvs }]) fn
-                            (some (Val.ref h₁.length)) vs with ⟨h₃, r₃⟩
+                            (some (Val.ref h₁.length)) vs.1 vs.2 with ⟨h₃, r₃⟩
                         rw [hC] at hy
                         cases r₃ <;> first
                           | (cases hy; exact absurd rfl hne)
-                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hC (by simp)]; exact hy)
+                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy)
                 all_goals
                   (rw [hcap] at hy
                    dsimp only at hy ⊢
@@ -362,20 +367,26 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                        dsimp only at hy ⊢
                        rcases hC : applyFunc ctx k
                            (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
-                           (some (Val.ref h₁.length)) vs with ⟨h₃, r₃⟩
+                           (some (Val.ref h₁.length)) vs.1 vs.2 with ⟨h₃, r₃⟩
                        rw [hC] at hy
                        cases r₃ <;> first
                          | (cases hy; exact absurd rfl hne)
-                         | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ hC (by simp)]; exact hy))
-      · intro ctx hctx h fn hfree self? vs h' r hy hne
+                         | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy))
+      · intro ctx hctx h fn hfree self? vs kws h' r hy hne
         simp only [applyFunc] at hy ⊢
+        by_cases hk : kwargsRejected fn kws = true
+        · rw [if_pos hk] at hy ⊢; exact hy
+        rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
                 (by first | assumption | simp | (cases hy; exact hne))]
              first | exact hy | (split <;> first | exact hy | simp_all))
-      · intro ctx hctx h fn hfree cap vs h' r hy hne
+      · intro ctx hctx h fn hfree cap vs kws h' r hy hne
         simp only [applyClosure] at hy ⊢
+        by_cases hk : kwargsRejected fn kws = true
+        · rw [if_pos hk] at hy ⊢; exact hy
+        rw [if_neg hk] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
@@ -385,24 +396,97 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         cases es with
         | nil => exact hy
         | cons a as =>
-            simp only [evalList] at hy ⊢
-            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
-            rw [hA] at hy
-            cases r₁ with
-            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
-            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
-            | outOfFuel => cases hy; exact absurd rfl hne
-            | val v =>
-                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
-                dsimp only at hy ⊢
-                rcases hB : evalList ctx k h₁ ρ as with ⟨h₂, s⟩
-                rw [hB] at hy
-                cases s with
-                | inr vs => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
-                | inl r₂ =>
-                    cases r₂ <;> first
-                      | (cases hy; exact absurd rfl hne)
-                      | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+            -- The three starred argument forms are dispatched on syntactically, before
+            -- `evalExpr` runs, so each needs its own step; the operand is still evaluated
+            -- by `evalExpr` and the tail by `evalList`, so the induction hypotheses are
+            -- the same two.
+            cases a
+            case starred e =>
+                simp only [evalList] at hy ⊢
+                rcases hA : evalExpr ctx k h ρ e with ⟨h₁, r₁⟩
+                rw [hA] at hy
+                cases r₁ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val v =>
+                    rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                    dsimp only at hy ⊢
+                    cases hit : Val.iterable v with
+                    | none => rw [hit] at hy; exact hy
+                    | some xs =>
+                        rw [hit] at hy
+                        dsimp only at hy ⊢
+                        rcases hB : evalList ctx k h₁ ρ as with ⟨h₂, s⟩
+                        rw [hB] at hy
+                        cases s with
+                        | inr vs => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                        | inl r₂ =>
+                            cases r₂ <;> first
+                              | (cases hy; exact absurd rfl hne)
+                              | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+            case dstarred e =>
+                simp only [evalList] at hy ⊢
+                rcases hA : evalExpr ctx k h ρ e with ⟨h₁, r₁⟩
+                rw [hA] at hy
+                cases r₁ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val v =>
+                    rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                    dsimp only at hy ⊢
+                    cases hit : strKeyed v with
+                    | none => rw [hit] at hy; exact hy
+                    | some ks =>
+                        rw [hit] at hy
+                        dsimp only at hy ⊢
+                        rcases hB : evalList ctx k h₁ ρ as with ⟨h₂, s⟩
+                        rw [hB] at hy
+                        cases s with
+                        | inr vs => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                        | inl r₂ =>
+                            cases r₂ <;> first
+                              | (cases hy; exact absurd rfl hne)
+                              | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+            case kwargE kk e =>
+                simp only [evalList] at hy ⊢
+                rcases hA : evalExpr ctx k h ρ e with ⟨h₁, r₁⟩
+                rw [hA] at hy
+                cases r₁ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val v =>
+                    rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                    dsimp only at hy ⊢
+                    rcases hB : evalList ctx k h₁ ρ as with ⟨h₂, s⟩
+                    rw [hB] at hy
+                    cases s with
+                    | inr vs => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | inl r₂ =>
+                        cases r₂ <;> first
+                          | (cases hy; exact absurd rfl hne)
+                          | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+            all_goals
+              (simp only [evalList] at hy ⊢
+               rcases hA : evalExpr ctx k h ρ _ with ⟨h₁, r₁⟩
+               rw [hA] at hy
+               cases r₁ with
+               | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+               | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+               | outOfFuel => cases hy; exact absurd rfl hne
+               | val v =>
+                   rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                   dsimp only at hy ⊢
+                   rcases hB : evalList ctx k h₁ ρ as with ⟨h₂, s⟩
+                   rw [hB] at hy
+                   cases s with
+                   | inr vs => rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                   | inl r₂ =>
+                       cases r₂ <;> first
+                         | (cases hy; exact absurd rfl hne)
+                         | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy))
       · intro ctx hctx h ρ ps h' r hy hne
         cases ps with
         | nil => exact hy
@@ -668,22 +752,24 @@ theorem evalExpr_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : 
 /-- `applyFunc` version. -/
 theorem applyFunc_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
     {fn : Func} (hfn : tfFreeS fn.body = true) {self? : Option Val} {vs : List Val}
-    {r : EResult} (he : applyFunc ctx k h fn self? vs = (h', r)) (hne : r ≠ .outOfFuel) :
-    applyFunc ctx (k+1) h fn self? vs = (h', r) :=
-  (fuelStep k).2.1 ctx hctx h fn hfn self? vs h' r he hne
+    {kws : List (String × Val)}
+    {r : EResult} (he : applyFunc ctx k h fn self? vs kws = (h', r))
+    (hne : r ≠ .outOfFuel) :
+    applyFunc ctx (k+1) h fn self? vs kws = (h', r) :=
+  (fuelStep k).2.1 ctx hctx h fn hfn self? vs kws h' r he hne
 
 /-- `applyClosure` version. -/
 theorem applyClosure_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
     {fn : Func} (hfn : tfFreeS fn.body = true) {cap : List (String × Val)}
-    {vs : List Val} {r : EResult}
-    (he : applyClosure ctx k h fn cap vs = (h', r)) (hne : r ≠ .outOfFuel) :
-    applyClosure ctx (k+1) h fn cap vs = (h', r) :=
-  (fuelStep k).2.2.1 ctx hctx h fn hfn cap vs h' r he hne
+    {vs : List Val} {kws : List (String × Val)} {r : EResult}
+    (he : applyClosure ctx k h fn cap vs kws = (h', r)) (hne : r ≠ .outOfFuel) :
+    applyClosure ctx (k+1) h fn cap vs kws = (h', r) :=
+  (fuelStep k).2.2.1 ctx hctx h fn hfn cap vs kws h' r he hne
 
 /-- `evalList` version. Its "out of fuel" is spelled `Sum.inl EResult.outOfFuel`, since the
-function returns `Sum EResult (List Val)`. -/
+function returns `Sum EResult (List Val × List (String × Val))`. -/
 theorem evalList_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
-    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val)}
+    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val × List (String × Val))}
     (he : evalList ctx k h ρ es = (h', r)) (hne : r ≠ .inl .outOfFuel) :
     evalList ctx (k+1) h ρ es = (h', r) :=
   (fuelStep k).2.2.2.1 ctx hctx h ρ es h' r he hne
@@ -725,8 +811,9 @@ theorem evalExpr_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat} {h h'
 /-- `applyFunc`, any larger budget. -/
 theorem applyFunc_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat} {h h' : Heap}
     {fn : Func} (hfn : tfFreeS fn.body = true) {self? : Option Val} {vs : List Val}
-    {r : EResult} (hk : k ≤ k') (he : applyFunc ctx k h fn self? vs = (h', r))
-    (hne : r ≠ .outOfFuel) : applyFunc ctx k' h fn self? vs = (h', r) := by
+    {kws : List (String × Val)}
+    {r : EResult} (hk : k ≤ k') (he : applyFunc ctx k h fn self? vs kws = (h', r))
+    (hne : r ≠ .outOfFuel) : applyFunc ctx k' h fn self? vs kws = (h', r) := by
   obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
   clear hk
   induction d with
@@ -736,9 +823,10 @@ theorem applyFunc_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat} {h h
 /-- `applyClosure`, any larger budget. -/
 theorem applyClosure_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat}
     {h h' : Heap} {fn : Func} (hfn : tfFreeS fn.body = true)
-    {cap : List (String × Val)} {vs : List Val} {r : EResult} (hk : k ≤ k')
-    (he : applyClosure ctx k h fn cap vs = (h', r)) (hne : r ≠ .outOfFuel) :
-    applyClosure ctx k' h fn cap vs = (h', r) := by
+    {cap : List (String × Val)} {vs : List Val} {kws : List (String × Val)}
+    {r : EResult} (hk : k ≤ k')
+    (he : applyClosure ctx k h fn cap vs kws = (h', r)) (hne : r ≠ .outOfFuel) :
+    applyClosure ctx k' h fn cap vs kws = (h', r) := by
   obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
   clear hk
   induction d with
@@ -747,7 +835,7 @@ theorem applyClosure_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat}
 
 /-- `evalList`, any larger budget. -/
 theorem evalList_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat} {h h' : Heap}
-    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val)} (hk : k ≤ k')
+    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val × List (String × Val))} (hk : k ≤ k')
     (he : evalList ctx k h ρ es = (h', r)) (hne : r ≠ .inl .outOfFuel) :
     evalList ctx k' h ρ es = (h', r) := by
   obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk

@@ -9,8 +9,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half, and until now it did not exist.
 
-The cost of not having it is measurable. On `cachetools`, 165 of 238 functions are
-hole-free and 69 are call-closed. A single untranslated construct anywhere in a function
+The cost of not having it is measurable. On `cachetools`, 179 of 208 functions are
+hole-free and 100 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -108,7 +108,7 @@ In order. A theorem that fails any of these is not weak evidence, it is no evide
    two-function slice of the translated `cachetools`, using the generated `Func` values
    verbatim. The only thing a slice can change is name resolution, since `Ctx.resolve`
    falls back to a unique-suffix match over the function table. `#eval`s at the end of the
-   demonstration section run the *full* 238-function program and confirm it agrees. That
+   demonstration section run the *full* 208-function program and confirm it agrees. That
    is evidence, not proof, and it is listed here as a reader obligation rather than
    claimed as one.
 
@@ -121,12 +121,19 @@ def methodkey(self, *args, **kwargs):
     return hashkey(*args, **kwargs)
 ```
 
-— translates to a body containing exactly one hole, `op:starredUnpack`, which is the most
-common hole label in the corpus (33 occurrences). That one node is the entire reason the
-function is outside the verifiable core.
+— **used** to translate to a body containing exactly one hole, `op:starredUnpack`, the most
+common hole label in the corpus (36 occurrences on the committed AST). That one node was
+the entire reason the function was outside the verifiable core.
 
-* `methodkey_holes` — untouched, it reports `hole "op:starredUnpack"` at any adequate
-  fuel. This is the status quo.
+It no longer is. STRATEGY.md §35 added the calling convention, so `methodkey` is hole-free
+and `Autoform/Contracts.lean` proves **`methodkey_refines` unconditionally** — an ordinary
+`Refine.Refines`, `Γ = []`. The contract-relative theorems below are kept and re-pointed
+at `keysProgramHoled`, which is `methodkey` **as the transpiler used to emit it**. Read
+them as a worked example of the mechanism on a historical program, not as the current
+state of `cachetools`.
+
+* `methodkey_holes` — on `keysProgramHoled`, it reports `hole "op:starredUnpack"` at any
+  adequate fuel. This is what the status quo used to be.
 * `satisfiable_pureValue` — the contract can be met; witness exhibited.
 * `methodkey_refinesUnder_value` — under that one contract, `methodkey` refines a total
   Lean function at fuel bound 14 on the unrestricted domain: it terminates, never raises,

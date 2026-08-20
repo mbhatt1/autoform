@@ -179,7 +179,7 @@ theorem uconst_cachetools___init___py__module___DefaultSize___getitem :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P]
 
 def dom_conform_cachetools___init___py__module___DefaultSize___setitem : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] }, expected := EResult.val (Val.unit) },
@@ -372,7 +372,7 @@ theorem uconst_cachetools___init___py__module___DefaultSize_pop :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P]
 
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
@@ -923,7 +923,7 @@ theorem uconst_cachetools___init___py__module__Cache_getsizeof :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P]
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P]
 
 def dom_conform_cachetools___init___py__module___TimedCache__Timer___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.fn "monotonic"] }, expected := EResult.val (Val.unit) },

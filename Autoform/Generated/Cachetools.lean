@@ -35,13 +35,6 @@ def f_cachetools___init___py__module___DefaultSize_clear : Func :=
   , params := []
   , body := .skip }
 
-/-- `cachetools/__init__.py:<module>._DefaultSize.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module___DefaultSize__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>._DefaultSize.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret
-            (.mcall (.fnref "cachetools/__init__.py:<module>._DefaultSize<meta>") "<fakeNew>" [])) }
-
 /-- `cachetools/__init__.py:<module>.Cache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__init__"
@@ -302,16 +295,6 @@ def f_cachetools___init___py__module__Cache_getsizeof : Func :=
             (.expr (.lit (.str "\"\"Return the size of a cache element's value.\"\"")))
             (.ret (.lit (.int 1)))) }
 
-/-- `cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__Cache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>"
-  , params := ["maxsize", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.Cache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>.FIFOCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__FIFOCache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.FIFOCache.__init__"
@@ -399,16 +382,6 @@ def f_cachetools___init___py__module__FIFOCache_clear : Func :=
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 .skip))) }
 
-/-- `cachetools/__init__.py:<module>.FIFOCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__FIFOCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.FIFOCache.<metaClassCallHandler>"
-  , params := ["maxsize", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.FIFOCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>.LFUCache._Link.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LFUCache__Link___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.LFUCache._Link.__init__"
@@ -428,16 +401,6 @@ def f_cachetools___init___py__module__LFUCache__Link_unlink : Func :=
               (.seq
                 (.setField (.name "prev") "next" (.name "next"))
                 (.seq .skip (.seq (.setField (.name "next") "prev" (.name "prev")) .skip))))) }
-
-/-- `cachetools/__init__.py:<module>.LFUCache._Link.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__LFUCache__Link__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.LFUCache._Link.<metaClassCallHandler>"
-  , params := ["count"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.LFUCache._Link<meta>")
-              "<fakeNew>"
-              [(.name "count")])) }
 
 /-- `cachetools/__init__.py:<module>.LFUCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LFUCache___init__ : Func :=
@@ -715,16 +678,6 @@ def f_cachetools___init___py__module__LFUCache__LFUCache__touch : Func :=
                                         (.name "key")
                                         (.name "curr")))))))))))))))) }
 
-/-- `cachetools/__init__.py:<module>.LFUCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__LFUCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.LFUCache.<metaClassCallHandler>"
-  , params := ["maxsize", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.LFUCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>.LRUCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__LRUCache___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.LRUCache.__init__"
@@ -832,16 +785,6 @@ def f_cachetools___init___py__module__LRUCache__LRUCache__touch : Func :=
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
                 "__exc"
                 (.setIndex (.field (.name "self") "_LRUCache__order") (.name "key") (.lit .unit))))) }
-
-/-- `cachetools/__init__.py:<module>.LRUCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__LRUCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.LRUCache.<metaClassCallHandler>"
-  , params := ["maxsize", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.LRUCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "getsizeof")])) }
 
 /-- `cachetools/__init__.py:<module>.RRCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__RRCache___init__ : Func :=
@@ -988,16 +931,6 @@ def f_cachetools___init___py__module__RRCache_clear : Func :=
                   (.expr (.mcall (.name "tmp0") "clear" [])))
                 (.seq .skip (.hole "op:delete-slice"))))) }
 
-/-- `cachetools/__init__.py:<module>.RRCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__RRCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.RRCache.<metaClassCallHandler>"
-  , params := ["maxsize", "choice", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.RRCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "choice"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache__Timer___init__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__init__"
@@ -1041,6 +974,7 @@ def f_cachetools___init___py__module___TimedCache__Timer___enter__ : Func :=
 def f_cachetools___init___py__module___TimedCache__Timer___exit__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__"
   , params := ["exc"]
+  , vararg := some "exc"
   , body := (.setField
             (.name "self")
             "_Timer__nesting"
@@ -1064,16 +998,6 @@ def f_cachetools___init___py__module___TimedCache__Timer___getattr__ : Func :=
   , body := (.seq
             (.ret (.call "getattr" [(.field (.name "self") "_Timer__timer"), (.name "name")]))
             .skip) }
-
-/-- `cachetools/__init__.py:<module>._TimedCache._Timer.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module___TimedCache__Timer__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>._TimedCache._Timer.<metaClassCallHandler>"
-  , params := ["timer"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>._TimedCache._Timer<meta>")
-              "<fakeNew>"
-              [(.name "timer")])) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache___init__ : Func :=
@@ -1103,7 +1027,15 @@ def f_cachetools___init___py__module___TimedCache___repr__ : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
+                        (.seq
+                          (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                          (.ret (.call "cache_repr" [(.name "self")]))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.__len__`  (from `cachetools/__init__.py`) -/
@@ -1117,7 +1049,15 @@ def f_cachetools___init___py__module___TimedCache___len__ : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
+                        (.seq
+                          (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                          (.ret (.call "cache_len" [(.name "self")]))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.currsize`  (from `cachetools/__init__.py`) -/
@@ -1131,7 +1071,15 @@ def f_cachetools___init___py__module___TimedCache_currsize : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
+                        (.seq
+                          (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                          (.ret (.field (.call "super" []) "currsize"))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.timer`  (from `cachetools/__init__.py`) -/
@@ -1146,6 +1094,8 @@ def f_cachetools___init___py__module___TimedCache_timer : Func :=
 def f_cachetools___init___py__module___TimedCache_get : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.get"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
@@ -1153,13 +1103,23 @@ def f_cachetools___init___py__module___TimedCache_get : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "get"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.pop`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_pop : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.pop"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
@@ -1167,13 +1127,23 @@ def f_cachetools___init___py__module___TimedCache_pop : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "pop"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.setdefault`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_setdefault : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.setdefault"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.seq
               (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
@@ -1181,7 +1151,15 @@ def f_cachetools___init___py__module___TimedCache_setdefault : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "setdefault"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.clear`  (from `cachetools/__init__.py`) -/
@@ -1195,16 +1173,6 @@ def f_cachetools___init___py__module___TimedCache_expire : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.expire"
   , params := ["time"]
   , body := (.seq (.raise (.name "NotImplementedError")) .skip) }
-
-/-- `cachetools/__init__.py:<module>._TimedCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module___TimedCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>._TimedCache.<metaClassCallHandler>"
-  , params := ["maxsize", "timer", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>._TimedCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "timer"), (.name "getsizeof")])) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache._Link.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache__Link___init__ : Func :=
@@ -1236,16 +1204,6 @@ def f_cachetools___init___py__module__TTLCache__Link_unlink : Func :=
               (.seq
                 (.setField (.name "prev") "next" (.name "next"))
                 (.seq .skip (.seq (.setField (.name "next") "prev" (.name "prev")) .skip))))) }
-
-/-- `cachetools/__init__.py:<module>.TTLCache._Link.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TTLCache__Link__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.TTLCache._Link.<metaClassCallHandler>"
-  , params := ["key", "expires"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.TTLCache._Link<meta>")
-              "<fakeNew>"
-              [(.name "key"), (.name "expires")])) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache___init__ : Func :=
@@ -1345,20 +1303,15 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
                         (.seq
-                          (.assign "time" (.name "value_tmp0"))
-                          (.seq
-                            (.expr (.mcall (.name "self") "expire" [(.name "time")]))
-                            (.expr
-                              (.call
-                                "cache_setitem"
-                                [(.name "self"), (.name "key"), (.name "value")]))))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                          (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                          (.expr
+                            (.call "cache_setitem" [(.name "self"), (.name "key"), (.name "value")]))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               (.seq
                 (.assign "__else_ok6" (.lit (.bool true)))
@@ -1471,8 +1424,17 @@ def f_cachetools___init___py__module__TTLCache___iter__ : Func :=
                             (.seq
                               (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                               (.seq
-                                (.assign "value_tmp0" (.call "" []))
-                                (.hole "control:TRY-finally-escaping")))))
+                                (.assign
+                                  "value_tmp0"
+                                  (.mcall (.name "manager_tmp0") "__enter__" []))
+                                (.tryFinally
+                                  (.seq
+                                    (.assign "time" (.name "value_tmp0"))
+                                    (.ifte
+                                      (.binop "<" (.name "time") (.field (.name "curr") "expires"))
+                                      (.ret (.field (.name "curr") "key"))
+                                      .skip))
+                                  (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                         (.assign "curr" (.field (.name "curr") "next"))))
                     (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))) }
 
@@ -1498,7 +1460,11 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
                       "tmp5"
                       (.call
                         "sorted"
-                        [(.mcall (.field (.name "self") "_TTLCache__links") "values" [])]))
+                        [ (.mcall (.field (.name "self") "_TTLCache__links") "values" [])
+                        , (.kwargE
+                            "key"
+                            (.fnref
+                              "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0")) ]))
                     (.forIn
                       "link"
                       (.name "tmp5")
@@ -1533,7 +1499,7 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
 def f_cachetools___init___py__module__TTLCache___setstate____lambda_0 : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0"
   , params := ["obj"]
-  , body := (.expr (.field (.name "obj") "expires")) }
+  , body := (.ret (.field (.name "obj") "expires")) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.ttl`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache_ttl : Func :=
@@ -1646,8 +1612,41 @@ def f_cachetools___init___py__module__TTLCache_popitem : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.assign "time" (.name "value_tmp0"))
+                            (.seq
+                              (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                              (.seq
+                                (.assign "__else_ok7" (.lit (.bool true)))
+                                (.seq
+                                  (.tryCatch
+                                    (.assign
+                                      "key"
+                                      (.call
+                                        "next"
+                                        [ (.call
+                                            "iter"
+                                            [(.field (.name "self") "_TTLCache__links")]) ]))
+                                    "__exc"
+                                    (.seq
+                                      (.assign "__else_ok7" (.lit (.bool false)))
+                                      (.raise
+                                        (.call
+                                          "KeyError"
+                                          [ (.binop
+                                              "%"
+                                              (.lit (.str "%s is empty"))
+                                              (.field (.call "type" [(.name "self")]) "__name__")) ]))))
+                                  (.ifte
+                                    (.name "__else_ok7")
+                                    (.ret
+                                      (.tupleE
+                                        [ (.name "key")
+                                        , (.mcall (.name "self") "pop" [(.name "key")]) ]))
+                                    .skip)))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
@@ -1698,16 +1697,6 @@ def f_cachetools___init___py__module__TTLCache__TTLCache__getlink : Func :=
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
                 (.seq .skip (.ret (.name "value")))))) }
 
-/-- `cachetools/__init__.py:<module>.TTLCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TTLCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.TTLCache.<metaClassCallHandler>"
-  , params := ["maxsize", "ttl", "timer", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.TTLCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "ttl"), (.name "timer"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>.TLRUCache._Item.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache__Item___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__"
@@ -1723,16 +1712,6 @@ def f_cachetools___init___py__module__TLRUCache__Item___lt__ : Func :=
   { name := "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__"
   , params := ["other"]
   , body := (.ret (.binop "<" (.field (.name "self") "expires") (.field (.name "other") "expires"))) }
-
-/-- `cachetools/__init__.py:<module>.TLRUCache._Item.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TLRUCache__Item__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.TLRUCache._Item.<metaClassCallHandler>"
-  , params := ["key", "expires"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.TLRUCache._Item<meta>")
-              "<fakeNew>"
-              [(.name "key"), (.name "expires")])) }
 
 /-- `cachetools/__init__.py:<module>.TLRUCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TLRUCache___init__ : Func :=
@@ -1819,7 +1798,30 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
+                        (.seq
+                          (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                          (.seq
+                            (.assign
+                              "expires"
+                              (.mcall
+                                (.name "self")
+                                "_TLRUCache__ttu"
+                                [(.name "key"), (.name "value"), (.name "time")]))
+                            (.seq
+                              (.ifte
+                                (.unop "!" (.binop "<" (.name "time") (.name "expires")))
+                                (.ret (.mcall (.name "self") "_TLRUCache__delitem" [(.name "key")]))
+                                .skip)
+                              (.expr
+                                (.call
+                                  "cache_setitem"
+                                  [(.name "self"), (.name "key"), (.name "value")]))))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               (.tryCatch
                 (.setField
@@ -1869,15 +1871,12 @@ def f_cachetools___init___py__module__TLRUCache___delitem__ : Func :=
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
-                        (.seq
-                          (.assign "time" (.name "value_tmp0"))
-                          (.expr (.call "cache_delitem" [(.name "self"), (.name "key")])))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
+                        (.assign "time" (.name "value_tmp0"))
+                        (.expr (.call "cache_delitem" [(.name "self"), (.name "key")])))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               .skip
               (.seq
@@ -1914,8 +1913,18 @@ def f_cachetools___init___py__module__TLRUCache___iter__ : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.assign "time" (.name "value_tmp0"))
+                            (.ifte
+                              (.binop
+                                "&&"
+                                (.binop "<" (.name "time") (.field (.name "curr") "expires"))
+                                (.unop "!" (.field (.name "curr") "removed")))
+                              (.ret (.field (.name "curr") "key"))
+                              .skip))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))))
             (.seq
               .skip
               (.seq
@@ -2078,8 +2087,41 @@ def f_cachetools___init___py__module__TLRUCache_popitem : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.assign "time" (.name "value_tmp0"))
+                            (.seq
+                              (.expr (.mcall (.name "self") "expire" [(.name "time")]))
+                              (.seq
+                                (.assign "__else_ok10" (.lit (.bool true)))
+                                (.seq
+                                  (.tryCatch
+                                    (.assign
+                                      "key"
+                                      (.call
+                                        "next"
+                                        [ (.call
+                                            "iter"
+                                            [(.field (.name "self") "_TLRUCache__items")]) ]))
+                                    "__exc"
+                                    (.seq
+                                      (.assign "__else_ok10" (.lit (.bool false)))
+                                      (.raise
+                                        (.call
+                                          "KeyError"
+                                          [ (.binop
+                                              "%"
+                                              (.lit (.str "%s is empty"))
+                                              (.field (.call "type" [(.name "self")]) "__name__")) ]))))
+                                  (.ifte
+                                    (.name "__else_ok10")
+                                    (.ret
+                                      (.tupleE
+                                        [ (.name "key")
+                                        , (.mcall (.name "self") "pop" [(.name "key")]) ]))
+                                    .skip)))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
@@ -2139,16 +2181,6 @@ def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
                   .skip)))
             .skip) }
 
-/-- `cachetools/__init__.py:<module>.TLRUCache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
-def f_cachetools___init___py__module__TLRUCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/__init__.py:<module>.TLRUCache.<metaClassCallHandler>"
-  , params := ["maxsize", "ttu", "timer", "getsizeof"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/__init__.py:<module>.TLRUCache<meta>")
-              "<fakeNew>"
-              [(.name "maxsize"), (.name "ttu"), (.name "timer"), (.name "getsizeof")])) }
-
 /-- `cachetools/__init__.py:<module>.cached`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__cached : Func :=
   { name := "cachetools/__init__.py:<module>.cached"
@@ -2196,15 +2228,16 @@ def f_cachetools___init___py__module__cached_decorator : Func :=
                       (.fnref "cachetools/__init__.py:<module>.cached.decorator.make_info"))))
                 (.ret
                   (.call
-                    "_wrapper"
+                    "cachetools/_cachedmethod.py:<module>._wrapper"
                     [ (.name "func")
                     , (.name "cache")
                     , (.name "key")
                     , (.name "lock")
-                    , (.name "condition") ])))
+                    , (.name "condition")
+                    , (.kwargE "info" (.name "make_info")) ])))
               (.ret
                 (.call
-                  "_wrapper"
+                  "cachetools/_cachedmethod.py:<module>._wrapper"
                   [ (.name "func")
                   , (.name "cache")
                   , (.name "key")
@@ -2297,15 +2330,16 @@ def f_cachetools___init___py__module__cachedmethod_decorator : Func :=
                   (.fnref "cachetools/__init__.py:<module>.cachedmethod.decorator.make_info"))
                 (.ret
                   (.call
-                    "_wrapper"
+                    "cachetools/_cachedmethod.py:<module>._wrapper"
                     [ (.name "method")
                     , (.name "cache")
                     , (.name "key")
                     , (.name "lock")
-                    , (.name "condition") ])))
+                    , (.name "condition")
+                    , (.kwargE "info" (.name "make_info")) ])))
               (.ret
                 (.call
-                  "_wrapper"
+                  "cachetools/_cachedmethod.py:<module>._wrapper"
                   [ (.name "method")
                   , (.name "cache")
                   , (.name "key")
@@ -2398,10 +2432,12 @@ def f_cachetools__cached_py__module___condition_info : Func :=
 def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._condition_info.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.hole "scope:nonlocal-write")
             (.seq
-              (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+              (.assign "k" (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
               (.seq
                 (.seq
                   (.assign "manager_tmp0" (.name "lock"))
@@ -2410,43 +2446,52 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.expr
+                              (.mcall
+                                (.name "cond")
+                                "wait_for"
+                                [ (.closure
+                                    "cachetools/_cached.py:<module>._condition_info.wrapper.<lambda>0") ]))
+                            (.tryCatch
+                              (.seq
+                                (.assign "result" (.index (.name "cache") (.name "k")))
+                                (.seq
+                                  (.assign "hits" (.binop "+" (.name "hits") (.lit (.int 1))))
+                                  (.ret (.name "result"))))
+                              "__exc"
+                              (.seq
+                                (.expr (.mcall (.name "pending") "add" [(.name "k")]))
+                                (.assign "misses" (.binop "+" (.name "misses") (.lit (.int 1)))))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
-                    (.seq
-                      (.tryCatch
+                    (.tryFinally
+                      (.seq
+                        (.assign
+                          "v"
+                          (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                         (.seq
-                          (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                          (.assign "manager_tmp1" (.name "lock"))
                           (.seq
-                            (.assign "manager_tmp1" (.name "lock"))
+                            (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
                             (.seq
-                              (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                              (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                               (.seq
-                                (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
-                                (.seq
-                                  (.assign "value_tmp1" (.call "" []))
-                                  (.hole "control:TRY-finally-escaping"))))))
-                        "__exc"
-                        (.seq
-                          (.seq
-                            (.assign "manager_tmp2" (.name "lock"))
-                            (.seq
-                              (.assign "enter_tmp2" (.field (.name "manager_tmp2") "__enter__"))
-                              (.seq
-                                (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
-                                (.seq
-                                  (.assign "value_tmp2" (.call "" []))
+                                (.assign
+                                  "value_tmp1"
+                                  (.mcall (.name "manager_tmp1") "__enter__" []))
+                                (.tryFinally
                                   (.seq
                                     (.tryCatch
-                                      (.seq
-                                        (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                        (.expr (.mcall (.name "cond") "notify_all" [])))
+                                      (.setIndex (.name "cache") (.name "k") (.name "v"))
                                       "__exc"
-                                      (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                    (.expr (.call "" [])))))))
-                          (.raise (.name "__exc"))))
+                                      .skip)
+                                    (.ret (.name "v")))
+                                  (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                       (.seq
                         (.assign "manager_tmp2" (.name "lock"))
                         (.seq
@@ -2454,15 +2499,12 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
                           (.seq
                             (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
                             (.seq
-                              (.assign "value_tmp2" (.call "" []))
-                              (.seq
-                                (.tryCatch
-                                  (.seq
-                                    (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                    (.expr (.mcall (.name "cond") "notify_all" [])))
-                                  "__exc"
-                                  (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                (.expr (.call "" []))))))))
+                              (.assign "value_tmp2" (.mcall (.name "manager_tmp2") "__enter__" []))
+                              (.tryFinally
+                                (.seq
+                                  (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
+                                  (.expr (.mcall (.name "cond") "notify_all" [])))
+                                (.expr (.mcall (.name "manager_tmp2") "__exit__" []))))))))
                     (.seq
                       .skip
                       (.seq
@@ -2527,19 +2569,16 @@ def f_cachetools__cached_py__module___condition_info_cache_clear : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.expr (.mcall (.name "cache") "clear" []))
                             (.seq
-                              (.expr (.mcall (.name "cache") "clear" []))
+                              (.assign "tmp0" (.lit (.int 0)))
                               (.seq
-                                (.assign "tmp0" (.lit (.int 0)))
-                                (.seq
-                                  (.assign "hits" (.name "tmp0"))
-                                  (.assign "misses" (.name "tmp0")))))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                                (.assign "hits" (.name "tmp0"))
+                                (.assign "misses" (.name "tmp0")))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
@@ -2559,7 +2598,11 @@ def f_cachetools__cached_py__module___condition_info_cache_info : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret (.call "info" [(.name "hits"), (.name "misses")]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               .skip
               (.seq
@@ -2598,12 +2641,16 @@ def f_cachetools__cached_py__module___locked_info : Func :=
 def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._locked_info.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
-                (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+                (.assign
+                  "k"
+                  (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                 (.seq
                   .skip
                   (.seq
@@ -2614,12 +2661,23 @@ def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
                         (.seq
                           (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                           (.seq
-                            (.assign "value_tmp0" (.call "" []))
-                            (.hole "control:TRY-finally-escaping")))))
+                            (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                            (.tryFinally
+                              (.tryCatch
+                                (.seq
+                                  (.assign "result" (.index (.name "cache") (.name "k")))
+                                  (.seq
+                                    (.assign "hits" (.binop "+" (.name "hits") (.lit (.int 1))))
+                                    (.ret (.name "result"))))
+                                "__exc"
+                                (.assign "misses" (.binop "+" (.name "misses") (.lit (.int 1)))))
+                              (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                     (.seq
                       .skip
                       (.seq
-                        (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                        (.assign
+                          "v"
+                          (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                         (.seq
                           .skip
                           (.seq
@@ -2630,8 +2688,19 @@ def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
                                 (.seq
                                   (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                                   (.seq
-                                    (.assign "value_tmp1" (.call "" []))
-                                    (.hole "control:TRY-finally-escaping")))))
+                                    (.assign
+                                      "value_tmp1"
+                                      (.mcall (.name "manager_tmp1") "__enter__" []))
+                                    (.tryFinally
+                                      (.tryCatch
+                                        (.ret
+                                          (.mcall
+                                            (.name "cache")
+                                            "setdefault"
+                                            [(.name "k"), (.name "v")]))
+                                        "__exc"
+                                        (.ret (.name "v")))
+                                      (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                             (.seq
                               .skip
                               (.seq
@@ -2670,19 +2739,16 @@ def f_cachetools__cached_py__module___locked_info_cache_clear : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.expr (.mcall (.name "cache") "clear" []))
                             (.seq
-                              (.expr (.mcall (.name "cache") "clear" []))
+                              (.assign "tmp0" (.lit (.int 0)))
                               (.seq
-                                (.assign "tmp0" (.lit (.int 0)))
-                                (.seq
-                                  (.assign "hits" (.name "tmp0"))
-                                  (.assign "misses" (.name "tmp0")))))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                                (.assign "hits" (.name "tmp0"))
+                                (.assign "misses" (.name "tmp0")))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
@@ -2702,7 +2768,11 @@ def f_cachetools__cached_py__module___locked_info_cache_info : Func :=
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret (.call "info" [(.name "hits"), (.name "misses")]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               .skip
               (.seq
@@ -2739,12 +2809,16 @@ def f_cachetools__cached_py__module___unlocked_info : Func :=
 def f_cachetools__cached_py__module___unlocked_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._unlocked_info.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
-                (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+                (.assign
+                  "k"
+                  (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                 (.seq
                   .skip
                   (.seq
@@ -2759,7 +2833,9 @@ def f_cachetools__cached_py__module___unlocked_info_wrapper : Func :=
                     (.seq
                       .skip
                       (.seq
-                        (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                        (.assign
+                          "v"
+                          (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                         (.seq
                           .skip
                           (.seq
@@ -2820,13 +2896,17 @@ def f_cachetools__cached_py__module___uncached_info : Func :=
 def f_cachetools__cached_py__module___uncached_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._uncached_info.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
                 (.assign "misses" (.binop "+" (.name "misses") (.lit (.int 1))))
-                (.seq .skip (.ret (.call "func" [(.hole "op:starredUnpack")])))))) }
+                (.seq
+                  .skip
+                  (.ret (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))))) }
 
 /-- `cachetools/_cached.py:<module>._uncached_info.cache_clear`  (from `cachetools/_cached.py`) -/
 def f_cachetools__cached_py__module___uncached_info_cache_clear : Func :=
@@ -2862,8 +2942,10 @@ def f_cachetools__cached_py__module___condition : Func :=
 def f_cachetools__cached_py__module___condition_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._condition.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+            (.assign "k" (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
             (.seq
               (.seq
                 (.assign "manager_tmp0" (.name "lock"))
@@ -2872,41 +2954,44 @@ def f_cachetools__cached_py__module___condition_wrapper : Func :=
                   (.seq
                     (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                     (.seq
-                      (.assign "value_tmp0" (.call "" []))
-                      (.hole "control:TRY-finally-escaping")))))
+                      (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                      (.tryFinally
+                        (.seq
+                          (.expr
+                            (.mcall
+                              (.name "cond")
+                              "wait_for"
+                              [ (.closure
+                                  "cachetools/_cached.py:<module>._condition.wrapper.<lambda>2") ]))
+                          (.tryCatch
+                            (.seq
+                              (.assign "result" (.index (.name "cache") (.name "k")))
+                              (.ret (.name "result")))
+                            "__exc"
+                            (.expr (.mcall (.name "pending") "add" [(.name "k")]))))
+                        (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
               (.seq
-                (.seq
-                  (.tryCatch
+                (.tryFinally
+                  (.seq
+                    (.assign
+                      "v"
+                      (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                     (.seq
-                      (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                      (.assign "manager_tmp1" (.name "lock"))
                       (.seq
-                        (.assign "manager_tmp1" (.name "lock"))
+                        (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
                         (.seq
-                          (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                          (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                           (.seq
-                            (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
-                            (.seq
-                              (.assign "value_tmp1" (.call "" []))
-                              (.hole "control:TRY-finally-escaping"))))))
-                    "__exc"
-                    (.seq
-                      (.seq
-                        (.assign "manager_tmp2" (.name "lock"))
-                        (.seq
-                          (.assign "enter_tmp2" (.field (.name "manager_tmp2") "__enter__"))
-                          (.seq
-                            (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
-                            (.seq
-                              (.assign "value_tmp2" (.call "" []))
+                            (.assign "value_tmp1" (.mcall (.name "manager_tmp1") "__enter__" []))
+                            (.tryFinally
                               (.seq
                                 (.tryCatch
-                                  (.seq
-                                    (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                    (.expr (.mcall (.name "cond") "notify_all" [])))
+                                  (.setIndex (.name "cache") (.name "k") (.name "v"))
                                   "__exc"
-                                  (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                (.expr (.call "" [])))))))
-                      (.raise (.name "__exc"))))
+                                  .skip)
+                                (.ret (.name "v")))
+                              (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                   (.seq
                     (.assign "manager_tmp2" (.name "lock"))
                     (.seq
@@ -2914,15 +2999,12 @@ def f_cachetools__cached_py__module___condition_wrapper : Func :=
                       (.seq
                         (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
                         (.seq
-                          (.assign "value_tmp2" (.call "" []))
-                          (.seq
-                            (.tryCatch
-                              (.seq
-                                (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                (.expr (.mcall (.name "cond") "notify_all" [])))
-                              "__exc"
-                              (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                            (.expr (.call "" []))))))))
+                          (.assign "value_tmp2" (.mcall (.name "manager_tmp2") "__enter__" []))
+                          (.tryFinally
+                            (.seq
+                              (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
+                              (.expr (.mcall (.name "cond") "notify_all" [])))
+                            (.expr (.mcall (.name "manager_tmp2") "__exit__" []))))))))
                 (.seq
                   .skip
                   (.seq
@@ -2979,13 +3061,10 @@ def f_cachetools__cached_py__module___condition_cache_clear : Func :=
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
-                        (.expr (.mcall (.name "cache") "clear" []))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.expr (.mcall (.name "cache") "clear" []))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/_cached.py:<module>._locked`  (from `cachetools/_cached.py`) -/
@@ -3006,8 +3085,10 @@ def f_cachetools__cached_py__module___locked : Func :=
 def f_cachetools__cached_py__module___locked_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._locked.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+            (.assign "k" (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
             (.seq
               .skip
               (.seq
@@ -3018,12 +3099,16 @@ def f_cachetools__cached_py__module___locked_wrapper : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.tryCatch (.ret (.index (.name "cache") (.name "k"))) "__exc" .skip)
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
-                    (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                    (.assign
+                      "v"
+                      (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                     (.seq
                       .skip
                       (.seq
@@ -3034,8 +3119,19 @@ def f_cachetools__cached_py__module___locked_wrapper : Func :=
                             (.seq
                               (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                               (.seq
-                                (.assign "value_tmp1" (.call "" []))
-                                (.hole "control:TRY-finally-escaping")))))
+                                (.assign
+                                  "value_tmp1"
+                                  (.mcall (.name "manager_tmp1") "__enter__" []))
+                                (.tryFinally
+                                  (.tryCatch
+                                    (.ret
+                                      (.mcall
+                                        (.name "cache")
+                                        "setdefault"
+                                        [(.name "k"), (.name "v")]))
+                                    "__exc"
+                                    (.ret (.name "v")))
+                                  (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                         (.seq
                           .skip
                           (.seq
@@ -3064,13 +3160,10 @@ def f_cachetools__cached_py__module___locked_cache_clear : Func :=
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
-                        (.expr (.mcall (.name "cache") "clear" []))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.expr (.mcall (.name "cache") "clear" []))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/_cached.py:<module>._unlocked`  (from `cachetools/_cached.py`) -/
@@ -3090,8 +3183,10 @@ def f_cachetools__cached_py__module___unlocked : Func :=
 def f_cachetools__cached_py__module___unlocked_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._unlocked.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
+            (.assign "k" (.call "key" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
             (.seq
               .skip
               (.seq
@@ -3099,7 +3194,9 @@ def f_cachetools__cached_py__module___unlocked_wrapper : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.assign "v" (.call "func" [(.hole "op:starredUnpack")]))
+                    (.assign
+                      "v"
+                      (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                     (.seq
                       .skip
                       (.seq
@@ -3132,7 +3229,11 @@ def f_cachetools__cached_py__module___uncached : Func :=
 def f_cachetools__cached_py__module___uncached_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._uncached.wrapper"
   , params := ["args", "kwargs"]
-  , body := (.seq (.ret (.call "func" [(.hole "op:starredUnpack")])) .skip) }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , body := (.seq
+            (.ret (.call "func" [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+            .skip) }
 
 /-- `cachetools/_cached.py:<module>._uncached.<lambda>4`  (from `cachetools/_cached.py`) -/
 def f_cachetools__cached_py__module___uncached__lambda_4 : Func :=
@@ -3149,7 +3250,11 @@ def f_cachetools__cached_py__module___wrapper : Func :=
               (.isOp true (.name "info") (.lit .unit))
               (.ifte
                 (.isOp false (.name "cache") (.lit .unit))
-                (.assign "wrapper" (.call "_uncached_info" [(.name "func"), (.name "info")]))
+                (.assign
+                  "wrapper"
+                  (.call
+                    "cachetools/_cached.py:<module>._uncached_info"
+                    [(.name "func"), (.name "info")]))
                 (.ifte
                   (.binop
                     "&&"
@@ -3158,7 +3263,7 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                   (.assign
                     "wrapper"
                     (.call
-                      "_condition_info"
+                      "cachetools/_cached.py:<module>._condition_info"
                       [ (.name "func")
                       , (.name "cache")
                       , (.name "key")
@@ -3170,7 +3275,7 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                     (.assign
                       "wrapper"
                       (.call
-                        "_condition_info"
+                        "cachetools/_cached.py:<module>._condition_info"
                         [ (.name "func")
                         , (.name "cache")
                         , (.name "key")
@@ -3182,7 +3287,7 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                       (.assign
                         "wrapper"
                         (.call
-                          "_locked_info"
+                          "cachetools/_cached.py:<module>._locked_info"
                           [ (.name "func")
                           , (.name "cache")
                           , (.name "key")
@@ -3191,12 +3296,14 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                       (.assign
                         "wrapper"
                         (.call
-                          "_unlocked_info"
+                          "cachetools/_cached.py:<module>._unlocked_info"
                           [(.name "func"), (.name "cache"), (.name "key"), (.name "info")]))))))
               (.seq
                 (.ifte
                   (.isOp false (.name "cache") (.lit .unit))
-                  (.assign "wrapper" (.call "_uncached" [(.name "func")]))
+                  (.assign
+                    "wrapper"
+                    (.call "cachetools/_cached.py:<module>._uncached" [(.name "func")]))
                   (.ifte
                     (.binop
                       "&&"
@@ -3205,7 +3312,7 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                     (.assign
                       "wrapper"
                       (.call
-                        "_condition"
+                        "cachetools/_cached.py:<module>._condition"
                         [ (.name "func")
                         , (.name "cache")
                         , (.name "key")
@@ -3216,7 +3323,7 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                       (.assign
                         "wrapper"
                         (.call
-                          "_condition"
+                          "cachetools/_cached.py:<module>._condition"
                           [ (.name "func")
                           , (.name "cache")
                           , (.name "key")
@@ -3227,11 +3334,13 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                         (.assign
                           "wrapper"
                           (.call
-                            "_locked"
+                            "cachetools/_cached.py:<module>._locked"
                             [(.name "func"), (.name "cache"), (.name "key"), (.name "lock")]))
                         (.assign
                           "wrapper"
-                          (.call "_unlocked" [(.name "func"), (.name "cache"), (.name "key")]))))))
+                          (.call
+                            "cachetools/_cached.py:<module>._unlocked"
+                            [(.name "func"), (.name "cache"), (.name "key")]))))))
                 (.setField (.name "wrapper") "cache_info" (.lit .unit))))
             (.seq
               .skip
@@ -3275,7 +3384,8 @@ def f_cachetools__cachedmethod_py__module___warn_classmethod : Func :=
                 (.name "warnings")
                 "warn"
                 [ (.lit (.str "decorating class methods with @cachedmethod is deprecated"))
-                , (.name "DeprecationWarning") ]))
+                , (.name "DeprecationWarning")
+                , (.kwargE "stacklevel" (.name "stacklevel")) ]))
             (.seq .skip .skip)) }
 
 /-- `cachetools/_cachedmethod.py:<module>._warn_instance_dict`  (from `cachetools/_cachedmethod.py`) -/
@@ -3283,7 +3393,13 @@ def f_cachetools__cachedmethod_py__module___warn_instance_dict : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._warn_instance_dict"
   , params := ["msg", "stacklevel"]
   , body := (.seq
-            (.expr (.mcall (.name "warnings") "warn" [(.name "msg"), (.name "DeprecationWarning")]))
+            (.expr
+              (.mcall
+                (.name "warnings")
+                "warn"
+                [ (.name "msg")
+                , (.name "DeprecationWarning")
+                , (.kwargE "stacklevel" (.name "stacklevel")) ]))
             (.seq .skip .skip)) }
 
 /-- `cachetools/_cachedmethod.py:<module>._none`  (from `cachetools/_cachedmethod.py`) -/
@@ -3299,7 +3415,10 @@ def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
   , body := (.seq
             (.ifte
               (.call "isinstance" [(.name "obj"), (.name "type")])
-              (.expr (.call "_warn_classmethod" []))
+              (.expr
+                (.call
+                  "cachetools/_cachedmethod.py:<module>._warn_classmethod"
+                  [(.kwargE "stacklevel" (.lit (.int 5)))]))
               .skip)
             (.seq
               (.expr
@@ -3337,6 +3456,8 @@ def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
 def f_cachetools__cachedmethod_py__module___WrapperBase___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq (.raise (.call "NotImplementedError" [])) .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -3368,22 +3489,6 @@ def f_cachetools__cachedmethod_py__module___WrapperBase_cache_condition : Func :
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_condition"
   , params := []
   , body := (.ret (.mcall (.name "self") "_WrapperBase__cond" [(.field (.name "self") "_obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._WrapperBase.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___WrapperBase__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.<metaClassCallHandler>"
-  , params := ["obj", "method", "cache", "key", "lock", "cond"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>")
-              "<fakeNew>"
-              [ (.fnref "cachetools/_cachedmethod.py:<module>._WrapperBase.cache")
-              , (.name "obj")
-              , (.name "method")
-              , (.name "cache")
-              , (.name "key")
-              , (.name "lock")
-              , (.name "cond") ])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DescriptorBase.__init__`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DescriptorBase___init__ : Func :=
@@ -3435,22 +3540,15 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                   .skip
                   (.seq (.ret (.name "wrapper")) (.seq .skip (.seq .skip (.seq .skip .skip)))))))) }
 
-/-- `cachetools/_cachedmethod.py:<module>._DescriptorBase.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___DescriptorBase__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._DescriptorBase.<metaClassCallHandler>"
-  , params := ["deprecated"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>")
-              "<fakeNew>"
-              [(.name "deprecated")])) }
-
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__init__`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__init__"
   , params := ["wrapper", "cache_clear"]
   , body := (.seq
-            (.seq (.assign "tmp0" (.call "super" [])) (.expr (.mcall (.name "tmp0") "__init__" [])))
+            (.seq
+              (.assign "tmp0" (.call "super" []))
+              (.expr
+                (.mcall (.name "tmp0") "__init__" [(.kwargE "deprecated" (.lit (.bool true)))])))
             (.seq
               (.setField (.name "self") "_DeprecatedDescriptorBase__wrapper" (.name "wrapper"))
               (.seq
@@ -3464,43 +3562,48 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__ : 
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.expr (.call "_warn_classmethod" []))
+            (.expr
+              (.call
+                "cachetools/_cachedmethod.py:<module>._warn_classmethod"
+                [(.kwargE "stacklevel" (.lit (.int 3)))]))
             (.seq
               .skip
               (.ret
                 (.mcall
                   (.name "self")
                   "_DeprecatedDescriptorBase__wrapper"
-                  [(.hole "op:starredUnpack")])))) }
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear"
   , params := ["objtype"]
   , body := (.seq
-            (.expr (.call "_warn_classmethod" []))
+            (.expr
+              (.call
+                "cachetools/_cachedmethod.py:<module>._warn_classmethod"
+                [(.kwargE "stacklevel" (.lit (.int 3)))]))
             (.seq
               .skip
               (.ret
                 (.mcall (.name "self") "_DeprecatedDescriptorBase__cache_clear" [(.name "objtype")])))) }
-
-/-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.<metaClassCallHandler>"
-  , params := ["wrapper", "cache_clear"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>")
-              "<fakeNew>"
-              [(.name "wrapper"), (.name "cache_clear")])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info"
   , params := ["method", "cache", "key", "lock", "cond", "info"]
   , body := (.seq
-            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
+            (.seq
+              (.assign
+                "Descriptor"
+                (.classClosure
+                  "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor<meta>"))
+              (.expr
+                (.classClosure
+                  "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor<meta>")))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip (.seq .skip (.seq .skip .skip))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3542,6 +3645,8 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
 def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.assign "cache" (.field (.name "self") "cache"))
             (.seq
@@ -3549,7 +3654,12 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
               (.seq
                 (.assign "cond" (.field (.name "self") "cache_condition"))
                 (.seq
-                  (.assign "key" (.mcall (.name "self") "cache_key" [(.hole "op:starredUnpack")]))
+                  (.assign
+                    "key"
+                    (.mcall
+                      (.name "self")
+                      "cache_key"
+                      [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                   (.seq
                     (.seq
                       (.assign "manager_tmp0" (.name "lock"))
@@ -3558,49 +3668,68 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
                         (.seq
                           (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                           (.seq
-                            (.assign "value_tmp0" (.call "" []))
-                            (.hole "control:TRY-finally-escaping")))))
+                            (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                            (.tryFinally
+                              (.seq
+                                (.expr
+                                  (.mcall
+                                    (.name "cond")
+                                    "wait_for"
+                                    [ (.closure
+                                        "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0") ]))
+                                (.tryCatch
+                                  (.seq
+                                    (.assign "result" (.index (.name "cache") (.name "key")))
+                                    (.seq
+                                      (.setField
+                                        (.name "self")
+                                        "_Wrapper__hits"
+                                        (.binop
+                                          "+"
+                                          (.field (.name "self") "_Wrapper__hits")
+                                          (.lit (.int 1))))
+                                      (.ret (.name "result"))))
+                                  "__exc"
+                                  (.seq
+                                    (.seq
+                                      (.assign "tmp0" (.field (.name "self") "_Wrapper__pending"))
+                                      (.expr (.mcall (.name "tmp0") "add" [(.name "key")])))
+                                    (.setField
+                                      (.name "self")
+                                      "_Wrapper__misses"
+                                      (.binop
+                                        "+"
+                                        (.field (.name "self") "_Wrapper__misses")
+                                        (.lit (.int 1)))))))
+                              (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                     (.seq
-                      (.seq
-                        (.tryCatch
+                      (.tryFinally
+                        (.seq
+                          (.assign
+                            "val"
+                            (.call
+                              "method"
+                              [ (.field (.name "self") "_obj")
+                              , (.starred (.name "args"))
+                              , (.dstarred (.name "kwargs")) ]))
                           (.seq
-                            (.assign
-                              "val"
-                              (.call
-                                "method"
-                                [(.field (.name "self") "_obj"), (.hole "op:starredUnpack")]))
+                            (.assign "manager_tmp1" (.name "lock"))
                             (.seq
-                              (.assign "manager_tmp1" (.name "lock"))
+                              (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
                               (.seq
-                                (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                                (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                                 (.seq
-                                  (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
-                                  (.seq
-                                    (.assign "value_tmp1" (.call "" []))
-                                    (.hole "control:TRY-finally-escaping"))))))
-                          "__exc"
-                          (.seq
-                            (.seq
-                              (.assign "manager_tmp2" (.name "lock"))
-                              (.seq
-                                (.assign "enter_tmp2" (.field (.name "manager_tmp2") "__enter__"))
-                                (.seq
-                                  (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
-                                  (.seq
-                                    (.assign "value_tmp2" (.call "" []))
+                                  (.assign
+                                    "value_tmp1"
+                                    (.mcall (.name "manager_tmp1") "__enter__" []))
+                                  (.tryFinally
                                     (.seq
                                       (.tryCatch
-                                        (.seq
-                                          (.seq
-                                            (.assign
-                                              "tmp1"
-                                              (.field (.name "self") "_Wrapper__pending"))
-                                            (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
-                                          (.expr (.mcall (.name "cond") "notify_all" [])))
+                                        (.setIndex (.name "cache") (.name "key") (.name "val"))
                                         "__exc"
-                                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                      (.expr (.call "" [])))))))
-                            (.raise (.name "__exc"))))
+                                        .skip)
+                                      (.ret (.name "val")))
+                                    (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                         (.seq
                           (.assign "manager_tmp2" (.name "lock"))
                           (.seq
@@ -3608,17 +3737,16 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
                             (.seq
                               (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
                               (.seq
-                                (.assign "value_tmp2" (.call "" []))
-                                (.seq
-                                  (.tryCatch
+                                (.assign
+                                  "value_tmp2"
+                                  (.mcall (.name "manager_tmp2") "__enter__" []))
+                                (.tryFinally
+                                  (.seq
                                     (.seq
-                                      (.seq
-                                        (.assign "tmp1" (.field (.name "self") "_Wrapper__pending"))
-                                        (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
-                                      (.expr (.mcall (.name "cond") "notify_all" [])))
-                                    "__exc"
-                                    (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                  (.expr (.call "" []))))))))
+                                      (.assign "tmp1" (.field (.name "self") "_Wrapper__pending"))
+                                      (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
+                                    (.expr (.mcall (.name "cond") "notify_all" [])))
+                                  (.expr (.mcall (.name "manager_tmp2") "__exit__" []))))))))
                       (.seq
                         .skip
                         (.seq
@@ -3679,21 +3807,18 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_ca
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
                         (.seq
+                          (.assign "tmp0" (.field (.name "self") "cache"))
+                          (.expr (.mcall (.name "tmp0") "clear" [])))
+                        (.seq
+                          (.assign "tmp1" (.lit (.int 0)))
                           (.seq
-                            (.assign "tmp0" (.field (.name "self") "cache"))
-                            (.expr (.mcall (.name "tmp0") "clear" [])))
-                          (.seq
-                            (.assign "tmp1" (.lit (.int 0)))
-                            (.seq
-                              (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
-                              (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                            (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                            (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.cache_info`  (from `cachetools/_cachedmethod.py`) -/
@@ -3707,27 +3832,29 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_ca
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.call
+                          "info"
+                          [ (.field (.name "self") "cache")
+                          , (.field (.name "self") "_Wrapper__hits")
+                          , (.field (.name "self") "_Wrapper__misses") ]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
-
-/-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___condition_info_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info"
   , params := ["method", "cache", "key", "lock", "info"]
   , body := (.seq
-            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
+            (.seq
+              (.assign
+                "Descriptor"
+                (.classClosure "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor<meta>"))
+              (.expr
+                (.classClosure "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor<meta>")))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip (.seq .skip .skip)))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3760,12 +3887,19 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___ini
 def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.assign "cache" (.field (.name "self") "cache"))
             (.seq
               (.assign "lock" (.field (.name "self") "cache_lock"))
               (.seq
-                (.assign "key" (.mcall (.name "self") "cache_key" [(.hole "op:starredUnpack")]))
+                (.assign
+                  "key"
+                  (.mcall
+                    (.name "self")
+                    "cache_key"
+                    [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                 (.seq
                   (.seq
                     (.assign "manager_tmp0" (.name "lock"))
@@ -3774,8 +3908,29 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___cal
                       (.seq
                         (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                         (.seq
-                          (.assign "value_tmp0" (.call "" []))
-                          (.hole "control:TRY-finally-escaping")))))
+                          (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                          (.tryFinally
+                            (.tryCatch
+                              (.seq
+                                (.assign "result" (.index (.name "cache") (.name "key")))
+                                (.seq
+                                  (.setField
+                                    (.name "self")
+                                    "_Wrapper__hits"
+                                    (.binop
+                                      "+"
+                                      (.field (.name "self") "_Wrapper__hits")
+                                      (.lit (.int 1))))
+                                  (.ret (.name "result"))))
+                              "__exc"
+                              (.setField
+                                (.name "self")
+                                "_Wrapper__misses"
+                                (.binop
+                                  "+"
+                                  (.field (.name "self") "_Wrapper__misses")
+                                  (.lit (.int 1)))))
+                            (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                   (.seq
                     .skip
                     (.seq
@@ -3783,7 +3938,9 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___cal
                         "val"
                         (.call
                           "method"
-                          [(.field (.name "self") "_obj"), (.hole "op:starredUnpack")]))
+                          [ (.field (.name "self") "_obj")
+                          , (.starred (.name "args"))
+                          , (.dstarred (.name "kwargs")) ]))
                       (.seq
                         .skip
                         (.seq
@@ -3794,8 +3951,22 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___cal
                               (.seq
                                 (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                                 (.seq
-                                  (.assign "value_tmp1" (.call "" []))
-                                  (.hole "control:TRY-finally-escaping")))))
+                                  (.assign
+                                    "value_tmp1"
+                                    (.mcall (.name "manager_tmp1") "__enter__" []))
+                                  (.tryFinally
+                                    (.tryCatch
+                                      (.ret
+                                        (.mcall
+                                          (.name "cache")
+                                          "setdefault"
+                                          [ (.fnref
+                                              "cachetools/_cachedmethod.py:<module>._WrapperBase.cache")
+                                          , (.name "key")
+                                          , (.name "val") ]))
+                                      "__exc"
+                                      (.ret (.name "val")))
+                                    (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                           (.seq
                             .skip
                             (.seq
@@ -3826,21 +3997,18 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                   (.seq
-                    (.assign "value_tmp0" (.call "" []))
-                    (.seq
-                      (.tryCatch
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.seq
                         (.seq
+                          (.assign "tmp0" (.field (.name "self") "cache"))
+                          (.expr (.mcall (.name "tmp0") "clear" [])))
+                        (.seq
+                          (.assign "tmp1" (.lit (.int 0)))
                           (.seq
-                            (.assign "tmp0" (.field (.name "self") "cache"))
-                            (.expr (.mcall (.name "tmp0") "clear" [])))
-                          (.seq
-                            (.assign "tmp1" (.lit (.int 0)))
-                            (.seq
-                              (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
-                              (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
-                        "__exc"
-                        (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                      (.expr (.call "" [])))))))
+                            (.setField (.name "self") "_Wrapper__hits" (.name "tmp1"))
+                            (.setField (.name "self") "_Wrapper__misses" (.name "tmp1")))))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_info`  (from `cachetools/_cachedmethod.py`) -/
@@ -3854,27 +4022,31 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache
                 (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
                 (.seq
                   (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
-                  (.seq (.assign "value_tmp0" (.call "" [])) (.hole "control:TRY-finally-escaping")))))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.call
+                          "info"
+                          [ (.field (.name "self") "cache")
+                          , (.field (.name "self") "_Wrapper__hits")
+                          , (.field (.name "self") "_Wrapper__misses") ]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
-
-/-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___locked_info_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_info : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info"
   , params := ["method", "cache", "key", "info"]
   , body := (.seq
-            (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
+            (.seq
+              (.assign
+                "Descriptor"
+                (.classClosure
+                  "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor<meta>"))
+              (.expr
+                (.classClosure
+                  "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor<meta>")))
             (.seq (.ret (.alloc "Descriptor" [])) (.seq .skip .skip))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -3905,10 +4077,17 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___i
 def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.assign "cache" (.field (.name "self") "cache"))
             (.seq
-              (.assign "key" (.mcall (.name "self") "cache_key" [(.hole "op:starredUnpack")]))
+              (.assign
+                "key"
+                (.mcall
+                  (.name "self")
+                  "cache_key"
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
               (.seq
                 (.tryCatch
                   (.seq
@@ -3929,7 +4108,11 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___c
                   (.seq
                     (.assign
                       "val"
-                      (.call "method" [(.field (.name "self") "_obj"), (.hole "op:starredUnpack")]))
+                      (.call
+                        "method"
+                        [ (.field (.name "self") "_obj")
+                        , (.starred (.name "args"))
+                        , (.dstarred (.name "kwargs")) ]))
                     (.seq
                       .skip
                       (.seq
@@ -3970,18 +4153,6 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cac
                 , (.field (.name "self") "_Wrapper__misses") ]))
             .skip) }
 
-/-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
-
 /-- `cachetools/_cachedmethod.py:<module>._condition`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition"
@@ -4002,8 +4173,13 @@ def f_cachetools__cachedmethod_py__module___condition : Func :=
                     (.closure "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"))
                   (.seq
                     (.seq
-                      (.assign "Descriptor" (.hole "scope:class-closure"))
-                      (.expr (.call "" [])))
+                      (.assign
+                        "Descriptor"
+                        (.classClosure
+                          "cachetools/_cachedmethod.py:<module>._condition.Descriptor<meta>"))
+                      (.expr
+                        (.classClosure
+                          "cachetools/_cachedmethod.py:<module>._condition.Descriptor<meta>")))
                     (.seq
                       (.ret
                         (.alloc "Descriptor" [(.name "classmethod_wrapper"), (.name "cache_clear")]))
@@ -4019,10 +4195,18 @@ def f_cachetools__cachedmethod_py__module___condition : Func :=
 def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.wrapper"
   , params := ["pending", "args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq
-              (.assign "k" (.call "key" [(.name "self"), (.hole "op:starredUnpack")]))
+              (.assign
+                "k"
+                (.call
+                  "key"
+                  [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
               (.seq
                 (.seq
                   (.assign "manager_tmp0" (.call "lock" [(.name "self")]))
@@ -4031,47 +4215,52 @@ def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.hole "control:TRY-finally-escaping")))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.seq
+                            (.seq
+                              (.assign "tmp0" (.call "cond" [(.name "self")]))
+                              (.expr
+                                (.mcall
+                                  (.name "tmp0")
+                                  "wait_for"
+                                  [ (.closure
+                                      "cachetools/_cachedmethod.py:<module>._condition.wrapper.<lambda>1") ])))
+                            (.tryCatch
+                              (.ret (.index (.name "c") (.name "k")))
+                              "__exc"
+                              (.expr (.mcall (.name "pending") "add" [(.name "k")]))))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
                   (.seq
-                    (.seq
-                      (.tryCatch
+                    (.tryFinally
+                      (.seq
+                        (.assign
+                          "v"
+                          (.call
+                            "method"
+                            [ (.name "self")
+                            , (.starred (.name "args"))
+                            , (.dstarred (.name "kwargs")) ]))
                         (.seq
-                          (.assign
-                            "v"
-                            (.call "method" [(.name "self"), (.hole "op:starredUnpack")]))
+                          (.assign "manager_tmp1" (.call "lock" [(.name "self")]))
                           (.seq
-                            (.assign "manager_tmp1" (.call "lock" [(.name "self")]))
+                            (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
                             (.seq
-                              (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                              (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                               (.seq
-                                (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
-                                (.seq
-                                  (.assign "value_tmp1" (.call "" []))
-                                  (.hole "control:TRY-finally-escaping"))))))
-                        "__exc"
-                        (.seq
-                          (.seq
-                            (.assign "manager_tmp2" (.call "lock" [(.name "self")]))
-                            (.seq
-                              (.assign "enter_tmp2" (.field (.name "manager_tmp2") "__enter__"))
-                              (.seq
-                                (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
-                                (.seq
-                                  (.assign "value_tmp2" (.call "" []))
+                                (.assign
+                                  "value_tmp1"
+                                  (.mcall (.name "manager_tmp1") "__enter__" []))
+                                (.tryFinally
                                   (.seq
                                     (.tryCatch
-                                      (.seq
-                                        (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                        (.seq
-                                          (.assign "tmp1" (.call "cond" [(.name "self")]))
-                                          (.expr (.mcall (.name "tmp1") "notify_all" []))))
+                                      (.setIndex (.name "c") (.name "k") (.name "v"))
                                       "__exc"
-                                      (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                    (.expr (.call "" [])))))))
-                          (.raise (.name "__exc"))))
+                                      .skip)
+                                    (.ret (.name "v")))
+                                  (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                       (.seq
                         (.assign "manager_tmp2" (.call "lock" [(.name "self")]))
                         (.seq
@@ -4079,17 +4268,14 @@ def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
                           (.seq
                             (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
                             (.seq
-                              (.assign "value_tmp2" (.call "" []))
-                              (.seq
-                                (.tryCatch
+                              (.assign "value_tmp2" (.mcall (.name "manager_tmp2") "__enter__" []))
+                              (.tryFinally
+                                (.seq
+                                  (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
                                   (.seq
-                                    (.expr (.mcall (.name "pending") "remove" [(.name "k")]))
-                                    (.seq
-                                      (.assign "tmp1" (.call "cond" [(.name "self")]))
-                                      (.expr (.mcall (.name "tmp1") "notify_all" []))))
-                                  "__exc"
-                                  (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                                (.expr (.call "" []))))))))
+                                    (.assign "tmp1" (.call "cond" [(.name "self")]))
+                                    (.expr (.mcall (.name "tmp1") "notify_all" []))))
+                                (.expr (.mcall (.name "manager_tmp2") "__exit__" []))))))))
                     (.seq
                       .skip
                       (.seq
@@ -4139,7 +4325,9 @@ def f_cachetools__cachedmethod_py__module___condition_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.cache_clear"
   , params := []
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq
               .skip
               (.seq
@@ -4150,25 +4338,30 @@ def f_cachetools__cachedmethod_py__module___condition_cache_clear : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
-                            (.expr (.mcall (.name "c") "clear" []))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.expr (.mcall (.name "c") "clear" []))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_classmethod_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.assign "p" (.mcall (.name "pending") "setdefault" [(.name "self"), (.call "set" [])]))
             (.seq
               .skip
               (.seq
-                (.ret (.call "wrapper" [(.name "self"), (.name "p"), (.hole "op:starredUnpack")]))
+                (.ret
+                  (.call
+                    "wrapper"
+                    [ (.name "self")
+                    , (.name "p")
+                    , (.starred (.name "args"))
+                    , (.dstarred (.name "kwargs")) ]))
                 (.seq .skip (.seq .skip .skip))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -4200,13 +4393,16 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___init_
 def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.ret
               (.call
                 "wrapper"
                 [ (.field (.name "self") "_obj")
                 , (.field (.name "self") "_Wrapper__pending")
-                , (.hole "op:starredUnpack") ]))
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
             .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -4214,18 +4410,6 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper_cache_c
   { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.cache_clear"
   , params := ["_objtype"]
   , body := (.seq (.ret (.call "cache_clear" [(.field (.name "self") "_obj")])) .skip) }
-
-/-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___condition_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked : Func :=
@@ -4238,7 +4422,12 @@ def f_cachetools__cachedmethod_py__module___locked : Func :=
                 "cache_clear"
                 (.closure "cachetools/_cachedmethod.py:<module>._locked.cache_clear"))
               (.seq
-                (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
+                (.seq
+                  (.assign
+                    "Descriptor"
+                    (.classClosure "cachetools/_cachedmethod.py:<module>._locked.Descriptor<meta>"))
+                  (.expr
+                    (.classClosure "cachetools/_cachedmethod.py:<module>._locked.Descriptor<meta>")))
                 (.seq
                   (.ret (.alloc "Descriptor" [(.name "wrapper"), (.name "cache_clear")]))
                   (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))) }
@@ -4247,12 +4436,20 @@ def f_cachetools__cachedmethod_py__module___locked : Func :=
 def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq
               .skip
               (.seq
-                (.assign "k" (.call "key" [(.name "self"), (.hole "op:starredUnpack")]))
+                (.assign
+                  "k"
+                  (.call
+                    "key"
+                    [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                 (.seq
                   .skip
                   (.seq
@@ -4263,12 +4460,20 @@ def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
                         (.seq
                           (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                           (.seq
-                            (.assign "value_tmp0" (.call "" []))
-                            (.hole "control:TRY-finally-escaping")))))
+                            (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                            (.tryFinally
+                              (.tryCatch (.ret (.index (.name "c") (.name "k"))) "__exc" .skip)
+                              (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                     (.seq
                       .skip
                       (.seq
-                        (.assign "v" (.call "method" [(.name "self"), (.hole "op:starredUnpack")]))
+                        (.assign
+                          "v"
+                          (.call
+                            "method"
+                            [ (.name "self")
+                            , (.starred (.name "args"))
+                            , (.dstarred (.name "kwargs")) ]))
                         (.seq
                           .skip
                           (.seq
@@ -4279,8 +4484,19 @@ def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
                                 (.seq
                                   (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
                                   (.seq
-                                    (.assign "value_tmp1" (.call "" []))
-                                    (.hole "control:TRY-finally-escaping")))))
+                                    (.assign
+                                      "value_tmp1"
+                                      (.mcall (.name "manager_tmp1") "__enter__" []))
+                                    (.tryFinally
+                                      (.tryCatch
+                                        (.ret
+                                          (.mcall
+                                            (.name "c")
+                                            "setdefault"
+                                            [(.name "k"), (.name "v")]))
+                                        "__exc"
+                                        (.ret (.name "v")))
+                                      (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                             (.seq
                               .skip
                               (.seq
@@ -4302,7 +4518,9 @@ def f_cachetools__cachedmethod_py__module___locked_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.cache_clear"
   , params := []
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq
               .skip
               (.seq
@@ -4313,13 +4531,10 @@ def f_cachetools__cachedmethod_py__module___locked_cache_clear : Func :=
                     (.seq
                       (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
                       (.seq
-                        (.assign "value_tmp0" (.call "" []))
-                        (.seq
-                          (.tryCatch
-                            (.expr (.mcall (.name "c") "clear" []))
-                            "__exc"
-                            (.seq (.expr (.call "" [])) (.raise (.name "__exc"))))
-                          (.expr (.call "" [])))))))
+                        (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                        (.tryFinally
+                          (.expr (.mcall (.name "c") "clear" []))
+                          (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -4346,8 +4561,15 @@ def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___init__ :
 def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.ret (.call "wrapper" [(.field (.name "self") "_obj"), (.hole "op:starredUnpack")]))
+            (.ret
+              (.call
+                "wrapper"
+                [ (.field (.name "self") "_obj")
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
             .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -4355,18 +4577,6 @@ def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper_cache_clea
   { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.cache_clear"
   , params := ["_objtype"]
   , body := (.seq (.ret (.call "cache_clear" [(.field (.name "self") "_obj")])) .skip) }
-
-/-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___locked_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked : Func :=
@@ -4379,7 +4589,14 @@ def f_cachetools__cachedmethod_py__module___unlocked : Func :=
                 "cache_clear"
                 (.closure "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"))
               (.seq
-                (.seq (.assign "Descriptor" (.hole "scope:class-closure")) (.expr (.call "" [])))
+                (.seq
+                  (.assign
+                    "Descriptor"
+                    (.classClosure
+                      "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor<meta>"))
+                  (.expr
+                    (.classClosure
+                      "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor<meta>")))
                 (.seq
                   (.ret (.alloc "Descriptor" [(.name "wrapper"), (.name "cache_clear")]))
                   (.seq .skip (.seq .skip (.seq .skip .skip))))))) }
@@ -4388,12 +4605,20 @@ def f_cachetools__cachedmethod_py__module___unlocked : Func :=
 def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.wrapper"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq
               .skip
               (.seq
-                (.assign "k" (.call "key" [(.name "self"), (.hole "op:starredUnpack")]))
+                (.assign
+                  "k"
+                  (.call
+                    "key"
+                    [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
                 (.seq
                   .skip
                   (.seq
@@ -4401,7 +4626,13 @@ def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
                     (.seq
                       .skip
                       (.seq
-                        (.assign "v" (.call "method" [(.name "self"), (.hole "op:starredUnpack")]))
+                        (.assign
+                          "v"
+                          (.call
+                            "method"
+                            [ (.name "self")
+                            , (.starred (.name "args"))
+                            , (.dstarred (.name "kwargs")) ]))
                         (.seq
                           .skip
                           (.seq
@@ -4416,7 +4647,9 @@ def f_cachetools__cachedmethod_py__module___unlocked_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"
   , params := []
   , body := (.seq
-            (.assign "c" (.call "cache" [(.name "self")]))
+            (.assign
+              "c"
+              (.call "cachetools/_cachedmethod.py:<module>._WrapperBase.cache" [(.name "self")]))
             (.seq .skip (.seq (.expr (.mcall (.name "c") "clear" [])) .skip))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.__init__`  (from `cachetools/_cachedmethod.py`) -/
@@ -4441,8 +4674,15 @@ def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___init__
 def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
-            (.ret (.call "wrapper" [(.field (.name "self") "_obj"), (.hole "op:starredUnpack")]))
+            (.ret
+              (.call
+                "wrapper"
+                [ (.field (.name "self") "_obj")
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
             .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -4450,18 +4690,6 @@ def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper_cache_cl
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.cache_clear"
   , params := ["_objtype"]
   , body := (.seq (.ret (.call "cache_clear" [(.field (.name "self") "_obj")])) .skip) }
-
-/-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.<metaClassCallHandler>"
-  , params := ["obj"]
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [(.name "obj")])) }
-
-/-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.<metaClassCallHandler>`  (from `cachetools/_cachedmethod.py`) -/
-def f_cachetools__cachedmethod_py__module___unlocked_Descriptor__metaClassCallHandler_ : Func :=
-  { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.hole "scope:class-closure") "<fakeNew>" [])) }
 
 /-- `cachetools/_cachedmethod.py:<module>._wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___wrapper : Func :=
@@ -4478,7 +4706,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                 (.assign
                   "wrapper"
                   (.call
-                    "_condition_info"
+                    "cachetools/_cachedmethod.py:<module>._condition_info"
                     [ (.name "method")
                     , (.name "cache")
                     , (.name "key")
@@ -4490,7 +4718,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                   (.assign
                     "wrapper"
                     (.call
-                      "_condition_info"
+                      "cachetools/_cachedmethod.py:<module>._condition_info"
                       [ (.name "method")
                       , (.name "cache")
                       , (.name "key")
@@ -4502,7 +4730,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                     (.assign
                       "wrapper"
                       (.call
-                        "_locked_info"
+                        "cachetools/_cachedmethod.py:<module>._locked_info"
                         [ (.name "method")
                         , (.name "cache")
                         , (.name "key")
@@ -4511,7 +4739,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                     (.assign
                       "wrapper"
                       (.call
-                        "_unlocked_info"
+                        "cachetools/_cachedmethod.py:<module>._unlocked_info"
                         [(.name "method"), (.name "cache"), (.name "key"), (.name "info")])))))
               (.ifte
                 (.binop
@@ -4521,7 +4749,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                 (.assign
                   "wrapper"
                   (.call
-                    "_condition"
+                    "cachetools/_cachedmethod.py:<module>._condition"
                     [ (.name "method")
                     , (.name "cache")
                     , (.name "key")
@@ -4532,7 +4760,7 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                   (.assign
                     "wrapper"
                     (.call
-                      "_condition"
+                      "cachetools/_cachedmethod.py:<module>._condition"
                       [ (.name "method")
                       , (.name "cache")
                       , (.name "key")
@@ -4543,11 +4771,13 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                     (.assign
                       "wrapper"
                       (.call
-                        "_locked"
+                        "cachetools/_cachedmethod.py:<module>._locked"
                         [(.name "method"), (.name "cache"), (.name "key"), (.name "lock")]))
                     (.assign
                       "wrapper"
-                      (.call "_unlocked" [(.name "method"), (.name "cache"), (.name "key")]))))))
+                      (.call
+                        "cachetools/_cachedmethod.py:<module>._unlocked"
+                        [(.name "method"), (.name "cache"), (.name "key")]))))))
             (.seq
               .skip
               (.seq
@@ -4598,16 +4828,6 @@ def f_cachetools_func_py__module___UnboundTTLCache_maxsize : Func :=
   , params := []
   , body := (.ret (.lit .unit)) }
 
-/-- `cachetools/func.py:<module>._UnboundTTLCache.<metaClassCallHandler>`  (from `cachetools/func.py`) -/
-def f_cachetools_func_py__module___UnboundTTLCache__metaClassCallHandler_ : Func :=
-  { name := "cachetools/func.py:<module>._UnboundTTLCache.<metaClassCallHandler>"
-  , params := ["ttl", "timer"]
-  , body := (.ret
-            (.mcall
-              (.fnref "cachetools/func.py:<module>._UnboundTTLCache<meta>")
-              "<fakeNew>"
-              [(.name "ttl"), (.name "timer")])) }
-
 /-- `cachetools/func.py:<module>._cache`  (from `cachetools/func.py`) -/
 def f_cachetools_func_py__module___cache : Func :=
   { name := "cachetools/func.py:<module>._cache"
@@ -4628,7 +4848,7 @@ def f_cachetools_func_py__module___cache_decorator : Func :=
                 (.fnref "cachetools/keys.py:<module>.typedkey")
                 (.fnref "cachetools/keys.py:<module>.hashkey")))
             (.seq
-              (.assign "wrapper" (.call "" [(.name "func")]))
+              (.assign "wrapper" (.hole "call:computed-callee"))
               (.seq
                 (.setField
                   (.name "wrapper")
@@ -4669,13 +4889,16 @@ def f_cachetools_func_py__module__fifo_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
+                  (.ret
+                    (.call
+                      "cachetools/func.py:<module>._cache"
+                      [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.call "" [(.name "maxsize")]))
+                    (.ret (.hole "call:computed-callee"))
                     (.ret
                       (.call
-                        "_cache"
+                        "cachetools/func.py:<module>._cache"
                         [ (.alloc "FIFOCache" [(.name "maxsize")])
                         , (.name "maxsize")
                         , (.name "typed") ]))))
@@ -4694,13 +4917,16 @@ def f_cachetools_func_py__module__lfu_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
+                  (.ret
+                    (.call
+                      "cachetools/func.py:<module>._cache"
+                      [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.call "" [(.name "maxsize")]))
+                    (.ret (.hole "call:computed-callee"))
                     (.ret
                       (.call
-                        "_cache"
+                        "cachetools/func.py:<module>._cache"
                         [ (.alloc "LFUCache" [(.name "maxsize")])
                         , (.name "maxsize")
                         , (.name "typed") ]))))
@@ -4719,13 +4945,16 @@ def f_cachetools_func_py__module__lru_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
+                  (.ret
+                    (.call
+                      "cachetools/func.py:<module>._cache"
+                      [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.call "" [(.name "maxsize")]))
+                    (.ret (.hole "call:computed-callee"))
                     (.ret
                       (.call
-                        "_cache"
+                        "cachetools/func.py:<module>._cache"
                         [ (.alloc "LRUCache" [(.name "maxsize")])
                         , (.name "maxsize")
                         , (.name "typed") ]))))
@@ -4744,13 +4973,16 @@ def f_cachetools_func_py__module__rr_cache : Func :=
               (.seq
                 (.ifte
                   (.isOp false (.name "maxsize") (.lit .unit))
-                  (.ret (.call "_cache" [(.dictE []), (.lit .unit), (.name "typed")]))
+                  (.ret
+                    (.call
+                      "cachetools/func.py:<module>._cache"
+                      [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.call "" [(.name "maxsize")]))
+                    (.ret (.hole "call:computed-callee"))
                     (.ret
                       (.call
-                        "_cache"
+                        "cachetools/func.py:<module>._cache"
                         [ (.alloc "RRCache" [(.name "maxsize"), (.name "choice")])
                         , (.name "maxsize")
                         , (.name "typed") ]))))
@@ -4771,16 +5003,16 @@ def f_cachetools_func_py__module__ttl_cache : Func :=
                   (.isOp false (.name "maxsize") (.lit .unit))
                   (.ret
                     (.call
-                      "_cache"
+                      "cachetools/func.py:<module>._cache"
                       [ (.alloc "_UnboundTTLCache" [(.name "ttl"), (.name "timer")])
                       , (.lit .unit)
                       , (.name "typed") ]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.call "" [(.name "maxsize")]))
+                    (.ret (.hole "call:computed-callee"))
                     (.ret
                       (.call
-                        "_cache"
+                        "cachetools/func.py:<module>._cache"
                         [ (.alloc "TTLCache" [(.name "maxsize"), (.name "ttl"), (.name "timer")])
                         , (.name "maxsize")
                         , (.name "typed") ]))))
@@ -4827,16 +5059,12 @@ def f_cachetools_keys_py__module___HashedTuple___getstate__ : Func :=
   , params := []
   , body := (.seq (.seq (.assign "tmp0" (.dictE [])) (.ret (.name "tmp0"))) .skip) }
 
-/-- `cachetools/keys.py:<module>._HashedTuple.<metaClassCallHandler>`  (from `cachetools/keys.py`) -/
-def f_cachetools_keys_py__module___HashedTuple__metaClassCallHandler_ : Func :=
-  { name := "cachetools/keys.py:<module>._HashedTuple.<metaClassCallHandler>"
-  , params := []
-  , body := (.ret (.mcall (.fnref "cachetools/keys.py:<module>._HashedTuple<meta>") "<fakeNew>" [])) }
-
 /-- `cachetools/keys.py:<module>.hashkey`  (from `cachetools/keys.py`) -/
 def f_cachetools_keys_py__module__hashkey : Func :=
   { name := "cachetools/keys.py:<module>.hashkey"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.expr (.lit (.str "\"\"Return a cache key for the specified hashable arguments.\"\"")))
             (.seq
@@ -4858,14 +5086,23 @@ def f_cachetools_keys_py__module__hashkey : Func :=
 def f_cachetools_keys_py__module__methodkey : Func :=
   { name := "cachetools/keys.py:<module>.methodkey"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.expr (.lit (.str "\"\"Return a cache key for use with cached methods.\"\"")))
-            (.seq .skip (.ret (.call "hashkey" [(.hole "op:starredUnpack")])))) }
+            (.seq
+              .skip
+              (.ret
+                (.call
+                  "cachetools/keys.py:<module>.hashkey"
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))) }
 
 /-- `cachetools/keys.py:<module>.typedkey`  (from `cachetools/keys.py`) -/
 def f_cachetools_keys_py__module__typedkey : Func :=
   { name := "cachetools/keys.py:<module>.typedkey"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.expr
               (.lit (.str "\"\"Return a typed cache key for the specified hashable arguments.\"\"")))
@@ -4913,9 +5150,16 @@ def f_cachetools_keys_py__module__typedkey : Func :=
 def f_cachetools_keys_py__module__typedmethodkey : Func :=
   { name := "cachetools/keys.py:<module>.typedmethodkey"
   , params := ["args", "kwargs"]
+  , vararg := some "args"
+  , kwarg := some "kwargs"
   , body := (.seq
             (.expr (.lit (.str "\"\"Return a typed cache key for use with cached methods.\"\"")))
-            (.seq .skip (.ret (.call "typedkey" [(.hole "op:starredUnpack")])))) }
+            (.seq
+              .skip
+              (.ret
+                (.call
+                  "cachetools/keys.py:<module>.typedkey"
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))) }
 
 /-- `cachetools/__init__.py:<module>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module_ : Func :=
@@ -4999,10 +5243,8 @@ def f_cachetools___init___py__module_ : Func :=
                                                                 (.fnref
                                                                   "cachetools/__init__.py:<module>._DefaultSize<meta>"))
                                                               (.expr
-                                                                (.call
-                                                                  ""
-                                                                  [ (.fnref
-                                                                      "cachetools/__init__.py:<module>._DefaultSize") ])))
+                                                                (.fnref
+                                                                  "cachetools/__init__.py:<module>._DefaultSize<meta>")))
                                                             (.seq
                                                               .skip
                                                               (.seq
@@ -5011,7 +5253,9 @@ def f_cachetools___init___py__module_ : Func :=
                                                                     "Cache"
                                                                     (.fnref
                                                                       "cachetools/__init__.py:<module>.Cache<meta>"))
-                                                                  (.expr (.alloc "" [])))
+                                                                  (.expr
+                                                                    (.fnref
+                                                                      "cachetools/__init__.py:<module>.Cache<meta>")))
                                                                 (.seq
                                                                   .skip
                                                                   (.seq
@@ -5020,7 +5264,9 @@ def f_cachetools___init___py__module_ : Func :=
                                                                         "FIFOCache"
                                                                         (.fnref
                                                                           "cachetools/__init__.py:<module>.FIFOCache<meta>"))
-                                                                      (.expr (.alloc "" [])))
+                                                                      (.expr
+                                                                        (.fnref
+                                                                          "cachetools/__init__.py:<module>.FIFOCache<meta>")))
                                                                     (.seq
                                                                       .skip
                                                                       (.seq
@@ -5029,7 +5275,9 @@ def f_cachetools___init___py__module_ : Func :=
                                                                             "LFUCache"
                                                                             (.fnref
                                                                               "cachetools/__init__.py:<module>.LFUCache<meta>"))
-                                                                          (.expr (.alloc "" [])))
+                                                                          (.expr
+                                                                            (.fnref
+                                                                              "cachetools/__init__.py:<module>.LFUCache<meta>")))
                                                                         (.seq
                                                                           .skip
                                                                           (.seq
@@ -5038,7 +5286,9 @@ def f_cachetools___init___py__module_ : Func :=
                                                                                 "LRUCache"
                                                                                 (.fnref
                                                                                   "cachetools/__init__.py:<module>.LRUCache<meta>"))
-                                                                              (.expr (.alloc "" [])))
+                                                                              (.expr
+                                                                                (.fnref
+                                                                                  "cachetools/__init__.py:<module>.LRUCache<meta>")))
                                                                             (.seq
                                                                               .skip
                                                                               (.seq
@@ -5048,7 +5298,8 @@ def f_cachetools___init___py__module_ : Func :=
                                                                                     (.fnref
                                                                                       "cachetools/__init__.py:<module>.RRCache<meta>"))
                                                                                   (.expr
-                                                                                    (.alloc "" [])))
+                                                                                    (.fnref
+                                                                                      "cachetools/__init__.py:<module>.RRCache<meta>")))
                                                                                 (.seq
                                                                                   .skip
                                                                                   (.seq
@@ -5058,9 +5309,8 @@ def f_cachetools___init___py__module_ : Func :=
                                                                                         (.fnref
                                                                                           "cachetools/__init__.py:<module>._TimedCache<meta>"))
                                                                                       (.expr
-                                                                                        (.call
-                                                                                          ""
-                                                                                          [])))
+                                                                                        (.fnref
+                                                                                          "cachetools/__init__.py:<module>._TimedCache<meta>")))
                                                                                     (.seq
                                                                                       .skip
                                                                                       (.seq
@@ -5070,9 +5320,8 @@ def f_cachetools___init___py__module_ : Func :=
                                                                                             (.fnref
                                                                                               "cachetools/__init__.py:<module>.TTLCache<meta>"))
                                                                                           (.expr
-                                                                                            (.alloc
-                                                                                              ""
-                                                                                              [])))
+                                                                                            (.fnref
+                                                                                              "cachetools/__init__.py:<module>.TTLCache<meta>")))
                                                                                         (.seq
                                                                                           .skip
                                                                                           (.seq
@@ -5082,9 +5331,8 @@ def f_cachetools___init___py__module_ : Func :=
                                                                                                 (.fnref
                                                                                                   "cachetools/__init__.py:<module>.TLRUCache<meta>"))
                                                                                               (.expr
-                                                                                                (.alloc
-                                                                                                  ""
-                                                                                                  [])))
+                                                                                                (.fnref
+                                                                                                  "cachetools/__init__.py:<module>.TLRUCache<meta>")))
                                                                                             (.seq
                                                                                               .skip
                                                                                               (.seq
@@ -5290,21 +5538,27 @@ def f_cachetools__cachedmethod_py__module_ : Func :=
                                           "_WrapperBase"
                                           (.fnref
                                             "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>"))
-                                        (.expr (.call "" [])))
+                                        (.expr
+                                          (.fnref
+                                            "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>")))
                                       (.seq
                                         (.seq
                                           (.setGlobal
                                             "_DescriptorBase"
                                             (.fnref
                                               "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>"))
-                                          (.expr (.call "" [])))
+                                          (.expr
+                                            (.fnref
+                                              "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>")))
                                         (.seq
                                           (.seq
                                             (.setGlobal
                                               "_DeprecatedDescriptorBase"
                                               (.fnref
                                                 "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>"))
-                                            (.expr (.call "" [])))
+                                            (.expr
+                                              (.fnref
+                                                "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>")))
                                           (.seq
                                             (.setGlobal
                                               "_condition_info"
@@ -5455,9 +5709,7 @@ def f_cachetools_func_py__module_ : Func :=
                                   "_UnboundTTLCache"
                                   (.fnref "cachetools/func.py:<module>._UnboundTTLCache<meta>"))
                                 (.expr
-                                  (.call
-                                    ""
-                                    [(.fnref "cachetools/func.py:<module>._UnboundTTLCache")])))
+                                  (.fnref "cachetools/func.py:<module>._UnboundTTLCache<meta>")))
                               (.seq
                                 (.setGlobal "_cache" (.fnref "cachetools/func.py:<module>._cache"))
                                 (.seq
@@ -5549,7 +5801,7 @@ def f_cachetools_keys_py__module_ : Func :=
                           (.setGlobal
                             "_HashedTuple"
                             (.fnref "cachetools/keys.py:<module>._HashedTuple<meta>"))
-                          (.expr (.call "" [(.fnref "cachetools/keys.py:<module>._HashedTuple")])))
+                          (.expr (.fnref "cachetools/keys.py:<module>._HashedTuple<meta>")))
                         (.seq
                           (.setGlobal "_kwmark" (.tupleE [(.name "_HashedTuple")]))
                           (.seq
@@ -5592,7 +5844,6 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module___DefaultSize___setitem__,
   f_cachetools___init___py__module___DefaultSize_pop,
   f_cachetools___init___py__module___DefaultSize_clear,
-  f_cachetools___init___py__module___DefaultSize__metaClassCallHandler_,
   f_cachetools___init___py__module__Cache___init__,
   f_cachetools___init___py__module__Cache___repr__,
   f_cachetools___init___py__module__Cache___getitem__,
@@ -5609,16 +5860,13 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__Cache_maxsize,
   f_cachetools___init___py__module__Cache_currsize,
   f_cachetools___init___py__module__Cache_getsizeof,
-  f_cachetools___init___py__module__Cache__metaClassCallHandler_,
   f_cachetools___init___py__module__FIFOCache___init__,
   f_cachetools___init___py__module__FIFOCache___setitem__,
   f_cachetools___init___py__module__FIFOCache___delitem__,
   f_cachetools___init___py__module__FIFOCache_popitem,
   f_cachetools___init___py__module__FIFOCache_clear,
-  f_cachetools___init___py__module__FIFOCache__metaClassCallHandler_,
   f_cachetools___init___py__module__LFUCache__Link___init__,
   f_cachetools___init___py__module__LFUCache__Link_unlink,
-  f_cachetools___init___py__module__LFUCache__Link__metaClassCallHandler_,
   f_cachetools___init___py__module__LFUCache___init__,
   f_cachetools___init___py__module__LFUCache___getitem__,
   f_cachetools___init___py__module__LFUCache___setitem__,
@@ -5626,7 +5874,6 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__LFUCache_popitem,
   f_cachetools___init___py__module__LFUCache_clear,
   f_cachetools___init___py__module__LFUCache__LFUCache__touch,
-  f_cachetools___init___py__module__LFUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__LRUCache___init__,
   f_cachetools___init___py__module__LRUCache___getitem__,
   f_cachetools___init___py__module__LRUCache___setitem__,
@@ -5634,21 +5881,18 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__LRUCache_popitem,
   f_cachetools___init___py__module__LRUCache_clear,
   f_cachetools___init___py__module__LRUCache__LRUCache__touch,
-  f_cachetools___init___py__module__LRUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__RRCache___init__,
   f_cachetools___init___py__module__RRCache_choice,
   f_cachetools___init___py__module__RRCache___setitem__,
   f_cachetools___init___py__module__RRCache___delitem__,
   f_cachetools___init___py__module__RRCache_popitem,
   f_cachetools___init___py__module__RRCache_clear,
-  f_cachetools___init___py__module__RRCache__metaClassCallHandler_,
   f_cachetools___init___py__module___TimedCache__Timer___init__,
   f_cachetools___init___py__module___TimedCache__Timer___call__,
   f_cachetools___init___py__module___TimedCache__Timer___enter__,
   f_cachetools___init___py__module___TimedCache__Timer___exit__,
   f_cachetools___init___py__module___TimedCache__Timer___reduce__,
   f_cachetools___init___py__module___TimedCache__Timer___getattr__,
-  f_cachetools___init___py__module___TimedCache__Timer__metaClassCallHandler_,
   f_cachetools___init___py__module___TimedCache___init__,
   f_cachetools___init___py__module___TimedCache___repr__,
   f_cachetools___init___py__module___TimedCache___len__,
@@ -5659,11 +5903,9 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module___TimedCache_setdefault,
   f_cachetools___init___py__module___TimedCache_clear,
   f_cachetools___init___py__module___TimedCache_expire,
-  f_cachetools___init___py__module___TimedCache__metaClassCallHandler_,
   f_cachetools___init___py__module__TTLCache__Link___init__,
   f_cachetools___init___py__module__TTLCache__Link___reduce__,
   f_cachetools___init___py__module__TTLCache__Link_unlink,
-  f_cachetools___init___py__module__TTLCache__Link__metaClassCallHandler_,
   f_cachetools___init___py__module__TTLCache___init__,
   f_cachetools___init___py__module__TTLCache___contains__,
   f_cachetools___init___py__module__TTLCache___getitem__,
@@ -5677,10 +5919,8 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__TTLCache_popitem,
   f_cachetools___init___py__module__TTLCache_clear,
   f_cachetools___init___py__module__TTLCache__TTLCache__getlink,
-  f_cachetools___init___py__module__TTLCache__metaClassCallHandler_,
   f_cachetools___init___py__module__TLRUCache__Item___init__,
   f_cachetools___init___py__module__TLRUCache__Item___lt__,
-  f_cachetools___init___py__module__TLRUCache__Item__metaClassCallHandler_,
   f_cachetools___init___py__module__TLRUCache___init__,
   f_cachetools___init___py__module__TLRUCache___contains__,
   f_cachetools___init___py__module__TLRUCache___getitem__,
@@ -5693,7 +5933,6 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module__TLRUCache_clear,
   f_cachetools___init___py__module__TLRUCache__TLRUCache__getitem,
   f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem,
-  f_cachetools___init___py__module__TLRUCache__metaClassCallHandler_,
   f_cachetools___init___py__module__cached,
   f_cachetools___init___py__module__cached_decorator,
   f_cachetools___init___py__module__cached_decorator_make_info_redefined_0,
@@ -5743,37 +5982,28 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools__cachedmethod_py__module___WrapperBase_cache_key,
   f_cachetools__cachedmethod_py__module___WrapperBase_cache_lock,
   f_cachetools__cachedmethod_py__module___WrapperBase_cache_condition,
-  f_cachetools__cachedmethod_py__module___WrapperBase__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___DescriptorBase___init__,
   f_cachetools__cachedmethod_py__module___DescriptorBase___set_name__,
   f_cachetools__cachedmethod_py__module___DescriptorBase___get__,
-  f_cachetools__cachedmethod_py__module___DescriptorBase__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__,
   f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___call__,
   f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase_cache_clear,
-  f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___condition_info,
   f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___call____lambda_0,
   f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_cache_clear,
   f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper_cache_info,
-  f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___condition_info_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___locked_info,
   f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache_clear,
   f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache_info,
-  f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___locked_info_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___unlocked_info,
   f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cache_clear,
   f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cache_info,
-  f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___condition,
   f_cachetools__cachedmethod_py__module___condition_wrapper,
   f_cachetools__cachedmethod_py__module___condition_wrapper__lambda_1,
@@ -5782,28 +6012,21 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper_cache_clear,
-  f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___condition_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___locked,
   f_cachetools__cachedmethod_py__module___locked_wrapper,
   f_cachetools__cachedmethod_py__module___locked_cache_clear,
   f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper_cache_clear,
-  f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___locked_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___unlocked,
   f_cachetools__cachedmethod_py__module___unlocked_wrapper,
   f_cachetools__cachedmethod_py__module___unlocked_cache_clear,
   f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___init__,
   f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___call__,
   f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper_cache_clear,
-  f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper__metaClassCallHandler_,
-  f_cachetools__cachedmethod_py__module___unlocked_Descriptor__metaClassCallHandler_,
   f_cachetools__cachedmethod_py__module___wrapper,
   f_cachetools_func_py__module___UnboundTTLCache___init__,
   f_cachetools_func_py__module___UnboundTTLCache_maxsize,
-  f_cachetools_func_py__module___UnboundTTLCache__metaClassCallHandler_,
   f_cachetools_func_py__module___cache,
   f_cachetools_func_py__module___cache_decorator,
   f_cachetools_func_py__module___cache_decorator__lambda_0,
@@ -5816,7 +6039,6 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools_keys_py__module___HashedTuple___add__,
   f_cachetools_keys_py__module___HashedTuple___radd__,
   f_cachetools_keys_py__module___HashedTuple___getstate__,
-  f_cachetools_keys_py__module___HashedTuple__metaClassCallHandler_,
   f_cachetools_keys_py__module__hashkey,
   f_cachetools_keys_py__module__methodkey,
   f_cachetools_keys_py__module__typedkey,
