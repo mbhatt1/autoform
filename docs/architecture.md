@@ -1,57 +1,55 @@
 # Architecture
 
-How the pieces fit together, and why they are arranged this way. Read `STRATEGY.md` for
-the full design record; this document is the map.
+How the pieces fit together. `STRATEGY.md` holds the full design record; this document is
+the map.
 
-## The central bet
+## The approach
 
-Do **not** translate a program into Lean definitions and then guess theorems about them.
-That is the failure mode of every naive "LLM → Lean" pipeline: the translation is
-unfaithful, nothing checks the faithfulness, and the resulting theorems are vacuous.
+Programs are not translated into Lean definitions with theorems then guessed about them.
+In that arrangement the translation is unfaithful, nothing checks the faithfulness, and
+the resulting theorems are vacuous.
 
-Instead: **formalize the language, not the program.**
+Instead the language is formalized, not the program.
 
-1. Write a definitional interpreter for the source language *inside Lean*
-   (`Autoform/Lang/Core/Semantics.lean`). It is written once, reviewed hard, and reused
-   for every program.
-2. Mechanically transpile the codebase into a **term** of that interpreter's syntax type
-   — a deep embedding. This step is a parser plus a printer, not a model: it is total,
-   deterministic and diff-testable.
-3. Every property of the program is now a theorem about `eval` applied to a concrete AST.
-   Crucially, the semantics itself is *checkable against reality* by differential-testing
-   `eval` against the real runtime — so the trust story does not begin with "assume the
-   translation is right".
-4. Layer a shallow embedding on top (`Autoform/Refine.lean`): prove once that the deep
-   term is observationally equivalent to a clean Lean function, then reason in the clean
-   world. This is the Aeneas/`hax` playbook and it is the only thing that scales.
+1. A definitional interpreter for the source language is written *inside Lean*
+   (`Autoform/Lang/Core/Semantics.lean`). It is written once and reused for every program.
+2. The codebase is mechanically transpiled into a **term** of that interpreter's syntax
+   type — a deep embedding. This step is a parser plus a printer, not a model: total,
+   deterministic, diff-testable.
+3. Every property of the program is then a theorem about `eval` applied to a concrete AST.
+   The semantics is checkable against reality by differential-testing `eval` against the
+   real runtime, so the trust story does not begin with "assume the translation is right".
+4. A shallow embedding is layered on top (`Autoform/Refine.lean`): prove once that the
+   deep term is observationally equivalent to a clean Lean function, then reason in the
+   clean world. This is the Aeneas/`hax` playbook.
 
-The consequence worth internalising: the artefact under proof is *data*. A program is a
-`Autoform.Core.Program` value, a coverage metric is a fold over that value, and a
-"specification" is a statement about `runFunc` applied to it.
+The artefact under proof is *data*. A program is a `Autoform.Core.Program` value, a
+coverage metric is a fold over that value, and a "specification" is a statement about
+`runFunc` applied to it.
 
-## Why the CPG is treated as a universal AST
+## The CPG as a universal AST
 
-The expensive part of step 2 is normally per-language: one front end, one syntax type and
-one transpiler per language you want to support. Joern's **code property graph** collapses
-that. C, C++, Java, JavaScript, Python, Kotlin and compiled binaries all normalize into a
-single node vocabulary — `CALL`, `IDENTIFIER`, `LITERAL`, `CONTROL_STRUCTURE`, `RETURN`,
-`BLOCK`, `FIELD_IDENTIFIER`, `METHOD_REF`, `TYPE_REF` — with operators appearing as
-`<operator>.*` calls. So the system writes:
+Step 2 is normally per-language: one front end, one syntax type and one transpiler per
+supported language. Joern's **code property graph** collapses that. C, C++, Java,
+JavaScript, Python, Kotlin and compiled binaries all normalize into a single node
+vocabulary — `CALL`, `IDENTIFIER`, `LITERAL`, `CONTROL_STRUCTURE`, `RETURN`, `BLOCK`,
+`FIELD_IDENTIFIER`, `METHOD_REF`, `TYPE_REF` — with operators appearing as `<operator>.*`
+calls. The system therefore writes:
 
 * **one** semantics for that vocabulary (`Autoform/Lang/Core/*`),
 * **one** CPG → JSON exporter (`cartographer/export_ast.sc`),
 * **one** JSON → Lean printer (`cartographer/render_lean.py`),
 
-and every Joern-supported front end comes along for free. Compared with the obvious
-alternative (compile everything to Wasm and write one Wasm semantics), source-level
-structure survives, which keeps the deep≈shallow refinement tractable.
+and every Joern-supported front end is covered. Compared with the alternative (compile
+everything to Wasm and write one Wasm semantics), source-level structure survives, which
+keeps the deep≈shallow refinement tractable.
 
-The bill for this comes due in one specific place, and it is the most important structural
-lesson in the project: **constructs that look alike across languages are the dangerous
-ones.** Integer division rounds toward negative infinity in Python and toward zero in C.
-`char*` arithmetic is not string concatenation. `<operator>.and` is bitwise, not logical.
-Every such construct is a latent *dialect parameter*, and the semantics carries
-`Core.Dialect` explicitly rather than picking a winner. See `docs/core-language.md`.
+The cost falls in one place: **constructs that look alike across languages are the
+dangerous ones.** Integer division rounds toward negative infinity in Python and toward
+zero in C. `char*` arithmetic is not string concatenation. `<operator>.and` is bitwise,
+not logical. Each such construct is a latent *dialect parameter*, and the semantics
+carries `Core.Dialect` explicitly rather than picking a winner. See
+`docs/core-language.md`.
 
 ## The pipeline
 
@@ -86,12 +84,12 @@ Two properties of this arrangement are load-bearing:
 * **Nothing is silently dropped.** A construct the exporter cannot translate faithfully
   becomes an `Expr.hole` / `Stmt.hole` tagged with the CPG node label that produced it.
   The ledger counts holes by cause; `scripts/sacm.py` turns each hole label into a named
-  SACM `Assumption` node, so an untranslated construct appears *in the argument* rather
+  SACM `Assumption` node, so an untranslated construct appears in the argument rather
   than vanishing from it.
 * **Every number has an oracle that does not share the artefact's assumptions.** Static
-  hole counting is computed from the same AST it describes, so it flatters itself; the
-  execution oracle (`core_oracle.py`) and the differential oracle (`differential.py`)
-  exist to disagree with it. See `docs/trust-model.md`.
+  hole counting is computed from the same AST it describes. The execution oracle
+  (`core_oracle.py`) and the differential oracle (`differential.py`) exist to disagree
+  with it. See `docs/trust-model.md`.
 
 ## Module layout
 
@@ -108,10 +106,10 @@ Two properties of this arrangement are load-bearing:
 ### `Autoform/Lang/Imp/` — the worked example
 
 `Syntax.lean` and `Semantics.lean` define a minimal imperative language with two
-presentations kept deliberately apart: `BigStep`, an inductive relation that *is* the
-specification, and `eval`, a computable fuel-indexed interpreter. `evalStmt_sound` bridges
-them. Imp exists to prove the harness works end to end (including the mutation gate) on
-something small enough to read.
+presentations kept apart: `BigStep`, an inductive relation that *is* the specification,
+and `eval`, a computable fuel-indexed interpreter. `evalStmt_sound` bridges them. Imp
+exists to exercise the harness end to end, including the mutation gate, on a small
+subject.
 
 ### `Autoform/` — the verification and accounting layer
 
@@ -123,7 +121,7 @@ something small enough to read.
 | `Contracts.lean` | Boundary contracts for code outside the verified core. Being written concurrently — see `docs/contracts.md`. |
 | `Harness/Audit.lean` | `#audit_axioms`, `#audit_depends`, `#audit_ledger`, implemented as Lean metaprogramming over `Lean.Environment`. |
 | `Harness/Conformance.lean` | Specimen-derived generators and checkers over the `BigStep` relation; `plausible` used as a **refutation** gate before a prover is allowed to spend time. |
-| `Tactics/Portfolio.lean` | The tiered proof portfolio, with the honesty guard that a rung counts as success only if the resulting term passes `hasSorry`/`hasExprMVar` screening. Exhaustion records an `Obligation` as data; it never admits a theorem. |
+| `Tactics/Portfolio.lean` | The tiered proof portfolio, with the guard that a rung counts as success only if the resulting term passes `hasSorry`/`hasExprMVar` screening. Exhaustion records an `Obligation` as data; it never admits a theorem. |
 | `Specs/*.lean` | Hand-written specifications *about generated modules*, stated by import so that mutating the generated file mutates the subject of the theorems. |
 | `SpecsGen/*.lean` | The hand-written vocabulary (`Case`, `Obs`, the `law*` predicates, `MRefines`) that machine-synthesized specifications are generated in, plus the generated specs themselves. |
 | `Generated/*.lean` | Transpiler output. Data literals; never hand-edited. |
@@ -132,7 +130,7 @@ something small enough to read.
 
 | File | Role |
 |---|---|
-| `formalization_graph.sc` | Joern query producing the formalization graph: call graph, effect classification (io / ffi / reflection / concurrency / nondeterminism), and a formalizability score. The scoring weights *are* the policy, and the policy is the part that is ours. |
+| `formalization_graph.sc` | Joern query producing the formalization graph: call graph, effect classification (io / ffi / reflection / concurrency / nondeterminism), and a formalizability score. The scoring weights are the policy. |
 | `export_ast.sc` | CPG → language-neutral JSON AST. Deterministic, no model on this path. Also answers the whole-program questions the node vocabulary cannot: module-level bindings, which function values capture an enclosing scope, and which operators change meaning under the dialect. |
 | `render_lean.py` | JSON AST → Lean `Program`. A pure function of the JSON: no timestamps, no dict-order dependence, byte-identical output for identical input. Infers the dialect from the file extension. |
 | `run.sh` | Cartographer-only driver (source tree → formalization graph). |
@@ -153,12 +151,12 @@ something small enough to read.
 | `prover/propose.py` | Local (ollama) neural whole-proof proposer, off unless `AUTOFORM_NEURAL=1`. Output is untrusted text; every candidate is re-elaborated and screened. |
 | `ledger.lean.tmpl` | The `#eval` script `autoform.sh` instantiates per module to print the ledger and write `ledger-<Module>.json`. |
 
-## What this architecture deliberately does not do
+## Out of scope by design
 
-* It does not attempt whole-repo formalization. You get a verified core plus declared
-  assumptions for everything else; that is a product decision, not a limitation to be
+* Whole-repo formalization is not attempted. The output is a verified core plus declared
+  assumptions for everything else. This is a product decision, not a limitation to be
   fixed later.
-* It does not let an agent close a goal. The Lean kernel is the only thing that decides
-  whether something is proved, which is what makes unattended operation safe.
-* It does not prove the transpiler correct. Transpiler faithfulness is *tested* — see
-  `docs/trust-model.md`, which is explicit about where that boundary sits.
+* An agent cannot close a goal. The Lean kernel is the only thing that decides whether
+  something is proved, which is what makes unattended operation safe.
+* The transpiler is not proved correct. Transpiler faithfulness is *tested* — see
+  `docs/trust-model.md`, which states where that boundary sits.

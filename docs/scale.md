@@ -1,7 +1,7 @@
 # Does this survive a large codebase?
 
 Every number in `README.md` and `STRATEGY.md` comes from one corpus: `cachetools`, 1,637
-lines, 238 functions. "Point it at an arbitrary codebase" was never tested. This is that
+lines, 238 functions at the time of writing (now 209). "Point it at an arbitrary codebase" was never tested. This is that
 test, on seven open-source Python repositories from 8.8k to 165k lines.
 
 Reproduce with `scripts/scale_test.py`, which runs the same stages as `autoform.sh` but

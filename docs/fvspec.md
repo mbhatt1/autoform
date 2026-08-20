@@ -1,13 +1,13 @@
 # FVSpec evaluation harness (`scripts/fvspec.py`)
 
-STRATEGY.md §11 adopts [FVSpec](https://github.com/GaloisInc/fvspec) for two purposes:
-it is the evaluation set for our Specifier, and its 9,415 LLM-transpiled Lean specs were
-**never mutation-validated**, so running our anti-vacuity gate across them is a genuine
-contribution back. This script is the second half.
+STRATEGY.md §11 adopts [FVSpec](https://github.com/GaloisInc/fvspec) for two purposes: it
+is the evaluation set for our Specifier, and its 9,415 LLM-transpiled Lean specs were never
+mutation-validated, so running our anti-vacuity gate across them is a contribution back.
+This script is the second half.
 
-## Where the data actually lives
+## Where the data lives
 
-Non-obvious and worth recording, because the plan's pointer is incomplete:
+The plan's pointer is incomplete:
 
 | Artifact | Location | Contents |
 |---|---|---|
@@ -79,7 +79,7 @@ theorem test_dawg_deterministic (data : Array (String × Char)) :
 ```
 
 The second is the dominant failure mode: a Python determinism PBT (`f(x) == f(x)`)
-transliterated into Lean, where purity makes it `rfl` and therefore contentless.
+transliterated into Lean, where purity makes it `rfl` and so contentless.
 
 The dataset ships its own `actually_invokes_given` flag; our dependency check disagrees
 with it on 3,321 of 9,352 problems (2,112 where the dataset claims the impl is invoked

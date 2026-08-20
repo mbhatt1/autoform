@@ -36,6 +36,15 @@ CHECKS = [
     ("docs/languages.md",
      r"\|\s*Python\s*\|.*?\|\s*(\d+)\s*\|\s*\d+%",
      "ledger-Cachetools.json", "functions", int),
+    # Added after a tone pass found three documents quoting three different populations
+    # for the same corpus (208, 238, 209) with only the third correct. Five checked
+    # figures was too few: the ones that drifted were the ones nobody checked.
+    ("docs/contracts.md", r"On `cachetools`, (\d+) of \d+ functions are",
+     "ledger-Cachetools.json", "holeFree", int),
+    ("docs/contracts.md", r"On `cachetools`, \d+ of (\d+) functions are",
+     "ledger-Cachetools.json", "functions", int),
+    ("docs/languages.md", r"the ledger's population \((\d+) for", 
+     "ledger-Cachetools.json", "functions", int),
 ]
 
 

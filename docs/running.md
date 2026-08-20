@@ -1,7 +1,8 @@
 # Installing and running autoform
 
 Written for someone who has never run this repository. Nothing below embeds a result;
-where a number would be useful, the command that produces it is given instead.
+where a number would be useful, the command that produces it is given instead. Figures
+move with every change; where a document and an artifact disagree, the artifact wins.
 
 ---
 
@@ -41,8 +42,8 @@ Joern supplies the code property graph that is this project's universal front en
 end-to-end job is opt-in.
 
 **On macOS arm64, do not trust the official installer.** `joern-install.sh` can **exit 0
-while having failed**, leaving you with no `joern-cli` directory and a shell that thinks
-the install succeeded. Fetch the release asset directly instead:
+while having failed**, leaving no `joern-cli` directory and a shell that reports success.
+Fetch the release asset directly instead:
 
 ```sh
 # pick a release from https://github.com/joernio/joern/releases (4.0.606 is known-good)
@@ -62,9 +63,17 @@ curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.
 chmod +x joern-install.sh && sudo ./joern-install.sh --without-plugins
 ```
 
-Whatever route you take, confirm the binary actually runs before believing the install —
-"exit 0" is precisely the shape a silent failure takes, which is a recurring theme in this
-project.
+Confirm the binary runs before believing the install — "exit 0" is the shape a silent
+failure takes.
+
+### The source tree the CPG was built from
+
+`cartographer/export_ast.sc` reads the original source text (for example to count the `*`s
+before a C parameter name), so the source tree the CPG was built from must still be present
+at the path recorded in `cpg.metaData.root` when the exporter runs. If it cannot read a
+file it needs, it aborts with `export_ast: cannot read source for <file> (root='…')`
+rather than guessing — a missing source tree fails the run loudly instead of producing a
+mistranslation.
 
 ### Python
 
@@ -148,8 +157,8 @@ How to read it:
 * **dynamic-hole risk** counts constructs that *can* hole on some input. It is the static
   analysis admitting what it cannot adjudicate; only `scripts/core_oracle.py` settles it.
 * **holes by cause** is the taxonomy from `docs/core-language.md`. Nothing is dropped
-  silently, so this table is the list of everything the translation refused to guess at.
-* **NOT PROVED : transpiler faithfulness** is not boilerplate. It is the trust boundary.
+  silently, so this table lists everything the translation refused to guess at.
+* **NOT PROVED : transpiler faithfulness** is the trust boundary, not boilerplate.
 
 `ledger-<Module>.json` is the same data, tagged with `module` and `dialect` so that
 `scripts/sacm.py` can attribute it. Untagged evidence cannot support a claim about a
@@ -196,8 +205,13 @@ records which mode ran in `audit.json`; `--no-fresh` exists but is strictly weak
 invoke the checker by hand, use `lake env leanchecker --fresh Autoform` (~1.5 min).
 
 **`leanchecker` is missing.** The audit reports UNVERIFIED — never a pass — and `--strict`
-turns that into a non-zero exit. That is intentional: a gap that is reported is a gap; a
-gap that is skipped silently is a lie.
+turns that into a non-zero exit. A gap that is reported is a gap; a gap that is skipped
+silently is a lie.
+
+**`export_ast: cannot read source for …`.** The exporter needs the source tree the CPG was
+built from, at the path recorded in the CPG metadata. Re-parse from the tree, or run the
+exporter where that path resolves. The failure is deliberate: without the source text the
+exporter would have to guess, and a guess here is a mistranslation rather than a hole.
 
 **The oracle reports divergences that make no sense.** Suspect a stale `.olean` first. An
 oracle reading a stale cache answers with the *previous* semantics and produces confident,

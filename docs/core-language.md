@@ -1,18 +1,17 @@
 # The Core language
 
 `Autoform.Core` is the deep-embedded universal imperative language that every translated
-codebase is mapped onto. It is the heart of the system: coverage, conformance, refinement
-and the whole trust ledger are statements about terms of these types and about the
-interpreter that runs them.
+codebase is mapped onto. Coverage, conformance, refinement and the trust ledger are all
+statements about terms of these types and about the interpreter that runs them.
 
 Source of truth: `Autoform/Lang/Core/Syntax.lean` and `Autoform/Lang/Core/Semantics.lean`.
 Where this document and the source disagree, the source is right and this document is a
 bug. Nothing here restates a number; the shapes are stable, the counts are not.
 
 Core is shaped to match **Joern's CPG node vocabulary**, not any one language's grammar.
-That is the whole reason one semantics can cover C, C++, Java, JavaScript, Python and
-Kotlin: the front ends have already normalized to a common vocabulary, so Core only has to
-be faithful to *that*.
+That is why one semantics can cover C, C++, Java, JavaScript, Python and Kotlin: the front
+ends have already normalized to a common vocabulary, so Core only has to be faithful to
+*that*.
 
 ---
 
@@ -21,7 +20,7 @@ be faithful to *that*.
 | Constructor | Meaning |
 |---|---|
 | `int : Int → Val` | An integer. Width and overflow are **not** properties of the value — they belong to `NumConfig`, selected by the dialect. A `Val.int` is always the mathematical integer that the configured arithmetic produced. |
-| `str : String → Val` | A string *or* a C `char*`. Deliberately one constructor: see §7, where the operators are dialect-split instead. |
+| `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
 | `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
@@ -31,16 +30,16 @@ be faithful to *that*.
 | `fn : String → Val` | A function, method or class used as a value (CPG `METHOD_REF` / `TYPE_REF`). |
 | `clos : String → List (String × Val) → Val` | A closure: a function name plus the bindings it captured. Capture is **by value**. |
 | `clsClos : String → List (String × Val) → Val` | A *class* value that captured an enclosing scope. Distinct from `clos` because a class is not a function: its methods, not it, read the captured bindings. |
-| `bobj : String → Val → Val` | An instance of a class whose **base is a builtin type** (`class X(tuple)`, `(list)`, `(dict)`, `(str)`): the class name plus the underlying builtin value. It compares, iterates, indexes and tests membership as the builtin does, which is what makes `hashkey(0) == (0,)` true as it is in CPython. It has **no mutable attributes** — a `bobj` is a value, not a heap object — so `e.f` on one is a hole. Which classes get one is recorded per program in `Program.builtinBases`; a class the exporter did not record stays an opaque `ref`. See `Autoform/BuiltinBase.lean`. |
+| `bobj : String → Val → Val` | An instance of a class whose **base is a builtin type** (`class X(tuple)`, `(list)`, `(dict)`, `(str)`): the class name plus the underlying builtin value. It compares, iterates, indexes and tests membership as the builtin does, which makes `hashkey(0) == (0,)` true as it is in CPython. It has **no mutable attributes** — a `bobj` is a value, not a heap object — so `e.f` on one is a hole. Which classes get one is recorded per program in `Program.builtinBases`; a class the exporter did not record stays an opaque `ref`. See `Autoform/BuiltinBase.lean`. |
 
-Two derived functions matter:
+Three derived functions:
 
 * `Val.truthy` — the permissive truthiness shared by most dynamic languages (empty
   containers, `0`, `""` and `unit` are false; references and callables are true).
 * `Val.iterable` — what a value iterates over, if anything. `none` for everything that is
   not a list, tuple or dict (or a `bobj` over one); `forIn` over anything else is a hole.
-* `Val.unbuiltin` — strips one layer of builtin-base wrapping. Deliberately
-  non-recursive, so the functions that use it stay plain matchers that reduce by `rfl`.
+* `Val.unbuiltin` — strips one layer of builtin-base wrapping. Non-recursive, so the
+  functions that use it stay plain matchers that reduce by `rfl`.
 
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring
@@ -48,14 +47,14 @@ captured environments.
 
 A `bobj` compares by its **contents, ignoring the class**, and compares equal to the plain
 builtin: CPython's `tuple.__eq__` does the same, and `A((0,)) == B((0,))` is `True` there
-for two distinct subclasses of `tuple`. That is only sound because `Expr.alloc` *refuses*
+for two distinct subclasses of `tuple`. That is sound only because `Expr.alloc` *refuses*
 to build a `bobj` for a class that defines its own `__eq__` (or its own `__init__`),
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
-There is deliberately **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a
-full IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired
-into `Val`; floats therefore still surface as holes and as skipped differential cases.
+There is **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a full
+IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired into
+`Val`; floats therefore still surface as holes and as skipped differential cases.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`
 
@@ -71,8 +70,8 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
   through `Heap.setField`, which conses a new binding onto the object's field list.
 * **Reads of absent things are `unit`**, not an error: `Env.get` on an unbound name,
   `Heap.getField` on an absent field, `Heap.get` on a dangling ref. This is Python-shaped
-  and is one of the places where a wrong answer is possible; the differential oracle is
-  what catches it (private name mangling was exactly this bug).
+  and is one of the places where a wrong answer is possible; the differential oracle
+  catches it (private name mangling was this bug).
 * **Field lookup order** is the object's own fields, then the bindings its class captured,
   then `unit`.
 * **Globals live on the heap, not in `Env`.** Module-level bindings must be mutable and
@@ -80,13 +79,12 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
   at `Ctx.globals`. `runMain` allocates it first, so it is ref 0, and any harness building
   its own heap must allocate fresh objects from `heap.length` onward.
 * **The heap is threaded explicitly** through `evalExpr`/`execStmt` rather than hidden in a
-  monad. That is a deliberate cost: it keeps the fuel recursion visibly structural, so Lean
-  accepts the interpreter as total without `partial`.
+  monad. That cost keeps the fuel recursion visibly structural, so Lean accepts the
+  interpreter as total without `partial`.
 * **`Ctx.resolve` falls back from exact name to *unique* suffix match**, because Joern emits
   fully-qualified names (`pkg/mod.py:<module>.Cls.meth`) while call sites carry short ones.
-  This is a heuristic, and it is written so that an *ambiguous* match resolves to a hole
-  rather than to a guess. `Ctx.resolveMethod` prefers `Cls.meth` and falls back to any
-  `.meth`.
+  This is a heuristic, written so that an *ambiguous* match resolves to a hole rather than
+  to a guess. `Ctx.resolveMethod` prefers `Cls.meth` and falls back to any `.meth`.
 
 ## 3. Expressions (`Expr`)
 
@@ -121,7 +119,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. **Always** the hole `setIndex:immutable-containers` — see §8. |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
-| `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. Note the CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
+| `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
 | `tryFinally : Stmt → Stmt → Stmt` | The finalizer runs on *every* exit path, and an abnormal exit from the finalizer discards the body's pending outcome — Python's rule, so `try: return 1 finally: return 2` returns 2. |
@@ -133,9 +131,9 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 
 `Func` is a name, parameter list and body; `Program` is a list of `Func` plus the
 `Dialect` the transpiler recorded. `Func.holes`, `Func.size`, `Func.total`,
-`Program.verifiableCore` are the folds the ledger is computed from — and note that
-`Func.total` inspects only the AST, which is why static hole-freedom is an upper bound
-rather than a guarantee (`docs/trust-model.md`).
+`Program.verifiableCore` are the folds the ledger is computed from. `Func.total` inspects
+only the AST, which is why static hole-freedom is an upper bound rather than a guarantee
+(`docs/trust-model.md`).
 
 ## 5. Evaluation: four outcomes, not two
 
@@ -147,29 +145,28 @@ inductive EResult | val : Val → EResult | exn : Val → EResult
 `Ctl`, the statement-level outcome, adds `normal`, `ret`, `brk`, `cont` for control flow
 and carries the same `exn` / `hole` / `outOfFuel`.
 
-The four-way split is the single most important design decision in the interpreter,
-because the two extra outcomes are both statements about **our ignorance**, and they mean
-different things:
+The two extra outcomes are both statements about ignorance, and they mean different
+things:
 
 * `val v` — the program has this behaviour.
 * `exn v` — the program has this behaviour, and the behaviour is an exception. Raising is
-  a real, specifiable outcome: "divides by zero raises `ZeroDivisionError`" is a
-  specification, not a gap.
-* `hole l` — *we did not translate this*, or the interpreter reached a construct it cannot
+  a specifiable outcome: "divides by zero raises `ZeroDivisionError`" is a specification,
+  not a gap.
+* `hole l` — *this was not translated*, or the interpreter reached a construct it cannot
   model. The program may have any behaviour here. No theorem may quantify over it.
-* `outOfFuel` — *we did not run long enough*. Says nothing about whether the program
-  terminates.
+* `outOfFuel` — *evaluation did not run long enough*. Says nothing about whether the
+  program terminates.
 
 Collapsing `hole` into an exception would make untranslated code look like specified
 behaviour. Collapsing `outOfFuel` into a value would let a specification be satisfied by a
-computation that never finished. Both are the failure this project exists to prevent, so
-they are constructors rather than error strings, and `Autoform/Refine.lean`'s `Outcome`
-type deliberately has **neither** — a refinement statement is therefore unsatisfiable by a
-function that holes or diverges (`refines_not_hole`, `refines_terminates`).
+computation that never finished. They are therefore constructors rather than error
+strings, and `Autoform/Refine.lean`'s `Outcome` type has **neither** — a refinement
+statement is unsatisfiable by a function that holes or diverges (`refines_not_hole`,
+`refines_terminates`).
 
 The interpreter is **fuel-indexed and structurally recursive on the fuel**, so Lean accepts
 it as total: no `partial`, no `unsafe`, no `sorry`. Fuel decrements at every recursive
-step, which means fuel is a bound on *evaluation depth*, not on execution steps; refinement
+step, so fuel is a bound on *evaluation depth*, not on execution steps; refinement
 theorems therefore quantify `∀ fuel ≥ N` rather than picking one.
 
 ## 6. Dialects
@@ -181,25 +178,25 @@ inductive Dialect | python | cLike
 Every program carries the dialect the transpiler inferred (`render_lean.py` infers it from
 the file extension). Arithmetic and string semantics are parameterized by it.
 
-This was **not** designed in. The differential harness's first run reported:
+This was not designed in. The differential harness's first run reported:
 
 ```
 DIVERGENCE fmod(6, -9): cpython=-3 lean=6
 ```
 
 Python floors integer division and modulo; C and Java truncate toward zero. The semantics
-had silently picked one, which meant it was right for one language and quietly wrong for
-every other. The tempting fix is to patch the operator. The correct fix is structural: a
-universal core language **must** be parameterized by the dialects it unifies, and the
-transpiler **must** record which one produced each program — otherwise the proofs are all
-about the wrong `eval`, and no amount of proving would ever surface it.
+had picked one, which made it right for one language and wrong for every other. Patching
+the operator is not sufficient: a universal core language must be parameterized by the
+dialects it unifies, and the transpiler must record which one produced each program —
+otherwise the proofs are about the wrong `eval`, and no amount of proving would surface
+it.
 
-The general rule, worth applying to anything added later: every place Core merges
-constructs that *look* alike across languages — string mutability, integer width and
-overflow, evaluation order, name resolution, equality — is a latent dialect parameter.
-Assume there are more, and let the oracles find them.
+The general rule: every place Core merges constructs that *look* alike across languages —
+string mutability, integer width and overflow, evaluation order, name resolution,
+equality — is a latent dialect parameter. Assume there are more, and let the oracles find
+them.
 
-Concretely, the dialect currently controls:
+The dialect currently controls:
 
 * `Dialect.idiv`/`imod` — floored vs truncated division and remainder.
 * `Dialect.toNumConfig` — the `NumConfig` from `Numeric.lean`: Python gets unbounded
@@ -210,11 +207,11 @@ Concretely, the dialect currently controls:
   under `.cLike`, a `char*` is an address, so all three are holes rather than the Python
   answer applied to a C program.
 * `Stdlib` — Python only. Under `.cLike` every builtin and method returns `none`, because
-  answering a C program with Python's builtins is exactly the original modulo bug again.
+  answering a C program with Python's builtins is the original modulo bug again.
 
 ## 7. Numeric outcomes
 
-`Numeric.lean`'s `NumResult` mirrors the same discipline one level down:
+`Numeric.lean`'s `NumResult` applies the same discipline one level down:
 
 | Outcome | Meaning |
 |---|---|
@@ -223,16 +220,16 @@ Concretely, the dialect currently controls:
 | `trap r` | The language *defines* this as a runtime fault (Go's `INT_MIN / -1`) → an exception. |
 | `ub r` | The language does not define this at all → **`Expr.hole "ub:<reason>"`**. |
 
-`ub` is the one that matters. C's signed overflow, `INT_MIN / -1` and shifts past the width
-have no correct answer; the program's meaning depends on the compiler. Returning a number
-there would be the same class of error as the original modulo bug, only harder to detect.
-Mapping `ub` to a hole keeps undefined behaviour out of proofs entirely: a program that
-relies on UB provably cannot be shown to do anything at that point.
+C's signed overflow, `INT_MIN / -1` and shifts past the width have no correct answer; the
+program's meaning depends on the compiler. Returning a number there would be the same
+class of error as the original modulo bug, and harder to detect. Mapping `ub` to a hole
+keeps undefined behaviour out of proofs entirely: a program that relies on UB cannot be
+shown to do anything at that point.
 
 ## 8. The hole taxonomy
 
 A hole is an untranslatable or unmodellable construct, labelled with what defeated the
-translation. Labels come from two places, and the distinction is worth keeping straight:
+translation. Labels come from two places:
 
 * **Static holes** are emitted by `cartographer/export_ast.sc`. They are visible in
   `ast-<Module>.json` and are what the ledger's holes-by-cause table counts.
@@ -240,7 +237,7 @@ translation. Labels come from two places, and the distinction is worth keeping s
   A statically hole-free function can still hole on some input; that is the "dynamic-hole
   risk" figure, and it is the execution oracle's business, not the type system's.
 
-To see the current static distribution, do not read a number out of a document — run:
+The current static distribution is not a number in this document. Run:
 
 ```sh
 python3 - <<'EOF'
@@ -285,7 +282,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 
 | Label | Raised when |
 |---|---|
-| `call:<name>` | The callee resolves neither in the program, nor as a value in scope, nor in the modelled stdlib. **This is the dangerous one**: in the AST a call to an untranslated function is indistinguishable from a call to a translated one, which is exactly why the ledger reports call-closure separately from hole-freedom. |
+| `call:<name>` | The callee resolves neither in the program, nor as a value in scope, nor in the modelled stdlib. In the AST a call to an untranslated function is indistinguishable from a call to a translated one, which is why the ledger reports call-closure separately from hole-freedom. |
 | `entry:<name>` | `runFunc`/`runMain` could not resolve the requested entry point. |
 | `field:<f>:non-object`, `setField:<f>:non-object` | Attribute read/write on a non-reference. |
 | `mcall:<Cls>.<m>` | No such method on the receiver's class. |
@@ -299,31 +296,29 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
 | `ub:<reason>` | The configured integer arithmetic says the source language does not define this operation. |
 | `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`. |
-| `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it ever appears. |
+| `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it appears. |
 | `initializers:outOfFuel` | Module initializers did not finish within the fuel budget. |
 
 ### Permanent by design vs not yet implemented
 
-The distinction is not cosmetic — it is what tells you whether a hole is work or a
-boundary.
+The distinction tells you whether a hole is work or a boundary.
 
-**Boundaries** (closing them means changing the design, and the design is deliberate):
+**Boundaries** (closing them means changing the design):
 
 * `scope:nonlocal-write` and global *rebinding*. Making these work requires every scope to
-  be a heap frame and `Env` to be references — a correct design, a large refactor of the
-  interpreter, and a re-repair of the entire refinement layer. Implementing writes by
-  copying values back would appear to work on simple cases and be silently wrong on
-  aliased ones. Reads across scopes work and are correct; writes are a hole. That is the
-  honest boundary.
+  be a heap frame and `Env` to be references — a large refactor of the interpreter and a
+  re-repair of the entire refinement layer. Implementing writes by copying values back
+  would appear to work on simple cases and be silently wrong on aliased ones. Reads across
+  scopes work and are correct; writes are a hole.
 * `cstr:*` and `str:pointer-*`. Core has one `Val.str` for Python strings and C `char*`.
   Rather than model addresses, the operations that differ are refused.
 * `op:starred-outside-call`. A starred form outside an argument list (`a, *b = xs`) is
   a *destructuring* pattern, not a call, and Core has no pattern binding. The calling
   convention (§35) covers the call side only.
-* `import:*` for genuinely external modules — this is the effect boundary itself, and the
-  SACM case declares it as an assumption rather than pretending it away.
-* `ub:*`. Not a gap at all: it is the semantics correctly refusing to commit where the
-  source language does not define an answer.
+* `import:*` for genuinely external modules — the effect boundary itself, which the SACM
+  case declares as an assumption.
+* `ub:*`. The semantics refusing to commit where the source language does not define an
+  answer.
 
 **Work** (a known design would close them):
 
@@ -336,6 +331,6 @@ boundary.
   lever on the verifiable core, because a function is only as analysable as its callees.
 * The `expr:`, `stmt:`, `op:` generic buckets — ordinary exporter work.
 
-The rule that governs every one of these: **an honest hole with a precise label always
-beats a wrong translation.** A hole is counted, declared, and blocks proof at exactly the
-right point. A wrong translation is invisible until an oracle happens to look.
+The governing rule: **an honest hole with a precise label beats a wrong translation.** A
+hole is counted, declared, and blocks proof at exactly the right point. A wrong
+translation is invisible until an oracle happens to look.

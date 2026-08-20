@@ -1,7 +1,7 @@
 # Boxed containers for Core
 
-**Status:** design, not implementation. Written to be read before `Syntax.lean` and
-`Semantics.lean` are changed.
+**Status: unimplemented design.** Nothing in this document is built. It is written to be
+read before `Syntax.lean` and `Semantics.lean` are changed.
 
 **Problem.** `Val.list`, `Val.tuple` and `Val.dict` are *values*. Python's are *objects*.
 The consequences are all currently visible in the ledger and the oracle:
@@ -14,8 +14,8 @@ The consequences are all currently visible in the ledger and the oracle:
 | `dict`/`tuple`-subclass receivers refused by the oracle | `differential.py` | `skip_self_not_object` 1,361 |
 | `==` cannot distinguish "equal" from "the same object" | `Val.beq` | see §5 |
 
-All five are one defect. This document specifies the fix, what it costs, and what it does
-*not* fix.
+All five are one defect. This document specifies the proposed fix, what it would cost, and
+what it would not fix.
 
 ---
 
@@ -52,13 +52,13 @@ structure Obj where
 
 ### Why a payload on `Obj`, and not a new `Val.box` constructor
 
-Because **it closes `skip_self_not_object` for free**, which a separate box does not.
+A payload on `Obj` closes `skip_self_not_object`; a separate box does not.
 `cachetools.Cache` is a `dict` subclass; `_HashedTuple` is a `tuple` subclass. Under a
 separate `Val.box`, such an instance is *both* an object (it has `__dict__` fields and a
-class) and a container, so it has to be encoded as one or the other — which is exactly
-why the oracle refuses 1,361 cases today. With the payload on `Obj`, it is **one heap
-cell**: `cls := "Cache"`, its own `fields`, and `payload := .dict [...]`. Method dispatch
-resolves in Python's own order:
+class) and a container, so it has to be encoded as one or the other — which is why the
+oracle refuses 1,361 cases today. With the payload on `Obj`, it is one heap cell:
+`cls := "Cache"`, its own `fields`, and `payload := .dict [...]`. Method dispatch resolves
+in Python's order:
 
 1. `Ctx.resolveMethod obj.cls name` — the user class wins (`Cache.__getitem__`);
 2. otherwise `Stdlib.method` on the payload — the builtin behaviour;
@@ -98,14 +98,13 @@ payload would make the object's size grow without bound under `xs.append` in a l
 
 ## 2. What the operations then mean
 
-### The rule that makes all of this correct
+### The rule the design depends on
 
 > **After the receiver expression has been evaluated to a `Val.ref`, the expression is
 > never looked at again.** Mutation is `Heap.setPayload r …`. No mutation path may
 > mention `Expr`.
 
-This is the whole design in one sentence, and it is what avoids the trap the stdlib work
-measured. The CPG desugars
+This is what avoids the trap the stdlib work measured. The CPG desugars
 
 ```python
 self.__data.pop(k)
@@ -226,15 +225,14 @@ a = []; b = []; b.append(1)     # a stays [], because `[]` allocates twice
 def f(xs): xs.append(1)         # f(a) mutates the caller's list, since args pass refs
 ```
 
-Both fall out of the design without a special case, which is the test of whether the
-design is right.
+Both fall out of the design without a special case.
 
 ---
 
 ## 4. Iteration
 
 `for x in xs` currently reads `Val.iterable : Val → Option (List Val)` and iterates a
-*snapshot*. After boxing there is a choice, and the faithful one is not the cheap one:
+*snapshot*. After boxing there is a choice:
 
 * **CPython's `list_iterator` holds the list object and an index.** Appending during
   iteration extends the loop; deleting shortens it. Modelling this means `execFor` carries
@@ -244,10 +242,10 @@ design is right.
   creation and the loop head compares. Cheap, and it turns a currently-invisible wrong
   answer into a modelled exception.
 
-Snapshot iteration should **not** be kept "for now": it is currently harmless because
-nothing can mutate a container mid-loop, and boxing is precisely what makes it reachable.
-Landing boxing and snapshot iteration together would introduce a silent wrong answer in
-the same commit that removes one.
+Snapshot iteration must not be retained past this change. It is currently harmless because
+nothing can mutate a container mid-loop; boxing is what makes the case reachable. Landing
+boxing and snapshot iteration together would introduce a silent wrong answer in the same
+commit that removes one.
 
 For an unboxed `Val.tuple` or `Val.str`, snapshot iteration remains exactly right.
 
@@ -255,8 +253,7 @@ For an unboxed `Val.tuple` or `Val.str`, snapshot iteration remains exactly righ
 
 ## 5. `==` versus `is`
 
-This is the subtlest part of the change and the one most likely to produce false
-divergences if done casually.
+This part of the change is the most likely to produce false divergences.
 
 Today `Val.beq` is structural and total: `Val → Val → Bool`. It serves `==`, `!=`, `in`,
 dict lookup, `list.index`, `list.count`, `list.remove`. `Expr.isOp` compares `.ref`s.
@@ -287,9 +284,9 @@ def Val.eqPy (h : Heap) : Nat → Val → Val → Option Bool
 
 Three properties it must have:
 
-1. **Reference identity short-circuits to `true` first.** This is not an optimisation, it
-   is CPython's own behaviour (`PyObject_RichCompare`'s identity fast path for
-   containers) and it is what makes `a == a` terminate for the cyclic list above.
+1. **Reference identity short-circuits to `true` first.** This is CPython's behaviour
+   (`PyObject_RichCompare`'s identity fast path for containers), and it is what makes
+   `a == a` terminate for the cyclic list above.
 2. **Out of fuel is `none`, not `false`.** `none` becomes `EResult.outOfFuel`, keeping the
    project's "ignorance ≠ behaviour" rule. A `false` here would be a manufactured
    divergence on deeply nested structures.
@@ -328,8 +325,7 @@ collected. Two consequences:
 
 * **Performance.** `Heap.setField`/`setPayload` are `mapIdx` — O(n) per write, so a loop
   doing `xs.append` n times is O(n²). Acceptable: the oracle runs small cases and the
-  interpreter is a specification, not a runtime. Worth stating in the ledger rather than
-  discovering.
+  interpreter is a specification, not a runtime. To be stated in the ledger.
 * **Proofs.** Refinement theorems currently pin the exact final heap. Once a loop
   allocates, that is fragile. The right shape is a monotonicity lemma:
 
@@ -356,8 +352,8 @@ Counts taken from this repository, not estimated:
 | theorems in the `PureE` fragment (fuel independence, heap inertness) | 3 | **unaffected** |
 | `evalSimp` mechanical lemmas (`evalExpr_*`, `execStmt_*`, `evalList_*`, `applyFunc_*`) | ~40 | **unaffected** |
 
-The headline "~74 theorems" overstates it, and the reason is a design decision already
-taken: `PureE` (`Refine.lean:487`) is `lit | name | fnref | unop | binop | cond` — it
+The "~74 theorems" figure overstates the cost, because of a design decision already taken:
+`PureE` (`Refine.lean:487`) is `lit | name | fnref | unop | binop | cond` — it
 never admitted `listE`, `dictE` or `index`. So `evalExpr_pure_fuel_indep`,
 `evalExpr_pure_fuel_mono` and `evalExpr_pure_heap_inert` — the three load-bearing
 structural theorems, and the expensive ones — are about a fragment that does not allocate,
@@ -383,8 +379,8 @@ because `Env` is untouched. Every scope stays a value; only the heap grows.
 ### `Autoform/Generated/*.lean`
 
 35 sites mention `setIndex`/`listE`/`dictE`. **None need regeneration.** The AST is
-unchanged; only its meaning changes. This is the deep-embedding payoff and worth stating
-in the ledger: a semantics change that re-verifies six corpora without re-running Joern.
+unchanged; only its meaning changes. This is the deep-embedding payoff: a semantics change
+that re-verifies six corpora without re-running Joern.
 
 ### `Autoform/Ledger.lean`, `Demo.lean`
 
@@ -444,10 +440,10 @@ Stated explicitly so they are not rediscovered as divergences.
 1. **`==` on objects with a user-defined `__eq__`/`__hash__`.** §27's boundary, and boxing
    does *not* move it. `Val.eqPy` compares structurally; CPython dispatches to user code.
    The 27 cases `differential.py` refuses under `unencodable_reasons` stay refused.
-   It *becomes possible* to fix — `eqPy` could re-enter `evalExpr` to call `__eq__` — but
+   Boxing makes a fix possible — `eqPy` could re-enter `evalExpr` to call `__eq__` — but
    that makes equality mutually recursive with evaluation (equality can raise, can loop,
-   can mutate the heap), which is a second design of comparable size. Not in scope, and
-   guessing in the meantime is worse than refusing.
+   can mutate the heap), which is a second design of comparable size. Out of scope; until
+   then the cases stay refused.
 2. **`is` / `id` on unboxed values** (`int`, `str`, `bool`, `float`, `tuple`). CPython
    interns small integers and some strings; none of it is specified. Hole
    `is:unboxed-value-identity`.
@@ -463,8 +459,8 @@ Stated explicitly so they are not rediscovered as divergences.
 5. **`sys.getsizeof`, `id()` as a number, memory addresses.** Allocator artefacts.
 6. **Concurrent mutation / thread safety.** Core has one thread; `cachetools`' locks
    already encode as unrepresentable and should stay that way.
-7. **Dict *iteration order* after delete-then-reinsert is faithful, not a hole** — worth
-   recording, because it looks like it should be a problem. CPython 3.7+ guarantees
+7. **Dict *iteration order* after delete-then-reinsert is faithful, not a hole.**
+   CPython 3.7+ guarantees
    insertion order, a deleted key reinserted goes to the end, and `Stdlib.dictSet`'s
    replace-in-place/append-at-end rule plus `dictDel` reproduce exactly that. What is
    *not* faithful is `popitem` on a dict that has had deletions in a specific pattern

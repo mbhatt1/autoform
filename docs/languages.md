@@ -2,11 +2,11 @@
 
 The README claims the CPG is "already a universal AST … *one* semantics and *one*
 exporter cover all of them". Until this run, everything measured was Python (`cachetools`)
-plus a five-function hand-written C file. This document is what happened when the
-unmodified pipeline (`./autoform.sh`) was pointed at real code in the other languages.
+plus a five-function hand-written C file. This document records what the unmodified
+pipeline (`./autoform.sh`) did when pointed at real code in the other languages.
 
-Nothing here was tuned. No pipeline file was modified. Where a number is bad, it is
-printed as measured.
+Nothing was tuned. No pipeline file was modified. Figures move with every change to the
+pipeline; where a document and an artifact disagree, the artifact wins.
 
 ## Corpora
 
@@ -55,15 +55,15 @@ maps to the single `.cLike` constructor, which is 32-bit truncating C. See below
   `autoform.sh` runs under `set -e` with joern's output redirected to `/dev/null`, so the
   run stops after `==> [1/6] parsing` printing **no error at all**. A CPG file is still
   written; running `export_ast.sc` on it crashes with the same exception. A hand-written
-  two-function Kotlin file goes end to end fine, so this is the frontend on real Kotlin,
-  not the corpus being exotic.
+  two-function Kotlin file goes end to end, so this is the frontend on real Kotlin, not
+  the corpus.
 * **JavaScript at scale — does not render.** lodash exports 693 functions (25 MB of AST)
   and then `render_lean.py` dies:
   `RecursionError: maximum recursion depth exceeded while decoding a JSON object`.
   `json.load` in CPython recurses on nesting depth, and jssrc2cpg produces deeply nested
-  expression trees. The exporter is fine; the renderer is the wall.
+  expression trees. The exporter completes; the renderer is the wall.
   `scripts/lang_matrix.py` raises the limit and walks iteratively, which is how the
-  lodash row above was measured at all.
+  lodash row above was measured.
 * **C differential oracle — segfaults.** `python3 scripts/differential.py` on `sds`
   terminated with `Segmentation fault: 11`. The C path `ctypes`-loads the compiled object
   and calls hole-free functions with random *integers*; `sds` functions take `char *`, so
@@ -74,14 +74,14 @@ maps to the single `.cLike` constructor, which is 32-bit truncating C. See below
   `is_c` tests for a `.c`/`.h` suffix. Everything that is not C is handed to CPython,
   which cannot import Java or Go, so the harness reports
   `no comparable cases in this corpus` and the run is scored with **zero** conformance
-  evidence. This is the load-bearing fact of this document: the oracle that found every
-  dialect bug in the project's history is only wired for two of the seven languages.
+  evidence. The oracle that found every dialect bug in the project's history is wired for
+  two of the seven languages.
 
 ## Node kinds the exporter does not map
 
-Holes by cause, per language — these are the CPG vocabulary items that exist but have no
-Core translation. They are *not* the same set across languages, which is the first direct
-evidence against "one node vocabulary".
+Holes by cause, per language — CPG vocabulary items that exist but have no Core
+translation. They are not the same set across languages, which is direct evidence against
+"one node vocabulary".
 
 | Language | Top hole causes |
 |---|---|
@@ -97,17 +97,17 @@ Language-specific constructs that hole *everywhere they appear*: Go's `:=` multi
 casts, TypeScript's `!` non-null assertion and `await`, JS iterators and spread, C's
 `goto` and pointer indirection. `control:FOR` is a hole in **every** C-family language —
 Joern models the C-style three-clause `for` differently from Python's `for … in`, and the
-exporter only handles the latter (plus `while`). That alone costs a large fraction of the
+exporter only handles the latter (plus `while`). That costs a large fraction of the
 coverage in C, Java and Go.
 
-`op:alloc` (166 holes in Java) is worth naming: constructor calls, i.e. essentially all
-idiomatic Java object creation, are untranslated.
+`op:alloc` (166 holes in Java) covers constructor calls, i.e. essentially all idiomatic
+Java object creation, which is untranslated.
 
 ## Silent mistranslations found
 
-These are the §12 failure mode: a construct that *looks* the same across languages and
-means something different, producing a **wrong answer rather than a hole**. Each was
-measured — Lean output from the generated module, real output from the real runtime.
+These are the §12 failure mode: a construct that looks the same across languages and means
+something different, producing a **wrong answer rather than a hole**. Each was measured —
+Lean output from the generated module, real output from the real runtime.
 
 ### 1. `and` / `or` return an operand, not a boolean (Python, JS, TS) — NEW, and it hits the flagship corpus
 
@@ -144,8 +144,8 @@ module says `Source dialect: .python`:
 | `md(-7, 3)` (`a % b`) | `-1` | **`2`** |
 | `half(-7, 2)` (`a / b`) | `-3.5` | **`-4`** |
 
-This is exactly the `fmod(6, -9)` bug the README celebrates catching, re-entering through
-the extension table. Verdict: **wrong**. The default should be a refusal, not Python.
+This is the `fmod(6, -9)` bug the README records catching, re-entering through the
+extension table. Verdict: **wrong**. The default should be a refusal, not Python.
 
 ### 3. JavaScript numbers are IEEE doubles; Core gives them 32-bit C integers
 
@@ -171,15 +171,15 @@ Both compile to `<operator>.equals` in jssrc2cpg and to Core `binop "=="`, evalu
 | `0 == false` | `true` | **`false`** |
 | `1 === "1"` | `false` | `false` ✅ |
 
-So `===` is right by luck and `==` is wrong, and Core cannot tell them apart even in
-principle — the distinction is erased before Core sees it. Verdict: **wrong**, and not
-fixable inside the semantics; it needs an exporter change.
+`===` agrees by coincidence and `==` is wrong; Core cannot tell them apart even in
+principle, because the distinction is erased before Core sees it. Verdict: **wrong**, and
+not fixable inside the semantics; it needs an exporter change.
 
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
 
 `.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
 `java64` and `go64` configs — but `Dialect` has only two constructors (`python`,
-`cLike`), so nothing can ever select them. They are dead code.
+`cLike`), so nothing can select them. They are dead code.
 
 | input | real runtime | Core |
 |---|---|---|
@@ -188,11 +188,11 @@ fixable inside the semantics; it needs an exporter change.
 | Go `a:=2147483647; a+1` | `2147483648` | **`-2147483648`** |
 | Go `m:=100000; m*m` | `10000000000` | **`1410065408`** |
 
-Note this is the *same* mistranslation §16 records finding for C (`mulbig(100000,100000)`
-giving `1410065408` against `cc`) — except this time `1410065408` is the wrong one,
-because Java `long` and Go `int` are 64-bit. Core has no types, so it cannot distinguish
-Java `int` from Java `long` at all; whichever width it picks is wrong for the other.
-Verdict: **wrong**.
+This is the *same* mistranslation §16 records finding for C (`mulbig(100000,100000)`
+giving `1410065408` against `cc`) — except here `1410065408` is the wrong one, because
+Java `long` and Go `int` are 64-bit. Core has no types, so it cannot distinguish Java
+`int` from Java `long`; whichever width it picks is wrong for the other. Verdict:
+**wrong**.
 
 ### 6. Java string `+`, `==`: right answer, wrong reason
 
@@ -200,10 +200,10 @@ Under `.cLike`, `applyBinop` makes `"a" + "b"` a hole labelled
 `str:pointer-arithmetic-not-modelled`, and `s == t` a hole labelled
 `str:pointer-equality-not-modelled`. For C those labels are correct. For Java:
 
-* `s == t` really *is* reference equality, so holing is conservative and defensible —
-  though the label says "pointer", which is the right idea by accident.
-* `s + t` really *is* concatenation and is completely ordinary Java. Holing it is a
-  coverage loss, not a wrong answer.
+* `s == t` is reference equality, so holing is conservative and defensible — though the
+  label says "pointer", which is the right idea by accident.
+* `s + t` is concatenation and is ordinary Java. Holing it is a coverage loss, not a wrong
+  answer.
 * The same rules are applied to JavaScript and TypeScript, where `+` on strings is
   concatenation and `==`/`===` on strings compare *contents*. Measured: JS `"a"+"b"` →
   `hole "str:pointer-arithmetic-not-modelled"` instead of `"ab"`; JS `1 + "1"` →
@@ -217,7 +217,7 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
 * Java `5 / 0` → Core `exn (.str "ZeroDivisionError")`. Java throws
   `ArithmeticException: / by zero`. The *shape* is right (an exception) but the identity
   is wrong; Core has no exception types, so a `catch (ArithmeticException e)` cannot be
-  matched. Not a wrong value, but not a faithful one either.
+  matched. Not a wrong value, not a faithful one.
 * Go `5 / 0` → same `ZeroDivisionError`. Go *panics*, which is not a catchable exception
   in the same sense (`recover` only in a deferred call). Approximate.
 * `Integer.MIN_VALUE / -1` → Core `-2147483648`. Java agrees. **Correct** ✅ (measured).
@@ -241,33 +241,32 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
 
 **"Universal" is aspirational, not currently true.** Precisely:
 
-1. **The front end genuinely does generalize.** Five languages parsed, exported and
-   type-checked without a single change to the exporter or the semantics, and Java —
-   the biggest corpus at 669 functions — produced the *highest* hole-free rate of any
-   language measured, 52%. That is real, and it is the strongest evidence the bet is
-   sound. One node vocabulary really did absorb four new frontends.
+1. **The front end generalizes.** Five languages parsed, exported and type-checked without
+   a change to the exporter or the semantics, and Java — the biggest corpus at 669
+   functions — produced the highest hole-free rate of any language measured, 52%. One node
+   vocabulary absorbed four new frontends.
 2. **The back end does not.** There are two dialects for six languages. `.cLike` means
    "32-bit truncating C" and is applied unchanged to Java `long`, Go `int64`, and
    JavaScript doubles. Every arithmetic answer Core gives for Java `long`, Go `int` or
    any JS number of magnitude ≥ 2³¹ is wrong, silently, with no hole. `Numeric.lean`
    already contains the right configs; `Dialect` has no constructors to reach them.
-3. **The safety net is Python-only.** The differential oracle — the single mechanism that
-   found every dialect bug the project documents — runs CPython or `cc` and nothing else.
-   For Java, Go, JS, TS and Kotlin it produces zero cases and says so quietly. So the
-   four new languages are exactly the ones with *no* check that the semantics matches
-   their runtime, which is why the mistranslations above had to be found by hand.
+3. **The safety net is Python-only.** The differential oracle — the mechanism that found
+   every dialect bug the project documents — runs CPython or `cc` and nothing else. For
+   Java, Go, JS, TS and Kotlin it produces zero cases and says so quietly. The four new
+   languages are the ones with *no* check that the semantics matches their runtime, which
+   is why the mistranslations above were found by hand.
 4. **Two languages fail outright on real code**: Kotlin (frontend crash, reported as
    silence) and JavaScript at scale (renderer `RecursionError`).
 5. **A file-extension typo is a semantics change.** `.tsx` gets Python's floored modulo.
    The dialect is inferred from a lookup table with a silent default; a language not in
    the table does not fail, it gets Python.
 
-An honest claim today would be: *"Python is supported and checked. C is supported and
-partially checked. Java, Go, JavaScript and TypeScript parse, translate and type-check —
-their arithmetic is known-wrong at 64-bit widths and for JS numbers, and nothing verifies
-them against their runtimes. Kotlin does not work on real code."*
+The accurate claim today: *"Python is supported and checked. C is supported and partially
+checked. Java, Go, JavaScript and TypeScript parse, translate and type-check — their
+arithmetic is known-wrong at 64-bit widths and for JS numbers, and nothing verifies them
+against their runtimes. Kotlin does not work on real code."*
 
-The cheapest thing that would change the verdict is not more front ends. It is
+The cheapest change to the verdict is not more front ends. It is
 (a) more `Dialect` constructors wired to the `NumConfig`s that already exist,
 (b) making `infer_dialect` refuse instead of defaulting to Python, and
 (c) a `java`/`node`/`go run` backend for `differential.py` — after which the oracle can
@@ -285,4 +284,4 @@ python3 scripts/lang_matrix.py ast-LangGo.json   # or specific ones
 `scripts/lang_matrix.py` measures corpora the ledger cannot reach, because it does not
 depend on the corpus having rendered.
 
-> **On the function count.** This table uses the ledger's population (208 for `cachetools`), which currently coincides with the neutral AST's (208) — historically the two differed (238 vs 208). The two differ because the ledger counts module-level synthesized functions that the AST does not list separately. Percentages elsewhere in the docs must state which population they are over; mixing the two populations silently inflates or deflates every ratio by about 13%.
+> **On the function count.** This table uses the ledger's population (209 for `cachetools`), which is regenerated by `scripts/ledger.lean.tmpl` and checked by `scripts/check_docs.py`. Earlier revisions of these documents quote 238 and 208; both are superseded. Percentages must state which population they are over, since the ledger counts module-level synthesized functions the neutral AST does not list separately.

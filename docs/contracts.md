@@ -7,19 +7,19 @@
 `STRATEGY.md` §5 lists, among the honest failure modes, *"Proof burden grows
 superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
-other half, and until now it did not exist.
+other half.
 
-The cost of not having it is measurable. On `cachetools`, 179 of 208 functions are
+On `cachetools`, 180 of 209 functions are
 hole-free and 101 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
-correct and is not weakened here. What was missing is the opt-in — a way to say "assume
-the hole labelled `op:starredUnpack` returns a value" and then prove the surrounding
-function correct **relative to** that assumption, with the assumption surfaced rather
-than discharged silently.
+not weakened here. What this file adds is the opt-in: a way to say "assume the hole
+labelled `op:starredUnpack` returns a value" and then prove the surrounding function
+correct **relative to** that assumption, with the assumption surfaced rather than
+discharged silently.
 
-## The mechanism in one paragraph
+## The mechanism
 
 A `Contract` names a hole label and asserts a property `post` of what the interpreter
 produces there, within a declared `fuel` budget. An `Impl` is a witness: a map from hole
@@ -37,7 +37,7 @@ resulting program refines `spec` in the ordinary sense. There is no second inter
 and no new evaluation rule; holes are filled with terms of the same language, so the
 semantics being trusted is exactly the semantics the differential oracle tests.
 
-## Why it is not `Refines`, and cannot be mistaken for it
+## How it differs from `Refines`
 
 * `Γ` is a parameter of the statement. A theorem is unconditional **iff** its `Γ` is
   literally `[]`, and in that case `refinesUnder_nil_iff` proves the two relations are
@@ -50,10 +50,10 @@ semantics being trusted is exactly the semantics the differential oracle tests.
   `Refines (σ.onProgram p)` — a claim about the *repaired* program. Nothing in this file
   ever produces a claim about `p` itself from a non-empty `Γ`.
 
-## The failure mode, and what is built in against it
+## The failure mode, and the guards against it
 
-A contract mechanism is a machine for assuming your conclusion. Four theorems make that
-visible instead of latent:
+A contract mechanism can be used to assume its conclusion. Four theorems make that visible
+rather than latent:
 
 | theorem | what it says |
 |---|---|
@@ -62,17 +62,15 @@ visible instead of latent:
 | `refinesUnder_unique` | if `Γ` **is** satisfiable, two specs proved under the same `Γ` agree on the domain |
 | `methodkey_not_refinable_under_top` | an *unconstrained* contract proves nothing at all, on a real function |
 
-The first is the whole problem stated as a theorem. Its consequence is that
-`Satisfiable Γ p` is a **proof obligation**, not a comment — this file's demonstrations
-prove it constructively, by exhibiting a witness implementation, before stating anything
-relative to the contract.
+By the first, `Satisfiable Γ p` is a **proof obligation**, not a comment. This file's
+demonstrations prove it constructively, by exhibiting a witness implementation, before
+stating anything relative to the contract.
 
-The last is the counterweight to the obvious over-reaction. Satisfiability is necessary
-and *not sufficient*: `topContract` ("this hole may do anything") is always satisfiable
-(`satisfiable_top`) and provably useless, because leaving the hole exactly where it is is
-one of the things "anything" includes, and `refines_not_hole` then bites. So the two
-degenerate ends — a contract that assumes too much and one that assumes nothing — are
-both detectable, and by different theorems.
+Satisfiability is necessary and *not sufficient*. `topContract` ("this hole may do
+anything") is always satisfiable (`satisfiable_top`) and useless, because leaving the hole
+where it is is one of the things "anything" includes, and `refines_not_hole` then applies.
+The two degenerate ends — a contract that assumes too much and one that assumes nothing —
+are detectable by different theorems.
 
 ## What a reader must check before believing a contract-relative theorem
 
@@ -89,8 +87,8 @@ In order. A theorem that fails any of these is not weak evidence, it is no evide
 3. **Read each `post`, not each `stmt`.** `Contract.stmt` is unchecked prose for the
    assurance case; it is never used in a proof. A wrong `stmt` misleads a human and
    cannot mislead the kernel, which is exactly why a human has to check it.
-4. **Ask whether the `post` is true of the real construct.** This is the only step no
-   tool here performs, and it is where all the risk lives. `pureValueContract` asserts
+4. **Ask whether the `post` is true of the real construct.** No tool here performs this
+   step. `pureValueContract` asserts
    that a hole terminates, returns a value, raises nothing and does not mutate the heap.
    For `op:starredUnpack` in CPython that is *false in general*: `f(*x)` raises
    `TypeError` when `x` is not iterable. So a theorem using it is implicitly conditional
@@ -154,16 +152,16 @@ state of `cachetools`.
 * `methodkey_not_refinable_under_top` — under the unconstrained contract, no spec refines
   it, at any fuel bound, on any non-empty domain.
 
-Read together: the mechanism admits a real function that was previously unspeakable, the
+Together: the mechanism admits a function that was previously outside the core, the
 admission is exactly as strong as the stated assumption, and both degenerate contracts are
-rejected by theorems rather than by discipline.
+rejected by theorems rather than by convention.
 
 ## Statement holes are deliberately out of scope
 
 `substS` does **not** fill `Stmt.hole`. A statement-level hole is an untranslated
-*effect*, and replacing it with an expression is a category error; the honest contract for
-one would have to be a relation on control outcomes (`Ctl`), including `brk`/`cont`/`ret`
-escaping from inside it. Doing that properly is a separate piece of work. Until then
+*effect*; replacing it with an expression is a category error. The contract for one would
+have to be a relation on control outcomes (`Ctl`), including `brk`/`cont`/`ret` escaping
+from inside it. That is separate work. Until then
 `control:TRY-finally-escaping` (31 occurrences) and `scope:nonlocal-write` (8) remain
 outside the mechanism, which is the conservative direction: they stay unspeakable rather
 than becoming speakable on a shaky footing.
@@ -209,3 +207,10 @@ What `scripts/sacm.py` should do with it:
    to say none.
 3. Record `fuelBound`, so the assumed cost of the untranslated construct appears in the
    case rather than only in the Lean source.
+
+> **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
+> `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
+> fails on a mismatch. Current: 209 functions, 180 hole-free, 101 call-closed, 40 holes.
+> Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
+> 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
+> `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.

@@ -1,24 +1,22 @@
 # The trust model
 
-What this system actually claims, on what basis, and — more importantly — what it does not
-claim. If you read one document in `docs/`, read this one.
+What this system claims, on what basis, and what it does not claim.
 
-The deliverable is **not** "your codebase is verified." It is a precise, machine-generated
-statement of *what is proved, about what model, under what assumptions*, such that a
-reader can locate the trust boundary in seconds. That artefact is the trust ledger
-(`ledger-<Module>.json`, `Autoform/Ledger.lean`) and the assurance case
-(`sacm-<Module>.json`, `scripts/sacm.py`).
+The deliverable is not "your codebase is verified." It is a machine-generated statement of
+*what is proved, about what model, under what assumptions*, such that a reader can locate
+the trust boundary. That artefact is the trust ledger (`ledger-<Module>.json`,
+`Autoform/Ledger.lean`) and the assurance case (`sacm-<Module>.json`, `scripts/sacm.py`).
 
 ---
 
-## 1. The one rule everything else follows from
+## 1. The rule everything else follows from
 
 > **A check that shares an assumption with the thing it checks will flatter it.**
 
-This is not a slogan; it is the observed failure mode of this project, four separate times:
+This is the observed failure mode of this project, four separate times:
 
 * A **coverage** metric computed by folding over an AST cannot see what the interpreter
-  does with that AST. Static hole-freedom had to be corrected downward twice — once for
+  does with that AST. Static hole-freedom was corrected downward twice — once for
   synthetic front-end wrappers counted as real functions, once because an untranslated
   callee is, in the AST, indistinguishable from a translated one.
 * A **dependency-vacuity** check (`#audit_depends`) cannot see whether a theorem
@@ -32,15 +30,14 @@ This is not a slogan; it is the observed failure mode of this project, four sepa
   is worse than having no oracle: it produced ten confident, specific, wrong divergences
   before being noticed.
 
-The defence is always the same: an oracle that does **not** share the artefact's
-assumptions. For semantics that is the real runtime; for specifications it is mutation;
-for coverage it is execution; for proofs it is an independent kernel replay. Any number
-reported without one should be read as an upper bound.
+The defence is an oracle that does not share the artefact's assumptions. For semantics that
+is the real runtime; for specifications it is mutation; for coverage it is execution; for
+proofs it is an independent kernel replay. Any number reported without one should be read as
+an upper bound.
 
 ## 2. The four oracles
 
-They are not redundant. Each sees a class of failure the others are structurally blind to,
-which is the argument for paying for all four.
+They are not redundant. Each sees a class of failure the others are structurally blind to.
 
 ### 2.1 Differential testing — catches *semantics that disagree with reality*
 
@@ -49,39 +46,35 @@ hook, recording `(function, receiver, args, outcome)` for every call landing in 
 translated function, then replays exactly those tuples against the Lean interpreter and
 compares structured values and exceptions.
 
-Blind spots of every other oracle that this one covers: a proof about a semantics that
-does not match the runtime is theater, and *no amount of proving surfaces it* — the proofs
-would all be about the wrong `eval`. Every one of the following was found here, not by
-inspection:
+It covers a blind spot of every other oracle: a proof about a semantics that does not match
+the runtime is about the wrong `eval`, and no amount of proving surfaces that. Each of the
+following was found here rather than by inspection:
 
 * Floored vs truncated `%` and `/` — which had silently mistranslated every C and Java
   program, and which is why the semantics is now dialect-parameterized.
 * Short-circuit evaluation: `b != 0 and a % b == 0` divided anyway. This had been
-  "conservative" (a hole) until exceptions were added, at which point it became an actively
-  wrong answer. **Fidelity work makes other fidelity bugs findable — the gaps are not
-  independent.**
+  conservative (a hole) until exceptions were added, at which point it became an actively
+  wrong answer. Fidelity work makes other fidelity bugs findable; the gaps are not
+  independent.
 * Python private name mangling (`__x` → `_Cls__x` inside a class body): a silently wrong
   field read returning `unit`.
 
-Three discipline rules this oracle operates under, each earned:
+Three discipline rules the oracle operates under:
 
 * **Outcomes are three-valued, never two**: agree / diverge / INCONCLUSIVE. A case that
-  was not actually compared is never reported as passing. That is the cardinal sin here.
-* **The oracle must establish it is reading the current artefact before it reports
+  was not actually compared is never reported as passing.
+* **The oracle establishes it is reading the current artefact before it reports
   anything** — it `lake build`s the generated module first. That check belongs in the
   oracle, not in the caller.
 * **An oracle must never report a disagreement it caused itself.** Receiver addresses are
   computed Lean-side and verified before comparison; representability of encoded values is
-  checked recursively and *fatally*, so an unencodable nested value refuses the case rather
-  than surfacing as a confident divergence. Fault injection confirms the guards fire.
+  checked recursively and fatally, so an unencodable nested value refuses the case rather
+  than surfacing as a divergence. Fault injection confirms the guards fire.
 
-The corresponding temptation, and the one that would destroy the number's meaning: fixing
-the *measurement* to match a broken artefact. Exposing unmangled field aliases in the value
-encoder would have made the numbers agree while leaving the transpiler wrong. Refusing that
-is what keeps the conformance rate worth reading.
-
-Strictness in an oracle buys **accuracy**, not just safety: the stricter the refusal, the
-more of the remaining agreements mean something.
+The corresponding failure mode is fixing the *measurement* to match a broken artefact.
+Exposing unmangled field aliases in the value encoder would have made the numbers agree
+while leaving the transpiler wrong. Stricter refusal means more of the remaining agreements
+carry information.
 
 ### 2.2 The mutation gate — catches *specifications that constrain nothing*
 
@@ -90,19 +83,17 @@ theorem still proves. Mutant killed → the theorem has teeth. Mutant survived �
 is vacuous with respect to that bug, and is scored a **failure**, not a success.
 
 This is the *sufficient* anti-vacuity test. `#audit_depends` (dependency vacuity) is
-*necessary but not sufficient*, and the gap between them is not hedging: a theorem can
-mention a definition and still say nothing about it. Cheap check first, expensive check
-second.
+*necessary but not sufficient*: a theorem can mention a definition and still say nothing
+about it. Cheap check first, expensive check second.
 
 For generated modules the gate mutates `Autoform/Generated/<M>.lean` — the actual
 transpiler output — and rebuilds `Autoform/Specs/<M>Spec.lean`, so the file mutated is the
-subject of the theorems. Stating specifications about generated code *by import* rather
-than by copying terms into the spec file is what makes this possible at all.
+subject of the theorems. Stating specifications about generated code by import rather than
+by copying terms into the spec file is what makes this possible.
 
-Known measurement caveat, stated rather than smoothed: when a mutant makes a module fail
-to compile, every theorem in that module is recorded as having killed it, so per-theorem
-attribution is coarse. The aggregate claim is sound; the per-theorem breakdown is not yet
-trustworthy.
+Measurement caveat: when a mutant makes a module fail to compile, every theorem in that
+module is recorded as having killed it, so per-theorem attribution is coarse. The aggregate
+claim is sound; the per-theorem breakdown is not yet trustworthy.
 
 ### 2.3 Axiom sweep + `leanchecker --fresh` — catches *unsound proofs*
 
@@ -114,51 +105,48 @@ trustworthy.
 2. **Source sweep** — greps for the escape hatches that do not appear as axioms: `sorry`,
    `partial`, `unsafe`, `native_decide`, `@[implemented_by]`, `axiom`. Comments and
    docstrings are stripped first, so prose *about* `sorry` is not reported as one. The Core
-   semantics is *claimed* to be free of all of these; this verifies the claim rather than
-   restating it.
+   semantics is claimed to be free of all of these; this verifies the claim.
 3. **Kernel re-verification** — `leanchecker` replays the compiled `.olean`s through the
    kernel from an empty environment.
 
-Three things about check 3 are load-bearing:
+Three facts about check 3:
 
 * `leanchecker` **ships with the Lean toolchain** (v4.28.0+). The standalone `lean4checker`
   is deprecated; there is nothing to install and no Homebrew formula.
 * **`--fresh` is mandatory.** Without it the checker can silently no-op on a module that has
-  only imports and no declarations of its own — which is exactly the shape of
-  `Autoform.lean`. The naive invocation produces a confident VERIFIED that checked nothing.
-  The audit records *which mode ran*, because the two are not equally strong.
+  only imports and no declarations of its own — the shape of `Autoform.lean`. The naive
+  invocation produces a VERIFIED result that checked nothing. The audit records which mode
+  ran, because the two are not equally strong.
 * **A missing checker is UNVERIFIED, never a pass**, and `--strict` (which CI uses) turns
-  that into a build failure. An oracle that silently skips is worse than no oracle.
+  that into a build failure.
 
-That the checker actually rejects bad input has been demonstrated twice rather than
-assumed: by installing a bogus declaration with `Environment.addDeclCore (doCheck := false)`,
-and by tampering with a copy of this project's own build tree. Both are rejected; the
-untampered control passes. "Exit 0" is exactly the shape a no-op takes, so a green result
-from an unexercised checker proves nothing.
+That the checker rejects bad input has been demonstrated twice rather than assumed: by
+installing a bogus declaration with `Environment.addDeclCore (doCheck := false)`, and by
+tampering with a copy of this project's own build tree. Both are rejected; the untampered
+control passes. "Exit 0" is also the shape a no-op takes, so a green result from an
+unexercised checker establishes nothing.
 
 ### 2.4 Execution — catches *coverage claims that static analysis flatters*
 
 `scripts/core_oracle.py`. The ledger's hole-free / call-closed / dynamic-hole-risk figures
-are all computed by static analysis of the same AST they describe. So this oracle does not
-analyse: it **runs** every function in the claimed core through the interpreter over many
+are all computed by static analysis of the same AST they describe. This oracle does not
+analyse: it runs every function in the claimed core through the interpreter over many
 inputs and reports which ones actually never hole.
 
-It was not built on suspicion. Static hole-freedom has already been corrected downward
-twice, and the ledger's own `dynamic-hole risk` count is the static analysis admitting
-there are constructs it cannot adjudicate. There is no argument that call-closure was the
-last correction.
+Static hole-freedom has already been corrected downward twice, and the ledger's own
+`dynamic-hole risk` count is the static analysis admitting there are constructs it cannot
+adjudicate. There is no argument that call-closure was the last correction.
 
 Its discipline mirrors the differential harness: a function nothing exercised is
 INCONCLUSIVE, never verified; `outOfFuel` is its own bucket because fuel exhaustion proves
 nothing in either direction; and it rebuilds before reporting.
 
-A fifth source of findings deserves a mention because it was not planned as an oracle at
-all: **proof itself catches operations that were never given a specification.** Unary minus
-kept returning mathematical negation after `Numeric.lean` was wired into binary operators,
-so `-INT_MIN` evaluated to a value that does not exist in a 32-bit integer. No differential
-test negated `INT_MIN`; the refinement layer found it, because stating
-`applyUnop_int_neg` as an unconditional `rfl` made the unconditionality itself visibly
-wrong.
+A fifth source of findings was not planned as an oracle: **proof itself catches operations
+that were never given a specification.** Unary minus kept returning mathematical negation
+after `Numeric.lean` was wired into binary operators, so `-INT_MIN` evaluated to a value
+that does not exist in a 32-bit integer. No differential test negated `INT_MIN`; the
+refinement layer found it, because stating `applyUnop_int_neg` as an unconditional `rfl`
+made the unconditionality visibly wrong.
 
 ## 3. The assurance case: G1–G5
 
@@ -166,36 +154,36 @@ wrong.
 the model is not ours, only the domain-specific evidence types and their combination rules
 are. `docs/ledger-schema.md` specifies the node vocabulary.
 
-The argument decomposes the top claim over the **four independent ways the pipeline can be
-wrong**:
+The argument decomposes the top claim over the four independent ways the pipeline can be
+wrong:
 
 | Goal | Claim | Evidence | Kind |
 |---|---|---|---|
 | **G1** | The module behaves as specified. | roll-up of G2–G5 | — |
 | **G2** | Faithfulness: the Lean semantics agrees with the real runtime on this module. | `conformance.json` | TEST |
-| **G3** | Coverage: the module is translated without holes. Split into **G3.1** (the call-closed verifiable core) and **G3.2** (the claim people actually read G3.1 as making — that these functions do not hole at runtime), the latter answerable only by execution. | `ast-*.json`, `ledger-*.json`, `core-oracle.json` | STATIC / TEST |
+| **G3** | Coverage: the module is translated without holes. Split into **G3.1** (the call-closed verifiable core) and **G3.2** (the claim people read G3.1 as making — that these functions do not hole at runtime), the latter answerable only by execution. | `ast-*.json`, `ledger-*.json`, `core-oracle.json` | STATIC / TEST |
 | **G4** | Adequacy: the specifications are non-vacuous — they constrain the behaviour they appear to. | `mutation.json` | TEST |
-| **G5** | Validity: all theorems are kernel-checked and depend on no unsound axiom. **G5.1** narrows this to what the repo-wide sweep actually earns. | `audit.json` | PROOF |
+| **G5** | Validity: all theorems are kernel-checked and depend on no unsound axiom. **G5.1** narrows this to what the repo-wide sweep earns. | `audit.json` | PROOF |
 
 Two structural rules keep the roll-up honest:
 
 * **Evidence kind is tracked separately from strength** (`PROOF` / `TEST` / `STATIC`). A
   claim discharged by kernel-checked proof and one discharged by a hundred passing test
-  cases are not the same assertion even when both meet threshold. Blurring test evidence
-  into a green tick that reads as proof is the thing the ledger's own
-  `NOT PROVED : transpiler faithfulness` line exists to prevent.
+  cases are not the same assertion even when both meet threshold. The ledger's
+  `NOT PROVED : transpiler faithfulness` line exists to prevent test evidence being read as
+  proof.
 * **Population-quantified claims are capped by coverage.** "Zero divergences" over cases
-  touching a minority of the module's functions says *nothing whatsoever* about the rest,
-  yet the earlier rule flipped the claim to SUPPORTED. Support is now bounded by the
-  fraction of the subject the evidence actually exercised — and the preferred fix is to
-  *narrow the claim*, not to weaken its status, because weakening the status of an
-  over-broad claim leaves a false claim on the page.
+  touching a minority of the module's functions says nothing about the rest, yet the earlier
+  rule flipped the claim to SUPPORTED. Support is now bounded by the fraction of the subject
+  the evidence exercised — and the preferred fix is to *narrow the claim*, not to weaken its
+  status, because weakening the status of an over-broad claim leaves a false claim on the
+  page.
 
 Evidence that cannot be attributed to its subject cannot fully support a claim about that
-subject. This rule has already fired three times: on an untagged `conformance.json`, on a
-mutation run whose subject was a different module, and on the repo-wide axiom sweep.
+subject. This rule has fired three times: on an untagged `conformance.json`, on a mutation
+run whose subject was a different module, and on the repo-wide axiom sweep.
 
-## 4. The three statuses (there are five, and the distinction is the point)
+## 4. The five statuses
 
 | Status | Meaning |
 |---|---|
@@ -205,43 +193,40 @@ mutation run whose subject was a different module, and on the repo-wide axiom sw
 | `DEFEATED` | We checked, and the evidence *contradicts* the claim. |
 | `UNDEVELOPED` | **We never checked.** No evidence is cited at all — GSN's undeveloped-goal diamond. |
 
-`UNSUPPORTED` and `UNDEVELOPED` are the pair worth staring at. "We looked and it is not
-established" and "nobody has looked" are different epistemic states, and collapsing them —
-in either direction — is how assurance cases become decoration. The combination rule is
-conjunctive (an argument is only as strong as its weakest leg) and `UNDEVELOPED` and
-`DEFEATED` share the bottom rank, with ties broken toward `DEFEATED`, because a refuted leg
-is worse news than an unexamined one.
+`UNSUPPORTED` and `UNDEVELOPED` are distinct: "we looked and it is not established" and
+"nobody has looked" are different epistemic states, and collapsing them in either direction
+makes the assurance case decoration. The combination rule is conjunctive (an argument is
+only as strong as its weakest leg); `UNDEVELOPED` and `DEFEATED` share the bottom rank, with
+ties broken toward `DEFEATED`, because a refuted leg is worse news than an unexamined one.
 
-Missing evidence is therefore **never omitted**: a claim with no supporting artefact is
-emitted as an `UNDEVELOPED` node with `toBeSupported: true`. Silently dropping it would
-manufacture confidence.
+Missing evidence is never omitted: a claim with no supporting artefact is emitted as an
+`UNDEVELOPED` node with `toBeSupported: true`. Silently dropping it would manufacture
+confidence.
 
-Likewise every hole label becomes a named SACM `Assumption`. An untranslated construct is
-not an absence — it is an assumption the argument rests on, and it must appear in the
-argument structure.
+Every hole label becomes a named SACM `Assumption`. An untranslated construct is not an
+absence — it is an assumption the argument rests on, and it must appear in the argument
+structure.
 
-A top claim coming out `UNDEVELOPED` on a real corpus is the **correct** answer, not a bug
-in the tool.
+A top claim coming out `UNDEVELOPED` on a real corpus is the correct answer, not a bug in
+the tool.
 
 ## 5. What this system does NOT establish
-
-Stated plainly, because the value of everything above depends on it.
 
 * **Transpiler faithfulness is tested, never proved.** There is no theorem relating the
   Joern CPG, the exported JSON, the printed Lean term, and the source program's actual
   meaning. The evidence is differential testing on the corpus's own test suite plus the
   determinism of the printer. The ledger prints `NOT PROVED : transpiler faithfulness` for
-  exactly this reason, and G2 is `TEST` evidence, never `PROOF`.
+  this reason, and G2 is `TEST` evidence, never `PROOF`.
 * **Conformance is sampling, not quantification.** It covers the cases the repository's
   test suite exercises, on values the harness can faithfully encode. Functions the suite
   never reaches, arguments it cannot encode (floats, sets, locks, very wide containers),
   and receivers Core cannot represent as objects (`tuple`/`dict` subclasses) are refused
   and counted, not compared. These structural ceilings bound how much of a real codebase
-  this oracle can reach *regardless of translation coverage*.
+  this oracle can reach regardless of translation coverage.
 * **Hole-freedom does not imply the program runs.** It is an upper bound. Call-closure
-  removes the invisible-callee failure mode; execution is what settles the rest.
-* **A verified core is not a verified repository.** You will never formalize the whole
-  codebase; that is a design decision. Everything outside the core is covered by declared
+  removes the invisible-callee failure mode; execution settles the rest.
+* **A verified core is not a verified repository.** The whole codebase will never be
+  formalized; that is a design decision. Everything outside the core is covered by declared
   assumptions and boundary contracts.
 * **The axiom sweep is repo-wide, not module-scoped.** It bounds the axiom basis of
   everything in the repository, including the semantics a given module is interpreted by,
@@ -257,8 +242,7 @@ Stated plainly, because the value of everything above depends on it.
 
 ## 6. How to check any of this yourself
 
-Do not trust a number printed in a document, including this one. Every figure in this
-repository is regenerable, and regenerating it is cheaper than arguing about it.
+Every figure in this repository is regenerable.
 
 ```sh
 lake build && python3 scripts/audit_all.py --strict   # axioms, escapes, kernel replay
