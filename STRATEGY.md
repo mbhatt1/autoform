@@ -1618,3 +1618,58 @@ several agents running it concurrently they overwrite each other mid-run, so a r
 report conformance for *another agent's program*. This was live for every concurrent run
 today. §27 said the last divergence was the apparatus; here the apparatus was not even
 measuring the right artifact.
+
+## §32 — Velvet/Loom: take the DSL, refuse the oracle
+
+`verse-lab/velvet` is a Dafny-style auto-active verifier for Lean 4, built on `verse-lab/loom`,
+with `requires`/`ensures`/`invariant`/`decreasing` macros, cvc5 and z3 wired in, and
+property-based testing in the same environment. On the surface it is exactly the tier-2
+hammer §5 asks for and this build does not have.
+
+It is not, and the reason is one line — `Loom/SMT.lean:215`:
+
+```lean
+axiom trust_smt : ∀ (p : Prop), p
+```
+
+closed by `mkApp (mkConst ``trust_smt) goalType`. This is not "assume the solver is
+right about this formula". It is a proof of every proposition. Checked directly in this
+build:
+
+```
+'two_eq_three' depends on axioms: [trust_smt]     -- (2 : Nat) = 3
+'false_holds'  depends on axioms: [trust_smt]     -- False
+```
+
+Adopting it would let `portfolio` close all 89 open obligations immediately, and every
+one would be worthless. `scripts/audit_all.py` allows exactly
+`{propext, Quot.sound, Classical.choice}`, so the sweep rejects it on sight — the gate
+works, and this is the first time it has been tested against a real external tool rather
+than a hypothetical.
+
+This vindicates `#smt_evidence`. §5 wanted SMT at tier 2; the design instead reaches
+cvc5/z3 through `scripts/prover/smt.py` and records the verdict as an **open obligation
+carrying the solver's answer as evidence**, because no Lean proof can be reconstructed
+from it. Velvet shows the alternative and what it costs: an axiom that makes the logic
+inconsistent, in exchange for a green checkmark. `bv_decide` remains the counterexample
+that proves the rule — SAT-backed *and* LRAT-replayed in the kernel, hence a real rung.
+
+What is worth taking, none of which costs trust:
+
+* **The specification DSL.** `requires`/`ensures`/`invariant`/`decreasing` as syntax over
+  an existing semantics. `Autoform/Contracts.lean` builds `Contract` values by hand and
+  `execStmt_loop_rule` takes its invariant and decreasing measure as explicit arguments;
+  both would read better as macros, and macros carry no soundness weight.
+* **Angelic vs demonic non-determinism.** This is the vocabulary for something already
+  built: `RefinesUnder` quantifies over *every* implementation consistent with the
+  contract, which is precisely demonic non-determinism, and `refinesUnder_of_unsatisfiable`
+  is the degenerate angelic case. Naming it connects the hole mechanism to existing
+  literature instead of inventing terms.
+* **Partial vs total correctness kept apart, with termination separate.** The fuel-indexed
+  interpreter already draws this line — `outOfFuel` is ignorance, not divergence — but the
+  ledger reports one number. Velvet's separation is the cleaner presentation.
+
+What Velvet does **not** help with: the remaining holes. `op:starredUnpack` (36),
+`import:module-value` (15), `scope:nonlocal-write` (8), `op:delete-index`/`-slice` (8),
+`call:computed-callee` (6) and the `_HashedTuple` builtin-base gap are all missing
+*language modelling* in Core, not missing proof automation. No verifier closes them.

@@ -279,6 +279,9 @@ def build_case(module, root):
         # Contract-relative theorems: which results are conditional, on what, and
         # whether the conditions are known to be satisfiable (scripts/emit_contracts.py).
         "contracts": os.path.join(root, f"contracts-{module}.json"),
+        # Execution over the claimed verifiable core. This answers G3.2 directly rather
+        # than by proxy, and it is the only artifact that can DEFEAT G3.1.
+        "coreOracle": os.path.join(root, "core-oracle.json"),
         # Fallback: the repo-wide audit sweep, if the per-module axiom dump is absent.
         "audit": os.path.join(root, "audit.json"),
     }
@@ -611,6 +614,45 @@ def build_case(module, root):
         # discharge it; only execution can, and execution has covered 39% of the module.
         exec_cov = (art["conformance"] or {}).get("functions_covered") \
             if isinstance(art["conformance"], dict) else None
+
+        # If the core oracle has run, it answers G3.2 directly: it EXECUTED the claimed
+        # core rather than estimating from conformance coverage. Prefer it, and let it
+        # defeat G3.1 when it refutes — a case whose own evidence contradicts a claim
+        # must say so, not average it away.
+        orc = art.get("coreOracle")
+        orc_ok = isinstance(orc, dict) and orc.get("module") == module
+        if orc_ok:
+            oc, orr = orc.get("claim") or {}, orc.get("result") or {}
+            claimed = oc.get("verifiable_core_static")
+            survived = orr.get("verifiable_core_executed")
+            refuted = orr.get("holed_on_some_input")
+            real = orr.get("holed_on_a_real_input")
+            never = orr.get("inconclusive_never_exercised")
+            c.evid("E7",
+                   f"Execution over the claimed verifiable core: {survived}/{claimed} "
+                   f"never holed; {refuted} holed on some input, {real} of those on an "
+                   f"input recorded from the project's own test suite; "
+                   f"{never} never exercised.",
+                   artifact="core-oracle.json",
+                   value={"claimed": claimed, "survived": survived, "refuted": refuted,
+                          "refutedOnRealInput": real, "neverExercised": never},
+                   metric="verifiable-core-executed", evidence_kind=TEST, scope=module,
+                   status=SUPPORTED if refuted == 0 else DEFEATED)
+            if refuted:
+                # The defeater is not hypothetical any more. D3 used to read "undefeated
+                # except where execution has looked"; execution has now looked and the
+                # claim did not survive.
+                d3r = c.claim(
+                    "D3.1",
+                    f"REFUTED BY EXECUTION: G3.1 claims {claimed} functions are a "
+                    f"verifiable core, but running them holes {refuted} of them, "
+                    f"{real} on real inputs. Static hole-freedom overstates runtime "
+                    f"hole-freedom here by about {claimed / max(survived, 1):.1f}x. "
+                    f"Causes are recorded in core-oracle.json's hole_labels.",
+                    DEFEATED, evidence_kind=TEST, scope=module)
+                c.link("E7", d3r, "SUPPORTS")
+                c.link(d3r, core, "COUNTERS")
+
         if risk == 0:
             dyn_st, dyn_frac = SUPPORTED, None
             dyn_note = "no construct in the module can hole at runtime."
@@ -622,6 +664,16 @@ def build_case(module, root):
                         f"reached {exec_cov if exec_cov is not None else 0}/{fn_total} "
                         f"functions. Static hole-freedom is an upper bound "
                         f"(STRATEGY.md §17, §19).")
+        # The oracle's own numbers replace the conformance proxy where available.
+        if orc_ok:
+            orr = orc.get("result") or {}
+            claimed = (orc.get("claim") or {}).get("verifiable_core_static") or fn_total
+            survived = orr.get("verifiable_core_executed") or 0
+            dyn_st, dyn_frac = (SUPPORTED, 1.0) if survived == claimed else \
+                (DEFEATED, survived / claimed if claimed else None)
+            dyn_note = (f"Settled by execution, not estimated: {survived} of {claimed} "
+                        f"claimed-core functions never holed on any input tried; "
+                        f"{orr.get('holed_on_some_input')} did. See core-oracle.json.")
         dyn = c.claim(
             "G3.2",
             f"The core of {module} is hole-free at RUNTIME: no execution of it reaches a "
