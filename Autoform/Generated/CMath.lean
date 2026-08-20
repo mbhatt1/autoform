@@ -15,53 +15,62 @@ open Autoform.Core
 def f_clamp : Func :=
   { name := "clamp"
   , params := ["x", "lo", "hi"]
-  , body := (.seq (.ifte (.binop "<" (.name "x") (.name "lo")) (.ret (.name "lo")) .skip) (.seq (.ifte (.binop ">" (.name "x") (.name "hi")) (.ret (.name "hi")) .skip) (.ret (.name "x")))) }
-
-/-- `math.c:<global>`  (from `math.c`) -/
-def f_math_c__global_ : Func :=
-  { name := "math.c:<global>"
-  , params := []
-  , body := (.seq (.hole "stmt:METHOD_REF") (.seq (.hole "stmt:METHOD_REF") (.seq (.hole "stmt:METHOD_REF") (.seq (.hole "stmt:METHOD_REF") (.hole "stmt:METHOD_REF"))))) }
+  , body := (.seq
+            (.ifte (.binop "<" (.name "x") (.name "lo")) (.ret (.name "lo")) .skip)
+            (.seq
+              (.ifte (.binop ">" (.name "x") (.name "hi")) (.ret (.name "hi")) .skip)
+              (.ret (.name "x")))) }
 
 /-- `poly`  (from `math.c`) -/
 def f_poly : Func :=
   { name := "poly"
   , params := ["a", "b", "c"]
-  , body := (.ret (.binop "-" (.binop "+" (.binop "*" (.name "a") (.name "b")) (.name "c")) (.name "a"))) }
+  , body := (.ret
+            (.binop "-" (.binop "+" (.binop "*" (.name "a") (.name "b")) (.name "c")) (.name "a"))) }
 
 /-- `sumto`  (from `math.c`) -/
 def f_sumto : Func :=
   { name := "sumto"
   , params := ["n"]
-  , body := (.seq .skip (.seq (.assign "acc" (.lit (.int 0))) (.seq .skip (.seq (.assign "i" (.lit (.int 0))) (.seq (.loop (.binop "<=" (.name "i") (.name "n")) (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i"))) (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))) (.ret (.name "acc"))))))) }
+  , body := (.seq
+            .skip
+            (.seq
+              (.assign "acc" (.lit (.int 0)))
+              (.seq
+                .skip
+                (.seq
+                  (.assign "i" (.lit (.int 0)))
+                  (.seq
+                    (.loop
+                      (.binop "<=" (.name "i") (.name "n"))
+                      (.seq
+                        (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
+                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))
+                    (.ret (.name "acc"))))))) }
 
 /-- `cdiv`  (from `math.c`) -/
 def f_cdiv : Func :=
   { name := "cdiv"
   , params := ["a", "b"]
-  , body := (.seq (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip) (.ret (.binop "/" (.name "a") (.name "b")))) }
+  , body := (.seq
+            (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip)
+            (.ret (.binop "/" (.name "a") (.name "b")))) }
 
 /-- `cmod`  (from `math.c`) -/
 def f_cmod : Func :=
   { name := "cmod"
   , params := ["a", "b"]
-  , body := (.seq (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip) (.ret (.binop "%" (.name "a") (.name "b")))) }
-
-/-- `<includes>:<global>`  (from `<includes>`) -/
-def f__includes___global_ : Func :=
-  { name := "<includes>:<global>"
-  , params := []
-  , body := .skip }
+  , body := (.seq
+            (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip)
+            (.ret (.binop "%" (.name "a") (.name "b")))) }
 
 /-- Source dialect: `.cLike` (integer division/modulo convention). -/
 def program : Program := { dialect := .cLike, funcs := [
   f_clamp,
-  f_math_c__global_,
   f_poly,
   f_sumto,
   f_cdiv,
-  f_cmod,
-  f__includes___global_
+  f_cmod
 ] }
 
 end Autoform.Generated

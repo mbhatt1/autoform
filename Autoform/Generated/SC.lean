@@ -15,7 +15,15 @@ open Autoform.Core
 def f_sc_py__module__safemod : Func :=
   { name := "sc.py:<module>.safemod"
   , params := ["a", "b"]
-  , body := (.seq (.ifte (.binop "&&" (.binop "!=" (.name "b") (.lit (.int 0))) (.binop "==" (.binop "%" (.name "a") (.name "b")) (.lit (.int 0)))) (.ret (.lit (.int 1))) .skip) (.ret (.lit (.int 0)))) }
+  , body := (.seq
+            (.ifte
+              (.binop
+                "&&"
+                (.binop "!=" (.name "b") (.lit (.int 0)))
+                (.binop "==" (.binop "%" (.name "a") (.name "b")) (.lit (.int 0))))
+              (.ret (.lit (.int 1)))
+              .skip)
+            (.ret (.lit (.int 0)))) }
 
 /-- Source dialect: `.python` (integer division/modulo convention). -/
 def program : Program := { dialect := .python, funcs := [

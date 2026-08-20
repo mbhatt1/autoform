@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_joern:
+        description: >-
+          Also run the Joern end-to-end pipeline job. Off by default: installing
+          Joern is a ~1.7 GB download, so it is never part of the gating build.
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------ #
+  # The real gate: it must build, the trust audit must find no leak,
+  # and the demo must run. No Joern anywhere in here.
+  # ------------------------------------------------------------------ #
+  build-and-audit:
+    name: build + trust audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read toolchain
+        id: toolchain
+        run: echo "version=$(cat lean-toolchain)" >> "$GITHUB_OUTPUT"
+
+      - name: Install elan / Lean (${{ steps.toolchain.outputs.version }})
+        run: |
+          set -euo pipefail
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Toolchain versions
+        run: |
+          lean --version
+          lake --version
+
+      - name: Cache .lake
+        uses: actions/cache@v4
+        with:
+          path: |
+            .lake
+          # lean-toolchain and the manifest between them pin every input that
+          # affects the build products; the source hash keeps the cache honest.
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+            lake-${{ runner.os }}-
+
+      - name: lake build
+        run: lake build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Fails the job on any trusted-code leak (sorryAx / ofReduceBool /
+      # ofReduceNat, or a stray `sorry` outside Demo.lean). See
+      # scripts/audit_all.py and STRATEGY.md Tier 4.
+      - name: Trust audit sweep
+        run: python3 scripts/audit_all.py
+
+      - name: Upload audit.json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-json
+          path: audit.json
+          if-no-files-found: warn
+
+      # Demo.lean deliberately contains a `sorry`-admitted theorem and two
+      # deliberately-failing audits, to demonstrate that the audit catches them.
+      # `lean` therefore exits non-zero by design; what we check is that it runs
+      # and that the expected diagnostics appear.
+      - name: Run the demo
+        run: |
+          set -o pipefail
+          lake env lean Demo.lean 2>&1 | tee demo.out || true
+          grep -q "TRUSTED-CODE LEAK" demo.out
+          grep -q "VACUOUS" demo.out
+
+  # ------------------------------------------------------------------ #
+  # OPTIONAL / MANUAL ONLY.
+  #
+  # Joern is a ~1.7 GB download, so the CPG -> AST -> Lean pipeline is NOT
+  # part of the gating build. Run it by hand from the Actions tab, or on a
+  # schedule, when the exporter or the transpiler changes.
+  # ------------------------------------------------------------------ #
+  joern-pipeline:
+    name: end-to-end pipeline (Joern, manual only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_joern == true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan / Lean
+        run: |
+          set -euo pipefail
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Joern (~1.7 GB — this is why the job is opt-in)
+        run: |
+          set -euo pipefail
+          curl -L https://github.com/joernio/joern/releases/latest/download/joern-install.sh -o joern-install.sh
+          chmod +x joern-install.sh
+          sudo ./joern-install.sh --without-plugins
+          joern --version
+
+      - name: Cache .lake
+        uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+
+      - name: lake build
+        run: lake build
+
+      - name: End-to-end run on the sample corpus
+        env:
+          JOERN_HOME: /opt/joern
+        run: |
+          mkdir -p /tmp/corpus
+          cp -r cartographer /tmp/corpus/ 2>/dev/null || true
+          ./autoform.sh /tmp/corpus Pipeline
+
+      - name: Upload pipeline artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-output
+          path: |
+            ast-*.json
+            formalization-graph.json
+            conformance.json
+          if-no-files-found: warn

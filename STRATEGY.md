@@ -802,3 +802,177 @@ The general defence is the one this project already relies on — an oracle that
 share the artifact's assumptions. For semantics that is the real runtime; for
 specifications it is mutation; for coverage it is execution. Any number reported without
 one should be read as an upper bound.
+
+## 18. Tier 1 measured: objects closed the gap
+
+Full pipeline on `cachetools` (233 real functions), before and after the Tier 1 work:
+
+| metric | before | after |
+|---|--:|--:|
+| holes | 745 (20% of nodes) | **102 (2%)** |
+| hole-free (upper bound) | 12 (5%) | **166 (71%)** |
+| verifiable core (hole-free **and** call-closed) | 6 (2%) | **45 (19%)** |
+
+§13 predicted "+166 from objects", and 166 is exactly what landed. The marginal-value
+metric was right.
+
+### What the exporter work actually found
+
+The CPG side turned out to matter more than the Lean side, and several of §13's
+assumptions were wrong:
+
+* **`FOR` does not exist in a Python CPG.** The frontend pre-desugars every `for` and
+  every comprehension into `tmp = e.__iter__()` plus a `WHILE` whose condition is an
+  `UNKNOWN` node. So §13's measurement of "`FOR` marginal value = +0" was right for the
+  wrong reason — it was never a `control:FOR` hole, it was hiding inside `expr:UNKNOWN`.
+  Reconstructing `forIn` from that shape is what unlocked iteration.
+* **A latent fidelity bug, removed.** `<operator>.and` / `.or` had been mapped to `&&`/`||`.
+  They are **bitwise** `&`/`|` (the logical ones are `logicalAnd`/`logicalOr`), and Core has
+  no bitwise operators — so that mapping was silently computing the wrong answer. They are
+  now holes. Same for float literals, which were becoming strings. This is the §12 lesson
+  recurring: *constructs that look alike across languages are the dangerous ones.*
+* **Resolved attribute access is not attribute access.** When Joern resolves `o.m`, it
+  prepends the target, so the node has three children rather than two; those are `fnref`,
+  not `field`.
+* **`<operator>.alloc` is not the construction signal** — it appears only in metaclass
+  adapters. Real construction is a call whose `methodFullName` ends in `.__init__`.
+
+### What is deliberately still a hole (102 total)
+
+Every one is a case where a faithful translation is not available and inventing one would
+be the §12 failure:
+
+* `starredUnpack` (33) — `*args` has no Core representation; splicing it changes arity.
+* `try/finally` where the body can `return`/`break` (29) — the non-escaping case *is*
+  translated, as `tryCatch(B, e, F; raise e); F`. When control escapes, `ret` bypasses the
+  handler and would skip the trailing `F`, so it stays a hole.
+* `try/except/else` (11) — `else` must run only when nothing was raised *and* its own
+  exceptions must not be caught. One `tryCatch` cannot express that.
+* `nonlocal` (8), `del d[k]` (8), multi-`except` (1, the CPG discards exception types).
+
+### The call-closure gap is now the interesting number
+
+166 hole-free but only 45 call-closed. The 121-function difference is functions that
+contain no holes themselves but call something outside the translated program — mostly
+Python builtins and stdlib. That is not a transpiler defect; it is the honest observation
+that **a function is only as analysable as its callees**, and it points at the next piece
+of work: a modelled standard library, not more CPG mapping.
+
+## 19. Tier 2 closed, and the oracle caught itself lying
+
+### The short-circuit bug became real, then was fixed
+
+§13 Tier 2 item 2 recorded that `&&`/`||` evaluated both operands eagerly, and called it
+*conservative* — a hole rather than a wrong answer — "only because Core has no side
+effects". Adding exceptions removed that excuse. With `%0` now raising, the harness caught:
+
+```
+safemod(-11, 0):  cpython = 0,  lean = raised ZeroDivisionError
+```
+
+`b != 0 and a % b == 0` divides anyway. That is an actively wrong answer. `evalExpr` now
+short-circuits before evaluating the right operand: **6/6 agree**.
+
+Worth noting *why* this became detectable: the bug existed all along, but was invisible
+until exceptions were first class. Fidelity work makes other fidelity bugs findable — the
+gaps are not independent.
+
+### `hole-free ≠ runnable`, confirmed independently
+
+The harness found two supposedly hole-free `cachetools` functions that hit unresolvable
+calls at runtime — `call:_CacheInfo`, `call:info`. This is §17's finding arrived at from
+the other direction, by execution rather than by static analysis, and it is why the ledger
+now reports call-closure separately.
+
+### The oracle was lying, silently
+
+The single most important process finding of this pass: **a stale `.olean` was answering
+with the previous semantics.** It produced 10 fictitious divergences and 22 fake
+inconclusives before being noticed. The harness now runs `lake build` on the generated
+module before comparing.
+
+Generalize it: this project's entire trust story rests on oracles that do not share the
+artifact's assumptions (§17). An oracle reading a stale cache shares the *old* artifact's
+assumptions, which is worse than having no oracle — it produces confident, specific,
+wrong findings. **Any oracle must establish that it is reading the current artifact
+before it reports anything.** That check belongs in the oracle, not in the caller.
+
+### Measured conformance after Tier 2
+
+| Corpus | functions (total / hole-free / exercised) | compared | agree | diverge | inconclusive |
+|---|---|--:|--:|--:|--:|
+| cachetools (test-suite driven) | 233 / 166 / 7 | 58 | **42/42 (100%)** | 0 | 16 |
+| stress | 6 / 5 / 5 | 25 | 25/25 | 0 | 0 |
+| sample | 5 / 2 / 2 | 10 | 10/10 | 0 | 0 |
+| ctest (`cc`) | 7 / 6 / 6 | 25 | 25/25 | 0 | 0 |
+| shortcircuit | 1 / 1 / 1 | 6 | 6/6 | 0 | 0 |
+
+`cachetools` went from **zero** comparable cases to 42 compared and agreeing, including
+method calls against reconstructed receivers — because the harness now drives from the
+repository's own test suite (§3's "every repo ships its own conformance suite"), snapshots
+the receiver into a Lean `Heap` literal, and compares structured values and exceptions
+rather than only integers.
+
+Honest coverage limits, reported rather than smoothed: 109 calls skipped because the
+receiver is a `tuple` subclass (a value, not an object with fields — Core cannot represent
+it), 34 skipped for `float` arguments, 2 hole-free methods never reached by the suite.
+
+### Tier 2 status
+
+| item | status |
+|---|---|
+| 1. integer width | **closed** — `Numeric.lean` wired; `ub ↦ hole` |
+| 2. short-circuit | **closed** |
+| 3. differential coverage | **closed** — test-suite driven, structured values, exceptions, methods |
+| 4. heap / aliasing / mutation | **closed** — done as part of Tier 1 |
+| 5. naive scoping | open — no closures, globals, `nonlocal` (8 holes on cachetools) |
+| 6. strings conflated | open — Python `str` and C `char*` are one `Val.str` |
+
+## 20. Refinement: the debt that mattered most
+
+§13 called the missing deep≈shallow refinement "the single largest architectural debt",
+because proving anything against `execStmt` applied to a concrete AST does not scale.
+`Autoform/Refine.lean` closes it.
+
+```lean
+inductive Outcome | ret : Val → Outcome | raise : Val → Outcome
+def Refines p name N dom spec : Prop :=
+  ∀ args, dom args → ∀ fuel, N ≤ fuel → runFunc p fuel name args = (spec args).toEResult
+```
+
+Three design choices make it non-vacuous, each backed by a theorem rather than a comment:
+
+* **`Outcome` has no `hole` and no `outOfFuel` constructor.** A refined function provably
+  never reports either (`refines_not_hole`, `refines_terminates`). Exceptions *are*
+  refinable — "raises `ZeroDivisionError`" is a specification — but hole and outOfFuel are
+  statements about our ignorance, so a spec cannot quietly absorb them.
+* **Fuel is universally quantified above a concrete bound**, not existential, so the answer
+  must be fuel-stable.
+* **`refines_unique`**: two shallow specs refining the same entry point agree on the domain.
+
+Proved on real translated functions: `poly`, `clamp`, `cdiv` (C) and `add`, `absval`,
+`cmpchain`, `fmod` (Python). `cdiv`/`fmod` are the dialect-sensitive pair — same shape,
+`.cLike ↦ Int.tdiv`, `.python ↦ Int.fmod` — both now proved.
+
+### The two negative results are the real evidence
+
+* `fdiv_not_refinable` — `ops.py:fdiv` contains `Expr.hole "op:floorDiv"`, and **no**
+  shallow spec, at any fuel bound, on any domain containing a nonzero divisor, refines it.
+  Holes are not merely inconvenient; they are provably unspecifiable.
+* `poly_not_refinable` — with fixed-width arithmetic wired in, `poly` does **not** refine
+  `a*b + c - a` on the unrestricted domain. The witness is `a = b = 100000`, the same
+  value that produced the original `1410065408` divergence against `cc`.
+
+That is the loop closing on itself: a bug found by the differential oracle, fixed by
+parameterizing the semantics, and now permanently recorded as a machine-checked
+impossibility theorem. `poly_refines` holds only under `Fits32 (a*b) ∧ Fits32 (a*b+c) ∧
+Fits32 (a*b+c-a)` — which is what the `dom` parameter was for, and why it is not decoration.
+
+`clamp_deep_idem` shows the payoff: idempotence is proved by `omega` on the plain Lean
+function, then transferred to the deep term with no interpreter in sight.
+
+All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.
+
+Open obligations, stated rather than admitted: general fuel monotonicity for the full
+language; loop invariants (`sumto`, `gcdish` are hole-free but need an invariant rule);
+heap-mutating methods (need a representation predicate).

@@ -289,9 +289,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val x) =>
-        match evalExpr ctx n h₁ ρ b with
-        | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
-        | (h₂, r)      => (h₂, r)
+        -- `&&` and `||` must NOT evaluate their right operand when the left already
+        -- decides the answer. Eager evaluation was a genuine soundness bug, not a
+        -- conservative approximation: `scripts/differential.py` caught
+        -- `safemod(-11, 0)` returning 0 in CPython while Core raised ZeroDivisionError,
+        -- because `b != 0 and a % b == 0` evaluated the division anyway.
+        if op == "&&" && !x.truthy then (h₁, .val (.bool false))
+        else if op == "||" && x.truthy then (h₁, .val (.bool true))
+        else
+          match evalExpr ctx n h₁ ρ b with
+          | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
+          | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with

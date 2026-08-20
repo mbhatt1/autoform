@@ -13,7 +13,8 @@ Java, JavaScript, Python, Kotlin and binaries all normalize to one node vocabula
 ## Use
 
 ```sh
-./autoform.sh <source-dir> [ModuleName]
+./autoform.sh <source-dir> [ModuleName]   # translate + type-check + conformance + ledger
+./assure.sh   <source-dir> <ModuleName>   # the above, plus audit, mutation gate, SACM case
 ```
 
 ```
@@ -26,22 +27,26 @@ source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core p
 
 | Corpus | Language | Functions | Verifiable core | Conformance vs real runtime |
 |---|---|---|---|---|
-| `cachetools` (real repo) | Python | 233 | 12 (5%) | no module-level int fns to compare |
-| stress corpus | Python | 6 | 5 (83%) | **25/25 (100%)** vs CPython |
+| `cachetools` (real repo) | Python | 233 | **45 (19%)** call-closed · 166 (71%) hole-free | **42/42 (100%)** vs CPython, test-suite driven |
+| stress corpus | Python | 6 | 6 (100%) | **30/30 (100%)** vs CPython |
 | sample | Python | 5 | 2 (40%) | **10/10 (100%)** vs CPython |
-| ctest | C | 7 | 6 (85%) | **25/25 (100%)** vs `cc` |
+| ctest | C | 5 | 5 (100%) | **25/25 (100%)** vs `cc` |
+| shortcircuit | Python | 1 | 1 (100%) | **6/6 (100%)** vs CPython |
 
 All generated Lean type-checks. The "verifiable core" is the set of **hole-free**
 functions — the only ones that can be verified unconditionally.
 
-The `cachetools` figure was originally reported as 130 (30%). It was wrong: 120 of those
-were Joern-synthesised `<metaClassAdapter>` wrappers duplicating real methods. The
-exporter now drops them. **5% is the honest number**, and the gap is objects — see
-`STRATEGY.md` §13.
+Three figures, because one number would mislead (`STRATEGY.md` §17):
+**hole-free** (no static holes) is an upper bound; **call-closed** additionally requires
+every callee to resolve inside the program, and is the honest verifiable core;
+**dynamic-hole risk** counts constructs that can still hole on some input.
+Static hole-freedom does *not* imply the interpreter never holes — an untranslated callee
+is invisible in the AST.
 
 ## The oracle has teeth
 
-The differential harness is not decoration. On first run it found a real bug:
+Every one of these was found by the tooling, not designed in. The differential harness is
+not decoration — on its first run it found a real bug:
 
 ```
 DIVERGENCE fmod(6, -9): cpython=-3 lean=6
@@ -103,6 +108,19 @@ doesn't match the runtime is theater — caught automatically rather than by ins
   analyzed problems. The dominant pattern: Python determinism tests (`f(x) == f(x)`)
   transliterated into Lean, where purity makes them `rfl`. Spec *translation* is not spec
   *preservation*.
+- **Short-circuit evaluation was an actively wrong answer.** `safemod(-11, 0)` returned
+  `0` in CPython and raised `ZeroDivisionError` in Lean, because `b != 0 and a % b == 0`
+  divided anyway. It had been *conservative* until exceptions were added — fidelity work
+  makes other fidelity bugs findable, so the gaps are not independent.
+- **A stale `.olean` made the oracle lie.** It answered with the previous semantics and
+  produced 10 fictitious divergences before being caught. An oracle reading a stale cache
+  is worse than no oracle: it is confidently, specifically wrong. Oracles must now
+  establish they are reading the current artifact before reporting.
+- **`<operator>.and`/`.or` are bitwise, not logical.** They had been mapped to `&&`/`||`,
+  silently computing wrong answers. Now holes.
+- **Static hole-freedom does not imply the program runs.** An untranslated callee is
+  invisible in the AST, so the ledger reports hole-free, call-closed, and dynamic-hole
+  risk as three separate numbers.
 
 ## Not yet built
 

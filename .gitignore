@@ -3,3 +3,8 @@ workspace/
 formalization-graph.json
 ast-*.json
 conformance.json
+ledger-*.json
+sacm-*.json
+mutation.json
+audit.json
+fvspec-report.json
