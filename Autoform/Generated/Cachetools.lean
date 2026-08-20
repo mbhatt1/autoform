@@ -291,7 +291,7 @@ def f_cachetools___init___py__module__Cache_currsize : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.currsize"
   , params := []
   , body := (.seq
-            (.expr (.lit (.str "\"\"The current size of the cache.\"\"")))
+            .skip
             (.ret (.field (.name "self") "_Cache__currsize"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.getsizeof`  (from `cachetools/__init__.py`) -/
@@ -300,7 +300,7 @@ def f_cachetools___init___py__module__Cache_getsizeof : Func :=
   , params := ["value"]
   , body := (.seq
             (.expr (.lit (.str "\"\"Return the size of a cache element's value.\"\"")))
-            (.ret (.lit (.int 0)))) }
+            (.ret (.lit (.int 1)))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache__metaClassCallHandler_ : Func :=

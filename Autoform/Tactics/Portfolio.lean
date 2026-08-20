@@ -445,7 +445,13 @@ structure SearchState where
   /-- Human-readable record of what was tried, for the ledger. -/
   log : Array String
 
-/-- Best-first proof search. Returns `true` iff `goal` is fully closed by a proof that
+/-- Best-first proof search.
+
+Note for `scripts/audit_all.py`'s source sweep: this and `toSMT` are the only `partial`
+definitions in the file. They are *metaprograms* — search drivers, not semantics — and a
+`partial` metaprogram cannot make an unsound proof, because everything it produces is
+still elaborated and kernel-checked, then screened by `screenProof`. Termination is
+enforced dynamically by the node budget rather than by the equation compiler. Returns `true` iff `goal` is fully closed by a proof that
 passed the honesty screen at every leaf. -/
 partial def searchGoal (cfg : SearchCfg) (st : IO.Ref SearchState) (goal : MVarId)
     (depth : Nat) (path : String) : TermElabM Bool := do

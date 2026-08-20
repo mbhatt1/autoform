@@ -23,11 +23,16 @@ source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core p
                    └─▶ formalization graph             └─▶ differential vs real runtime
 ```
 
+> **Numbers in this file go stale.** A dozen artifacts describe the same metrics and they
+> drift apart. Regenerate rather than trust:
+> `./autoform.sh <src> <Name>` prints the ledger; `python3 scripts/sacm.py --module <Name>`
+> prints the assurance case. `docs/` explains what each number means.
+
 ## Verified end to end
 
 | Corpus | Language | Functions | Verifiable core | Conformance vs real runtime |
 |---|---|---|---|---|
-| `cachetools` (real repo) | Python | 233 | **45 (19%)** call-closed · 166 (71%) hole-free | **42/42 (100%)** vs CPython, test-suite driven |
+| `cachetools` (real repo) | Python | see below | see below | see below |
 | stress corpus | Python | 6 | 6 (100%) | **30/30 (100%)** vs CPython |
 | sample | Python | 5 | 2 (40%) | **10/10 (100%)** vs CPython |
 | ctest | C | 5 | 5 (100%) | **25/25 (100%)** vs `cc` |
@@ -140,10 +145,12 @@ a root module that has only imports, which is exactly `Autoform.lean`'s shape.
 
 ## Not yet built
 
-Neural/SMT prover tiers, spec synthesis, boxed mutable containers (`Stmt.setIndex` is
-still an honest hole), cross-scope *writes* (`nonlocal`; reads and closures work), a
-modelled standard library (the 166 hole-free vs 45 call-closed gap is almost entirely
-uncalled stdlib).
+Boxed mutable containers (`Stmt.setIndex` is still an honest hole — design in
+`docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
+contracts at holes, so partially-translated functions can be reasoned about under stated
+assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
+is **not yet wired into the semantics**, so floats still hole); `op:starredUnpack`, which
+needs a variadic calling convention.
 
 ## Dependencies
 

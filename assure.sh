@@ -40,8 +40,16 @@ lake build >/dev/null 2>&1 || echo "  (library build failed; audit will report i
 python3 scripts/audit_all.py || echo "  audit: findings recorded"
 
 hdr "4/5 specification teeth (mutation gate)"
-python3 scripts/mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Semantics \
-  --max-mutants 8 || echo "  mutation: survivors recorded"
+# Mutate the module under assurance, not the toy reference semantics. This step used to
+# hardcode Autoform/Lang/Imp/Semantics.lean, so every assure.sh run produced G4 evidence
+# about Imp regardless of the module named on the command line. sacm.py correctly capped
+# that as off-subject, which meant the pipeline could never support G4 on its own.
+if [ -f "$ROOT/Autoform/Specs/${MOD}Spec.lean" ]; then
+  python3 scripts/mutate.py "Autoform/Generated/$MOD.lean" "Autoform.Generated.$MOD" \
+    --max-mutants 8 || echo "  mutation: survivors recorded"
+else
+  echo "  no Autoform/Specs/${MOD}Spec.lean — G4 will be UNDEVELOPED for $MOD (correct)"
+fi
 
 hdr "5/5 assurance case"
 python3 scripts/sacm.py --module "$MOD"

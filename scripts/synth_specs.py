@@ -532,7 +532,7 @@ def domain_defs(c):
     return "def dom_%s : List %s :=\n  [%s]\n" % (c.id, ty, body)
 
 
-def refute(cands, module, chunk=25):
+def refute(cands, module, chunk=120):
     """Evaluate every candidate over its domain, in the Lean semantics, before anything
     is emitted. A single counterexample drops the candidate.
 
@@ -552,13 +552,22 @@ def refute(cands, module, chunk=25):
                           if c.dom_kind == "obs" else
                           "isHole (runCase C FUEL %s x).2" % c.fdef))
         src.append("end Autoform.SpecsGen.%s\n" % module)
-        rc, out, err, path = lean_run("\n".join(src), "refute%d" % i)
+        # A concurrently rebuilt `.olean` makes `lake env lean` fail for reasons that
+        # have nothing to do with the candidates; retry once before recording a chunk as
+        # unevaluated, since "not checked" silently shrinks the population.
         got = {}
-        for line in out.splitlines():
-            m = re.match(r'@@([A-Za-z0-9_]+)@@(true|false) (\d+) (\d+)', line)
-            if m:
-                got[m.group(1)] = (m.group(2) == "true", int(m.group(3)),
-                                   int(m.group(4)))
+        for attempt in range(2):
+            rc, out, err, path = lean_run("\n".join(src), "refute%d" % i)
+            for line in out.splitlines():
+                m = re.match(r'@@([A-Za-z0-9_]+)@@(true|false) (\d+) (\d+)', line)
+                if m:
+                    got[m.group(1)] = (m.group(2) == "true", int(m.group(3)),
+                                       int(m.group(4)))
+            if got:
+                break
+            subprocess.run(["lake", "build", "Autoform.Generated.%s" % module,
+                            "Autoform.SpecsGen.Basis"], capture_output=True, env=ENV,
+                           cwd=REPO)
         for c in part:
             if c.id not in got:
                 c.status, c.reason = "not_checked", "lean could not evaluate the domain"
