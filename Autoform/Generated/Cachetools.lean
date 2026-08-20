@@ -27,7 +27,7 @@ def f_cachetools___init___py__module___DefaultSize___setitem__ : Func :=
 def f_cachetools___init___py__module___DefaultSize_pop : Func :=
   { name := "cachetools/__init__.py:<module>._DefaultSize.pop"
   , params := ["_key"]
-  , body := (.ret (.lit (.int 1))) }
+  , body := (.ret (.lit (.int 0))) }
 
 /-- `cachetools/__init__.py:<module>._DefaultSize.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___DefaultSize_clear : Func :=
@@ -291,7 +291,7 @@ def f_cachetools___init___py__module__Cache_currsize : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.currsize"
   , params := []
   , body := (.seq
-            .skip
+            (.expr (.lit (.str "\"\"The current size of the cache.\"\"")))
             (.ret (.field (.name "self") "_Cache__currsize"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.getsizeof`  (from `cachetools/__init__.py`) -/

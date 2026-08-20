@@ -469,4 +469,262 @@ def assumptionsJson (theoremName : String) (Γ : ContractEnv)
     , ("satisfiabilityProof",
         match satisfiabilityProof with | some n => .str n | none => .null) ]
 
+
+/-! ## 6. A real function, proved under a contract
+
+`cachetools/keys.py:methodkey` is
+
+```python
+def methodkey(self, *args, **kwargs):
+    return hashkey(*args, **kwargs)
+```
+
+and the transpiler emits it with exactly one hole:
+
+```lean
+body := .seq (.expr (.lit (.str "…docstring…")))
+          (.seq .skip (.ret (.call "hashkey" [(.hole "op:starredUnpack")])))
+```
+
+`op:starredUnpack` is the most common hole label in the corpus (33 occurrences), and this
+single node is the entire reason `methodkey` is outside the verifiable core today. The
+`Func` values below are **the generated ones, imported unedited** from
+`Autoform/Generated/Cachetools.lean`.
+
+**Scope, stated rather than glossed.** The theorems are about a two-function program, not
+about all of `cachetools`. That matters for exactly one thing — name resolution: `.call
+"hashkey"` is resolved by `Ctx.resolve`'s unique-suffix rule, which could in principle
+answer differently in a 238-function table. The `#eval`s at the end of this section check
+that the full program agrees; they are evidence, not proof, and `docs/contracts.md` lists
+this as a reader obligation. -/
+
+namespace Demo
+
+open Autoform.Generated
+
+/-- `methodkey` together with the `hashkey` it calls, verbatim from the generated module. -/
+def keysProgram : Program := { dialect := .python, funcs :=
+  [ f_cachetools_keys_py__module__hashkey
+  , f_cachetools_keys_py__module__methodkey ] }
+
+/-- The entry point, spelled as the CPG names it. -/
+def methodkeyName : String := "cachetools/keys.py:<module>.methodkey"
+
+/-! ### Satisfiability first
+
+By `refinesUnder_of_unsatisfiable`, a contract-relative theorem says nothing until its
+contracts are known to be meetable. So the satisfiability proofs come first, and they are
+constructive: each exhibits an implementation. -/
+
+/-- `pureValueContract` is satisfiable here: an integer literal is a hole implementation
+that terminates, returns, raises nothing and leaves the heap alone. -/
+theorem satisfiable_pureValue :
+    Satisfiable [pureValueContract "op:starredUnpack"] keysProgram := by
+  refine ⟨[("op:starredUnpack", .lit (.int 0))], ⟨?_, ?_⟩, ?_⟩
+  · intro l hl
+    simp [Impl.labels] at hl
+    simp [ContractEnv.labels, pureValueContract, hl]
+  · intro c hc e' he' k hk h ρ
+    simp [pureValueContract] at hc
+    subst hc
+    simp only [pureValueContract] at he' ⊢
+    simp at he'
+    subst he'
+    obtain ⟨m, rfl⟩ : ∃ m, k = m + 1 := ⟨k - 1, by omega⟩
+    exact ⟨rfl, ⟨.int 0, rfl⟩⟩
+  · intro c hc
+    simp at hc; subst hc
+    simp [pureValueContract]
+
+/-- `raisesContract` is satisfiable **only for payloads Core can actually raise.** Division
+by zero is one: `1 / 0` is a legal `Expr` whose meaning is `.exn (.str "ZeroDivisionError")`.
+
+This is a real limitation and it is the mechanism working: an assumption that the hole
+raises `MyCustomError` is not automatically meetable, and the obligation surfaces here
+rather than being smuggled in. -/
+theorem satisfiable_raises_zeroDiv :
+    Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgram := by
+  refine ⟨[("op:starredUnpack", .binop "/" (.lit (.int 1)) (.lit (.int 0)))], ⟨?_, ?_⟩, ?_⟩
+  · intro l hl
+    simp [Impl.labels] at hl
+    simp [ContractEnv.labels, raisesContract, hl]
+  · intro c hc e' he' k hk h ρ
+    simp [raisesContract] at hc
+    subst hc
+    simp only [raisesContract] at he' ⊢
+    simp at he'
+    subst he'
+    obtain ⟨m, rfl⟩ : ∃ m, k = m + 2 := ⟨k - 2, by omega⟩
+    rfl
+  · intro c hc
+    simp at hc; subst hc
+    simp [raisesContract]
+
+/-! ### The theorems
+
+Both are `RefinesUnder`, at the concrete fuel bound 14, on the unrestricted domain. -/
+
+set_option maxHeartbeats 2000000 in
+set_option maxRecDepth 8000 in
+/-- **`methodkey` refines a total Lean specification, under one contract.**
+
+Assuming only that the starred-unpack construct returns *some* value without touching the
+heap, `methodkey` provably terminates, provably never raises, provably never reaches any
+other hole, and returns a freshly allocated `_HashedTuple` at address 0 — for every
+argument list and every fuel budget from 14 up.
+
+Note what is *not* assumed: nothing about which value the hole produces. The conclusion is
+uniform over all implementations meeting the contract, which is the strongest form this
+mechanism can deliver — and here it happens to be available, because `_HashedTuple` has no
+`__init__` in the translated program, so the unpacked arguments are not observable in the
+result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
+theorem methodkey_refinesUnder_value :
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram methodkeyName 14
+      (fun _ => True) (fun _ => .ret (.ref 0)) := by
+  intro σ hc ht
+  have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
+    simp
+  obtain ⟨e, he⟩ : ∃ e, σ.lookup "op:starredUnpack" = some e := by
+    have h1 : (σ.lookup "op:starredUnpack").isSome := ht _ hmem
+    exact Option.isSome_iff_exists.mp h1
+  have hpost := hc.2 _ hmem e he
+  simp only [pureValueContract] at hpost
+  -- The contract fixes the *shape* of the hole's outcome, not its value; that is enough
+  -- to rewrite past it.
+  have hvf : ∀ k h ρ, 1 ≤ k → evalExpr (ctxOf (σ.onProgram keysProgram)) k h ρ e =
+      (h, .val (match (evalExpr (ctxOf (σ.onProgram keysProgram)) k h ρ e).2 with
+                | .val v => v | _ => .unit)) := by
+    intro k h ρ hk
+    obtain ⟨h1, v, h2⟩ := hpost k hk h ρ
+    rw [h2]
+    exact Prod.ext h1 h2
+  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+    substEP, he, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hvf
+  intro args _
+  apply forall_ge_of_forall_add
+  intro k
+  simp +decide [runFunc, methodkeyName, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, substEP, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, String.endsWith, Env.set, Env.get,
+    Val.truthy, Heap.alloc, hvf]
+
+set_option maxHeartbeats 2000000 in
+set_option maxRecDepth 8000 in
+/-- **A different contract proves a different theorem.**
+
+Under the assumption that the same hole *raises*, `methodkey` refines `raise payload`
+instead. The contract is therefore load-bearing: it is not a formality that lets an
+otherwise-fixed conclusion through, it determines the conclusion.
+
+Taken with `methodkey_refinesUnder_value` this is also the sharpest illustration of what
+`refinesUnder_unique` does and does not say. Both theorems are true; they do not conflict,
+because they are relative to different `Γ`s. Reading either one without its `Γ` is reading
+it wrong. -/
+theorem methodkey_refinesUnder_raise (payload : Val) :
+    RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgram methodkeyName 14
+      (fun _ => True) (fun _ => .raise payload) := by
+  intro σ hc ht
+  have hmem : raisesContract "op:starredUnpack" payload ∈
+      [raisesContract "op:starredUnpack" payload] := by simp
+  obtain ⟨e, he⟩ : ∃ e, σ.lookup "op:starredUnpack" = some e := by
+    have h1 : (σ.lookup "op:starredUnpack").isSome := ht _ hmem
+    exact Option.isSome_iff_exists.mp h1
+  have hpost := hc.2 _ hmem e he
+  simp only [raisesContract] at hpost
+  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+    substEP, he, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
+  intro args _
+  apply forall_ge_of_forall_add
+  intro k
+  simp +decide [runFunc, methodkeyName, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, substEP, he, Ctx.resolve, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
+
+/-- The contract-relative theorem plus its satisfiability proof, which is the pair a
+reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
+theorem methodkey_value_result :
+    Satisfiable [pureValueContract "op:starredUnpack"] keysProgram ∧
+    RefinesUnder [pureValueContract "op:starredUnpack"] keysProgram methodkeyName 14
+      (fun _ => True) (fun _ => .ret (.ref 0)) :=
+  ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
+
+/-! ### The negative result
+
+Without it the section above would be advocacy. -/
+
+/-- Leaving the hole in place is a legal implementation of `topContract`. -/
+def idImpl : Impl := [("op:starredUnpack", .hole "op:starredUnpack")]
+
+theorem idImpl_onProgram : idImpl.onProgram keysProgram = keysProgram := by
+  simp [idImpl, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
+
+set_option maxHeartbeats 1000000 in
+set_option maxRecDepth 8000 in
+/-- Untouched, `methodkey` reports the hole, at any adequate fuel — the situation this
+whole file exists to improve on. -/
+theorem methodkey_holes (k : Nat) (args : List Val) :
+    runFunc keysProgram (k + 14) methodkeyName args = .hole "op:starredUnpack" := by
+  simp +decide [runFunc, methodkeyName, keysProgram, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey, Ctx.resolve, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy]
+
+/-- **An unconstrained contract proves nothing.**
+
+Under `topContract` — satisfiable, by `satisfiable_top`, and therefore not excluded by the
+anti-vacuity check — *no* specification refines `methodkey`, at any fuel bound, on any
+non-empty domain. The reason is exactly right: "the hole may do anything" includes
+"the hole may still be a hole", and `Refine.refines_not_hole` then bites.
+
+So satisfiability is necessary and not sufficient, and the useful contracts are the ones
+that say something. A `Γ` full of `topContract`s is detectably worthless rather than
+quietly worthless. -/
+theorem methodkey_not_refinable_under_top (N : Nat) (dom : List Val → Prop)
+    (spec : List Val → Outcome) (args : List Val) (hd : dom args) :
+    ¬ RefinesUnder [topContract "op:starredUnpack"] keysProgram methodkeyName N dom spec := by
+  intro h
+  have hcons : Consistent [topContract "op:starredUnpack"] keysProgram idImpl := by
+    refine ⟨?_, ?_⟩
+    · intro l hl
+      simp [idImpl, Impl.labels] at hl
+      simp [ContractEnv.labels, topContract, hl]
+    · intro c hc e' _ k _ h' ρ
+      simp at hc; subst hc; trivial
+  have htot : Total [topContract "op:starredUnpack"] idImpl := by
+    intro c hc; simp at hc; subst hc; simp [topContract, idImpl]
+  have hR := h idImpl hcons htot
+  rw [idImpl_onProgram] at hR
+  exact refines_not_hole hR args hd (N + 14) (Nat.le_add_right _ _) "op:starredUnpack"
+    (methodkey_holes N args)
+
+/-! ### Cross-checks against the full program
+
+`keysProgram` is a two-function slice. These evaluate the *whole* translated `cachetools`
+(238 functions) and confirm the slice did not change the answer — the same
+oracle-not-sharing-the-artifact's-assumptions discipline as §17. They are `#eval`, so they
+are evidence for a reader, not part of any proof. -/
+
+-- The untouched full program holes, exactly as the slice does.
+#eval reprStr (runFunc Autoform.Generated.program 40 methodkeyName [.int 1])
+
+-- With the hole implemented, the full program returns `_HashedTuple` at address 0 —
+-- agreeing with `methodkey_refinesUnder_value`.
+#eval reprStr (runFunc (Impl.onProgram [("op:starredUnpack", Expr.lit (.int 0))]
+  Autoform.Generated.program) 40 methodkeyName [.int 1])
+
+/-! ### The assumption record this theorem exports -/
+
+-- What `scripts/sacm.py` should turn into `Assumption` nodes attached to
+-- `methodkey_refinesUnder_value` — not to the module.
+#eval (assumptionsJson
+  "Autoform.Contracts.Demo.methodkey_refinesUnder_value"
+  [pureValueContract "op:starredUnpack"]
+  (some "Autoform.Contracts.Demo.satisfiable_pureValue")).pretty
+
+end Demo
+
 end Autoform.Contracts

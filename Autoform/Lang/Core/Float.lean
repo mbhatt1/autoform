@@ -1,5 +1,3 @@
-import Autoform.Lang.Core.Syntax
-
 /-!
 # Core — binary floating point
 
@@ -365,14 +363,6 @@ def cDoubleExcess : FConfig := { cDouble with excessPrecision := true }
 def java64 : FConfig := { fmt := Format.binary64, onDivZero := .ieee }
 end FConfig
 
-/-- Float configuration implied by a `Core.Dialect`. `cLike` gets `cDouble`, matching what
-the oracle measures on x86-64; switch to `cDoubleExcess` to *surface* excess-precision
-dependence instead of assuming it away. As with `NumConfig`, the ledger must record which
-one a result was obtained under. -/
-def Dialect.toFConfig : Dialect → FConfig
-  | .python => FConfig.python
-  | .cLike  => FConfig.cDouble
-
 /-! ## Results -/
 
 /-- Outcome of a floating-point operation. Four outcomes, for four different reasons,
@@ -517,7 +507,15 @@ The configuration is unused, deliberately: comparison decodes both operands to t
 *exact* values, so a binary32 and a binary64 operand compare correctly without a
 conversion step (C's `float`→`double` promotion is exact, so this agrees with C too).
 Everything that *rounds* takes the format from the configuration; nothing here rounds. -/
-def cmp (_c : FConfig) (x y : Fl) : Option Ordering :=
+def cmp (_c : FConfig) (x y : Fl) : Option Ordering := Fl.cmpv x y
+
+end FConfig
+
+namespace Fl
+
+/-- Comparison, without a configuration — see the note on `FConfig.cmp`. This is the form
+`Val.beq` needs, since `Val` carries no dialect. -/
+def cmpv (x y : Fl) : Option Ordering :=
   if x.isNaN || y.isNaN then none
   else if x.isZero && y.isZero then some .eq        -- +0.0 == -0.0
   else if x.isInf || y.isInf then
@@ -536,14 +534,24 @@ def cmp (_c : FConfig) (x y : Fl) : Option Ordering :=
           some (if sa then compare B A else compare A B)
     | _, _ => none
 
+/-- Python `==` on two floats: NaN is not equal to itself, `+0.0 == -0.0`. -/
+def eqv (x y : Fl) : Bool := Fl.cmpv x y == some .eq
+
+/-- Truthiness: `bool(0.0) == bool(-0.0) == False`, everything else — including `nan` —
+is `True`. -/
+def truthy (x : Fl) : Bool := !x.isZero
+
+end Fl
+
+namespace FConfig
+
 def eq (c : FConfig) (x y : Fl) : Bool := c.cmp x y == some .eq
 def lt (c : FConfig) (x y : Fl) : Bool := c.cmp x y == some .lt
 def le (c : FConfig) (x y : Fl) : Bool := c.cmp x y == some .lt || c.cmp x y == some .eq
 def ne (c : FConfig) (x y : Fl) : Bool := !(c.eq x y)
 
-/-- Truthiness: `bool(0.0) == bool(-0.0) == False`, everything else including `nan` is
-`True`. -/
-def truthy (_c : FConfig) (x : Fl) : Bool := !x.isZero
+/-- Truthiness of a float under a configuration; the configuration is irrelevant. -/
+def truthy (_c : FConfig) (x : Fl) : Bool := Fl.truthy x
 
 /-! ### Conversions
 
@@ -571,7 +579,14 @@ def toInt (_c : FConfig) (x : Fl) : Except String Int :=
 
 /-- Exact comparison between an `Int` and a float, as Python performs it. No coercion in
 either direction, so `10^23 == 1e23` comes out `False`, matching CPython. -/
-def cmpInt (_c : FConfig) (n : Int) (x : Fl) : Option Ordering :=
+def cmpInt (_c : FConfig) (n : Int) (x : Fl) : Option Ordering := Fl.cmpIntv n x
+
+end FConfig
+
+namespace Fl
+
+/-- Exact `Int` vs float comparison, configuration-free. -/
+def cmpIntv (n : Int) (x : Fl) : Option Ordering :=
   if x.isNaN then none
   else if x.isInf then some (if x.signBit then .gt else .lt)
   else match x.toExact with
@@ -582,6 +597,10 @@ def cmpInt (_c : FConfig) (n : Int) (x : Fl) : Option Ordering :=
           else (n * 2 ^ (-e).toNat, (m : Int))
         some (compare nn (if s then -dd else dd))
     | none => none
+
+end Fl
+
+namespace FConfig
 
 /-! ### Explicitly unmodelled -/
 
