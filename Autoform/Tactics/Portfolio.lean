@@ -202,6 +202,14 @@ hammer: `bv_decide` is core, SAT-backed and LRAT-checked *by the kernel*, so it 
 genuine tier-2 rung and not an oracle. `aesop` is a dependency and a tier-2 rung.
 `duper` and `lean-smt` remain unavailable (not dependencies).
 
+Measured, so the dependency is not taken on faith: run against the first 16 of the 71
+open obligations in `Autoform.SpecsGen.Cachetools`, the ladder *with* `aesop` closes
+**0**. That is the expected answer and not an argument against the rung — every one of
+those obligations is of the form "proved at FUEL only, fuel-independence unproved", which
+needs induction over the five mutually recursive interpreter functions plus a
+monotonicity lemma. No proof-search tactic finds that, and a portfolio that appeared to
+would be reporting a bug. `aesop` earns its place on ordinary goals, not on this class.
+
 Note what adding `aesop` says about tiers 4/5 below: `aesop` *is* best-first proof
 search, done properly and maintained by people who work on nothing else. The hand-rolled
 search here is worth keeping only for what `aesop` does not do — decomposition and
