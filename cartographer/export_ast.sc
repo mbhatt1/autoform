@@ -544,8 +544,18 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           else if (c.headOption.exists(ch => ch == '"' || ch == '\''))
             ujson.Obj("k" -> "str", "v" -> unquoted)
           else if (c.isEmpty) ujson.Obj("k" -> "unit")
-          // Unquoted, non-numeric literal code: the frontend synthesises these for
-          // constructs like `import a.b`. Calling it a string would be inventing a value.
+          // A bare dotted identifier in literal position is not a literal at all: the
+          // Python frontend synthesises these as the *operands of import statements*
+          // (`__future__`, `annotations`, `ansible.errors`, `typing`, `os`). Filing them
+          // under `lit:unquoted` reported a literal-parsing problem and pointed at the
+          // wrong remedy -- on Ansible it hid 2,157 import operands inside a label that
+          // says "we could not read this number". Naming them `import:operand` puts them
+          // with the other import holes, where the actual work is.
+          else if (c.matches("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*""") ||
+                   c == ".")
+            hole("import:operand")
+          // Unquoted, non-numeric, non-identifier literal code. Calling it a string would
+          // be inventing a value.
           else hole("lit:unquoted")
       }
     case i: Identifier        => ujson.Obj("k" -> "name", "v" -> i.name)

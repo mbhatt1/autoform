@@ -6,7 +6,13 @@ import Autoform.Lang.Core.Semantics
 -- Linux `lib/` hit the limit at two declarations and the whole module failed to
 -- type-check. Raising it costs nothing for shallow modules and is the difference
 -- between compiling a real codebase and not.
-set_option maxRecDepth 8000
+--
+-- 8000 was not enough either. The binding constraint is not the nesting depth of
+-- any one body (Ansible's deepest is 297) but the `funcs := [...]` list literal,
+-- which elaborates as nested cons cells -- one frame or more per function, and
+-- Ansible has 5,546. So the limit has to scale with the module's function count,
+-- not with how deep its code happens to be.
+set_option maxRecDepth 8688
 
 /-!
 # LangTS — machine-generated
