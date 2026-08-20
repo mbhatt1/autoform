@@ -202,7 +202,7 @@ def f_cachetools___init___py__module__Cache___delitem__ : Func :=
 def f_cachetools___init___py__module__Cache___contains__ : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.__contains__"
   , params := ["key"]
-  , body := (.ret (.inOp false (.name "key") (.field (.name "self") "_Cache__data"))) }
+  , body := (.ret (.inOp false (.name "key") (.field (.name "key") "_Cache__data"))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__missing__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___missing__ : Func :=
@@ -1533,7 +1533,7 @@ def f_cachetools___init___py__module__TTLCache___setstate__ : Func :=
 def f_cachetools___init___py__module__TTLCache___setstate____lambda_0 : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0"
   , params := ["obj"]
-  , body := (.expr (.field (.name "obj") "expires")) }
+  , body := (.ret (.field (.name "obj") "expires")) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache.ttl`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__TTLCache_ttl : Func :=
