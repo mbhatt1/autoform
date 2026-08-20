@@ -133,11 +133,20 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | 100% on all corpora |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | **5 divergences on `cachetools`**, one root cause (see below); 100% on the smaller corpora |
 | specifications constrain behaviour | source-level mutation gate | 100%, HAS TEETH |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
-| untranslated code is declared | hole counting + SACM assumptions | 102 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 78 holes, all named |
+
+The first row used to read "100% on all corpora". It stopped being true when the
+differential harness stopped skipping varargs functions and reached `hashkey` for the
+first time: `class _HashedTuple(tuple)` translates to an ordinary class, so its instances
+are opaque `Val.ref`s, while CPython's instance *is* a tuple. Core has no inheritance
+from builtin types. The divergence is pre-existing — the same `ref 1` comes out of the
+pre-change build — and it is recorded as a divergence rather than reclassified as
+"unrepresentable", because the semantics really does compute a different answer and
+calling that not-measured would be the more flattering lie. See STRATEGY.md §31.
 
 `leanchecker` ships with the Lean toolchain (v4.28.0+) — `lean4checker` is deprecated and
 there is no Homebrew formula. **Use `--fresh`**: without it the checker can silently pass

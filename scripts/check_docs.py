@@ -53,6 +53,18 @@ CROSS = [
      "function count"),
 ]
 
+# (doc, regex with one capturing group, artifact, counter) — figures quoted in prose
+# rather than held in a JSON field.
+COUNTED = [
+    ("README.md", r"\|\s*(\d+) holes, all named\s*\|",
+     "ast-Cachetools.json", "ast_hole_count", "hole count"),
+]
+
+
+def ast_hole_count(path):
+    """Holes in a neutral AST, counted from the label field the exporter emits."""
+    return len(re.findall(r'"(?:label|hole)"\s*:\s*"[^"]+"', open(path).read()))
+
 
 def ast_function_count(path):
     d = json.load(open(path))
@@ -95,6 +107,19 @@ def main():
         got = cast(m.group(1).replace(",", ""))
         if got != want:
             stale.append(f"{doc}: says {key}={got}, {art} says {want}")
+    for doc, rx, art, fn, what in COUNTED:
+        dp, ap_ = os.path.join(a.root, doc), os.path.join(a.root, art)
+        if not (os.path.exists(dp) and os.path.exists(ap_)):
+            missing.append(f"{doc} or {art}")
+            continue
+        want = globals()[fn](ap_)
+        m = re.search(rx, open(dp).read())
+        if not m:
+            stale.append(f"{doc}: pattern for {what} no longer matches — the doc was "
+                         f"restructured and this check stopped checking.")
+        elif int(m.group(1)) != want:
+            stale.append(f"{doc}: says {what}={m.group(1)}, {art} has {want}")
+
     for m in missing:
         print(f"MISSING  {m}", file=sys.stderr)
     for s in stale:
