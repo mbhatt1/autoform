@@ -295,16 +295,16 @@ Only C-like dialects collapse it to a boolean. -/
 theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = false) :
     evalExpr ctx (k+1) h ρ (.binop "&&" a b)
-      = (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool false)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd]
+      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
+  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
 
 /-- `||` does not evaluate its right operand once the left is truthy, and yields the
 **left operand itself** under Python value semantics (`5 or 0` is `5`, not `True`). -/
 theorem evalExpr_or_short {a b : Expr} {h₁ : Heap} {x : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = true) :
     evalExpr ctx (k+1) h ρ (.binop "||" a b)
-      = (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool true)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd]
+      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
+  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
 
 /-- A non-value in the left operand short-circuits and is propagated unchanged. This is
 what stops a hole in one operand from being silently absorbed. -/

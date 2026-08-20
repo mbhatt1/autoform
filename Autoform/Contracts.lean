@@ -509,32 +509,6 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
-/-! ### Name-resolution facts
-
-`Ctx.resolve` falls back to a unique-suffix match, and `Ctx.resolveMethod` to a
-class-qualified one. These are the six suffix tests the interpreter performs while running
-`methodkey`, discharged once so the evaluation proofs below do not have to reduce string
-operations inline. -/
-
-private theorem ew_hashkey_hashkey :
-    "cachetools/keys.py:<module>.hashkey".endsWith ".hashkey" = true := by
-  simp +decide [String.endsWith]
-private theorem ew_methodkey_hashkey :
-    "cachetools/keys.py:<module>.methodkey".endsWith ".hashkey" = false := by
-  simp +decide [String.endsWith]
-private theorem ew_hashkey_htinit :
-    "cachetools/keys.py:<module>.hashkey".endsWith "._HashedTuple.__init__" = false := by
-  simp +decide [String.endsWith]
-private theorem ew_methodkey_htinit :
-    "cachetools/keys.py:<module>.methodkey".endsWith "._HashedTuple.__init__" = false := by
-  simp +decide [String.endsWith]
-private theorem ew_hashkey_init :
-    "cachetools/keys.py:<module>.hashkey".endsWith ".__init__" = false := by
-  simp +decide [String.endsWith]
-private theorem ew_methodkey_init :
-    "cachetools/keys.py:<module>.methodkey".endsWith ".__init__" = false := by
-  simp +decide [String.endsWith]
-
 /-! ### Satisfiability first
 
 By `refinesUnder_of_unsatisfiable`, a contract-relative theorem says nothing until its
@@ -630,20 +604,33 @@ theorem methodkey_refinesUnder_value :
   intro args _
   apply forall_ge_of_forall_add
   intro k
+  -- `Ctx.resolve`'s suffix test hides its pattern inside a `Pattern` *instance* argument,
+  -- where `simp` does not rewrite. Normalising the three concatenations by `rw` lets the
+  -- interpreter's name resolution reduce; the alternation below is just evaluation.
   simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, hvf,
-    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
-    ew_hashkey_init, ew_methodkey_init]
+    Val.truthy, Heap.alloc, String.endsWith, hvf]
+  rw [show ("." ++ "hashkey") = ".hashkey" from by rfl]
+  simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
+    Val.truthy, Heap.alloc, String.endsWith, hvf]
+  try rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__"
+        from by rfl]
   try simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
-    Val.truthy, Heap.alloc, hvf,
-    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
-    ew_hashkey_init, ew_methodkey_init]
+    Val.truthy, Heap.alloc, String.endsWith, hvf]
+  try rw [show ("." ++ "__init__") = ".__init__" from by rfl]
+  try simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, he, Ctx.resolve, Ctx.resolveMethod, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
+    Val.truthy, Heap.alloc, String.endsWith, hvf]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**

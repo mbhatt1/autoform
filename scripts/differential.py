@@ -1038,6 +1038,11 @@ def main():
                 print("lean environment failure, not bisecting:",
                       (out.stdout[:200] + " " + out.stderr[:300]).replace("\n", " ")[:300])
             return got
+        if len(got) < len(idxs) and len(idxs) == 1 and os.environ.get(
+                "AUTOFORM_DIFF_KEEP"):
+            # debugging aid: keep the exact file the interpreter choked on
+            import shutil
+            shutil.copy(scratch, "/tmp/autoform_diff_fail_%d.lean" % idxs[0])
         if len(got) < len(idxs) and len(idxs) > 1:
             mid = len(idxs) // 2
             got.update(lean_eval(idxs[:mid], depth + 1))

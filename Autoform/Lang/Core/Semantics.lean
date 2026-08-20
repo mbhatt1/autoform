@@ -214,9 +214,9 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- for both, so applying Python's string semantics under `.cLike` would be a silent
   -- wrong answer of exactly the kind §12 is about. Under `.cLike` these are holes.
   | "+",  .str _,   .str _   =>
-      match d with
-      | .python => .val (.str (match a, b with | .str x, .str y => x ++ y | _, _ => ""))
-      | .cLike  => .hole "str:pointer-arithmetic-not-modelled"
+      if d.stringsAreValues then
+        .val (.str (match a, b with | .str x, .str y => x ++ y | _, _ => ""))
+      else .hole "str:pointer-arithmetic-not-modelled"
   | "+",  .list x,  .list y  => .val (.list (x ++ y))
   | "+",  .tuple x, .tuple y => .val (.tuple (x ++ y))
   | "-",  .int x, .int y => numToE (nc.sub x y)
@@ -228,23 +228,19 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | ">",  .int x, .int y => .val (.bool (x > y))
   | ">=", .int x, .int y => .val (.bool (x ≥ y))
   | "<",  .str x, .str y =>
-      match d with
-      | .python => .val (.bool (x < y))
-      | .cLike  => .hole "str:pointer-compare-not-modelled"
+      if d.stringsAreValues then .val (.bool (x < y))
+      else .hole "str:pointer-compare-not-modelled"
   | ">",  .str x, .str y =>
-      match d with
-      | .python => .val (.bool (x > y))
-      | .cLike  => .hole "str:pointer-compare-not-modelled"
+      if d.stringsAreValues then .val (.bool (x > y))
+      else .hole "str:pointer-compare-not-modelled"
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
   | "==", .str _, .str _ =>
-      match d with
-      | .python => .val (.bool (Val.beq a b))
-      | .cLike  => .hole "str:pointer-equality-not-modelled"
+      if d.stringsAreValues then .val (.bool (Val.beq a b))
+      else .hole "str:pointer-equality-not-modelled"
   | "!=", .str _, .str _ =>
-      match d with
-      | .python => .val (.bool (!Val.beq a b))
-      | .cLike  => .hole "str:pointer-equality-not-modelled"
+      if d.stringsAreValues then .val (.bool (!Val.beq a b))
+      else .hole "str:pointer-equality-not-modelled"
   -- Floats, including mixed `int`/`float`. Placed before the generic `==`/`!=` so that
   -- the dialect split on comparison (see `flCmp`) is not bypassed by `Val.beq`.
   | op, .float _, .float _ => flBinop d op a b
@@ -259,8 +255,8 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "!=", x, y           => .val (.bool (!Val.beq x y))
   -- Reached only when the left operand did not decide the result, so the value
   -- of the expression is the RIGHT operand under value semantics.
-  | "&&", _, y           => .val (match d with | .python => y | .cLike => .bool y.truthy)
-  | "||", _, y           => .val (match d with | .python => y | .cLike => .bool y.truthy)
+  | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
+  | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | _, _, _              => .hole s!"binop:{op}"
 
 /-!
@@ -465,9 +461,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- conditions, where truthiness makes the two indistinguishable.
         -- C is the opposite: `&&`/`||` genuinely yield 0/1.
         if op == "&&" && !x.truthy then
-          (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool false))
+          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
         else if op == "||" && x.truthy then
-          (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool true))
+          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
           | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
