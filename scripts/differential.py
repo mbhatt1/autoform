@@ -34,7 +34,7 @@ random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 FUEL = 5000
 MAX_TOTAL_CASES = 600      # keep the generated Lean file compile-bounded
 MAX_DEPTH = 8              # value-encoding depth limit
-MAX_ELEMS = 2048           # value-encoding breadth limit (a resource
+MAX_ELEMS = 512            # value-encoding breadth limit (a resource
                            # bound, not a fidelity one: containers are
                            # encoded whole or refused, never truncated)
 

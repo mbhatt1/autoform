@@ -273,17 +273,18 @@ passes `screenProof`. The second check is the anti-self-certification guard: a r
 not trusted to report its own honesty. -/
 def tryRung (goal : MVarId) (r : Rung) : TermElabM Bool := quietly do
   let s ← saveState
-  try
-    let gs ← Tactic.run goal (Tactic.evalTactic r.tac)
-    if !gs.isEmpty then
-      s.restore; return false
-    if let some why ← screenProof goal then
-      trace[autoform.portfolio] "rejected `{r.label}`: {why}"
-      s.restore; return false
-    return true
-  catch _ =>
-    s.restore
-    return false
+  -- `tryCatchRuntimeEx`, not a plain `try`: a rung that exhausts the recursion depth or
+  -- the heartbeat budget has *failed*, and must not abort the whole elaboration.
+  tryCatchRuntimeEx
+    (do
+      let gs ← Tactic.run goal (Tactic.evalTactic r.tac)
+      if !gs.isEmpty then
+        s.restore; return false
+      if let some why ← screenProof goal then
+        trace[autoform.portfolio] "rejected `{r.label}`: {why}"
+        s.restore; return false
+      return true)
+    (fun _ => do s.restore; return false)
 
 /-- Apply `tac` to `goal` as a *move*: it may leave subgoals. Returns them, or `none` if
 the tactic failed or made no progress. State is restored on failure, and the caller is
@@ -291,17 +292,16 @@ responsible for restoring it if it abandons the branch. -/
 def tryMove (goal : MVarId) (tac : TSyntax `tactic) : TermElabM (Option (List MVarId)) := quietly do
   let s ← saveState
   let before ← instantiateMVars (← goal.getType)
-  try
-    let gs ← Tactic.run goal (Tactic.evalTactic tac)
-    -- Reject no-ops: a move that returns the same single goal is a loop.
-    if h : gs.length = 1 then
-      let g := gs[0]
-      if (← instantiateMVars (← g.getType)) == before then
-        s.restore; return none
-    return some gs
-  catch _ =>
-    s.restore
-    return none
+  tryCatchRuntimeEx
+    (do
+      let gs ← Tactic.run goal (Tactic.evalTactic tac)
+      -- Reject no-ops: a move that returns the same single goal is a loop.
+      if h : gs.length = 1 then
+        let g := gs[0]
+        if (← instantiateMVars (← g.getType)) == before then
+          s.restore; return none
+      return some gs)
+    (fun _ => do s.restore; return none)
 
 /-! ## Tier 5: decomposition and generalization moves
 
