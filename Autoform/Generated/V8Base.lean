@@ -333,11 +333,11 @@ def f_v8_base_BoundedPageAllocator___init__ : Func :=
   { name := "v8.base.BoundedPageAllocator.__init__"
   , params := ["page_allocator", "start", "size", "allocate_page_size", "page_initialization_mode", "page_freeing_mode"]
   , body := (.seq
-            (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   (.setField (.name "self") "allocate_page_size_" (.name "allocate_page_size"))
                   (.seq
@@ -399,9 +399,9 @@ def f_v8_base_BoundedPageAllocator_AllocatePages_void__size_t_size_t_PageAllocat
                       (.seq
                         (.assign "guard" (.alloc "MutexGuard" [(.field (.name "self") "mutex_")]))
                         (.seq
-                          (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -411,7 +411,7 @@ def f_v8_base_BoundedPageAllocator_AllocatePages_void__size_t_size_t_PageAllocat
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "hint_address" (.hole "op:cast:opaque-type"))
+                                    (.assign "hint_address" (.unop "cast:u64" (.call "Address" [])))
                                     (.seq
                                       (.ifte
                                         (.binop
@@ -487,7 +487,7 @@ def f_v8_base_BoundedPageAllocator_AllocatePages_void__size_t_size_t_PageAllocat
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "ptr" (.hole "op:cast:scalar"))
+                                        (.assign "ptr" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.ifte
                                         (.binop
@@ -546,7 +546,7 @@ def f_v8_base_BoundedPageAllocator_AllocatePages_void__size_t_size_t_PageAllocat
                                         "region_allocator_"
                                         [(.name "address")])
                                         , (.name "size")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.setField
                                         (.name "self")
@@ -567,11 +567,11 @@ def f_v8_base_BoundedPageAllocator_AllocatePagesAt_bool_v8_base_BoundedPageAlloc
                 (.seq
                   (.assign "guard" (.alloc "MutexGuard" [(.field (.name "self") "mutex_")]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
                           (.ifte
                             (.unop
@@ -590,7 +590,7 @@ def f_v8_base_BoundedPageAllocator_AllocatePagesAt_bool_v8_base_BoundedPageAlloc
                           (.seq
                             .skip
                             (.seq
-                              (.assign "ptr" (.hole "op:cast:scalar"))
+                              (.assign "ptr" (.hole "op:cast:pointer"))
                               (.seq
                                 (.ifte
                                   (.unop
@@ -608,7 +608,7 @@ def f_v8_base_BoundedPageAllocator_AllocatePagesAt_bool_v8_base_BoundedPageAlloc
                                         "region_allocator_"
                                         [(.name "address")])
                                         , (.name "size")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
                                       (.setField
                                         (.name "self")
@@ -638,11 +638,11 @@ def f_v8_base_BoundedPageAllocator_ResizeAllocationAt_bool_void__size_t_size_t_P
                   (.seq
                     .skip
                     (.seq
-                      (.assign "address_at" (.hole "op:cast:opaque-type"))
+                      (.assign "address_at" (.unop "cast:u64" (.name "address")))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK" [(.lit .unit)]))
                           (.seq
                             (.ifte
                               (.binop "<" (.name "new_size") (.name "old_size"))
@@ -652,7 +652,7 @@ def f_v8_base_BoundedPageAllocator_ResizeAllocationAt_bool_void__size_t_size_t_P
                                 (.ret (.lit (.bool true)))
                                 .skip))
                             (.seq
-                              (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                               (.seq
                                 .skip
                                 (.seq
@@ -701,7 +701,7 @@ def f_v8_base_BoundedPageAllocator_ResizeAllocationAt_bool_void__size_t_size_t_P
                                         (.mcall
                                         (.name "self")
                                         "page_allocator_"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.hole "op:cast:pointer")
                                         , (.binop "-" (.name "new_size") (.name "old_size"))
                                         , (.name "access") ]))
                                         (.seq
@@ -711,7 +711,7 @@ def f_v8_base_BoundedPageAllocator_ResizeAllocationAt_bool_void__size_t_size_t_P
                                         (.name "allocated_old_size")
                                         (.name "allocated_new_size"))
                                         (.expr
-                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         .skip)
                                         (.seq
                                         (.setField
@@ -746,13 +746,13 @@ def f_v8_base_BoundedPageAllocator_ReserveForSharedMemoryMapping_bool_void__size
                       (.seq
                         .skip
                         (.seq
-                          (.assign "address" (.hole "op:cast:opaque-type"))
+                          (.assign "address" (.unop "cast:u64" (.name "ptr")))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.seq
-                                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK" [(.lit .unit)]))
                                 (.seq
                                   .skip
                                   (.seq
@@ -826,7 +826,7 @@ def f_v8_base_BoundedPageAllocator_FreePages_bool_void__size_t_ : Func :=
                     (.seq
                       .skip
                       (.seq
-                        (.assign "address" (.hole "op:cast:opaque-type"))
+                        (.assign "address" (.unop "cast:u64" (.name "raw_address")))
                         (.seq
                           (.ifte
                             (.binop
@@ -836,7 +836,7 @@ def f_v8_base_BoundedPageAllocator_FreePages_bool_void__size_t_ : Func :=
                                 (.name "PageInitializationMode")
                                 "kAllocatedPagesMustBeZeroInitialized"))
                             (.seq
-                              (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                               (.seq
                                 (.assign
                                   "success"
@@ -847,7 +847,7 @@ def f_v8_base_BoundedPageAllocator_FreePages_bool_void__size_t_ : Func :=
                                 (.expr
                                   (.call
                                     "CHECK"
-                                    [(.name "success"), (.hole "expr:CONTROL_STRUCTURE")]))))
+                                    [(.name "success"), (.hole "expr:CONTROL_STRUCTURE:DO")]))))
                             (.hole "control:SWITCH"))
                           (.seq
                             .skip
@@ -864,7 +864,7 @@ def f_v8_base_BoundedPageAllocator_FreePages_bool_void__size_t_ : Func :=
                                         (.name "self")
                                         "region_allocator_"
                                         [(.name "address")])
-                                    , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                    , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                 (.ret (.name "success"))))))))))))) }
 
 /-- `v8.base.BoundedPageAllocator.ReleasePages:bool(void*,size_t,size_t)`  (from `bounded-page-allocator.cc`) -/
@@ -882,13 +882,13 @@ def f_v8_base_BoundedPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func
                   (.seq
                     .skip
                     (.seq
-                      (.assign "address" (.hole "op:cast:opaque-type"))
+                      (.assign "address" (.unop "cast:u64" (.name "raw_address")))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -928,7 +928,7 @@ def f_v8_base_BoundedPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "free_address" (.hole "op:cast:scalar"))
+                                        (.assign "free_address" (.hole "op:cast:pointer"))
                                         (.seq
                                         .skip
                                         (.seq
@@ -944,7 +944,7 @@ def f_v8_base_BoundedPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func
                                         (.name "PageInitializationMode")
                                         "kAllocatedPagesMustBeZeroInitialized"))
                                         (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.ret
                                         (.mcall
                                         (.name "self")
@@ -958,7 +958,7 @@ def f_v8_base_BoundedPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func
                                         (.field (.name "self") "page_freeing_mode_")
                                         (.field (.name "PageFreeingMode") "kMakeInaccessible"))
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.ret
                                         (.mcall
                                         (.name "self")
@@ -969,7 +969,7 @@ def f_v8_base_BoundedPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func
                                         .skip)
                                         (.seq
                                         (.expr
-                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         (.ret
                                         (.mcall
                                         (.name "self")
@@ -983,11 +983,11 @@ def f_v8_base_BoundedPageAllocator_SetPermissions_bool_void__size_t_PageAllocato
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -1014,11 +1014,11 @@ def f_v8_base_BoundedPageAllocator_RecommitPages_bool_void__size_t_PageAllocator
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -1064,7 +1064,7 @@ def f_v8_base_BoundedPageAllocator_AllocationStatusToString_char__v8_base_Bounde
             .skip
             (.seq
               (.hole "control:SWITCH")
-              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `v8.base.BoundedPageAllocator.RecordStats:v8.base.BoundedPageAllocator.Stats()`  (from `bounded-page-allocator.cc`) -/
 def f_v8_base_BoundedPageAllocator_RecordStats_v8_base_BoundedPageAllocator_Stats__ : Func :=
@@ -1210,7 +1210,7 @@ def f_TraceStackFrame__Unwind_Reason_Code__Unwind_Context__void__ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.assign "state" (.hole "op:cast:object"))
+                  (.assign "state" (.hole "op:cast:pointer"))
                   (.seq
                     .skip
                     (.seq
@@ -1281,9 +1281,7 @@ def f_v8_base_debug_StackTrace___init__' : Func :=
                 (.seq
                   (.assign
                     "state"
-                    (.alloc
-                      "StackCrawlState"
-                      [(.unop "cast:u64" (.field (.name "self") "trace_")), (.name "kMaxTraces")]))
+                    (.alloc "StackCrawlState" [(.hole "op:cast:pointer"), (.name "kMaxTraces")]))
                   (.seq
                     (.expr
                       (.call
@@ -1374,7 +1372,7 @@ def f_v8_base_debug_PrintToStderr_void_char__ : Func :=
                       [ (.name "STDERR_FILENO")
                       , (.name "output")
                       , (.call "strlen" [(.name "output")]) ]))
-                  (.expr (.call "USE" [(.name "return_val"), (.hole "expr:CONTROL_STRUCTURE")])))))) }
+                  (.expr (.call "USE" [(.name "return_val"), (.hole "expr:CONTROL_STRUCTURE:DO")])))))) }
 
 /-- `v8.base.debug.StackDumpSignalHandler:void(int,siginfo_t*,void*)`  (from `debug/stack_trace_posix.cc`) -/
 def f_v8_base_debug_StackDumpSignalHandler_void_int_siginfo_t__void__ : Func :=
@@ -2314,7 +2312,7 @@ def f_StackTrace_InitTrace_void_CONTEXT__ : Func :=
                                         (.setIndex
                                         (.name "trace_")
                                         (.hole "op:postIncrement:value")
-                                        (.hole "op:cast:scalar")))
+                                        (.hole "op:cast:pointer")))
                                         (.hole "control:FOR")))))))))))))))))))))))) }
 
 /-- `v8.base.debug.StackTrace.Print<duplicate>2:void()<const>`  (from `debug/stack_trace_win.cc`) -/
@@ -2391,7 +2389,7 @@ def f_v8_base_debug_StartThread_bool_void__ : Func :=
                                 [ (.hole "op:addressOf:local:opaque-type")
                                 , (.hole "op:addressOf:local:scalar") ]))
                             (.seq
-                              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                               (.seq
                                 (.ifte
                                   (.binop "<" (.name "stack_size") (.name "kDefaultStackSize"))
@@ -2651,7 +2649,7 @@ def f_v8_base_debug_StackDumpingSignalThread_void__void__ : Func :=
                                         "CHECK_EQ"
                                         [ (.lit (.bool true))
                                         , (.name "success")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.loop
                                         (.lit (.int 1))
                                         (.seq
@@ -2660,9 +2658,9 @@ def f_v8_base_debug_StackDumpingSignalThread_void__void__ : Func :=
                                         "CHECK_EQ"
                                         [ (.call "pause" [])
                                         , (.unop "-" (.lit (.int 1)))
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.expr
-                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))))))))))))))))))))))))))))))))))))))) }
+                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))))))))))))))))))))))))))))))))))) }
 
 /-- `v8.base.debug.EnableInProcessStackDumping<duplicate>3:bool()`  (from `debug/stack_trace_zos.cc`) -/
 def f_v8_base_debug_EnableInProcessStackDumping_duplicate_3_bool__ : Func :=
@@ -2690,7 +2688,7 @@ def f_v8_base_debug_EnableInProcessStackDumping_duplicate_3_bool__ : Func :=
                             "CHECK_EQ"
                             [ (.lit (.bool true))
                             , (.name "success")
-                            , (.hole "expr:CONTROL_STRUCTURE") ]))
+                            , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                         (.seq
                           .skip
                           (.seq
@@ -2699,7 +2697,7 @@ def f_v8_base_debug_EnableInProcessStackDumping_duplicate_3_bool__ : Func :=
                               (.expr
                                 (.call
                                   "CHECK_EQ"
-                                  [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                                  [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                               (.ret (.name "success")))))))))))) }
 
 /-- `v8.base.debug.DisableSignalStackDump<duplicate>3:void()`  (from `debug/stack_trace_zos.cc`) -/
@@ -2728,7 +2726,7 @@ def f_v8_base_debug_StackTrace_Print_duplicate_3_void___const_ : Func :=
 def f_v8_base_debug_StackTrace_OutputToStream_duplicate_3_void_std_ostream___const_ : Func :=
   { name := "v8.base.debug.StackTrace.OutputToStream<duplicate>3:void(std.ostream*)<const>"
   , params := ["os"]
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `SignedDivisionByConstant:MagicNumbersForDivision(T)`  (from `division-by-constant.cc`) -/
 def f_SignedDivisionByConstant_MagicNumbersForDivision_T_ : Func :=
@@ -2737,7 +2735,7 @@ def f_SignedDivisionByConstant_MagicNumbersForDivision_T_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -2842,9 +2840,9 @@ def f_v8_base_UnsignedDivisionByConstant_MagicNumbersForDivision_T_unsigned_ : F
             (.seq
               .skip
               (.seq
-                (.expr (.hole "op:staticAssert"))
+                (.expr (.lit .unit))
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -2940,9 +2938,9 @@ def f_EmulatedVirtualAddressSubspace___init__ : Func :=
   { name := "EmulatedVirtualAddressSubspace.__init__"
   , params := ["parent_space", "base", "mapped_size", "total_size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 (.setField (.name "self") "VirtualAddressSpace" (.call "page_size" []))
                 (.seq
@@ -3049,7 +3047,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_AllocatePages_Address_v8_base_Addre
                                         (.name "self")
                                         "region_allocator_"
                                         [(.name "address")])
-                                      , (.hole "expr:CONTROL_STRUCTURE") ])))
+                                      , (.hole "expr:CONTROL_STRUCTURE:DO") ])))
                                 .skip)))))
                       .skip)
                     (.seq
@@ -3081,10 +3079,10 @@ def f_v8_base_EmulatedVirtualAddressSubspace_FreePages_void_v8_base_Address_size
                         "CHECK_EQ"
                         [ (.name "size")
                         , (.mcall (.name "self") "region_allocator_" [(.name "address")])
-                        , (.hole "expr:CONTROL_STRUCTURE") ]))
-                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")])))))
+                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
+                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.expr (.mcall (.name "self") "parent_space_" [(.name "address"), (.name "size")]))))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.AllocateSharedPages:Address(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)`  (from `emulated-virtual-address-subspace.cc`) -/
@@ -3109,7 +3107,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_FreeSharedPages_void_v8_base_Addres
   { name := "v8.base.EmulatedVirtualAddressSubspace.FreeSharedPages:void(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.expr (.mcall (.name "self") "parent_space_" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)`  (from `emulated-virtual-address-subspace.cc`) -/
@@ -3117,7 +3115,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_SetPagePermissions_bool_v8_base_Add
   { name := "v8.base.EmulatedVirtualAddressSubspace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret
               (.mcall
                 (.name "self")
@@ -3167,9 +3165,9 @@ def f_v8_base_EmulatedVirtualAddressSubspace_FreeGuardRegion_void_v8_base_Addres
                       "CHECK_EQ"
                       [ (.name "size")
                       , (.mcall (.name "self") "region_allocator_" [(.name "address")])
-                      , (.hole "expr:CONTROL_STRUCTURE") ]))))
+                      , (.hole "expr:CONTROL_STRUCTURE:DO") ]))))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.expr (.mcall (.name "self") "parent_space_" [(.name "address"), (.name "size")]))))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.CanAllocateSubspaces:bool()`  (from `emulated-virtual-address-subspace.cc`) -/
@@ -3197,7 +3195,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_RecommitPages_bool_v8_base_Address_
   { name := "v8.base.EmulatedVirtualAddressSubspace.RecommitPages:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret
               (.mcall
                 (.name "self")
@@ -3209,7 +3207,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_DiscardSystemPages_bool_v8_base_Add
   { name := "v8.base.EmulatedVirtualAddressSubspace.DiscardSystemPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.mcall (.name "self") "parent_space_" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.DecommitPages:bool(v8.base.Address,size_t)`  (from `emulated-virtual-address-subspace.cc`) -/
@@ -3217,7 +3215,7 @@ def f_v8_base_EmulatedVirtualAddressSubspace_DecommitPages_bool_v8_base_Address_
   { name := "v8.base.EmulatedVirtualAddressSubspace.DecommitPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.mcall (.name "self") "parent_space_" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.RelativePath:unique_ptr(char*,char*)`  (from `file-utils.cc`) -/
@@ -3225,7 +3223,7 @@ def f_v8_base_RelativePath_unique_ptr_char__char__ : Func :=
   { name := "v8.base.RelativePath:unique_ptr(char*,char*)"
   , params := ["exec_path", "name"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               .skip
               (.seq
@@ -3322,7 +3320,7 @@ def f_v8_base_ieee754_acosh_double_double_ : Func :=
                                   [ (.name "hx")
                                   , (.name "lx")
                                   , (.name "x")
-                                  , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                  , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                               (.ifte
                                 (.binop "<" (.name "hx") (.lit (.int 1072693248)))
                                 (.ret (.call "signaling_NaN" []))
@@ -3411,7 +3409,7 @@ def f_v8_base_ieee754_asinh_double_double_ : Func :=
                                         "GET_HIGH_WORD"
                                         [ (.name "hx")
                                         , (.name "x")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
                                       (.assign "ix" (.hole "op:and"))
                                       (.seq
@@ -3542,7 +3540,7 @@ def f_v8_base_ieee754_atanh_double_double_ : Func :=
                                         [ (.name "hx")
                                         , (.name "lx")
                                         , (.name "x")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
                                       (.assign "ix" (.hole "op:and"))
                                       (.seq
@@ -3576,7 +3574,7 @@ def f_v8_base_ieee754_atanh_double_double_ : Func :=
                                         "SET_HIGH_WORD"
                                         [ (.name "x")
                                         , (.name "ix")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.ifte
                                         (.binop "<" (.name "ix") (.lit (.int 1071644672)))
@@ -3690,7 +3688,9 @@ def f_v8_base_ieee754_cosh_double_double_ : Func :=
                                   (.expr
                                     (.call
                                       "GET_HIGH_WORD"
-                                      [(.name "ix"), (.name "x"), (.hole "expr:CONTROL_STRUCTURE")]))
+                                      [ (.name "ix")
+                                      , (.name "x")
+                                      , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                   (.seq
                                     (.expr
                                       (.call
@@ -4213,7 +4213,7 @@ def f_v8_base_NormalizedExponent_int_uint64_t_int_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_NE" [(.lit .unit)]))
               (.seq
                 (.loop
                   (.binop "==" (.hole "op:and") (.lit (.int 0)))
@@ -4241,9 +4241,9 @@ def f_v8_base_BignumDtoa_void_double_v8_base_BignumDtoaMode_int_Vector_int__int_
                       (.seq
                         .skip
                         (.seq
-                          (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -4314,7 +4314,7 @@ def f_v8_base_BignumDtoa_void_double_v8_base_BignumDtoaMode_int_Vector_int__int_
                                         (.seq
                                         (.assign "delta_plus" (.alloc "Bignum" []))
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -4374,7 +4374,7 @@ def f_v8_base_GenerateShortestDigits_void_v8_base_Bignum__v8_base_Bignum__v8_bas
                         "v8.base.Bignum.DivideModuloIntBignum:ANY(v8.base.Bignum&)"
                         [(.hole "op:indirection:pointer")]))
                     (.seq
-                      (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                       (.seq
                         (.setIndex
                           (.name "buffer")
@@ -4457,7 +4457,7 @@ def f_v8_base_GenerateShortestDigits_void_v8_base_Bignum__v8_base_Bignum__v8_bas
                                         (.ifte
                                         (.binop ">" (.name "compare") (.lit (.int 0)))
                                         (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.hole "op:postIncrement:impure-target"))
                                         (.ifte
                                         (.binop
@@ -4477,14 +4477,14 @@ def f_v8_base_GenerateShortestDigits_void_v8_base_Bignum__v8_base_Bignum__v8_bas
                                         (.lit (.int 0)))
                                         .skip
                                         (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.hole "op:postIncrement:impure-target")))))
                                         (.ret (.lit .unit)))))
                                     (.ifte
                                       (.binop "!=" (.name "in_delta_room_minus") (.lit (.int 0)))
                                       (.ret (.lit .unit))
                                       (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.seq
                                         (.hole "op:postIncrement:impure-target")
                                         (.ret (.lit .unit)))))))))))))))))) }
@@ -4494,7 +4494,7 @@ def f_v8_base_GenerateCountedDigits_void_int_int__v8_base_Bignum__v8_base_Bignum
   { name := "v8.base.GenerateCountedDigits:void(int,int*,v8.base.Bignum*,v8.base.Bignum*,Vector,int*)"
   , params := ["count", "decimal_point", "numerator", "denominator", "buffer", "length"]
   , body := (.seq
-            (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_GE" [(.lit .unit)]))
             (.seq
               (.hole "control:FOR")
               (.seq
@@ -4548,7 +4548,7 @@ def f_v8_base_BignumToFixed_void_int_int__v8_base_Bignum__v8_base_Bignum__Vector
             (.ifte
               (.binop "==" (.unop "-" (.hole "op:indirection:pointer")) (.name "requested_digits"))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   (.expr (.call "v8.base.Bignum.Times10:void()" []))
                   (.seq
@@ -4622,7 +4622,7 @@ def f_v8_base_InitialScaledStartValuesPositiveExponent_void_double_int_bool_v8_b
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_GE" [(.lit .unit)]))
               (.seq
                 (.expr (.call "AssignUInt64" [(.call "Significand" [])]))
                 (.seq
@@ -4775,7 +4775,7 @@ def f_v8_base_InitialScaledStartValuesNegativeExponentNegativePower_void_double_
                                         [(.hole "op:indirection:pointer")])))
                                   .skip)
                                 (.seq
-                                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                  (.expr (.call "DCHECK" [(.lit .unit)]))
                                   (.seq
                                     (.expr (.call "MultiplyByUInt64" [(.name "significand")]))
                                     (.seq
@@ -4940,7 +4940,7 @@ def f_v8_base_Bignum_AssignUInt16_void_uint16_t_ : Func :=
   { name := "v8.base.Bignum.AssignUInt16:void(uint16_t)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_GE" [(.lit .unit)]))
             (.seq
               (.expr (.call "v8.base.Bignum.Zero:void()" []))
               (.seq
@@ -5109,7 +5109,7 @@ def f_v8_base_HexCharValue_int_char_ : Func :=
                     (.binop "<=" (.name "c") (.lit (.str "F"))))
                   (.ret (.binop "-" (.binop "+" (.lit (.int 10)) (.name "c")) (.lit (.str "A"))))
                   .skip)
-                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.Bignum.AssignHexString:void(Vector)`  (from `numbers/bignum.cc`) -/
 def f_v8_base_Bignum_AssignHexString_void_Vector_ : Func :=
@@ -5204,9 +5204,9 @@ def f_v8_base_Bignum_AddBignum_void_v8_base_Bignum__ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     (.expr (.call "v8.base.Bignum.Align:void(v8.base.Bignum&)" [(.name "other")]))
                     (.seq
@@ -5237,7 +5237,7 @@ def f_v8_base_Bignum_AddBignum_void_v8_base_Bignum__ : Func :=
                                   (.field (.name "other") "exponent_")
                                   (.field (.name "self") "exponent_")))
                               (.seq
-                                (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                 (.seq
                                   (.hole "control:FOR")
                                   (.seq
@@ -5272,7 +5272,7 @@ def f_v8_base_Bignum_AddBignum_void_v8_base_Bignum__ : Func :=
                                         "max"
                                         [ (.name "bigit_pos")
                                         , (.field (.name "self") "used_digits_") ]))
-                                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))))))))))) }
+                                      (.expr (.call "DCHECK" [(.lit .unit)])))))))))))))))) }
 
 /-- `v8.base.Bignum.SubtractBignum:void(v8.base.Bignum&)`  (from `numbers/bignum.cc`) -/
 def f_v8_base_Bignum_SubtractBignum_void_v8_base_Bignum__ : Func :=
@@ -5283,11 +5283,11 @@ def f_v8_base_Bignum_SubtractBignum_void_v8_base_Bignum__ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       (.expr (.call "v8.base.Bignum.Align:void(v8.base.Bignum&)" [(.name "other")]))
                       (.seq
@@ -5383,7 +5383,7 @@ def f_v8_base_Bignum_MultiplyByUInt32_void_uint32_t_ : Func :=
                       (.ret (.lit .unit))
                       .skip)
                     (.seq
-                      (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                       (.seq
                         .skip
                         (.seq
@@ -5404,7 +5404,7 @@ def f_v8_base_Bignum_MultiplyByUInt32_void_uint32_t_ : Func :=
                                   (.setIndex
                                     (.field (.name "self") "bigits_")
                                     (.field (.name "self") "used_digits_")
-                                    (.hole "op:cast:opaque-type"))
+                                    (.unop "cast:u32" (.hole "op:and")))
                                   (.seq
                                     (.setField
                                       (.name "self")
@@ -5434,7 +5434,7 @@ def f_v8_base_Bignum_MultiplyByUInt64_void_uint64_t_ : Func :=
                     (.seq (.expr (.call "v8.base.Bignum.Zero:void()" [])) (.ret (.lit .unit)))
                     .skip)
                   (.seq
-                    (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -5463,7 +5463,7 @@ def f_v8_base_Bignum_MultiplyByUInt64_void_uint64_t_ : Func :=
                                         (.setIndex
                                         (.field (.name "self") "bigits_")
                                         (.field (.name "self") "used_digits_")
-                                        (.hole "op:cast:opaque-type"))
+                                        (.unop "cast:u32" (.hole "op:and")))
                                         (.seq
                                         (.setField
                                         (.name "self")
@@ -5558,7 +5558,7 @@ def f_v8_base_Bignum_MultiplyByPowerOfTen_void_int_ : Func :=
                                         (.seq
                                         (.assign "kFive1_to_12" (.hole "op:arrayInitializer"))
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
                                         (.ifte
                                         (.binop "==" (.name "exponent") (.lit (.int 0)))
@@ -5620,7 +5620,7 @@ def f_v8_base_Bignum_Square_void__ : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -5663,7 +5663,7 @@ def f_v8_base_Bignum_Square_void__ : Func :=
                                         (.seq
                                         (.hole "control:FOR")
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
                                         (.setField
                                         (.name "self")
@@ -5680,9 +5680,9 @@ def f_v8_base_Bignum_AssignPowerUInt16_void_uint16_t_int_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_NE" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                 (.seq
                   (.ifte
                     (.binop "==" (.name "power_exponent") (.lit (.int 0)))
@@ -5834,11 +5834,11 @@ def f_v8_base_Bignum_DivideModuloIntBignum_uint16_t_v8_base_Bignum__ : Func :=
   { name := "v8.base.Bignum.DivideModuloIntBignum:uint16_t(v8.base.Bignum&)"
   , params := ["other"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                 (.seq
                   (.ifte
                     (.binop
@@ -5860,7 +5860,7 @@ def f_v8_base_Bignum_DivideModuloIntBignum_uint16_t_v8_base_Bignum__ : Func :=
                               (.call "BigitLength" [])
                               (.call "v8.base.Bignum.BigitLength:int()<const>" []))
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.seq
                                 (.assign
                                   "result"
@@ -5884,7 +5884,7 @@ def f_v8_base_Bignum_DivideModuloIntBignum_uint16_t_v8_base_Bignum__ : Func :=
                                         (.field (.name "self") "used_digits_")
                                         (.lit (.int 1)))) ])))))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -5987,7 +5987,7 @@ def f_v8_base_SizeInHexChars_int_S_ : Func :=
   { name := "v8.base.SizeInHexChars:int(S)"
   , params := ["number"]
   , body := (.seq
-            (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_GT" [(.lit .unit)]))
             (.seq
               .skip
               (.seq
@@ -6010,9 +6010,9 @@ def f_v8_base_Bignum_ToHexString_bool_char__int__const_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -6125,9 +6125,9 @@ def f_v8_base_Bignum_Compare_int_v8_base_Bignum__v8_base_Bignum__ : Func :=
   { name := "v8.base.Bignum.Compare:int(v8.base.Bignum&,v8.base.Bignum&)"
   , params := ["a", "b"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -6157,11 +6157,11 @@ def f_v8_base_Bignum_PlusCompare_int_v8_base_Bignum__v8_base_Bignum__v8_base_Big
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     (.ifte
                       (.binop
@@ -6309,8 +6309,8 @@ def f_v8_base_Bignum_Align_void_v8_base_Bignum__ : Func :=
                             "exponent_"
                             (.binop "-" (.field (.name "self") "exponent_") (.name "zero_digits")))
                           (.seq
-                            (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
-                            (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))))))))))
+                            (.expr (.call "DCHECK_GE" [(.lit .unit)]))
+                            (.expr (.call "DCHECK_GE" [(.lit .unit)]))))))))))
             .skip) }
 
 /-- `v8.base.Bignum.BigitsShiftLeft:void(int)`  (from `numbers/bignum.cc`) -/
@@ -6322,9 +6322,9 @@ def f_v8_base_Bignum_BigitsShiftLeft_void_int_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -6355,7 +6355,7 @@ def f_v8_base_Bignum_SubtractTimes_void_v8_base_Bignum__int_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     (.ifte
                       (.binop "<" (.name "factor") (.lit (.int 3)))
@@ -6380,7 +6380,7 @@ def f_v8_base_Bignum_SubtractTimes_void_v8_base_Bignum__int_ : Func :=
                                 (.hole "control:FOR")
                                 (.seq
                                   (.expr (.call "v8.base.Bignum.Clamp:void()" []))
-                                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))))))))) }
+                                  (.expr (.call "DCHECK" [(.lit .unit)])))))))))))))) }
 
 /-- `v8.base.PowersOfTenCache.GetCachedPowerForBinaryExponentRange:void(int,int,v8.base.DiyFp*,int*)`  (from `numbers/cached-powers.cc`) -/
 def f_v8_base_PowersOfTenCache_GetCachedPowerForBinaryExponentRange_void_int_int_v8_base_DiyFp__int__ : Func :=
@@ -6434,7 +6434,7 @@ def f_v8_base_PowersOfTenCache_GetCachedPowerForBinaryExponentRange_void_int_int
                                         (.name "kDecimalExponentDistance"))
                                         (.lit (.int 1))))
                                     (.seq
-                                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                      (.expr (.call "DCHECK" [(.lit .unit)]))
                                       (.seq
                                         .skip
                                         (.seq
@@ -6442,9 +6442,9 @@ def f_v8_base_PowersOfTenCache_GetCachedPowerForBinaryExponentRange_void_int_int
                                         "cached_power"
                                         (.index (.name "kCachedPowers") (.name "index")))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
                                         (.hole "assign:lhs:indirection")
                                         (.hole "assign:lhs:indirection")))))))))))))))))))) }
@@ -6460,9 +6460,9 @@ def f_v8_base_PowersOfTenCache_GetCachedPowerForDecimalExponent_void_int_v8_base
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -6483,8 +6483,8 @@ def f_v8_base_PowersOfTenCache_GetCachedPowerForDecimalExponent_void_int_v8_base
                               (.seq
                                 (.hole "assign:lhs:indirection")
                                 (.seq
-                                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))))))))) }
+                                  (.expr (.call "DCHECK" [(.lit .unit)]))
+                                  (.expr (.call "DCHECK" [(.lit .unit)])))))))))))))) }
 
 /-- `v8.base.DtoaToBignumDtoaMode:v8.base.BignumDtoaMode(v8.base.DtoaMode)`  (from `numbers/dtoa.cc`) -/
 def f_v8_base_DtoaToBignumDtoaMode_v8_base_BignumDtoaMode_v8_base_DtoaMode_ : Func :=
@@ -6511,9 +6511,9 @@ def f_v8_base_DoubleToAscii_void_double_v8_base_DtoaMode_int_Vector_int__int__in
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
                           (.ifte
                             (.binop
@@ -6590,7 +6590,7 @@ def f_v8_base_RoundWeed_bool_char__uint64_t_uint64_t_uint64_t_uint64_t_uint64_t_
                 (.seq
                   (.assign "big_distance" (.binop "+" (.name "distance_too_high_w") (.name "unit")))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       (.loop
                         (.binop
@@ -6661,7 +6661,7 @@ def f_v8_base_RoundWeedCounted_bool_Vector_int_uint64_t_uint64_t_uint64_t_int__ 
   { name := "v8.base.RoundWeedCounted:bool(Vector,int,uint64_t,uint64_t,uint64_t,int*)"
   , params := ["buffer", "length", "rest", "ten_kappa", "unit", "kappa"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               (.ifte
                 (.binop ">=" (.name "unit") (.name "ten_kappa"))
@@ -6757,11 +6757,11 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -6883,11 +6883,11 @@ def f_v8_base_DigitGen_bool_v8_base_DiyFp_v8_base_DiyFp_v8_base_DiyFp_char___int
                                         "divisor_exponent"
                                         (.binop "-" (.name "divisor_exponent") (.lit (.int 1)))))))))))))))
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.loop
                                         (.lit (.bool true))
                                         (.seq
@@ -6939,11 +6939,11 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -7044,11 +7044,11 @@ def f_v8_base_DigitGenCounted_bool_v8_base_DiyFp_int_Vector_int__int__ : Func :=
                                         , (.name "kappa") ]))))
                                         .skip)
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
                                         (.loop
                                         (.binop
@@ -7134,7 +7134,7 @@ def f_v8_base_Grisu3_bool_double_char___int__ : Func :=
                                         "v8.base.Double.NormalizedBoundaries:void(v8.base.DiyFp*,v8.base.DiyFp*)<const>"
                                         [(.name "boundary_minus"), (.name "boundary_plus")]))
                                     (.seq
-                                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                      (.expr (.call "DCHECK" [(.lit .unit)]))
                                       (.seq
                                         .skip
                                         (.seq
@@ -7174,7 +7174,7 @@ def f_v8_base_Grisu3_bool_double_char___int__ : Func :=
                                         , (.name "ten_mk")
                                         , (.hole "op:addressOf:local:scalar") ]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -7184,7 +7184,7 @@ def f_v8_base_Grisu3_bool_double_char___int__ : Func :=
                                         "v8.base.DiyFp.Times:v8.base.DiyFp(v8.base.DiyFp&,v8.base.DiyFp&)"
                                         [(.name "w"), (.name "ten_mk")]))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -7276,7 +7276,7 @@ def f_v8_base_Grisu3Counted_bool_double_int_Vector_int__int__ : Func :=
                                         , (.name "ten_mk")
                                         , (.hole "op:addressOf:local:scalar") ]))
                                       (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -7312,9 +7312,9 @@ def f_v8_base_FastDtoa_bool_double_v8_base_FastDtoaMode_int_Vector_int__int__ : 
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -7608,11 +7608,11 @@ def f_v8_base_FillFractionals_void_uint64_t_int_int_Vector_int__int__ : Func :=
   { name := "v8.base.FillFractionals:void(uint64_t,int,int,Vector,int*,int*)"
   , params := ["fractionals", "exponent", "fractional_count", "buffer", "length", "decimal_point"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ifte
               (.binop "<=" (.unop "-" (.name "exponent")) (.lit (.int 64)))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -7630,7 +7630,7 @@ def f_v8_base_FillFractionals_void_uint64_t_int_int_Vector_int__int__ : Func :=
                             [(.name "buffer"), (.name "length"), (.name "decimal_point")]))
                         .skip)))))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -7855,7 +7855,7 @@ def f_v8_base_FastFixedDtoa_bool_double_int_Vector_int__int__ : Func :=
                                         (.name "exponent")
                                         (.unop "-" (.lit (.int 128))))
                                         (.seq
-                                        (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                                         (.seq
                                         (.setIndex
                                         (.name "buffer")
@@ -7916,7 +7916,7 @@ def f_v8_base_TrimToMaxSignificantDigits_void_Vector_int_char__int__ : Func :=
             (.seq
               (.hole "control:FOR")
               (.seq
-                (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                 (.seq
                   (.setIndex
                     (.name "significant_buffer")
@@ -7960,7 +7960,7 @@ def f_v8_base_ReadUint64_uint64_t_Vector_int__ : Func :=
                                 (.index (.name "buffer") (.hole "op:postIncrement:value"))
                                 (.lit (.int 0))))
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.assign
                                 "result"
                                 (.binop
@@ -8028,7 +8028,7 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                           (.seq
                             (.hole "assign:lhs:indirection")
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.seq
                                 (.expr (.hole "op:assignmentDivision"))
                                 (.ret (.lit (.bool true))))))
@@ -8042,7 +8042,7 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                             (.seq
                               (.hole "assign:lhs:indirection")
                               (.seq
-                                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK" [(.lit .unit)]))
                                 (.seq
                                   (.expr (.hole "op:assignmentMultiplication"))
                                   (.ret (.lit (.bool true))))))
@@ -8067,7 +8067,7 @@ def f_v8_base_DoubleStrtod_bool_Vector_int_double__ : Func :=
                                 (.seq
                                   (.hole "assign:lhs:indirection")
                                   (.seq
-                                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                    (.expr (.call "DCHECK" [(.lit .unit)]))
                                     (.seq
                                       (.expr (.hole "op:assignmentMultiplication"))
                                       (.seq
@@ -8082,10 +8082,10 @@ def f_v8_base_AdjustmentPowerOfTen_v8_base_DiyFp_int_ : Func :=
   { name := "v8.base.AdjustmentPowerOfTen:v8.base.DiyFp(int)"
   , params := ["exponent"]
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
-              (.seq (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) (.hole "control:SWITCH")))) }
+              (.expr (.call "DCHECK_LT" [(.lit .unit)]))
+              (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.hole "control:SWITCH")))) }
 
 /-- `v8.base.DiyFpStrtod:bool(Vector,int,double*)`  (from `numbers/strtod.cc`) -/
 def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
@@ -8153,7 +8153,7 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         (.name "old_e")
                                         (.call "v8.base.DiyFp.e:int()<const>" [])) ]))
                                         (.seq
-                                        (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                                         (.seq
                                         (.ifte
                                         (.binop
@@ -8213,7 +8213,7 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         (.name "kMaxUint64DecimalDigits")
                                         (.call "v8.base.Vector.length:int()<const>" []))
                                         (.name "adjustment_exponent"))
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.assign
                                         "error"
                                         (.binop
@@ -8348,9 +8348,9 @@ def f_v8_base_DiyFpStrtod_bool_Vector_int_double__ : Func :=
                                         (.name "shift_amount"))))))))
                                         .skip)
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -8432,13 +8432,13 @@ def f_v8_base_BignumStrtod_double_Vector_int_double_ : Func :=
                       "upper_boundary"
                       (.call "v8.base.Double.UpperBoundary:v8.base.DiyFp()<const>" []))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -8705,7 +8705,7 @@ def f_v8_base_SharedMemoryMapping__clinit__v8_base_SharedMemoryMapping__ : Func 
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "page_allocator_" (.name "<tmp>0")))))) }
 
 /-- `v8.base.SharedMemoryMapping.__init__`  (from `page-allocator.cc`) -/
@@ -8743,7 +8743,7 @@ def f_v8_base_SharedMemory__clinit__v8_base_SharedMemory__ : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "allocator_" (.name "<tmp>0")))))) }
 
 /-- `v8.base.SharedMemory.__init__`  (from `page-allocator.cc`) -/
@@ -8831,12 +8831,12 @@ def f_v8_base_PageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func :=
   { name := "v8.base.PageAllocator.ReleasePages:bool(void*,size_t,size_t)"
   , params := ["address", "size", "new_size"]
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.seq
               (.expr
                 (.call
                   "Release"
-                  [ (.binop "+" (.unop "cast:u8" (.name "address")) (.name "new_size"))
+                  [ (.binop "+" (.hole "op:cast:pointer") (.name "new_size"))
                   , (.binop "-" (.name "size") (.name "new_size")) ]))
               (.ret (.lit (.bool true))))) }
 
@@ -8938,7 +8938,7 @@ def f_v8_base_ConditionVariable_WaitFor_bool_v8_base_Mutex__v8_base_TimeDelta__ 
 def f_v8_base_RecursiveMutex__RecursiveMutex_ANY__ : Func :=
   { name := "v8.base.RecursiveMutex.~RecursiveMutex:ANY()"
   , params := []
-  , body := (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) }
+  , body := (.expr (.call "DCHECK_EQ" [(.lit .unit)])) }
 
 /-- `v8.base.RecursiveMutex.Lock:void()`  (from `platform/mutex.cc`) -/
 def f_v8_base_RecursiveMutex_Lock_void__ : Func :=
@@ -8961,7 +8961,7 @@ def f_v8_base_RecursiveMutex_Lock_void__ : Func :=
                 (.seq
                   (.expr (.mcall (.name "self") "mutex_" []))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       (.setField (.name "self") "thread_id_" (.name "own_id"))
                       (.setField (.name "self") "level_" (.lit (.int 1))))))))) }
@@ -8999,7 +8999,7 @@ def f_v8_base_RecursiveMutex_TryLock_bool__ : Func :=
                   (.ifte
                     (.mcall (.name "self") "mutex_" [])
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                       (.seq
                         (.setField (.name "self") "thread_id_" (.name "own_id"))
                         (.seq
@@ -9018,7 +9018,7 @@ def f_v8_base_Mutex___init__ : Func :=
 def f_v8_base_Mutex__Mutex_ANY__ : Func :=
   { name := "v8.base.Mutex.~Mutex:ANY()"
   , params := []
-  , body := (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) }
+  , body := (.expr (.call "DCHECK_EQ" [(.lit .unit)])) }
 
 /-- `v8.base.get_gmt_offset:int64_t(tm&)`  (from `platform/platform-aix.cc`) -/
 def f_v8_base_get_gmt_offset_int64_t_tm__ : Func :=
@@ -9035,7 +9035,7 @@ def f_v8_base_get_gmt_offset_int64_t_tm__ : Func :=
                     "ret_code"
                     (.call "gettimeofday" [(.hole "op:addressOf:local:opaque-type"), (.name "tz")]))
                   (.seq
-                    (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                     (.seq
                       (.ifte
                         (.binop "==" (.name "ret_code") (.unop "-" (.lit (.int 1))))
@@ -9101,7 +9101,7 @@ def f_v8_base_AIXTimezoneCache_LocalTimeOffset_double_double_bool_ : Func :=
               (.seq
                 (.assign "utc" (.call "time" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -9113,7 +9113,7 @@ def f_v8_base_AIXTimezoneCache_LocalTimeOffset_double_double_bool_ : Func :=
                             "localtime_r"
                             [(.hole "op:addressOf:local:opaque-type"), (.name "tm")]))
                         (.seq
-                          (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
                           (.ret (.hole "op:cast:scalar")))))))))) }
 
 /-- `v8.base.OS.CreateTimezoneCache:v8.base.TimezoneCache*()`  (from `platform/platform-aix.cc`) -/
@@ -9343,7 +9343,8 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_v8_base_Stack_StackSlot__ : Fu
                                     (.expr
                                       (.call
                                         "CHECK"
-                                        [(.unop "!" (.name "rc")), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [ (.unop "!" (.name "rc"))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.seq
                                       (.ifte
                                         (.binop
@@ -9358,7 +9359,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_v8_base_Stack_StackSlot__ : Fu
                                         (.name "NULL")))
                                         (.ret (.lit .unit))
                                         .skip)
-                                      (.ret (.hole "op:cast:scalar")))))))))))))))) }
+                                      (.ret (.hole "op:cast:pointer")))))))))))))))) }
 
 /-- `v8.base.OS.DecommitPages:bool(void*,size_t)`  (from `platform/platform-aix.cc`) -/
 def f_v8_base_OS_DecommitPages_bool_void__size_t_ : Func :=
@@ -9367,9 +9368,9 @@ def f_v8_base_OS_DecommitPages_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   (.ifte
                     (.binop
@@ -9398,7 +9399,7 @@ def f_v8_base_GetProtectionFromMemoryPermission_unsigned_longint_v8_base_OS_Memo
                       .skip
                       (.seq
                         (.hole "control:SWITCH")
-                        (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))))))))) }
+                        (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))))) }
 
 /-- `v8.base.RandomizedVirtualAlloc:uint8_t(size_t,DWORD,DWORD,void*)`  (from `platform/platform-cygwin.cc`) -/
 def f_v8_base_RandomizedVirtualAlloc_uint8_t_size_t_DWORD_DWORD_void__ : Func :=
@@ -9428,7 +9429,7 @@ def f_v8_base_RandomizedVirtualAlloc_uint8_t_size_t_DWORD_DWORD_void__ : Func :=
                           "VirtualAlloc"
                           [(.lit .unit), (.name "size"), (.name "flags"), (.name "protect")]))
                       .skip)
-                    (.ret (.unop "cast:u8" (.name "base")))))))) }
+                    (.ret (.hole "op:cast:pointer"))))))) }
 
 /-- `v8.base.CygwinTimezoneCache.~CygwinTimezoneCache:ANY()`  (from `platform/platform-cygwin.cc`) -/
 def f_v8_base_CygwinTimezoneCache__CygwinTimezoneCache_ANY__ : Func :=
@@ -9478,7 +9479,7 @@ def f_v8_base_LocalTimeOffset_double_double_bool_ : Func :=
               (.seq
                 (.assign "utc" (.call "time" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -9490,7 +9491,7 @@ def f_v8_base_LocalTimeOffset_double_double_bool_ : Func :=
                             "localtime_r"
                             [(.hole "op:addressOf:local:opaque-type"), (.name "tm")]))
                         (.seq
-                          (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
                           (.ret (.hole "op:cast:scalar")))))))))) }
 
 /-- `OS.Allocate:void*(void*,size_t,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-cygwin.cc`) -/
@@ -9508,11 +9509,11 @@ def f_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func 
                   (.seq
                     (.assign "page_size" (.call "v8.base.OS.AllocatePageSize:ANY()" []))
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                           (.seq
                             (.assign
                               "hint"
@@ -9560,7 +9561,7 @@ def f_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func 
                                         (.seq
                                         (.ifte
                                         (.binop "==" (.name "base") (.name "aligned_base"))
-                                        (.ret (.hole "op:cast:scalar"))
+                                        (.ret (.hole "op:cast:pointer"))
                                         .skip)
                                         (.seq
                                         (.expr (.call "Free" [(.name "base"), (.name "size")]))
@@ -9584,8 +9585,8 @@ def f_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func 
                                         (.seq
                                         (.hole "control:FOR")
                                         (.seq
-                                        (.expr (.call "DCHECK_IMPLIES" [(.hole "op:cast:scalar")]))
-                                        (.ret (.hole "op:cast:scalar")))))))))))))))))))))))))))))) }
+                                        (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
+                                        (.ret (.hole "op:cast:pointer")))))))))))))))))))))))))))))) }
 
 /-- `v8.base.OS.Free:void(void*,size_t)`  (from `platform/platform-cygwin.cc`) -/
 def f_v8_base_OS_Free_void_void__size_t_ : Func :=
@@ -9596,12 +9597,13 @@ def f_v8_base_OS_Free_void_void__size_t_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "USE" [(.name "size"), (.hole "expr:CONTROL_STRUCTURE")]))
-                    (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))))))) }
+                    (.expr (.call "USE" [(.name "size"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
+                    (.expr
+                      (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))))))) }
 
 /-- `v8.base.OS.Release:void(void*,size_t)`  (from `platform/platform-cygwin.cc`) -/
 def f_v8_base_OS_Release_void_void__size_t_ : Func :=
@@ -9610,10 +9612,10 @@ def f_v8_base_OS_Release_void_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.OS.SetPermissions:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-cygwin.cc`) -/
 def f_v8_base_OS_SetPermissions_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -9626,9 +9628,9 @@ def f_v8_base_OS_SetPermissions_bool_void__size_t_v8_base_OS_MemoryPermission_ :
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       (.ifte
                         (.binop
@@ -9725,7 +9727,7 @@ def f_v8_base_OS_DiscardSystemPages_bool_void__size_t_ : Func :=
                                     (.expr
                                       (.call
                                         "CHECK"
-                                        [(.name "ptr"), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.name "ptr"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                     (.ret (.name "ptr"))))))))))))))) }
 
 /-- `v8.base.OS.SealPages:bool(void*,size_t)`  (from `platform/platform-cygwin.cc`) -/
@@ -9783,7 +9785,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_0_vector__ : Func :=
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "lib_name" (.hole "op:cast:scalar"))
+                                    (.assign "lib_name" (.hole "op:cast:pointer"))
                                     (.seq
                                       (.loop
                                         (.lit (.bool true))
@@ -9935,7 +9937,7 @@ def f_v8_base_GetVMProtFromMemoryPermission_vm_prot_t_v8_base_OS_MemoryPermissio
                     .skip
                     (.seq
                       (.hole "control:SWITCH")
-                      (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))))))) }
+                      (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))))) }
 
 /-- `v8.base.mach_vm_map_wrapper:kern_return_t(mach_vm_address_t*,mach_vm_size_t,int,mach_port_t,memory_object_offset_t,vm_prot_t)`  (from `platform/platform-darwin.cc`) -/
 def f_v8_base_mach_vm_map_wrapper_kern_return_t_mach_vm_address_t__mach_vm_size_t_int_mach_port_t_memory_object_offset_t_vm_ : Func :=
@@ -10025,7 +10027,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackReservedLimit_v8_base_Stack_StackSlo
   , body := (.ret
             (.binop
               "-"
-              (.unop "cast:u8" (.call "pthread_get_stackaddr_np" [(.call "pthread_self" [])]))
+              (.hole "op:cast:pointer")
               (.call "pthread_get_stacksize_np" [(.call "pthread_self" [])]))) }
 
 /-- `v8.base.OS.CreateSharedMemoryHandleForTesting:optional(size_t)`  (from `platform/platform-darwin.cc`) -/
@@ -10080,7 +10082,7 @@ def f_v8_base_OS_DestroySharedMemoryHandle_void_SharedMemoryHandle_ : Func :=
               .skip
               (.seq
                 (.assign "port" (.call "GetPlatformHandle" []))
-                (.expr (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.OS.AllocateShared:void*(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-darwin.cc`) -/
 def f_v8_base_OS_AllocateShared_void__void__size_t_v8_base_OS_MemoryPermission_SharedMemoryHandle_uint64_t_ : Func :=
@@ -10093,7 +10095,7 @@ def f_v8_base_OS_AllocateShared_void__void__size_t_v8_base_OS_MemoryPermission_S
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -10140,7 +10142,7 @@ def f_v8_base_OS_AllocateShared_void__void__size_t_v8_base_OS_MemoryPermission_S
                                         (.binop "!=" (.name "kr") (.name "KERN_SUCCESS"))
                                         (.ret (.lit .unit))
                                         .skip)
-                                      (.ret (.hole "op:cast:scalar")))))))))))))))) }
+                                      (.ret (.hole "op:cast:pointer")))))))))))))))) }
 
 /-- `v8.base.OS.RemapPages:bool(void*,size_t,void*,v8.base.OS.MemoryPermission)`  (from `platform/platform-darwin.cc`) -/
 def f_v8_base_OS_RemapPages_bool_void__size_t_void__v8_base_OS_MemoryPermission_ : Func :=
@@ -10157,11 +10159,11 @@ def f_v8_base_OS_RemapPages_bool_void__size_t_void__v8_base_OS_MemoryPermission_
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK" [(.lit .unit)]))
                           (.seq
                             .skip
                             (.seq
@@ -10205,7 +10207,7 @@ def f_v8_base_OS_RemapPages_bool_void__size_t_void__v8_base_OS_MemoryPermission_
                                         (.expr
                                         (.call
                                         "CHECK_EQ"
-                                        [(.name "new_address"), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.name "new_address"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         (.ret (.lit (.bool true)))))))))))))))))))))) }
 
 /-- `v8.base.AddressSpaceReservation.AllocateShared:bool(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-darwin.cc`) -/
@@ -10219,7 +10221,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_bool_void__size_t_v8_base_O
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -10358,7 +10360,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_2_vector__ : Func :=
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "map" (.hole "op:cast:object"))
+                                        (.assign "map" (.hole "op:cast:pointer"))
                                         (.seq
                                         .skip
                                         (.seq
@@ -10373,7 +10375,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_2_vector__ : Func :=
                                         "CHECK_NE"
                                         [ (.lit (.int 0))
                                         , (.name "ssize")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.ifte
                                         (.binop
@@ -10468,13 +10470,13 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_1_v8_base_Stack_Stac
                               (.expr
                                 (.call
                                   "CHECK"
-                                  [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE")]))
+                                  [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                               (.seq
                                 (.expr
                                   (.call
                                     "pthread_attr_destroy"
                                     [(.hole "op:addressOf:local:opaque-type")]))
-                                (.ret (.binop "+" (.unop "cast:u8" (.name "base")) (.name "size"))))))))
+                                (.ret (.binop "+" (.hole "op:cast:pointer") (.name "size"))))))))
                       .skip)
                     (.seq
                       (.expr
@@ -10490,7 +10492,7 @@ def f_v8_base_SetVmexResource_void__ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -10525,7 +10527,7 @@ def f_v8_base_GetProtectionFromMemoryPermission_zx_vm_option_t_v8_base_OS_Memory
                   .skip
                   (.seq
                     (.hole "control:SWITCH")
-                    (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))))))) }
+                    (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))) }
 
 /-- `v8.base.GetAlignmentOptionFromAlignment:zx_vm_option_t(size_t)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_GetAlignmentOptionFromAlignment_zx_vm_option_t_size_t_ : Func :=
@@ -10540,9 +10542,9 @@ def f_v8_base_GetAlignmentOptionFromAlignment_zx_vm_option_t_size_t_ : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.hole "op:staticAssert"))
+                    (.expr (.lit .unit))
                     (.seq
-                      (.expr (.hole "op:staticAssert"))
+                      (.expr (.lit .unit))
                       (.seq
                         .skip
                         (.seq
@@ -10560,11 +10562,11 @@ def f_v8_base_MapVmo_void__zx_vmar__void__size_t_void__zx_vmo__uint64_t_v8_base_
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK_IMPLIES" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
                       (.seq
                         .skip
                         (.seq
@@ -10602,7 +10604,7 @@ def f_v8_base_MapVmo_void__zx_vmar__void__size_t_void__zx_vmo__uint64_t_v8_base_
                                     (.expr
                                       (.call
                                         "CHECK_EQ"
-                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                     (.seq
                                       .skip
                                       (.seq
@@ -10612,7 +10614,7 @@ def f_v8_base_MapVmo_void__zx_vmar__void__size_t_void__zx_vmo__uint64_t_v8_base_
                                         (.seq
                                         (.assign "base" (.unop "cast:u64" (.name "vmar_base")))
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
                                         (.assign
                                         "vmar_offset"
@@ -10640,8 +10642,8 @@ def f_v8_base_MapVmo_void__zx_vmar__void__size_t_void__zx_vmo__uint64_t_v8_base_
                                         (.ifte
                                         (.binop "==" (.name "status") (.name "ZX_OK"))
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                                        (.ret (.hole "op:cast:scalar")))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                                        (.ret (.hole "op:cast:pointer")))
                                         .skip)
                                         (.seq
                                         (.ifte
@@ -10678,7 +10680,7 @@ def f_v8_base_TrimMapping_void__zx_vmar__void__size_t_size_t_size_t_ : Func :=
                 (.seq
                   (.assign "new_base" (.hole "op:and"))
                   (.seq
-                    (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -10693,9 +10695,9 @@ def f_v8_base_TrimMapping_void__zx_vmar__void__size_t_size_t_size_t_ : Func :=
                                 (.binop "-" (.name "base_length") (.name "pre_slack"))
                                 (.name "target_length")))
                             (.seq
-                              (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                               (.seq
-                                (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                                 (.seq
                                   (.ifte
                                     (.binop "!=" (.name "pre_slack") (.lit (.int 0)))
@@ -10710,7 +10712,7 @@ def f_v8_base_TrimMapping_void__zx_vmar__void__size_t_size_t_size_t_ : Func :=
                                         [ (.binop "+" (.name "new_base") (.name "target_length"))
                                         , (.name "post_slack") ]))
                                       .skip)
-                                    (.ret (.hole "op:cast:scalar"))))))))))))))) }
+                                    (.ret (.hole "op:cast:pointer"))))))))))))))) }
 
 /-- `v8.base.CreateAndMapVmo:void*(zx.vmar&,void*,size_t,void*,v8.base.PlacementMode,size_t,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_CreateAndMapVmo_void__zx_vmar__void__size_t_void__v8_base_PlacementMode_size_t_size_t_v8_base_OS_MemoryPermiss : Func :=
@@ -10884,9 +10886,9 @@ def f_v8_base_UnmapVmo_bool_zx_vmar__size_t_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.ret
                   (.binop
                     "=="
@@ -10900,9 +10902,9 @@ def f_v8_base_SetPermissionsInternal_bool_zx_vmar__size_t_void__size_t_v8_base_O
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -10917,7 +10919,9 @@ def f_v8_base_SetPermissionsInternal_bool_zx_vmar__size_t_void__size_t_v8_base_O
                             [(.name "prot"), (.unop "cast:u64" (.name "address")), (.name "size")]))
                         (.seq
                           (.expr
-                            (.call "CHECK_EQ" [(.name "status"), (.hole "expr:CONTROL_STRUCTURE")]))
+                            (.call
+                              "CHECK_EQ"
+                              [(.name "status"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.ret (.binop "==" (.name "status") (.name "ZX_OK"))))))))))) }
 
 /-- `v8.base.DiscardSystemPagesInternal:bool(zx.vmar&,size_t,void*,size_t)`  (from `platform/platform-fuchsia.cc`) -/
@@ -10929,9 +10933,9 @@ def f_v8_base_DiscardSystemPagesInternal_bool_zx_vmar__size_t_void__size_t_ : Fu
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -10967,13 +10971,13 @@ def f_v8_base_CreateAddressSpaceReservationInternal_zx_status_t_zx_vmar__void__s
                       (.seq
                         .skip
                         (.seq
-                          (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                             (.seq
-                              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                               (.seq
-                                (.expr (.call "DCHECK_IMPLIES" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
                                 (.seq
                                   .skip
                                   (.seq
@@ -10992,7 +10996,7 @@ def f_v8_base_CreateAddressSpaceReservationInternal_zx_status_t_zx_vmar__void__s
                                         "CHECK_NE"
                                         [ (.lit (.int 0))
                                         , (.name "alignment_option")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -11017,7 +11021,7 @@ def f_v8_base_CreateAddressSpaceReservationInternal_zx_status_t_zx_vmar__void__s
                                         (.seq
                                         (.assign "base" (.unop "cast:u64" (.name "vmar_base")))
                                         (.seq
-                                        (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                                         (.seq
                                         (.assign
                                         "vmar_offset"
@@ -11100,9 +11104,11 @@ def f_v8_base_OS_Initialize_void_char__ : Func :=
                             , (.lit .unit) ]))
                         (.seq
                           (.expr
-                            (.call "CHECK_EQ" [(.name "status"), (.hole "expr:CONTROL_STRUCTURE")]))
+                            (.call
+                              "CHECK_EQ"
+                              [(.name "status"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.seq
-                            (.assign "g_root_vmar_base" (.hole "op:cast:scalar"))
+                            (.assign "g_root_vmar_base" (.hole "op:cast:pointer"))
                             (.expr (.call "v8.base.SetVmexResource:void()" []))))))))))) }
 
 /-- `v8.base.OS.Allocate:void*(void*,size_t,size_t,v8.base.OS.MemoryPermission,std.optional)`  (from `platform/platform-fuchsia.cc`) -/
@@ -11114,7 +11120,7 @@ def f_v8_base_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -11140,7 +11146,7 @@ def f_v8_base_OS_Allocate_void__void__size_t_size_t_v8_base_OS_MemoryPermission_
 def f_v8_base_OS_Free_duplicate_0_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Free<duplicate>0:void(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.AllocateShared<duplicate>0:void*(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_AllocateShared_duplicate_0_void__void__size_t_v8_base_OS_MemoryPermission_SharedMemoryHandle_uint64_t_ : Func :=
@@ -11183,7 +11189,7 @@ def f_v8_base_OS_AllocateShared_duplicate_0_void__void__size_t_v8_base_OS_Memory
 def f_v8_base_OS_FreeShared_void_void__size_t_ : Func :=
   { name := "v8.base.OS.FreeShared:void(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.Release<duplicate>0:void(void*,size_t)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_Release_duplicate_0_void_void__size_t_ : Func :=
@@ -11208,7 +11214,7 @@ def f_v8_base_OS_SetPermissions_duplicate_0_bool_void__size_t_v8_base_OS_MemoryP
 def f_v8_base_OS_SetDataReadOnly_void_void__size_t_ : Func :=
   { name := "v8.base.OS.SetDataReadOnly:void(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.seq .skip (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))) }
+  , body := (.seq .skip (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))) }
 
 /-- `v8.base.OS.SetMemoryRegionName:bool(void*,size_t,char*)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__ : Func :=
@@ -11273,9 +11279,9 @@ def f_v8_base_OS_CreateAddressSpaceReservation_optional_void__size_t_size_t_v8_b
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -11314,7 +11320,7 @@ def f_v8_base_OS_CreateAddressSpaceReservation_optional_void__size_t_size_t_v8_b
                                   (.ret
                                     (.call
                                       "AddressSpaceReservation"
-                                      [ (.hole "op:cast:scalar")
+                                      [ (.hole "op:cast:pointer")
                                       , (.name "size")
                                       , (.call "release" []) ])))))))))))))) }
 
@@ -11331,7 +11337,7 @@ def f_v8_base_OS_FreeAddressSpaceReservation_void_v8_base_AddressSpaceReservatio
                 (.seq
                   (.assign "vmar" (.alloc "vmar" [(.field (.name "reservation") "vmar_")]))
                   (.expr
-                    (.call "CHECK_EQ" [(.call "destroy" []), (.hole "expr:CONTROL_STRUCTURE")])))))) }
+                    (.call "CHECK_EQ" [(.call "destroy" []), (.hole "expr:CONTROL_STRUCTURE:DO")])))))) }
 
 /-- `v8.base.OS.CreateSharedMemoryHandleForTesting<duplicate>0:optional(size_t)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_CreateSharedMemoryHandleForTesting_duplicate_0_optional_size_t_ : Func :=
@@ -11375,13 +11381,13 @@ def f_v8_base_OS_HasLazyCommits_duplicate_0_bool__ : Func :=
 def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_3_vector__ : Func :=
   { name := "v8.base.OS.GetSharedLibraryAddresses<duplicate>3:vector()"
   , params := []
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.SignalCodeMovingGC<duplicate>3:void()`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_SignalCodeMovingGC_duplicate_3_void__ : Func :=
   { name := "v8.base.OS.SignalCodeMovingGC<duplicate>3:void()"
   , params := []
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.GetUserTime:int(uint32_t*,uint32_t*)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_OS_GetUserTime_int_uint32_t__uint32_t__ : Func :=
@@ -11459,7 +11465,7 @@ def f_v8_base_AddressSpaceReservation_CreateSubReservation_optional_void__size_t
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -11487,11 +11493,11 @@ def f_v8_base_AddressSpaceReservation_CreateSubReservation_optional_void__size_t
                               (.ret (.lit .unit))
                               .skip)
                             (.seq
-                              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                               (.ret
                                 (.call
                                   "AddressSpaceReservation"
-                                  [(.hole "op:cast:scalar"), (.name "size"), (.call "release" [])])))))))))))) }
+                                  [(.hole "op:cast:pointer"), (.name "size"), (.call "release" [])])))))))))))) }
 
 /-- `v8.base.AddressSpaceReservation.FreeSubReservation:bool(v8.base.AddressSpaceReservation)`  (from `platform/platform-fuchsia.cc`) -/
 def f_v8_base_AddressSpaceReservation_FreeSubReservation_bool_v8_base_AddressSpaceReservation_ : Func :=
@@ -11513,7 +11519,7 @@ def f_v8_base_AddressSpaceReservation_Allocate_bool_void__size_t_v8_base_OS_Memo
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -11530,7 +11536,7 @@ def f_v8_base_AddressSpaceReservation_Allocate_bool_void__size_t_v8_base_OS_Memo
                         , (.call "v8.base.OS.AllocatePageSize:ANY()" [])
                         , (.name "access") ]))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.ret (.binop "!=" (.name "allocation") (.lit .unit))))))))) }
 
 /-- `v8.base.AddressSpaceReservation.Free:bool(void*,size_t)`  (from `platform/platform-fuchsia.cc`) -/
@@ -11540,7 +11546,7 @@ def f_v8_base_AddressSpaceReservation_Free_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "UnmapVmo"
@@ -11560,7 +11566,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_0_bool_void__size
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -11586,7 +11592,7 @@ def f_v8_base_AddressSpaceReservation_FreeShared_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "UnmapVmo"
@@ -11602,7 +11608,7 @@ def f_v8_base_AddressSpaceReservation_SetPermissions_bool_void__size_t_v8_base_O
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "SetPermissionsInternal"
@@ -11625,7 +11631,7 @@ def f_v8_base_AddressSpaceReservation_DiscardSystemPages_bool_void__size_t_ : Fu
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "DiscardSystemPagesInternal"
@@ -11641,7 +11647,7 @@ def f_v8_base_AddressSpaceReservation_DecommitPages_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.binop
                   "&&"
@@ -11708,7 +11714,7 @@ def f_v8_base_OS_SignalCodeMovingGC_duplicate_4_void__ : Func :=
                                       , (.call "fileno" [(.name "f")])
                                       , (.lit (.int 0)) ]))
                                   (.seq
-                                    (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                    (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                     (.seq
                                       (.expr (.call "Free" [(.name "addr"), (.name "size")]))
                                       (.expr (.call "fclose" [(.name "f")])))))))))))))))) }
@@ -11746,9 +11752,7 @@ def f_v8_base_OS_RemapShared_void__void__void__size_t_ : Func :=
                         (.binop "==" (.name "result") (.name "MAP_FAILED"))
                         (.ret (.lit .unit))
                         .skip)
-                      (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                        (.ret (.name "result"))))))))) }
+                      (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.name "result"))))))))) }
 
 /-- `v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>4:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)`  (from `platform/platform-linux.cc`) -/
 def f_v8_base_OS_GetFirstFreeMemoryRangeWithin_duplicate_4_optional_v8_base_OS_Address_v8_base_OS_Address_size_t_size_t_ : Func :=
@@ -11995,11 +11999,11 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                           (.seq
                             (.assign "address_addr" (.unop "cast:u64" (.name "address")))
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.seq
-                                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK" [(.lit .unit)]))
                                 (.seq
-                                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                  (.expr (.call "DCHECK" [(.lit .unit)]))
                                   (.seq
                                     .skip
                                     (.seq
@@ -12018,7 +12022,7 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                                         "result"
                                         (.call
                                         "mremap"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.hole "op:cast:pointer")
                                         , (.name "size")
                                         , (.name "size")
                                         , (.hole "op:or")
@@ -12031,19 +12035,19 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                                         "CHECK_EQ"
                                         [ (.name "result")
                                         , (.name "new_address")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.expr
                                         (.call
                                         "CHECK_EQ"
-                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         (.seq
                                         (.expr
                                         (.call
                                         "CHECK_EQ"
-                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.ret (.lit (.bool true)))))))
                                         .skip)))
                                         .skip)
@@ -12148,7 +12152,7 @@ def f_v8_base_OS_RemapPages_duplicate_0_bool_void__size_t_void__v8_base_OS_Memor
                                         (.ifte
                                         (.binop "!=" (.name "mapped_address") (.name "new_address"))
                                         (.expr
-                                        (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                        (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         .skip)
                                         (.ret (.lit (.bool true)))))))))))))))))))))))))))))))))))) }
 
@@ -12203,7 +12207,8 @@ def f_v8_base_SignalSafeMapsParser_Next_optional__ : Func :=
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.call "CHECK" [(.call "IsValid" []), (.hole "expr:CONTROL_STRUCTURE")]))
+                    (.expr
+                      (.call "CHECK" [(.call "IsValid" []), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                     (.seq
                       .skip
                       (.seq
@@ -12580,7 +12585,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_5_vector__ : Func :=
                               (.seq
                                 .skip
                                 (.seq
-                                  (.assign "lib_name" (.hole "op:cast:scalar"))
+                                  (.assign "lib_name" (.hole "op:cast:pointer"))
                                   (.seq
                                     (.loop
                                       (.lit (.bool true))
@@ -12750,7 +12755,7 @@ def f_v8_base_OS_SignalCodeMovingGC_duplicate_5_void__ : Func :=
                                         , (.call "fileno" [(.name "f")])
                                         , (.lit (.int 0)) ]))
                                     (.seq
-                                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                      (.expr (.call "DCHECK" [(.lit .unit)]))
                                       (.seq
                                         (.expr (.call "Free" [(.name "addr"), (.name "size")]))
                                         (.expr (.call "fclose" [(.name "f")]))))))))))))))))) }
@@ -12820,7 +12825,7 @@ def f_v8_base_PosixDefaultTimezoneCache_LocalTimeOffset_double_double_bool_ : Fu
                           "localtime_r"
                           [(.hole "op:addressOf:local:opaque-type"), (.name "tm")]))
                       (.seq
-                        (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
                         (.ret (.hole "op:cast:scalar"))))))))) }
 
 /-- `v8.base.GetPlatformRandomNumberGenerator:v8.base.RandomNumberGenerator*()`  (from `platform/platform-posix.cc`) -/
@@ -12973,7 +12978,7 @@ def f_v8_base_GetProtectionFromMemoryPermission_int_v8_base_OS_MemoryPermission_
                     .skip
                     (.seq
                       (.hole "control:SWITCH")
-                      (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))))))) }
+                      (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))))) }
 
 /-- `v8.base.PosixInitializeCommon:void(char*)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_PosixInitializeCommon_void_char__ : Func :=
@@ -13046,7 +13051,7 @@ def f_v8_base_OS_EnsureAlternativeSignalStackIsAvailableForCurrentThread_void__ 
                                       (.expr
                                         (.call
                                         "CHECK_GE"
-                                        [(.name "kStackSize"), (.hole "expr:CONTROL_STRUCTURE")]))
+                                        [(.name "kStackSize"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                       (.seq
                                         .skip
                                         (.seq
@@ -13079,15 +13084,16 @@ def f_v8_base_OS_EnsureAlternativeSignalStackIsAvailableForCurrentThread_void__ 
                                         "CHECK_NE"
                                         [ (.name "ptr")
                                         , (.lit .unit)
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         .skip
                                         (.seq
                                         (.assign
                                         "stack_ptr"
-                                        (.binop "+" (.hole "op:cast:scalar") (.name "kPageSize")))
+                                        (.binop "+" (.hole "op:cast:pointer") (.name "kPageSize")))
                                         (.seq
-                                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                        (.expr
+                                        (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                         (.seq
                                         (.setField (.name "ss") "ss_sp" (.name "stack_ptr"))
                                         (.seq
@@ -13176,7 +13182,7 @@ def f_v8_base_OS_GetRandomMmapAddr_void___ : Func :=
                         [(.name "raw_addr"), (.lit (.int 1073737728))]))
                     (.seq
                       (.assign "raw_addr" (.binop "+" (.name "raw_addr") (.lit (.int 536870912))))
-                      (.ret (.hole "op:cast:scalar")))))))) }
+                      (.ret (.hole "op:cast:pointer")))))))) }
 
 /-- `v8.base.OS.Allocate<duplicate>0:void*(void*,size_t,size_t,v8.base.OS.MemoryPermission,std.optional)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_MemoryPermission_std_optional_ : Func :=
@@ -13189,9 +13195,9 @@ def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_Memor
               (.seq
                 (.assign "page_size" (.call "v8.base.OS.AllocatePageSize:ANY()" []))
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       (.assign
                         "hint"
@@ -13236,22 +13242,16 @@ def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_Memor
                                       (.seq
                                         .skip
                                         (.seq
-                                        (.assign "base" (.unop "cast:u8" (.name "result")))
+                                        (.assign "base" (.hole "op:cast:pointer"))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign
-                                        "aligned_base"
-                                        (.unop
-                                        "cast:u8"
-                                        (.call
-                                        "RoundUp"
-                                        [(.unop "cast:u64" (.name "base")), (.name "alignment")])))
+                                        (.assign "aligned_base" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.ifte
                                         (.binop "!=" (.name "aligned_base") (.name "base"))
                                         (.seq
-                                        (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -13271,7 +13271,7 @@ def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_Memor
                                         (.ifte
                                         (.binop "!=" (.name "size") (.name "request_size"))
                                         (.seq
-                                        (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -13289,7 +13289,7 @@ def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_Memor
                                         (.binop "-" (.name "request_size") (.name "suffix_size")))))))
                                         .skip)
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
                                         (.ifte
                                         (.binop
@@ -13299,24 +13299,13 @@ def f_v8_base_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_Memor
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign
-                                        "new_base"
-                                        (.unop
-                                        "cast:u8"
-                                        (.call
-                                        "Allocate"
-                                        [ (.name "aligned_base")
-                                        , (.name "size")
-                                        , (.name "access")
-                                        , (.name "page_type")
-                                        , (.name "handle")
-                                        , (.lit (.bool true)) ])))
+                                        (.assign "new_base" (.hole "op:cast:pointer"))
                                         (.ifte
                                         (.binop "!=" (.name "new_base") (.name "aligned_base"))
                                         (.ret (.lit .unit))
                                         .skip)))
                                         .skip)
-                                        (.ret (.hole "op:cast:scalar")))))))))))))))))))))))) }
+                                        (.ret (.hole "op:cast:pointer")))))))))))))))))))))))) }
 
 /-- `v8.base.OS.AllocateShared:void*(size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_AllocateShared_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -13325,7 +13314,7 @@ def f_v8_base_OS_AllocateShared_void__size_t_v8_base_OS_MemoryPermission_ : Func
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.ret
                 (.call
                   "Allocate"
@@ -13339,10 +13328,10 @@ def f_v8_base_OS_Free_duplicate_1_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Free<duplicate>1:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `v8.base.OS.AllocateShared<duplicate>1:void*(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_AllocateShared_duplicate_1_void__void__size_t_v8_base_OS_MemoryPermission_SharedMemoryHandle_uint64_t_ : Func :=
@@ -13353,7 +13342,7 @@ def f_v8_base_OS_AllocateShared_duplicate_1_void__void__size_t_v8_base_OS_Memory
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -13391,18 +13380,18 @@ def f_v8_base_OS_FreeShared_duplicate_0_void_void__size_t_ : Func :=
   { name := "v8.base.OS.FreeShared<duplicate>0:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))) }
 
 /-- `v8.base.OS.Release<duplicate>1:void(void*,size_t)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_Release_duplicate_1_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Release<duplicate>1:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `v8.base.OS.SetPermissions<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_SetPermissions_duplicate_1_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -13417,9 +13406,9 @@ def f_v8_base_OS_SetPermissions_duplicate_1_bool_void__size_t_v8_base_OS_MemoryP
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                       (.seq
                         .skip
                         (.seq
@@ -13439,7 +13428,7 @@ def f_v8_base_OS_SetPermissions_duplicate_1_bool_void__size_t_v8_base_OS_MemoryP
                               (.seq
                                 (.ifte
                                   (.binop "!=" (.name "ret") (.lit (.int 0)))
-                                  (.expr (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                  (.expr (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                   .skip)
                                 (.seq
                                   (.ifte
@@ -13452,7 +13441,7 @@ def f_v8_base_OS_SetPermissions_duplicate_1_bool_void__size_t_v8_base_OS_MemoryP
                                         (.field
                                         (.field (.name "OS") "MemoryPermission")
                                         "kNoAccess")))
-                                    (.expr (.call "USE" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                    (.expr (.call "USE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                     .skip)
                                   (.ret (.binop "==" (.name "ret") (.lit (.int 0)))))))))))))))) }
 
@@ -13465,9 +13454,9 @@ def f_v8_base_OS_SetDataReadOnly_duplicate_0_void_void__size_t_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                 (.seq
-                  (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))
+                  (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.ifte
                     (.binop
                       "!="
@@ -13495,8 +13484,8 @@ def f_v8_base_OS_RecommitPages_duplicate_1_bool_void__size_t_v8_base_OS_MemoryPe
   { name := "v8.base.OS.RecommitPages<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.seq (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) (.ret (.lit (.bool true))))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.ret (.lit (.bool true))))) }
 
 /-- `v8.base.OS.DiscardSystemPages<duplicate>1:bool(void*,size_t)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_DiscardSystemPages_duplicate_1_bool_void__size_t_ : Func :=
@@ -13505,9 +13494,9 @@ def f_v8_base_OS_DiscardSystemPages_duplicate_1_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -13518,7 +13507,7 @@ def f_v8_base_OS_DiscardSystemPages_duplicate_1_bool_void__size_t_ : Func :=
                       (.expr
                         (.call
                           "CHECK_EQ"
-                          [(.lit (.int 0)), (.name "ret"), (.hole "expr:CONTROL_STRUCTURE")]))
+                          [(.lit (.int 0)), (.name "ret"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                       (.ret (.lit (.bool true))))))))) }
 
 /-- `v8.base.OS.DecommitPages<duplicate>1:bool(void*,size_t)`  (from `platform/platform-posix.cc`) -/
@@ -13540,9 +13529,9 @@ def f_v8_base_OS_DecommitPages_duplicate_1_bool_void__size_t_ : Func :=
                       (.seq
                         .skip
                         (.seq
-                          (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -13562,7 +13551,8 @@ def f_v8_base_OS_DecommitPages_duplicate_1_bool_void__size_t_ : Func :=
                                       "V8_UNLIKELY"
                                       [(.binop "==" (.name "ret") (.name "MAP_FAILED"))])
                                     (.seq
-                                      (.expr (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                      (.expr
+                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                       (.ret (.lit (.bool false))))
                                     .skip)
                                   (.seq
@@ -13571,7 +13561,7 @@ def f_v8_base_OS_DecommitPages_duplicate_1_bool_void__size_t_ : Func :=
                                         "CHECK_EQ"
                                         [ (.name "ret")
                                         , (.name "address")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                     (.ret (.lit (.bool true)))))))))))))))) }
 
 /-- `v8.base.OS.SealPages<duplicate>1:bool(void*,size_t)`  (from `platform/platform-posix.cc`) -/
@@ -13668,7 +13658,7 @@ def f_v8_base_OS_DestroySharedMemoryHandle_duplicate_1_void_SharedMemoryHandle_ 
                   "CHECK_EQ"
                   [ (.lit (.int 0))
                   , (.call "close" [(.name "fd")])
-                  , (.hole "expr:CONTROL_STRUCTURE") ])))) }
+                  , (.hole "expr:CONTROL_STRUCTURE:DO") ])))) }
 
 /-- `v8.base.OS.HasLazyCommits<duplicate>1:bool()`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_OS_HasLazyCommits_duplicate_1_bool__ : Func :=
@@ -14196,11 +14186,11 @@ def f_v8_base_AddressSpaceReservation_CreateSubReservation_duplicate_0_optional_
   { name := "v8.base.AddressSpaceReservation.CreateSubReservation<duplicate>0:optional(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "max_permission"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.ret (.call "AddressSpaceReservation" [(.name "address"), (.name "size")]))))) }
 
 /-- `v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>0:bool(v8.base.AddressSpaceReservation)`  (from `platform/platform-posix.cc`) -/
@@ -14216,7 +14206,7 @@ def f_v8_base_AddressSpaceReservation_Allocate_duplicate_0_bool_void__size_t_v8_
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 (.ifte
                   (.binop
@@ -14233,7 +14223,7 @@ def f_v8_base_AddressSpaceReservation_Free_duplicate_0_bool_void__size_t_ : Func
   { name := "v8.base.AddressSpaceReservation.Free<duplicate>0:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "DecommitPages" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.AddressSpaceReservation.AllocateShared<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-posix.cc`) -/
@@ -14247,7 +14237,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_1_bool_void__size
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -14286,7 +14276,7 @@ def f_v8_base_AddressSpaceReservation_FreeShared_duplicate_0_bool_void__size_t_ 
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.ret
                       (.binop
                         "=="
@@ -14305,7 +14295,7 @@ def f_v8_base_AddressSpaceReservation_SetPermissions_duplicate_0_bool_void__size
   { name := "v8.base.AddressSpaceReservation.SetPermissions<duplicate>0:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "SetPermissions" [(.name "address"), (.name "size"), (.name "access")]))) }
 
 /-- `v8.base.AddressSpaceReservation.RecommitPages<duplicate>0:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-posix.cc`) -/
@@ -14313,7 +14303,7 @@ def f_v8_base_AddressSpaceReservation_RecommitPages_duplicate_0_bool_void__size_
   { name := "v8.base.AddressSpaceReservation.RecommitPages<duplicate>0:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "RecommitPages" [(.name "address"), (.name "size"), (.name "access")]))) }
 
 /-- `v8.base.AddressSpaceReservation.DiscardSystemPages<duplicate>0:bool(void*,size_t)`  (from `platform/platform-posix.cc`) -/
@@ -14321,7 +14311,7 @@ def f_v8_base_AddressSpaceReservation_DiscardSystemPages_duplicate_0_bool_void__
   { name := "v8.base.AddressSpaceReservation.DiscardSystemPages<duplicate>0:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "DiscardSystemPages" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.AddressSpaceReservation.DecommitPages<duplicate>0:bool(void*,size_t)`  (from `platform/platform-posix.cc`) -/
@@ -14329,7 +14319,7 @@ def f_v8_base_AddressSpaceReservation_DecommitPages_duplicate_0_bool_void__size_
   { name := "v8.base.AddressSpaceReservation.DecommitPages<duplicate>0:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "DecommitPages" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.Thread.PlatformData.<clinit>:v8.base.Thread.PlatformData()`  (from `platform/platform-posix.cc`) -/
@@ -14341,7 +14331,7 @@ def f_v8_base_Thread_PlatformData__clinit__v8_base_Thread_PlatformData__ : Func 
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "thread_creation_mutex_" (.name "<tmp>0")))))) }
 
 /-- `v8.base.Thread.PlatformData.__init__`  (from `platform/platform-posix.cc`) -/
@@ -14417,7 +14407,7 @@ def f_v8_base_ThreadEntry_void__void__ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.assign "thread" (.hole "op:cast:object"))
+                  (.assign "thread" (.hole "op:cast:pointer"))
                   (.seq
                     (.seq
                       .skip
@@ -14434,7 +14424,7 @@ def f_v8_base_ThreadEntry_void__void__ : Func :=
                           "v8.base.SetThreadName:void(char*)"
                           [(.call "v8.base.Thread.name:char*()<const>" [])]))
                       (.seq
-                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                         (.seq
                           (.expr (.call "v8.base.Thread.NotifyStartedAndDispatch:void()" []))
                           (.ret (.lit .unit)))))))))) }
@@ -14592,9 +14582,9 @@ def f_v8_base_Thread_CreateThreadLocalKey_LocalStorageKey__ : Func :=
                       "pthread_key_create"
                       [(.hole "op:addressOf:local:opaque-type"), (.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")]))
+                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                       (.seq
                         .skip
                         (.seq
@@ -14616,8 +14606,8 @@ def f_v8_base_Thread_DeleteThreadLocalKey_void_v8_base_Thread_LocalStorageKey_ :
                   (.seq
                     (.assign "result" (.call "pthread_key_delete" [(.name "pthread_key")]))
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")])))))))) }
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")])))))))) }
 
 /-- `v8.base.Thread.GetThreadLocal:void*(v8.base.Thread.LocalStorageKey)`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_Thread_GetThreadLocal_void__v8_base_Thread_LocalStorageKey_ : Func :=
@@ -14646,8 +14636,8 @@ def f_v8_base_Thread_SetThreadLocal_void_v8_base_Thread_LocalStorageKey_void__ :
                       "result"
                       (.call "pthread_setspecific" [(.name "pthread_key"), (.name "value")]))
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")])))))))) }
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                      (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")])))))))) }
 
 /-- `v8.base.Stack.ObtainCurrentThreadStackStart<duplicate>2:v8.base.Stack.StackSlot()`  (from `platform/platform-posix.cc`) -/
 def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_2_v8_base_Stack_StackSlot__ : Func :=
@@ -14666,7 +14656,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_2_v8_base_Stack_Stac
                 (.seq
                   (.ifte
                     (.binop "!=" (.name "error") (.lit (.int 0)))
-                    (.seq (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])) (.ret (.lit .unit)))
+                    (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.lit .unit)))
                     .skip)
                   (.seq
                     .skip
@@ -14684,7 +14674,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_2_v8_base_Stack_Stac
                           (.expr
                             (.call
                               "CHECK"
-                              [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE")]))
+                              [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.seq
                             (.expr
                               (.call
@@ -14695,7 +14685,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_2_v8_base_Stack_Stac
                               (.seq
                                 (.assign
                                   "stack_start"
-                                  (.binop "+" (.unop "cast:u8" (.name "base")) (.name "size")))
+                                  (.binop "+" (.hole "op:cast:pointer") (.name "size")))
                                 (.ret (.name "stack_start"))))))))))))) }
 
 /-- `v8.base.Stack.ObtainCurrentThreadStackReservedLimit<duplicate>0:v8.base.Stack.StackSlot()`  (from `platform/platform-posix.cc`) -/
@@ -14715,7 +14705,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackReservedLimit_duplicate_0_v8_base_St
                 (.seq
                   (.ifte
                     (.binop "!=" (.name "error") (.lit (.int 0)))
-                    (.seq (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])) (.ret (.lit .unit)))
+                    (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.lit .unit)))
                     .skip)
                   (.seq
                     .skip
@@ -14733,7 +14723,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackReservedLimit_duplicate_0_v8_base_St
                           (.expr
                             (.call
                               "CHECK"
-                              [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE")]))
+                              [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.seq
                             (.expr
                               (.call
@@ -14745,7 +14735,7 @@ def f_v8_base_Stack_ObtainCurrentThreadStackReservedLimit_duplicate_0_v8_base_St
 def f_v8_base_Stack_SetCurrentThreadStackBounds_void_uintptr_t_uintptr_t_ : Func :=
   { name := "v8.base.Stack.SetCurrentThreadStackBounds:void(uintptr_t,uintptr_t)"
   , params := ["", ""]
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `Stack.GetCurrentStackPosition:StackSlot()`  (from `platform/platform-posix.cc`) -/
 def f_Stack_GetCurrentStackPosition_StackSlot__ : Func :=
@@ -14838,7 +14828,7 @@ def f_v8_base_OS_GetSharedLibraryAddresses_duplicate_6_vector__ : Func :=
                                         (.ret (.name "result")))
                                         .skip)
                                         (.seq
-                                        (.assign "mapinfos" (.hole "op:cast:object"))
+                                        (.assign "mapinfos" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.ifte
                                         (.binop "==" (.name "mapinfos") (.lit .unit))
@@ -15002,13 +14992,13 @@ def f_v8_base_Stack_ObtainCurrentThreadStackStart_duplicate_3_v8_base_Stack_Stac
                               (.expr
                                 (.call
                                   "CHECK"
-                                  [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE")]))
+                                  [(.unop "!" (.name "error")), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                               (.seq
                                 (.expr
                                   (.call
                                     "pthread_attr_destroy"
                                     [(.hole "op:addressOf:local:opaque-type")]))
-                                (.ret (.binop "+" (.unop "cast:u8" (.name "base")) (.name "size"))))))))
+                                (.ret (.binop "+" (.hole "op:cast:pointer") (.name "size"))))))))
                       .skip)
                     (.seq
                       (.expr
@@ -15129,9 +15119,9 @@ def f_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_MemoryPermiss
             (.seq
               (.assign "page_size" (.call "v8.base.OS.AllocatePageSize:ANY()" []))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
                     (.assign
                       "address"
@@ -15168,22 +15158,16 @@ def f_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_MemoryPermiss
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.assign "base" (.unop "cast:u8" (.name "result")))
+                                    (.assign "base" (.hole "op:cast:pointer"))
                                     (.seq
                                       .skip
                                       (.seq
-                                        (.assign
-                                        "aligned_base"
-                                        (.unop
-                                        "cast:u8"
-                                        (.call
-                                        "RoundUp"
-                                        [(.unop "cast:u64" (.name "base")), (.name "alignment")])))
+                                        (.assign "aligned_base" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.ifte
                                         (.binop "!=" (.name "aligned_base") (.name "base"))
                                         (.seq
-                                        (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -15203,7 +15187,7 @@ def f_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_MemoryPermiss
                                         (.ifte
                                         (.binop "!=" (.name "size") (.name "request_size"))
                                         (.seq
-                                        (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                                         (.seq
                                         .skip
                                         (.seq
@@ -15221,20 +15205,20 @@ def f_OS_Allocate_duplicate_0_void__void__size_t_size_t_v8_base_OS_MemoryPermiss
                                         (.binop "-" (.name "request_size") (.name "suffix_size")))))))
                                         .skip)
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                                        (.ret (.hole "op:cast:scalar")))))))))))))))))))) }
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                                        (.ret (.hole "op:cast:pointer")))))))))))))))))))) }
 
 /-- `v8.base.OS.Free<duplicate>2:void(void*,size_t)`  (from `platform/platform-starboard.cc`) -/
 def f_v8_base_OS_Free_duplicate_2_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Free<duplicate>2:void(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.Release<duplicate>2:void(void*,size_t)`  (from `platform/platform-starboard.cc`) -/
 def f_v8_base_OS_Release_duplicate_2_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Release<duplicate>2:void(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.SetPermissions<duplicate>2:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-starboard.cc`) -/
 def f_v8_base_OS_SetPermissions_duplicate_2_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -15528,7 +15512,7 @@ def f_v8_base_ThreadEntry_duplicate_0_void__void__ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.assign "thread" (.hole "op:cast:object"))
+                  (.assign "thread" (.hole "op:cast:pointer"))
                   (.seq
                     (.expr
                       (.binop
@@ -15627,7 +15611,7 @@ def f_v8_base_Thread_SetThreadLocal_duplicate_0_void_v8_base_Thread_LocalStorage
             .skip
             (.seq
               (.assign "result" (.call "SbThreadSetLocalValue" [(.name "key"), (.name "value")]))
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)])))) }
 
 /-- `v8.base.StarboardTimezoneCache.<clinit>:v8.base.StarboardTimezoneCache()`  (from `platform/platform-starboard.cc`) -/
 def f_v8_base_StarboardTimezoneCache__clinit__v8_base_StarboardTimezoneCache__ : Func :=
@@ -16042,7 +16026,7 @@ def f_v8_base_Win32Time__clinit__v8_base_Win32Time__ : Func :=
                             (.seq
                               (.assign "kShortTzNames" (.lit (.bool false)))
                               (.seq
-                                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                 (.seq (.expr (.call "ANY" [])) (.assign "time_" (.name "<tmp>0")))))))))))))) }
 
 /-- `v8.base.Win32Time.ft:FILETIME()`  (from `platform/platform-win32.cc`) -/
@@ -16387,7 +16371,7 @@ def f_v8_base_OS_GetUserTime_duplicate_2_int_uint32_t__uint32_t__ : Func :=
                       , (.hole "op:addressOf:local:opaque-type")
                       , (.hole "op:addressOf:local:opaque-type")
                       , (.hole "op:addressOf:local:opaque-type")
-                      , (.hole "op:cast:opaque-type") ]))
+                      , (.hole "op:cast:pointer") ]))
                   (.ret (.unop "-" (.lit (.int 1))))
                   .skip)
                 (.seq
@@ -16507,7 +16491,7 @@ def f_v8_base_OS_ExitProcess_duplicate_0_void_int_ : Func :=
               (.seq
                 (.expr
                   (.call "TerminateProcess" [(.call "GetCurrentProcess" []), (.name "exit_code")]))
-                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.HasConsole:bool()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_HasConsole_bool__ : Func :=
@@ -16585,7 +16569,7 @@ def f_OS_ConvertUtf8StringToUtf16_wstring_char__ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.hole "op:staticAssert"))
+                (.expr (.lit .unit))
                 (.seq
                   .skip
                   (.seq
@@ -16876,8 +16860,9 @@ def f_v8_base_OS_StrNCpy_duplicate_1_void_char__int_char__size_t_ : Func :=
                             "strncpy_s"
                             [(.name "dest"), (.name "length"), (.name "src"), (.name "n")]))
                         (.seq
-                          (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")]))
-                          (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))))) }
+                          (.expr
+                            (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
+                          (.expr (.call "DCHECK" [(.lit .unit)])))))))))) }
 
 /-- `v8.base.GetPlatformRandomNumberGenerator<duplicate>0:v8.base.RandomNumberGenerator*()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_GetPlatformRandomNumberGenerator_duplicate_0_v8_base_RandomNumberGenerator___ : Func :=
@@ -16970,7 +16955,7 @@ def f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_duplicate_0_bool__ : Func
 def f_v8_base_OS_EnsureAlternativeSignalStackIsAvailableForCurrentThread_duplicate_0_void__ : Func :=
   { name := "v8.base.OS.EnsureAlternativeSignalStackIsAvailableForCurrentThread<duplicate>0:void()"
   , params := []
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.AllocatePageSize<duplicate>1:size_t()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_AllocatePageSize_duplicate_1_size_t__ : Func :=
@@ -17010,7 +16995,7 @@ def f_v8_base_OS_CommitPageSize_duplicate_1_size_t__ : Func :=
                       (.expr (.call "GetSystemInfo" [(.name "info")]))
                       (.seq
                         (.assign "page_size" (.field (.name "info") "dwPageSize"))
-                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])))))
+                        (.expr (.call "DCHECK_EQ" [(.lit .unit)])))))
                   .skip)
                 (.ret (.name "page_size"))))) }
 
@@ -17077,7 +17062,7 @@ def f_v8_base_OS_GetRandomMmapAddr_duplicate_1_void___ : Func :=
                                     (.call
                                       "<operators>.assignmentAnd"
                                       [(.name "address"), (.name "kAllocationRandomAddressMax")]))
-                                  (.ret (.hole "op:cast:scalar")))))))))))))) }
+                                  (.ret (.hole "op:cast:pointer")))))))))))))) }
 
 /-- `v8.base.GetProtectionFromMemoryPermission:DWORD(v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_GetProtectionFromMemoryPermission_DWORD_v8_base_OS_MemoryPermission_ : Func :=
@@ -17099,7 +17084,7 @@ def f_v8_base_GetProtectionFromMemoryPermission_DWORD_v8_base_OS_MemoryPermissio
                         .skip
                         (.seq
                           (.hole "control:SWITCH")
-                          (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))))))))) }
+                          (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))))))) }
 
 /-- `v8.base.GetFileViewAccessFromMemoryPermission:DWORD(v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_GetFileViewAccessFromMemoryPermission_DWORD_v8_base_OS_MemoryPermission_ : Func :=
@@ -17113,7 +17098,7 @@ def f_v8_base_GetFileViewAccessFromMemoryPermission_DWORD_v8_base_OS_MemoryPermi
                 .skip
                 (.seq
                   (.hole "control:SWITCH")
-                  (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))))) }
+                  (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))) }
 
 /-- `v8.base.VirtualAllocWrapper:void*(void*,size_t,DWORD,DWORD)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_VirtualAllocWrapper_void__void__size_t_DWORD_DWORD_ : Func :=
@@ -17161,7 +17146,7 @@ def f_v8_base_VirtualAllocWithHint_uint8_t_size_t_DWORD_DWORD_void__ : Func :=
                       "VirtualAllocWrapper"
                       [(.lit .unit), (.name "size"), (.name "flags"), (.name "protect")]))
                   .skip)
-                (.ret (.unop "cast:u8" (.name "base")))))) }
+                (.ret (.hole "op:cast:pointer"))))) }
 
 /-- `v8.base.AllocateInternal:void*(void*,size_t,size_t,size_t,DWORD,DWORD)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_AllocateInternal_void__void__size_t_size_t_size_t_DWORD_DWORD_ : Func :=
@@ -17182,18 +17167,14 @@ def f_v8_base_AllocateInternal_void__void__size_t_size_t_size_t_DWORD_DWORD_ : F
                   (.seq
                     .skip
                     (.seq
-                      (.assign
-                        "aligned_base"
-                        (.unop
-                          "cast:u8"
-                          (.call "RoundUp" [(.unop "cast:u64" (.name "base")), (.name "alignment")])))
+                      (.assign "aligned_base" (.hole "op:cast:pointer"))
                       (.seq
                         (.ifte
                           (.binop "==" (.name "base") (.name "aligned_base"))
-                          (.ret (.hole "op:cast:scalar"))
+                          (.ret (.hole "op:cast:pointer"))
                           .skip)
                         (.seq
-                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.seq
                             (.assign "hint" (.lit .unit))
                             (.seq
@@ -17214,8 +17195,8 @@ def f_v8_base_AllocateInternal_void__void__size_t_size_t_size_t_DWORD_DWORD_ : F
                                       (.seq
                                         (.hole "control:FOR")
                                         (.seq
-                                        (.expr (.call "DCHECK_IMPLIES" [(.hole "op:cast:scalar")]))
-                                        (.ret (.hole "op:cast:scalar")))))))))))))))))) }
+                                        (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
+                                        (.ret (.hole "op:cast:pointer")))))))))))))))))) }
 
 /-- `v8.base.CheckIsOOMError:void(int)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_CheckIsOOMError_void_int_ : Func :=
@@ -17227,7 +17208,7 @@ def f_v8_base_CheckIsOOMError_void_int_ : Func :=
               .skip
               (.ifte
                 (.binop "!=" (.name "error") (.name "ERROR_NOT_ENOUGH_MEMORY"))
-                (.expr (.call "CHECK_EQ" [(.name "error"), (.hole "expr:CONTROL_STRUCTURE")]))
+                (.expr (.call "CHECK_EQ" [(.name "error"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                 .skip))) }
 
 /-- `v8.base.OS.Allocate<duplicate>1:void*(void*,size_t,size_t,v8.base.OS.MemoryPermission,std.optional)`  (from `platform/platform-win32.cc`) -/
@@ -17241,17 +17222,17 @@ def f_v8_base_OS_Allocate_duplicate_1_void__void__size_t_size_t_v8_base_OS_Memor
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
                       (.assign "page_size" (.call "v8.base.OS.AllocatePageSize:ANY()" []))
                       (.seq
-                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                             (.seq
                               (.assign
                                 "hint"
@@ -17297,23 +17278,24 @@ def f_v8_base_OS_Free_duplicate_3_void_void__size_t_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "USE" [(.name "size"), (.hole "expr:CONTROL_STRUCTURE")]))
-                    (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))))))) }
+                    (.expr (.call "USE" [(.name "size"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
+                    (.expr
+                      (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))))))) }
 
 /-- `v8.base.OS.AllocateShared<duplicate>2:void*(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_AllocateShared_duplicate_2_void__void__size_t_v8_base_OS_MemoryPermission_SharedMemoryHandle_uint64_t_ : Func :=
   { name := "v8.base.OS.AllocateShared<duplicate>2:void*(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)"
   , params := ["hint", "size", "permission", "handle", "offset"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -17367,7 +17349,7 @@ def f_v8_base_OS_FreeShared_duplicate_1_void_void__size_t_ : Func :=
   , body := (.expr
             (.call
               "CHECK"
-              [(.call "UnmapViewOfFile" [(.name "address")]), (.hole "expr:CONTROL_STRUCTURE")])) }
+              [(.call "UnmapViewOfFile" [(.name "address")]), (.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.OS.Release<duplicate>3:void(void*,size_t)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_Release_duplicate_3_void_void__size_t_ : Func :=
@@ -17376,10 +17358,10 @@ def f_v8_base_OS_Release_duplicate_3_void_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                (.expr (.call "CHECK_NE" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.OS.SetPermissions<duplicate>3:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_SetPermissions_duplicate_3_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -17392,9 +17374,9 @@ def f_v8_base_OS_SetPermissions_duplicate_3_bool_void__size_t_v8_base_OS_MemoryP
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       (.ifte
                         (.binop
@@ -17447,14 +17429,14 @@ def f_v8_base_OS_SetDataReadOnly_duplicate_1_void_void__size_t_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
-                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
-                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))))))))) }
+                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
+                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))))) }
 
 /-- `v8.base.OS.SetMemoryRegionName<duplicate>1:bool(void*,size_t,char*)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__ : Func :=
@@ -17519,7 +17501,7 @@ def f_v8_base_OS_DiscardSystemPages_duplicate_3_bool_void__size_t_ : Func :=
                                   (.expr
                                     (.call
                                       "CHECK"
-                                      [(.name "ptr"), (.hole "expr:CONTROL_STRUCTURE")]))
+                                      [(.name "ptr"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                                   (.ret (.name "ptr")))))))))))))) }
 
 /-- `v8.base.OS.DecommitPages<duplicate>2:bool(void*,size_t)`  (from `platform/platform-win32.cc`) -/
@@ -17529,9 +17511,9 @@ def f_v8_base_OS_DecommitPages_duplicate_2_bool_void__size_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.ret
                   (.binop
                     "!="
@@ -17576,23 +17558,23 @@ def f_OS_CreateAddressSpaceReservation_optional_void__size_t_size_t_v8_base_OS_M
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     (.expr
                       (.call
                         "CHECK"
                         [ (.call "v8.base.OS.CanReserveAddressSpace:bool()" [])
-                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                     (.seq
                       .skip
                       (.seq
                         (.assign "page_size" (.call "v8.base.OS.AllocatePageSize:ANY()" []))
                         (.seq
-                          (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                             (.seq
-                              (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                               (.seq
                                 (.assign
                                   "hint"
@@ -17670,7 +17652,8 @@ def f_v8_base_OS_DestroySharedMemoryHandle_duplicate_2_void_SharedMemoryHandle_ 
               (.expr
                 (.call
                   "CHECK"
-                  [(.call "CloseHandle" [(.name "file_mapping")]), (.hole "expr:CONTROL_STRUCTURE")])))) }
+                  [ (.call "CloseHandle" [(.name "file_mapping")])
+                  , (.hole "expr:CONTROL_STRUCTURE:DO") ])))) }
 
 /-- `v8.base.OS.HasLazyCommits<duplicate>3:bool()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_HasLazyCommits_duplicate_3_bool__ : Func :=
@@ -17810,13 +17793,13 @@ def f_v8_base_PreciseSleepTimer_Sleep_void_v8_base_TimeDelta__const_ : Func :=
                                   (.seq
                                     (.assign "resume" (.lit (.bool false)))
                                     (.seq
-                                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                                       (.seq
                                         .skip
                                         (.seq
                                         (.assign "timeout_interval" (.name "INFINITE"))
                                         (.expr
-                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE")])))))))))))))))))) }
+                                        (.call "CHECK_EQ" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))))))))))))))) }
 
 /-- `v8.base.OS.Abort<duplicate>1:void()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_Abort_duplicate_1_void__ : Func :=
@@ -18120,11 +18103,11 @@ def f_AddressSpaceReservation_CreateSubReservation_optional_void__size_t_v8_base
   { name := "AddressSpaceReservation.CreateSubReservation:optional(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "max_permission"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                 (.ret (.call "AddressSpaceReservation" [(.name "address"), (.name "size")]))))) }
 
 /-- `v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>1:bool(v8.base.AddressSpaceReservation)`  (from `platform/platform-win32.cc`) -/
@@ -18142,7 +18125,7 @@ def f_AddressSpaceReservation_SplitPlaceholder_bool_void__size_t_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
 
 /-- `AddressSpaceReservation.MergePlaceholders:bool(void*,size_t)`  (from `platform/platform-win32.cc`) -/
@@ -18154,7 +18137,7 @@ def f_AddressSpaceReservation_MergePlaceholders_bool_void__size_t_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
 
 /-- `v8.base.AddressSpaceReservation.Allocate<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
@@ -18172,9 +18155,9 @@ def f_v8_base_AddressSpaceReservation_Allocate_duplicate_1_bool_void__size_t_v8_
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                        (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                         (.seq
                           .skip
                           (.seq
@@ -18213,7 +18196,7 @@ def f_v8_base_AddressSpaceReservation_Free_duplicate_1_bool_void__size_t_ : Func
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.ret (.call "VirtualFree" [(.name "address"), (.name "size"), (.hole "op:or")]))))) }
 
 /-- `v8.base.AddressSpaceReservation.AllocateShared<duplicate>2:bool(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-win32.cc`) -/
@@ -18225,9 +18208,9 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_2_bool_void__size
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                  (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.seq
                     .skip
                     (.seq
@@ -18260,9 +18243,9 @@ def f_v8_base_AddressSpaceReservation_FreeShared_duplicate_1_bool_void__size_t_ 
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                  (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.ret
                     (.call
                       "UnmapViewOfFile2"
@@ -18275,7 +18258,7 @@ def f_v8_base_AddressSpaceReservation_SetPermissions_duplicate_1_bool_void__size
   { name := "v8.base.AddressSpaceReservation.SetPermissions<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "SetPermissions" [(.name "address"), (.name "size"), (.name "access")]))) }
 
 /-- `v8.base.AddressSpaceReservation.RecommitPages<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-win32.cc`) -/
@@ -18283,7 +18266,7 @@ def f_v8_base_AddressSpaceReservation_RecommitPages_duplicate_1_bool_void__size_
   { name := "v8.base.AddressSpaceReservation.RecommitPages<duplicate>1:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "RecommitPages" [(.name "address"), (.name "size"), (.name "access")]))) }
 
 /-- `v8.base.AddressSpaceReservation.DiscardSystemPages<duplicate>1:bool(void*,size_t)`  (from `platform/platform-win32.cc`) -/
@@ -18291,7 +18274,7 @@ def f_v8_base_AddressSpaceReservation_DiscardSystemPages_duplicate_1_bool_void__
   { name := "v8.base.AddressSpaceReservation.DiscardSystemPages<duplicate>1:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "DiscardSystemPages" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.AddressSpaceReservation.DecommitPages<duplicate>1:bool(void*,size_t)`  (from `platform/platform-win32.cc`) -/
@@ -18299,7 +18282,7 @@ def f_v8_base_AddressSpaceReservation_DecommitPages_duplicate_1_bool_void__size_
   { name := "v8.base.AddressSpaceReservation.DecommitPages<duplicate>1:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.call "DecommitPages" [(.name "address"), (.name "size")]))) }
 
 /-- `v8.base.LoadDbgHelpAndTlHelp32:bool()`  (from `platform/platform-win32.cc`) -/
@@ -18718,7 +18701,7 @@ def f_v8_base_ThreadEntry_unsigned_int_void__ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.assign "thread" (.hole "op:cast:object"))
+              (.assign "thread" (.hole "op:cast:pointer"))
               (.seq
                 (.expr (.call "v8.base.Thread.NotifyStartedAndDispatch:void()" []))
                 (.ret (.lit (.int 0)))))) }
@@ -18833,9 +18816,7 @@ def f_v8_base_Thread_CreateThreadLocalKey_duplicate_1_LocalStorageKey__ : Func :
             .skip
             (.seq
               (.assign "result" (.call "TlsAlloc" []))
-              (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                (.ret (.hole "op:cast:opaque-type"))))) }
+              (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.hole "op:cast:opaque-type"))))) }
 
 /-- `v8.base.Thread.DeleteThreadLocalKey<duplicate>1:void(v8.base.Thread.LocalStorageKey)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_Thread_DeleteThreadLocalKey_duplicate_1_void_v8_base_Thread_LocalStorageKey_ : Func :=
@@ -18848,8 +18829,8 @@ def f_v8_base_Thread_DeleteThreadLocalKey_duplicate_1_void_v8_base_Thread_LocalS
               (.seq
                 (.assign "result" (.call "TlsFree" [(.hole "op:cast:opaque-type")]))
                 (.seq
-                  (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")]))
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))) }
+                  (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)])))))) }
 
 /-- `v8.base.Thread.GetThreadLocal<duplicate>1:void*(v8.base.Thread.LocalStorageKey)`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_Thread_GetThreadLocal_duplicate_1_void__v8_base_Thread_LocalStorageKey_ : Func :=
@@ -18870,8 +18851,8 @@ def f_v8_base_Thread_SetThreadLocal_duplicate_1_void_v8_base_Thread_LocalStorage
                   "result"
                   (.call "TlsSetValue" [(.hole "op:cast:opaque-type"), (.name "value")]))
                 (.seq
-                  (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE")]))
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))) }
+                  (.expr (.call "USE" [(.name "result"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)])))))) }
 
 /-- `v8.base.OS.AdjustSchedulingParams<duplicate>9:void()`  (from `platform/platform-win32.cc`) -/
 def f_v8_base_OS_AdjustSchedulingParams_duplicate_9_void__ : Func :=
@@ -19011,20 +18992,20 @@ def f_v8_base_OS_Free_duplicate_4_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Free<duplicate>4:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `v8.base.OS.Release<duplicate>4:void(void*,size_t)`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_OS_Release_duplicate_4_void_void__size_t_ : Func :=
   { name := "v8.base.OS.Release<duplicate>4:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+              (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `OS.Allocate<duplicate>1:void*(void*,size_t,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-zos.cc`) -/
 def f_OS_Allocate_duplicate_1_void__void__size_t_size_t_v8_base_OS_MemoryPermission_ : Func :=
@@ -19153,7 +19134,7 @@ def f_v8_base_OS_AllocateShared_duplicate_3_void__void__size_t_v8_base_OS_Memory
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -19181,8 +19162,8 @@ def f_v8_base_OS_FreeShared_duplicate_2_void_void__size_t_ : Func :=
   { name := "v8.base.OS.FreeShared<duplicate>2:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE")]))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.expr (.call "CHECK_EQ" [(.lit (.int 0)), (.hole "expr:CONTROL_STRUCTURE:DO")]))) }
 
 /-- `v8.base.AddressSpaceReservation.AllocateShared<duplicate>3:bool(void*,size_t,v8.base.OS.MemoryPermission,SharedMemoryHandle,uint64_t)`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_3_bool_void__size_t_v8_base_OS_MemoryPermission_SharedMemoryH : Func :=
@@ -19195,7 +19176,7 @@ def f_v8_base_AddressSpaceReservation_AllocateShared_duplicate_3_bool_void__size
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -19234,7 +19215,7 @@ def f_v8_base_AddressSpaceReservation_FreeShared_duplicate_2_bool_void__size_t_ 
                 (.seq
                   .skip
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.ret
                       (.binop
                         "!="
@@ -19273,29 +19254,27 @@ def f_v8_base_OS_SetPermissions_duplicate_4_bool_void__size_t_v8_base_OS_MemoryP
   { name := "v8.base.OS.SetPermissions<duplicate>4:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-              (.seq
-                (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                (.ret (.lit (.bool true)))))) }
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+              (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.ret (.lit (.bool true)))))) }
 
 /-- `v8.base.OS.SetDataReadOnly<duplicate>2:void(void*,size_t)`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_OS_SetDataReadOnly_duplicate_2_void_void__size_t_ : Func :=
   { name := "v8.base.OS.SetDataReadOnly<duplicate>2:void(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))) }
 
 /-- `v8.base.OS.RecommitPages<duplicate>4:bool(void*,size_t,v8.base.OS.MemoryPermission)`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_OS_RecommitPages_duplicate_4_bool_void__size_t_v8_base_OS_MemoryPermission_ : Func :=
   { name := "v8.base.OS.RecommitPages<duplicate>4:bool(void*,size_t,v8.base.OS.MemoryPermission)"
   , params := ["address", "size", "access"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
               (.ret (.call "SetPermissions" [(.name "address"), (.name "size"), (.name "access")])))) }
 
 /-- `v8.base.OS.DiscardSystemPages<duplicate>4:bool(void*,size_t)`  (from `platform/platform-zos.cc`) -/
@@ -19303,16 +19282,16 @@ def f_v8_base_OS_DiscardSystemPages_duplicate_4_bool_void__size_t_ : Func :=
   { name := "v8.base.OS.DiscardSystemPages<duplicate>4:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.seq (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) (.ret (.lit (.bool true))))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.ret (.lit (.bool true))))) }
 
 /-- `v8.base.OS.DecommitPages<duplicate>3:bool(void*,size_t)`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_OS_DecommitPages_duplicate_3_bool_void__size_t_ : Func :=
   { name := "v8.base.OS.DecommitPages<duplicate>3:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-            (.seq (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) (.ret (.lit (.bool true))))) }
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+            (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.ret (.lit (.bool true))))) }
 
 /-- `v8.base.OS.HasLazyCommits<duplicate>4:bool()`  (from `platform/platform-zos.cc`) -/
 def f_v8_base_OS_HasLazyCommits_duplicate_4_bool__ : Func :=
@@ -19874,7 +19853,7 @@ def f_v8_base_ThreadTicks_IsSupported_bool__ : Func :=
 def f_v8_base_ThreadTicks_Now_v8_base_ThreadTicks__ : Func :=
   { name := "v8.base.ThreadTicks.Now:v8.base.ThreadTicks()"
   , params := []
-  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])) }
+  , body := (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])) }
 
 /-- `v8.base.RegionAllocator.__init__`  (from `region-allocator.cc`) -/
 def f_v8_base_RegionAllocator___init__ : Func :=
@@ -19888,17 +19867,17 @@ def f_v8_base_RegionAllocator___init__ : Func :=
                 (.expr
                   (.call
                     "CHECK_LT"
-                    [(.call "begin" []), (.call "end" []), (.hole "expr:CONTROL_STRUCTURE")]))
+                    [(.call "begin" []), (.call "end" []), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                 (.seq
                   (.expr
                     (.call
                       "CHECK"
                       [ (.mcall (.name "self") "page_size_" [(.field (.name "self") "page_size_")])
-                      , (.hole "expr:CONTROL_STRUCTURE") ]))
+                      , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                   (.seq
-                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                     (.seq
-                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                       (.seq
                         .skip
                         (.seq
@@ -19976,10 +19955,8 @@ def f_v8_base_RegionAllocator_FindRegion_iterator_v8_base_RegionAllocator_Addres
                       (.seq
                         (.assign "iter" (.mcall (.name "self") "all_regions_" [(.name "key")]))
                         (.seq
-                          (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
-                          (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                            (.ret (.name "iter"))))))))))) }
+                          (.expr (.call "DCHECK_NE" [(.lit .unit)]))
+                          (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.name "iter"))))))))))) }
 
 /-- `v8.base.RegionAllocator.FreeListAddRegion:void(v8.base.RegionAllocator.Region*)`  (from `region-allocator.cc`) -/
 def f_v8_base_RegionAllocator_FreeListAddRegion_void_v8_base_RegionAllocator_Region__ : Func :=
@@ -20069,17 +20046,17 @@ def f_v8_base_RegionAllocator_FreeListRemoveRegion_void_v8_base_RegionAllocator_
   { name := "v8.base.RegionAllocator.FreeListRemoveRegion:void(v8.base.RegionAllocator.Region*)"
   , params := ["region"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               .skip
               (.seq
                 (.assign "iter" (.mcall (.name "self") "free_regions_" [(.name "region")]))
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                       (.seq
                         (.setField
                           (.name "self")
@@ -20096,18 +20073,18 @@ def f_v8_base_RegionAllocator_Split_v8_base_RegionAllocator_Region__v8_base_Regi
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                     (.seq
                       (.ifte
                         (.field (.name "self") "on_split_")
                         (.expr (.call "on_split_" [(.call "begin" []), (.name "new_size")]))
                         .skip)
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
                           .skip
                           (.seq
@@ -20170,7 +20147,7 @@ def f_v8_base_RegionAllocator_Merge_void_AllRegionsSet_iterator_AllRegionsSet_it
                 (.seq
                   (.assign "next" (.hole "op:indirection:opaque-type"))
                   (.seq
-                    (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                     (.seq
                       (.ifte
                         (.field (.name "self") "on_merge_")
@@ -20184,9 +20161,7 @@ def f_v8_base_RegionAllocator_Merge_void_AllRegionsSet_iterator_AllRegionsSet_it
                           (.call "set_size" [(.binop "+" (.call "size" []) (.call "size" []))]))
                         (.seq
                           (.expr (.mcall (.name "self") "all_regions_" [(.name "next_iter")]))
-                          (.seq
-                            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                            (.del "next")))))))))) }
+                          (.seq (.expr (.call "DCHECK_EQ" [(.lit .unit)])) (.del "next")))))))))) }
 
 /-- `v8.base.RegionAllocator.AllocateRegion:Address(size_t,v8.base.RegionAllocator.AllocationStrategy)`  (from `region-allocator.cc`) -/
 def f_v8_base_RegionAllocator_AllocateRegion_Address_size_t_v8_base_RegionAllocator_AllocationStrategy_ : Func :=
@@ -20199,9 +20174,9 @@ def f_v8_base_RegionAllocator_AllocateRegion_Address_size_t_v8_base_RegionAlloca
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -20214,7 +20189,7 @@ def f_v8_base_RegionAllocator_AllocateRegion_Address_size_t_v8_base_RegionAlloca
                               (.field (.name "AllocationStrategy") "kFirstFit"))
                             (.assign "region" (.call "FreeListFindRegion" [(.name "size")]))
                             (.seq
-                              (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                               (.assign
                                 "region"
                                 (.call "FreeListFindLargestRegion" [(.name "size")]))))
@@ -20229,9 +20204,9 @@ def f_v8_base_RegionAllocator_AllocateRegion_Address_size_t_v8_base_RegionAlloca
                                 (.expr (.call "Split" [(.name "region"), (.name "size")]))
                                 .skip)
                               (.seq
-                                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                (.expr (.call "DCHECK" [(.lit .unit)]))
                                 (.seq
-                                  (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                  (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                   (.seq
                                     (.expr
                                       (.call
@@ -20269,13 +20244,13 @@ def f_v8_base_RegionAllocator_AllocateRegionAt_bool_v8_base_RegionAllocator_Addr
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -20291,7 +20266,7 @@ def f_v8_base_RegionAllocator_AllocateRegionAt_bool_v8_base_RegionAllocator_Addr
                             (.ret (.lit (.bool false)))
                             .skip)
                           (.seq
-                            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
                             (.seq
                               .skip
                               (.seq
@@ -20334,7 +20309,7 @@ def f_v8_base_RegionAllocator_AllocateRegionAt_bool_v8_base_RegionAllocator_Addr
                                         "new_size"
                                         (.binop "-" (.name "requested_address") (.call "begin" [])))
                                         (.seq
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)]))
                                         (.assign
                                         "region"
                                         (.call "Split" [(.name "region"), (.name "new_size")])))))
@@ -20345,9 +20320,9 @@ def f_v8_base_RegionAllocator_AllocateRegionAt_bool_v8_base_RegionAllocator_Addr
                                         (.expr (.call "Split" [(.name "region"), (.name "size")]))
                                         .skip)
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -20369,11 +20344,11 @@ def f_v8_base_RegionAllocator_AllocateAlignedRegion_Address_size_t_size_t_ : Fun
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                     (.seq
                       .skip
                       (.seq
@@ -20424,8 +20399,8 @@ def f_v8_base_RegionAllocator_AllocateAlignedRegion_Address_size_t_size_t_ : Fun
                                         [ (.name "region")
                                         , (.binop "-" (.name "start") (.call "begin" [])) ]))
                                         (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
-                                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
+                                        (.expr (.call "DCHECK" [(.lit .unit)])))))))
                                     .skip)
                                   (.seq
                                     (.ifte
@@ -20433,9 +20408,9 @@ def f_v8_base_RegionAllocator_AllocateAlignedRegion_Address_size_t_size_t_ : Fun
                                       (.expr (.call "Split" [(.name "region"), (.name "size")]))
                                       .skip)
                                     (.seq
-                                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                                      (.expr (.call "DCHECK" [(.lit .unit)]))
                                       (.seq
-                                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -20453,9 +20428,9 @@ def f_v8_base_RegionAllocator_AllocateRegion_Address_v8_base_RegionAllocator_Add
   { name := "v8.base.RegionAllocator.AllocateRegion:Address(v8.base.RegionAllocator.Address,size_t,size_t)"
   , params := ["hint", "size", "alignment"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 (.ifte
                   (.binop "&&" (.name "hint") (.call "contains" [(.name "hint"), (.name "size")]))
@@ -20482,7 +20457,7 @@ def f_v8_base_RegionAllocator_TrimRegion_size_t_v8_base_RegionAllocator_Address_
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -20509,7 +20484,7 @@ def f_v8_base_RegionAllocator_TrimRegion_size_t_v8_base_RegionAllocator_Address_
                             (.ret (.lit (.int 0)))
                             .skip)
                           (.seq
-                            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                             (.seq
                               (.ifte
                                 (.binop ">" (.name "new_size") (.lit (.int 0)))
@@ -20541,7 +20516,7 @@ def f_v8_base_RegionAllocator_TrimRegion_size_t_v8_base_RegionAllocator_Address_
                                         (.seq
                                         (.assign "next_iter" (.call "next" [(.name "region_iter")]))
                                         (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.ifte
                                         (.call "is_free" [])
                                         (.seq
@@ -20567,7 +20542,7 @@ def f_v8_base_RegionAllocator_TrimRegion_size_t_v8_base_RegionAllocator_Address_
                                         (.seq
                                         (.assign "prev_iter" (.call "prev" [(.name "region_iter")]))
                                         (.seq
-                                        (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                        (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                         (.ifte
                                         (.call "is_free" [])
                                         (.seq
@@ -20595,7 +20570,7 @@ def f_v8_base_RegionAllocator_TryGrowRegion_bool_v8_base_RegionAllocator_Address
   { name := "v8.base.RegionAllocator.TryGrowRegion:bool(v8.base.RegionAllocator.Address,size_t)"
   , params := ["address", "new_size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               .skip
               (.seq
@@ -20620,9 +20595,9 @@ def f_v8_base_RegionAllocator_TryGrowRegion_bool_v8_base_RegionAllocator_Address
                           (.ret (.lit (.bool false)))
                           .skip)
                         (.seq
-                          (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
                             (.seq
                               (.ifte
                                 (.unop
@@ -20638,7 +20613,7 @@ def f_v8_base_RegionAllocator_TryGrowRegion_bool_v8_base_RegionAllocator_Address
                                 (.seq
                                   (.assign "new_region_iter" (.call "next" [(.name "region_iter")]))
                                   (.seq
-                                    (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+                                    (.expr (.call "DCHECK_NE" [(.lit .unit)]))
                                     (.seq
                                       (.expr
                                         (.call
@@ -20678,7 +20653,7 @@ def f_v8_base_RegionAllocator_IsFree_bool_v8_base_RegionAllocator_Address_size_t
   { name := "v8.base.RegionAllocator.IsFree:bool(v8.base.RegionAllocator.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.seq
               .skip
               (.seq
@@ -20785,7 +20760,7 @@ def f_v8_base_LsanPageAllocator___init__ : Func :=
   { name := "v8.base.LsanPageAllocator.__init__"
   , params := ["page_allocator"]
   , body := (.seq
-            (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
             (.seq
               (.setField (.name "self") "page_allocator_" (.name "page_allocator"))
               (.seq
@@ -20839,7 +20814,7 @@ def f_v8_base_LsanPageAllocator_FreePages_bool_void__size_t_ : Func :=
   { name := "v8.base.LsanPageAllocator.FreePages:bool(void*,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.ret (.lit (.bool true)))) }
 
 /-- `v8.base.LsanPageAllocator.ReleasePages:bool(void*,size_t,size_t)`  (from `sanitizer/lsan-page-allocator.cc`) -/
@@ -20847,7 +20822,7 @@ def f_v8_base_LsanPageAllocator_ReleasePages_bool_void__size_t_size_t_ : Func :=
   { name := "v8.base.LsanPageAllocator.ReleasePages:bool(void*,size_t,size_t)"
   , params := ["address", "size", "new_size"]
   , body := (.seq
-            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.ret (.lit (.bool true)))) }
 
 /-- `v8.base.LsanVirtualAddressSpace.__init__`  (from `sanitizer/lsan-virtual-address-space.cc`) -/
@@ -20855,7 +20830,7 @@ def f_v8_base_LsanVirtualAddressSpace___init__ : Func :=
   { name := "v8.base.LsanVirtualAddressSpace.__init__"
   , params := ["vas"]
   , body := (.seq
-            (.expr (.call "DCHECK_NOT_NULL" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_NOT_NULL" [(.lit .unit)]))
             (.seq
               (.setField (.name "self") "VirtualAddressSpace" (.call "page_size" []))
               (.setField (.name "self") "vas_" (.call "move" [(.name "vas")])))) }
@@ -21129,8 +21104,7 @@ def f_v8_base_RandomNumberGenerator___init__ : Func :=
                           (.ifte
                             (.call
                               "entropy_source"
-                              [ (.unop "cast:u8" (.hole "op:addressOf:local:scalar"))
-                              , (.hole "op:sizeOf") ])
+                              [(.hole "op:cast:pointer"), (.hole "op:sizeOf")])
                             (.seq (.expr (.call "SetSeed" [(.name "seed")])) (.ret (.lit .unit)))
                             .skip))
                         .skip)))
@@ -21181,7 +21155,7 @@ def f_v8_base_RandomNumberGenerator_NextInt_int_int_ : Func :=
   { name := "v8.base.RandomNumberGenerator.NextInt:int(int)"
   , params := ["max"]
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.seq
               (.ifte
                 (.call "IsPowerOfTwo" [(.name "max")])
@@ -21274,7 +21248,7 @@ def f_v8_base_RandomNumberGenerator_NextSample_vector_uint64_t_size_t_ : Func :=
                   (.expr
                     (.call
                       "CHECK_LE"
-                      [(.name "n"), (.name "max"), (.hole "expr:CONTROL_STRUCTURE")]))
+                      [(.name "n"), (.name "max"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.seq
                     (.ifte
                       (.binop "==" (.name "n") (.lit (.int 0)))
@@ -21329,7 +21303,7 @@ def f_v8_base_RandomNumberGenerator_NextSample_vector_uint64_t_size_t_ : Func :=
                                         "CHECK_LT"
                                         [ (.name "x")
                                         , (.name "max")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.expr (.call "insert" [(.name "x")]))
                                         (.assign
@@ -21371,7 +21345,7 @@ def f_v8_base_RandomNumberGenerator_NextSampleSlow_vector_uint64_t_size_t_std_un
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "CHECK_GE" [(.name "n"), (.hole "expr:CONTROL_STRUCTURE")]))
+                  (.expr (.call "CHECK_GE" [(.name "n"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
                   (.seq
                     (.expr
                       (.binop
@@ -21418,7 +21392,7 @@ def f_v8_base_RandomNumberGenerator_NextSampleSlow_vector_uint64_t_size_t_std_un
                                         "CHECK_LT"
                                         [ (.name "x")
                                         , (.call "size" [])
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                       (.seq
                                         (.expr
                                         (.call
@@ -21447,9 +21421,9 @@ def f_v8_base_RandomNumberGenerator_Next_int_int_ : Func :=
   { name := "v8.base.RandomNumberGenerator.Next:int(int)"
   , params := ["bits"]
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_GE" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -21485,7 +21459,7 @@ def f_v8_base_RandomNumberGenerator_SetSeed_void_int64_t_ : Func :=
                       (.name "self")
                       "state1_"
                       (.call "MurmurHash3" [(.unop "!" (.field (.name "self") "state0_"))]))
-                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))))))) }
+                    (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))))) }
 
 /-- `v8.base.RandomNumberGenerator.MurmurHash3:uint64_t(uint64_t)`  (from `utils/random-number-generator.cc`) -/
 def f_v8_base_RandomNumberGenerator_MurmurHash3_uint64_t_uint64_t_ : Func :=
@@ -21526,7 +21500,7 @@ def f_v8_base_ConvertPageAllocatorPermission_PagePermissions_v8_PageAllocator_Pe
               .skip
               (.seq
                 (.hole "control:SWITCH")
-                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))))) }
+                (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))))) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.__init__`  (from `virtual-address-space-page-allocator.cc`) -/
 def f_v8_base_VirtualAddressSpacePageAllocator___init__ : Func :=
@@ -21538,7 +21512,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator___init__ : Func :=
 def f_v8_base_VirtualAddressSpacePageAllocator_AllocatePages_void__void__size_t_size_t_PageAllocator_Permission_ : Func :=
   { name := "v8.base.VirtualAddressSpacePageAllocator.AllocatePages:void*(void*,size_t,size_t,PageAllocator.Permission)"
   , params := ["hint", "size", "alignment", "access"]
-  , body := (.ret (.hole "op:cast:scalar")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.FreePages:bool(void*,size_t)`  (from `virtual-address-space-page-allocator.cc`) -/
 def f_v8_base_VirtualAddressSpacePageAllocator_FreePages_bool_void__size_t_ : Func :=
@@ -21553,7 +21527,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_FreePages_bool_void__size_t_ : Fu
                 (.seq
                   .skip
                   (.seq
-                    (.assign "address" (.hole "op:cast:opaque-type"))
+                    (.assign "address" (.unop "cast:u64" (.name "ptr")))
                     (.seq
                       .skip
                       (.seq
@@ -21583,7 +21557,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_ReleasePages_bool_void__size_t_si
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_LE" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -21591,7 +21565,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_ReleasePages_bool_void__size_t_si
                   (.seq
                     .skip
                     (.seq
-                      (.assign "address" (.hole "op:cast:opaque-type"))
+                      (.assign "address" (.unop "cast:u64" (.name "ptr")))
                       (.seq
                         (.expr
                           (.mcall
@@ -21599,7 +21573,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_ReleasePages_bool_void__size_t_si
                             "resized_allocations_"
                             [(.hole "op:arrayInitializer")]))
                         (.seq
-                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                           (.ret (.lit (.bool true))))))))))) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.SetPermissions:bool(void*,size_t,PageAllocator.Permission)`  (from `virtual-address-space-page-allocator.cc`) -/
@@ -21610,7 +21584,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_SetPermissions_bool_void__size_t_
             (.mcall
               (.name "self")
               "vas_"
-              [ (.hole "op:cast:opaque-type")
+              [ (.unop "cast:u64" (.name "address"))
               , (.name "size")
               , (.call "ConvertPageAllocatorPermission" [(.name "access")]) ])) }
 
@@ -21622,7 +21596,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_RecommitPages_bool_void__size_t_P
             (.mcall
               (.name "self")
               "vas_"
-              [ (.hole "op:cast:opaque-type")
+              [ (.unop "cast:u64" (.name "address"))
               , (.name "size")
               , (.call "ConvertPageAllocatorPermission" [(.name "access")]) ])) }
 
@@ -21630,13 +21604,15 @@ def f_v8_base_VirtualAddressSpacePageAllocator_RecommitPages_bool_void__size_t_P
 def f_v8_base_VirtualAddressSpacePageAllocator_DiscardSystemPages_bool_void__size_t_ : Func :=
   { name := "v8.base.VirtualAddressSpacePageAllocator.DiscardSystemPages:bool(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.ret (.mcall (.name "self") "vas_" [(.hole "op:cast:opaque-type"), (.name "size")])) }
+  , body := (.ret
+            (.mcall (.name "self") "vas_" [(.unop "cast:u64" (.name "address")), (.name "size")])) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.DecommitPages:bool(void*,size_t)`  (from `virtual-address-space-page-allocator.cc`) -/
 def f_v8_base_VirtualAddressSpacePageAllocator_DecommitPages_bool_void__size_t_ : Func :=
   { name := "v8.base.VirtualAddressSpacePageAllocator.DecommitPages:bool(void*,size_t)"
   , params := ["address", "size"]
-  , body := (.ret (.mcall (.name "self") "vas_" [(.hole "op:cast:opaque-type"), (.name "size")])) }
+  , body := (.ret
+            (.mcall (.name "self") "vas_" [(.unop "cast:u64" (.name "address")), (.name "size")])) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.SealPages:bool(void*,size_t)`  (from `virtual-address-space-page-allocator.cc`) -/
 def f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_ : Func :=
@@ -21667,13 +21643,13 @@ def f_v8_base_VirtualAddressSpace___init__ : Func :=
   { name := "v8.base.VirtualAddressSpace.__init__"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.setField
                     (.name "self")
                     "VirtualAddressSpaceBase"
@@ -21689,42 +21665,50 @@ def f_v8_base_VirtualAddressSpace_SetRandomSeed_void_int64_t_ : Func :=
 def f_v8_base_VirtualAddressSpace_RandomPageAddress_Address__ : Func :=
   { name := "v8.base.VirtualAddressSpace.RandomPageAddress:Address()"
   , params := []
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.unop "cast:u64" (.call "v8.base.OS.GetRandomMmapAddr:void*()" []))) }
 
 /-- `v8.base.VirtualAddressSpace.AllocatePages:Address(v8.base.Address,size_t,size_t,PagePermissions)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_AllocatePages_Address_v8_base_Address_size_t_size_t_PagePermissions_ : Func :=
   { name := "v8.base.VirtualAddressSpace.AllocatePages:Address(v8.base.Address,size_t,size_t,PagePermissions)"
   , params := ["hint", "size", "alignment", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                (.ret (.hole "op:cast:opaque-type"))))) }
+                (.expr (.call "DCHECK" [(.lit .unit)]))
+                (.ret
+                  (.unop
+                    "cast:u64"
+                    (.call
+                      "Allocate"
+                      [ (.hole "op:cast:pointer")
+                      , (.name "size")
+                      , (.name "alignment")
+                      , (.call "ToMemoryPermission" [(.name "permissions")]) ])))))) }
 
 /-- `v8.base.VirtualAddressSpace.FreePages:void(v8.base.Address,size_t)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_FreePages_void_v8_base_Address_size_t_ : Func :=
   { name := "v8.base.VirtualAddressSpace.FreePages:void(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-              (.expr (.call "Free" [(.hole "op:cast:scalar"), (.name "size")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)]))
+              (.expr (.call "Free" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSpace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_SetPagePermissions_bool_v8_base_Address_size_t_PagePermissions_ : Func :=
   { name := "v8.base.VirtualAddressSpace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "SetPermissions"
-                  [ (.hole "op:cast:scalar")
+                  [ (.hole "op:cast:pointer")
                   , (.name "size")
                   , (.call "ToMemoryPermission" [(.name "permissions")]) ])))) }
 
@@ -21735,13 +21719,13 @@ def f_v8_base_VirtualAddressSpace_AllocateGuardRegion_bool_v8_base_Address_size_
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
-                    (.assign "hint" (.hole "op:cast:scalar"))
+                    (.assign "hint" (.hole "op:cast:pointer"))
                     (.seq
                       .skip
                       (.seq
@@ -21768,10 +21752,10 @@ def f_v8_base_VirtualAddressSpace_FreeGuardRegion_void_v8_base_Address_size_t_ :
   { name := "v8.base.VirtualAddressSpace.FreeGuardRegion:void(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-              (.expr (.call "Free" [(.hole "op:cast:scalar"), (.name "size")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)]))
+              (.expr (.call "Free" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSpace.CanAllocateSubspaces:bool()`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_CanAllocateSubspaces_bool__ : Func :=
@@ -21784,22 +21768,31 @@ def f_v8_base_VirtualAddressSpace_AllocateSharedPages_Address_v8_base_Address_si
   { name := "v8.base.VirtualAddressSpace.AllocateSharedPages:Address(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)"
   , params := ["hint", "size", "permissions", "handle", "offset"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                (.ret (.hole "op:cast:opaque-type"))))) }
+                (.expr (.call "DCHECK" [(.lit .unit)]))
+                (.ret
+                  (.unop
+                    "cast:u64"
+                    (.call
+                      "AllocateShared"
+                      [ (.hole "op:cast:pointer")
+                      , (.name "size")
+                      , (.call "ToMemoryPermission" [(.name "permissions")])
+                      , (.name "handle")
+                      , (.name "offset") ])))))) }
 
 /-- `v8.base.VirtualAddressSpace.FreeSharedPages:void(v8.base.Address,size_t)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_FreeSharedPages_void_v8_base_Address_size_t_ : Func :=
   { name := "v8.base.VirtualAddressSpace.FreeSharedPages:void(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-              (.expr (.call "FreeShared" [(.hole "op:cast:scalar"), (.name "size")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)]))
+              (.expr (.call "FreeShared" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSpace.AllocateSubspace:unique_ptr(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_AllocateSubspace_unique_ptr_v8_base_Address_size_t_size_t_PagePermissions_std_optional_std : Func :=
@@ -21812,11 +21805,11 @@ def f_v8_base_VirtualAddressSpace_AllocateSubspace_unique_ptr_v8_base_Address_si
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
                         .skip
                         (.seq
@@ -21824,7 +21817,7 @@ def f_v8_base_VirtualAddressSpace_AllocateSubspace_unique_ptr_v8_base_Address_si
                             "reservation"
                             (.call
                               "CreateAddressSpaceReservation"
-                              [ (.hole "op:cast:scalar")
+                              [ (.hole "op:cast:pointer")
                               , (.name "size")
                               , (.name "alignment")
                               , (.call "ToMemoryPermission" [(.name "max_page_permissions")])
@@ -21854,13 +21847,13 @@ def f_v8_base_VirtualAddressSpace_RecommitPages_bool_v8_base_Address_size_t_Page
   { name := "v8.base.VirtualAddressSpace.RecommitPages:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
                 (.call
                   "RecommitPages"
-                  [ (.hole "op:cast:scalar")
+                  [ (.hole "op:cast:pointer")
                   , (.name "size")
                   , (.call "ToMemoryPermission" [(.name "permissions")]) ])))) }
 
@@ -21869,20 +21862,20 @@ def f_v8_base_VirtualAddressSpace_DiscardSystemPages_bool_v8_base_Address_size_t
   { name := "v8.base.VirtualAddressSpace.DiscardSystemPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-              (.ret (.call "DiscardSystemPages" [(.hole "op:cast:scalar"), (.name "size")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)]))
+              (.ret (.call "DiscardSystemPages" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSpace.DecommitPages:bool(v8.base.Address,size_t)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_DecommitPages_bool_v8_base_Address_size_t_ : Func :=
   { name := "v8.base.VirtualAddressSpace.DecommitPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-              (.ret (.call "DecommitPages" [(.hole "op:cast:scalar"), (.name "size")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)]))
+              (.ret (.call "DecommitPages" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSpace.FreeSubspace:void(v8.base.VirtualAddressSubspace*)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSpace_FreeSubspace_void_v8_base_VirtualAddressSubspace__ : Func :=
@@ -21898,14 +21891,19 @@ def f_v8_base_VirtualAddressSubspace___init__ : Func :=
   , body := (.seq
             (.ifte
               (.field (.name "self") "pkey_")
-              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))
+              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
               .skip)
             (.seq
               (.setField (.name "self") "VirtualAddressSpaceBase" (.call "page_size" []))
               (.seq
                 (.setField (.name "self") "reservation_" (.name "reservation"))
                 (.seq
-                  (.setField (.name "self") "region_allocator_" (.hole "op:cast:opaque-type"))
+                  (.setField
+                    (.name "self")
+                    "region_allocator_"
+                    (.unop
+                      "cast:u64"
+                      (.call "v8.base.AddressSpaceReservation.base:void*()<const>" [])))
                   (.seq
                     (.setField (.name "self") "parent_space_" (.name "parent_space"))
                     (.setField (.name "self") "pkey_" (.name "key"))))))) }
@@ -21963,13 +21961,13 @@ def f_v8_base_VirtualAddressSubspace_AllocatePages_Address_v8_base_Address_size_
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
                           .skip
                           (.seq
@@ -22000,7 +21998,7 @@ def f_v8_base_VirtualAddressSubspace_AllocatePages_Address_v8_base_Address_size_
                                         (.mcall
                                         (.name "self")
                                         "reservation_"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.hole "op:cast:pointer")
                                         , (.name "size")
                                         , (.call "ToMemoryPermission" [(.name "permissions")]) ]))
                                       (.seq
@@ -22012,7 +22010,7 @@ def f_v8_base_VirtualAddressSubspace_AllocatePages_Address_v8_base_Address_size_
                                         (.name "self")
                                         "region_allocator_"
                                         [(.name "address")])
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.ret (.name "kNullAddress")))
                                       .skip)
                                     (.ret (.name "address"))))))))))))))) }
@@ -22026,9 +22024,9 @@ def f_v8_base_VirtualAddressSubspace_FreePages_void_v8_base_Address_size_t_ : Fu
             (.seq
               .skip
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -22040,7 +22038,7 @@ def f_v8_base_VirtualAddressSubspace_FreePages_void_v8_base_Address_size_t_ : Fu
                             (.mcall
                               (.name "self")
                               "reservation_"
-                              [(.hole "op:cast:scalar"), (.name "size")]))
+                              [(.hole "op:cast:pointer"), (.name "size")]))
                           (.expr
                             (.mcall
                               (.name "OOMType")
@@ -22054,10 +22052,10 @@ def f_v8_base_VirtualAddressSubspace_FreePages_void_v8_base_Address_size_t_ : Fu
                               "CHECK_EQ"
                               [ (.name "size")
                               , (.mcall (.name "self") "region_allocator_" [(.name "address")])
-                              , (.hole "expr:CONTROL_STRUCTURE") ]))
+                              , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                           (.ifte
                             (.unop "!" (.mcall (.name "self") "name_" []))
-                            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                            (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                             .skip))))))))) }
 
 /-- `v8.base.VirtualAddressSubspace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)`  (from `virtual-address-space.cc`) -/
@@ -22065,16 +22063,16 @@ def f_v8_base_VirtualAddressSubspace_SetPagePermissions_bool_v8_base_Address_siz
   { name := "v8.base.VirtualAddressSubspace.SetPagePermissions:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.ret
                   (.mcall
                     (.name "self")
                     "reservation_"
-                    [ (.hole "op:cast:scalar")
+                    [ (.hole "op:cast:pointer")
                     , (.name "size")
                     , (.call "ToMemoryPermission" [(.name "permissions")]) ]))))) }
 
@@ -22085,9 +22083,9 @@ def f_v8_base_VirtualAddressSubspace_AllocateGuardRegion_bool_v8_base_Address_si
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -22105,9 +22103,9 @@ def f_v8_base_VirtualAddressSubspace_FreeGuardRegion_void_v8_base_Address_size_t
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -22117,7 +22115,7 @@ def f_v8_base_VirtualAddressSubspace_FreeGuardRegion_void_v8_base_Address_size_t
                         "CHECK_EQ"
                         [ (.name "size")
                         , (.mcall (.name "self") "region_allocator_" [(.name "address")])
-                        , (.hole "expr:CONTROL_STRUCTURE") ]))))))) }
+                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))))))) }
 
 /-- `v8.base.VirtualAddressSubspace.AllocateSharedPages:Address(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSubspace_AllocateSharedPages_Address_v8_base_Address_size_t_PagePermissions_SharedMemoryHandle_u : Func :=
@@ -22130,11 +22128,11 @@ def f_v8_base_VirtualAddressSubspace_AllocateSharedPages_Address_v8_base_Address
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK" [(.lit .unit)]))
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
                         .skip
                         (.seq
@@ -22165,7 +22163,7 @@ def f_v8_base_VirtualAddressSubspace_AllocateSharedPages_Address_v8_base_Address
                                       (.mcall
                                         (.name "self")
                                         "reservation_"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.hole "op:cast:pointer")
                                         , (.name "size")
                                         , (.call "ToMemoryPermission" [(.name "permissions")])
                                         , (.name "handle")
@@ -22179,7 +22177,7 @@ def f_v8_base_VirtualAddressSubspace_AllocateSharedPages_Address_v8_base_Address
                                         (.name "self")
                                         "region_allocator_"
                                         [(.name "address")])
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                       (.ret (.name "kNullAddress")))
                                     .skip)
                                   (.ret (.name "address")))))))))))))) }
@@ -22191,25 +22189,25 @@ def f_v8_base_VirtualAddressSubspace_FreeSharedPages_void_v8_base_Address_size_t
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
                     (.assign "guard" (.alloc "MutexGuard" [(.field (.name "self") "mutex_")]))
                     (.seq
-                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                       (.seq
                         (.expr
                           (.call
                             "CHECK_EQ"
                             [ (.name "size")
                             , (.mcall (.name "self") "region_allocator_" [(.name "address")])
-                            , (.hole "expr:CONTROL_STRUCTURE") ]))
+                            , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                         (.ifte
                           (.unop "!" (.mcall (.name "self") "name_" []))
-                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                          (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                           .skip)))))))) }
 
 /-- `v8.base.VirtualAddressSubspace.AllocateSubspace:unique_ptr(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)`  (from `virtual-address-space.cc`) -/
@@ -22227,15 +22225,15 @@ def f_v8_base_VirtualAddressSubspace_AllocateSubspace_unique_ptr_v8_base_Address
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK" [(.lit .unit)]))
                         (.seq
-                          (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                          (.expr (.call "DCHECK" [(.lit .unit)]))
                           (.seq
-                            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                            (.expr (.call "DCHECK" [(.lit .unit)]))
                             (.seq
-                              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                              (.expr (.call "DCHECK" [(.lit .unit)]))
                               (.seq
                                 .skip
                                 (.seq
@@ -22267,7 +22265,7 @@ def f_v8_base_VirtualAddressSubspace_AllocateSubspace_unique_ptr_v8_base_Address
                                         (.mcall
                                         (.name "self")
                                         "reservation_"
-                                        [ (.hole "op:cast:scalar")
+                                        [ (.hole "op:cast:pointer")
                                         , (.name "size")
                                         , (.call
                                         "ToMemoryPermission"
@@ -22284,7 +22282,7 @@ def f_v8_base_VirtualAddressSubspace_AllocateSubspace_unique_ptr_v8_base_Address
                                         (.name "self")
                                         "region_allocator_"
                                         [(.name "address")])
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.ret (.lit .unit)))
                                         .skip)
                                         (.ret
@@ -22307,16 +22305,16 @@ def f_v8_base_VirtualAddressSubspace_RecommitPages_bool_v8_base_Address_size_t_P
   { name := "v8.base.VirtualAddressSubspace.RecommitPages:bool(v8.base.Address,size_t,PagePermissions)"
   , params := ["address", "size", "permissions"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.ret
                   (.mcall
                     (.name "self")
                     "reservation_"
-                    [ (.hole "op:cast:scalar")
+                    [ (.hole "op:cast:pointer")
                     , (.name "size")
                     , (.call "ToMemoryPermission" [(.name "permissions")]) ]))))) }
 
@@ -22325,20 +22323,20 @@ def f_v8_base_VirtualAddressSubspace_DiscardSystemPages_bool_v8_base_Address_siz
   { name := "v8.base.VirtualAddressSubspace.DiscardSystemPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret
-                (.mcall (.name "self") "reservation_" [(.hole "op:cast:scalar"), (.name "size")])))) }
+                (.mcall (.name "self") "reservation_" [(.hole "op:cast:pointer"), (.name "size")])))) }
 
 /-- `v8.base.VirtualAddressSubspace.DecommitPages:bool(v8.base.Address,size_t)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSubspace_DecommitPages_bool_v8_base_Address_size_t_ : Func :=
   { name := "v8.base.VirtualAddressSubspace.DecommitPages:bool(v8.base.Address,size_t)"
   , params := ["address", "size"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -22347,11 +22345,11 @@ def f_v8_base_VirtualAddressSubspace_DecommitPages_bool_v8_base_Address_size_t_ 
                     (.mcall
                       (.name "self")
                       "reservation_"
-                      [(.hole "op:cast:scalar"), (.name "size")]))
+                      [(.hole "op:cast:pointer"), (.name "size")]))
                   (.seq
                     (.ifte
                       (.binop "&&" (.name "success") (.unop "!" (.mcall (.name "self") "name_" [])))
-                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE")]))
+                      (.expr (.call "CHECK" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
                       .skip)
                     (.ret (.name "success"))))))) }
 
@@ -22372,19 +22370,23 @@ def f_v8_base_VirtualAddressSubspace_FreeSubspace_void_v8_base_VirtualAddressSub
                     (.seq
                       .skip
                       (.seq
-                        (.assign "base" (.hole "op:cast:opaque-type"))
+                        (.assign
+                          "base"
+                          (.unop
+                            "cast:u64"
+                            (.call "v8.base.AddressSpaceReservation.base:void*()<const>" [])))
                         (.seq
                           (.expr
                             (.call
                               "CHECK_EQ"
                               [ (.call "size" [])
                               , (.mcall (.name "self") "region_allocator_" [(.name "base")])
-                              , (.hole "expr:CONTROL_STRUCTURE") ]))
+                              , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                           (.expr
                             (.call
                               "CHECK"
                               [ (.mcall (.name "self") "reservation_" [(.name "reservation")])
-                              , (.hole "expr:CONTROL_STRUCTURE") ])))))))))) }
+                              , (.hole "expr:CONTROL_STRUCTURE:DO") ])))))))))) }
 
 /-- `v8.base.VirtualAddressSubspace.SetName:bool(std.string&)`  (from `virtual-address-space.cc`) -/
 def f_v8_base_VirtualAddressSubspace_SetName_bool_std_string__ : Func :=
@@ -22394,7 +22396,7 @@ def f_v8_base_VirtualAddressSubspace_SetName_bool_std_string__ : Func :=
             (.expr
               (.call
                 "CHECK"
-                [(.call "IsValidMappingName" [(.name "name")]), (.hole "expr:CONTROL_STRUCTURE")]))
+                [(.call "IsValidMappingName" [(.name "name")]), (.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.seq
               (.ifte
                 (.mcall (.name "self") "reservation_" [(.call "c_str" [])])
@@ -22573,7 +22575,7 @@ def f_v8_base_AddressRegion_contains_bool_v8_base_AddressRegion_Address__const_ 
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.ret
                 (.binop "<" (.binop "-" (.name "address") (.call "begin" [])) (.call "size" []))))) }
 
@@ -22584,7 +22586,7 @@ def f_v8_base_AddressRegion_contains_bool_v8_base_AddressRegion_Address_size_t__
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
                 .skip
                 (.seq
@@ -22647,7 +22649,8 @@ def f_v8_base_AddressRegionOf_AddressRegion_T__size_t_ : Func :=
               (.ret
                 (.alloc
                   "AddressRegion"
-                  [(.hole "op:cast:opaque-type"), (.binop "*" (.hole "op:sizeOf") (.name "size"))])))) }
+                  [ (.unop "cast:u64" (.name "ptr"))
+                  , (.binop "*" (.hole "op:sizeOf") (.name "size")) ])))) }
 
 /-- `v8.base.AddressRegionOf:ANY(Container&&)`  (from `address-region.h`) -/
 def f_v8_base_AddressRegionOf_ANY_Container___ : Func :=
@@ -22666,7 +22669,7 @@ def f_v8_base_bits_ReverseBits_T_T_ : Func :=
   { name := "v8.base.bits.ReverseBits:T(T)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.hole "op:staticAssert"))
+            (.expr (.lit .unit))
             (.seq
               .skip
               (.seq
@@ -22678,7 +22681,7 @@ def f_v8_base_bits_ReverseBytes_T_T_ : Func :=
   { name := "v8.base.bits.ReverseBytes:T(T)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.hole "op:staticAssert"))
+            (.expr (.lit .unit))
             (.seq
               .skip
               (.seq
@@ -22689,13 +22692,13 @@ def f_v8_base_bits_ReverseBytes_T_T_ : Func :=
 def f_v8_base_bits_Unsigned_make_unsigned_t_T_ : Func :=
   { name := "v8.base.bits.Unsigned:make_unsigned_t(T)"
   , params := ["value"]
-  , body := (.seq .skip (.seq (.expr (.hole "op:staticAssert")) (.ret (.hole "op:cast:opaque-type")))) }
+  , body := (.seq .skip (.seq (.expr (.lit .unit)) (.ret (.hole "op:cast:opaque-type")))) }
 
 /-- `v8.base.bits.Signed:make_signed_t(T)`  (from `bits.h`) -/
 def f_v8_base_bits_Signed_make_signed_t_T_ : Func :=
   { name := "v8.base.bits.Signed:make_signed_t(T)"
   , params := ["value"]
-  , body := (.seq .skip (.seq (.expr (.hole "op:staticAssert")) (.ret (.hole "op:cast:opaque-type")))) }
+  , body := (.seq .skip (.seq (.expr (.lit .unit)) (.ret (.hole "op:cast:opaque-type")))) }
 
 /-- `v8.base.bits.CountLeadingZeros32:unsigned int(uint32_t)`  (from `bits.h`) -/
 def f_v8_base_bits_CountLeadingZeros32_unsigned_int_uint32_t_ : Func :=
@@ -22716,7 +22719,7 @@ def f_v8_base_bits_CountLeadingSignBits_unsigned_T_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.ret
                 (.cond
                   (.binop "<" (.name "value") (.lit (.int 0)))
@@ -22740,7 +22743,7 @@ def f_v8_base_RoundUpToPowerOfTwo32_uint32_t_uint32_t_ : Func :=
   { name := "v8.base.RoundUpToPowerOfTwo32:uint32_t(uint32_t)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.seq
               (.ifte
                 (.binop "!=" (.name "value") (.lit (.int 0)))
@@ -22778,7 +22781,7 @@ def f_v8_base_RoundUpToPowerOfTwo64_uint64_t_uint64_t_ : Func :=
   { name := "v8.base.RoundUpToPowerOfTwo64:uint64_t(uint64_t)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.seq
               (.ifte
                 (.binop "!=" (.name "value") (.lit (.int 0)))
@@ -23132,17 +23135,17 @@ def f_v8_base_BoundedPageAllocator__clinit__v8_base_BoundedPageAllocator__ : Fun
                           .skip
                           (.seq
                             (.seq
-                              (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                              (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                               (.seq
                                 (.expr (.call "ANY" []))
                                 (.assign "RecordStats" (.name "<tmp>0"))))
                             (.seq
                               (.seq
-                                (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                 (.seq (.expr (.call "ANY" [])) (.assign "mutex_" (.name "<tmp>1"))))
                               (.seq
                                 (.seq
-                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq
                                     (.expr (.call "ANY" []))
                                     (.assign "region_allocator_" (.name "<tmp>2"))))
@@ -23212,7 +23215,7 @@ def f_v8_base_ToString_char__v8_base_BoundedPageAllocator_AllocationStatus_ : Fu
             .skip
             (.seq
               (.hole "control:SWITCH")
-              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")])))) }
+              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))) }
 
 /-- `v8.base.CPU.<clinit>:v8.base.CPU()`  (from `cpu/cpu.h`) -/
 def f_v8_base_CPU__clinit__v8_base_CPU__ : Func :=
@@ -23402,7 +23405,7 @@ def f_v8_base_CPU__clinit__v8_base_CPU__ : Func :=
                                         .skip
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetInstance" (.name "<tmp>0"))))
@@ -23855,7 +23858,7 @@ def f_v8_base_CPU_num_virtual_address_bits_int___const_ : Func :=
   { name := "v8.base.CPU.num_virtual_address_bits:int()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.field (.name "self") "num_virtual_address_bits_"))) }
 
 /-- `v8.base.CPU.has_idiva:bool()<const>`  (from `cpu/cpu.h`) -/
@@ -24066,7 +24069,7 @@ def f_v8_base_debug_StackTrace__clinit__v8_base_debug_StackTrace__ : Func :=
 def f_v8_base_MagicNumbersForDivision__clinit__v8_base_MagicNumbersForDivision__ : Func :=
   { name := "v8.base.MagicNumbersForDivision.<clinit>:v8.base.MagicNumbersForDivision()"
   , params := []
-  , body := (.seq .skip (.expr (.hole "op:staticAssert"))) }
+  , body := (.seq .skip (.expr (.lit .unit))) }
 
 /-- `v8.base.MagicNumbersForDivision.__init__`  (from `division-by-constant.h`) -/
 def f_v8_base_MagicNumbersForDivision___init__ : Func :=
@@ -24128,22 +24131,22 @@ def f_v8_base_EmulatedVirtualAddressSubspace__clinit__v8_base_EmulatedVirtualAdd
                           .skip
                           (.seq
                             (.seq
-                              (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                              (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                               (.seq
                                 (.expr (.call "ANY" []))
                                 (.assign "AllocateSubspace" (.name "<tmp>0"))))
                             (.seq
                               (.seq
-                                (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                 (.seq (.expr (.call "ANY" [])) (.assign "mutex_" (.name "<tmp>1"))))
                               (.seq
                                 (.seq
-                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq
                                     (.expr (.call "ANY" []))
                                     (.assign "region_allocator_" (.name "<tmp>2"))))
                                 (.seq
-                                  (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq (.expr (.call "ANY" [])) (.assign "rng_" (.name "<tmp>3"))))))))))))))) }
 
 /-- `v8.base.EmulatedVirtualAddressSubspace.ActiveMemoryProtectionKey:optional()`  (from `emulated-virtual-address-subspace.h`) -/
@@ -24260,7 +24263,7 @@ def f_v8_base_hash_combine_size_t_size_t_size_t_ : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                  (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                   (.seq
                     (.expr (.call "uint64_t" [(.lit (.int 14313749767032793493))]))
                     (.assign "m" (.name "<tmp>0"))))
@@ -24621,7 +24624,7 @@ def f_v8_base_LeakyInstanceTrait_Destroy_void_T__ : Func :=
 def f_v8_base_StaticallyAllocatedInstanceTrait_MutableInstance_ANY_v8_base_StaticallyAllocatedInstanceTrait_StorageType__ : Func :=
   { name := "v8.base.StaticallyAllocatedInstanceTrait.MutableInstance:ANY(v8.base.StaticallyAllocatedInstanceTrait.StorageType*)"
   , params := ["storage"]
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.StaticallyAllocatedInstanceTrait.InitStorageUsingTrait:void(v8.base.StaticallyAllocatedInstanceTrait.StorageType*)`  (from `lazy-instance.h`) -/
 def f_v8_base_StaticallyAllocatedInstanceTrait_InitStorageUsingTrait_void_v8_base_StaticallyAllocatedInstanceTrait_StorageTy : Func :=
@@ -24678,7 +24681,7 @@ def f_v8_base_SingleThreadInitOnceTrait_Init_void_v8_base_OnceType__Function_Sto
 def f_v8_base_LazyInstanceImpl_InitInstance_void_void__ : Func :=
   { name := "v8.base.LazyInstanceImpl.InitInstance:void(void*)"
   , params := ["storage"]
-  , body := (.expr (.call "InitStorageUsingTrait" [(.hole "op:cast:opaque-type")])) }
+  , body := (.expr (.call "InitStorageUsingTrait" [(.hole "op:cast:pointer")])) }
 
 /-- `v8.base.LazyInstanceImpl.Init:void()<const>`  (from `lazy-instance.h`) -/
 def f_v8_base_LazyInstanceImpl_Init_void___const_ : Func :=
@@ -24689,7 +24692,7 @@ def f_v8_base_LazyInstanceImpl_Init_void___const_ : Func :=
               "Init"
               [ (.hole "op:addressOf:field:opaque-type")
               , (.hole "op:addressOf:method_ref:unknown-type")
-              , (.hole "op:cast:scalar") ])) }
+              , (.hole "op:cast:pointer") ])) }
 
 /-- `v8.base.LazyInstanceImpl.Pointer:ANY()`  (from `lazy-instance.h`) -/
 def f_v8_base_LazyInstanceImpl_Pointer_ANY__ : Func :=
@@ -24734,7 +24737,7 @@ def f_v8_base_LeakyObject___v8_base_LeakyObject__v8_base_LeakyObject__ : Func :=
 def f_v8_base_LeakyObject_get_ANY__ : Func :=
   { name := "v8.base.LeakyObject.get:ANY()"
   , params := []
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.detail.PrintToString:string(Ts&&)`  (from `logging.h`) -/
 def f_v8_base_detail_PrintToString_string_Ts___ : Func :=
@@ -24778,7 +24781,7 @@ def f_v8_base_detail_GetUnderlyingEnumTypeForPrinting_ANY_T_ : Func :=
 def f_v8_base_PrintCheckOperand_string_T_ : Func :=
   { name := "v8.base.PrintCheckOperand:string(T)"
   , params := ["val"]
-  , body := (.ret (.call "PrintCheckOperand" [(.hole "op:cast:scalar")])) }
+  , body := (.ret (.call "PrintCheckOperand" [(.hole "op:cast:pointer")])) }
 
 /-- `PrintCheckOperand:string(T)`  (from `logging.h`) -/
 def f_PrintCheckOperand_string_T_ : Func :=
@@ -24989,8 +24992,8 @@ def f_RoundDown_T_T_intptr_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
-              (.seq (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])) (.ret (.hole "op:and"))))) }
+              (.expr (.lit .unit))
+              (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.hole "op:and"))))) }
 
 /-- `RoundDown:T(T)`  (from `macros.h`) -/
 def f_RoundDown_T_T_ : Func :=
@@ -25000,9 +25003,7 @@ def f_RoundDown_T_T_ : Func :=
             .skip
             (.seq
               .skip
-              (.seq
-                (.expr (.hole "op:staticAssert"))
-                (.seq (.expr (.hole "op:staticAssert")) (.ret (.hole "op:and")))))) }
+              (.seq (.expr (.lit .unit)) (.seq (.expr (.lit .unit)) (.ret (.hole "op:and")))))) }
 
 /-- `RoundUp:T(T,intptr_t)`  (from `macros.h`) -/
 def f_RoundUp_T_T_intptr_t_ : Func :=
@@ -25011,11 +25012,11 @@ def f_RoundUp_T_T_intptr_t_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
-                (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                 (.seq
-                  (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                   (.ret (.call "RoundDown<T>" [(.hole "op:cast:object"), (.name "m")])))))) }
 
 /-- `RoundUp:T(T)`  (from `macros.h`) -/
@@ -25027,11 +25028,11 @@ def f_RoundUp_T_T_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.hole "op:staticAssert"))
+                (.expr (.lit .unit))
                 (.seq
-                  (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                   (.seq
-                    (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                     (.ret (.call "RoundDown<m, T>" [(.hole "op:cast:object")]))))))) }
 
 /-- `IsAligned:bool(T,U)`  (from `macros.h`) -/
@@ -25050,13 +25051,13 @@ def f_IsAlignedAddress_bool_T__size_t_ : Func :=
 def f_AlignedAddress_T_T__size_t_ : Func :=
   { name := "AlignedAddress:T(T*,size_t)"
   , params := ["address", "alignment"]
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `RoundUpAddress:T(T*,size_t)`  (from `macros.h`) -/
 def f_RoundUpAddress_T_T__size_t_ : Func :=
   { name := "RoundUpAddress:T(T*,size_t)"
   , params := ["address", "alignment"]
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `is_inbounds:bool(float_t)`  (from `macros.h`) -/
 def f_is_inbounds_bool_float_t_ : Func :=
@@ -25073,7 +25074,7 @@ def f_is_inbounds_bool_float_t_ : Func :=
                   (.seq
                     .skip
                     (.seq
-                      (.expr (.hole "op:staticAssert"))
+                      (.expr (.lit .unit))
                       (.seq
                         .skip
                         (.seq
@@ -25109,13 +25110,13 @@ def f_is_inbounds_bool_float_t_ : Func :=
                                         (.call
                                         "USE"
                                         [ (.name "kLowerBoundIsMin")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.seq
                                         (.expr
                                         (.call
                                         "USE"
                                         [ (.name "kUpperBoundIsMax")
-                                        , (.hole "expr:CONTROL_STRUCTURE") ]))
+                                        , (.hole "expr:CONTROL_STRUCTURE:DO") ]))
                                         (.ret
                                         (.binop
                                         "&&"
@@ -25228,7 +25229,7 @@ def f_v8_base_Bignum__clinit__v8_base_Bignum__ : Func :=
                                         (.seq
                                         (.expr (.hole "op:arrayInitializer"))
                                         (.seq
-                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "bigits_" (.name "<tmp>0"))))))))))))))))))))) }
@@ -25331,7 +25332,7 @@ def f_v8_base_Bignum_EnsureCapacity_void_int_ : Func :=
             .skip
             (.ifte
               (.binop ">" (.name "size") (.name "kBigitCapacity"))
-              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE")]))
+              (.expr (.call "UNREACHABLE" [(.hole "expr:CONTROL_STRUCTURE:DO")]))
               .skip)) }
 
 /-- `v8.base.Bignum.BigitLength:int()<const>`  (from `numbers/bignum.h`) -/
@@ -25374,9 +25375,9 @@ def f_v8_base_DiyFp_Subtract_void_v8_base_DiyFp__ : Func :=
   { name := "v8.base.DiyFp.Subtract:void(v8.base.DiyFp&)"
   , params := ["other"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.setField
                 (.name "self")
                 "f_"
@@ -25428,7 +25429,7 @@ def f_v8_base_DiyFp_Normalize_void__ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_NE" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -25602,9 +25603,9 @@ def f_v8_base_Double_AsDiyFp_v8_base_DiyFp___const_ : Func :=
   { name := "v8.base.Double.AsDiyFp:v8.base.DiyFp()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_GT" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret (.call "DiyFp" [(.call "Significand" []), (.call "Exponent" [])])))) }
 
 /-- `v8.base.Double.AsNormalizedDiyFp:v8.base.DiyFp()<const>`  (from `numbers/double.h`) -/
@@ -25618,7 +25619,7 @@ def f_v8_base_Double_AsNormalizedDiyFp_v8_base_DiyFp___const_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -25797,7 +25798,7 @@ def f_v8_base_Double_UpperBoundary_v8_base_DiyFp___const_ : Func :=
   { name := "v8.base.Double.UpperBoundary:v8.base.DiyFp()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_GT" [(.lit .unit)]))
             (.ret
               (.call
                 "DiyFp"
@@ -25815,7 +25816,7 @@ def f_v8_base_Double_NormalizedBoundaries_void_v8_base_DiyFp__v8_base_DiyFp___co
               (.seq
                 .skip
                 (.seq
-                  (.expr (.call "DCHECK_GT" [(.hole "op:cast:scalar")]))
+                  (.expr (.call "DCHECK_GT" [(.lit .unit)]))
                   (.seq
                     .skip
                     (.seq
@@ -26814,7 +26815,7 @@ def f_v8_base_internal_SafeUnsignedAbs_ANY_T_ : Func :=
 def f_v8_base_internal_CheckOnFailure_HandleFailure_T__ : Func :=
   { name := "v8.base.internal.CheckOnFailure.HandleFailure:T()"
   , params := []
-  , body := (.seq (.expr (.hole "op:cast:scalar")) (.ret (.call "T" []))) }
+  , body := (.seq (.expr (.hole "op:assignment")) (.ret (.call "T" []))) }
 
 /-- `v8.base.internal.RangeCheck.<clinit>:v8.base.internal.RangeCheck()`  (from `numerics/safe_conversions_impl.h`) -/
 def f_v8_base_internal_RangeCheck__clinit__v8_base_internal_RangeCheck__ : Func :=
@@ -27094,9 +27095,7 @@ def f_v8_base_internal_FastIntegerArithmeticPromotionImpl__clinit__v8_base_inter
   , params := []
   , body := (.seq
             .skip
-            (.seq
-              .skip
-              (.seq (.expr (.hole "op:staticAssert")) (.assign "kContained" (.lit (.bool true)))))) }
+            (.seq .skip (.seq (.expr (.lit .unit)) (.assign "kContained" (.lit (.bool true)))))) }
 
 /-- `v8.base.internal.as_signed:ANY(Src)`  (from `numerics/safe_conversions_impl.h`) -/
 def f_v8_base_internal_as_signed_ANY_Src_ : Func :=
@@ -27157,7 +27156,7 @@ def f_v8_base_AddWithWraparound_signed_type_signed_type_signed_type_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
                 (.hole "stmt:TYPE_DECL")
                 (.seq
@@ -27183,7 +27182,7 @@ def f_v8_base_SubWithWraparound_signed_type_signed_type_signed_type_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
                 (.hole "stmt:TYPE_DECL")
                 (.seq
@@ -27209,7 +27208,7 @@ def f_v8_base_MulWithWraparound_signed_type_signed_type_signed_type_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
                 (.hole "stmt:TYPE_DECL")
                 (.seq
@@ -27255,7 +27254,7 @@ def f_v8_base_NegateWithWraparound_signed_type_signed_type_ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.call "ASSERT_SIGNED_INTEGER_TYPE" [(.hole "op:staticAssert")]))
+                (.expr (.call "ASSERT_SIGNED_INTEGER_TYPE" [(.lit .unit)]))
                 (.seq
                   (.ifte
                     (.binop
@@ -27276,7 +27275,7 @@ def f_v8_base_ShlWithWraparound_signed_type_signed_type_signed_type_ : Func :=
   , body := (.seq
             .skip
             (.seq
-              (.expr (.call "ASSERT_SIGNED_INTEGER_TYPE" [(.hole "op:staticAssert")]))
+              (.expr (.call "ASSERT_SIGNED_INTEGER_TYPE" [(.lit .unit)]))
               (.seq
                 (.hole "stmt:TYPE_DECL")
                 (.seq
@@ -27361,7 +27360,7 @@ def f_v8_base_PageAllocator__clinit__v8_base_PageAllocator__ : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "AllocateSharedPages" (.name "<tmp>0")))))) }
 
 /-- `v8.base.PageAllocator.~PageAllocator:ANY()`  (from `page-allocator.h`) -/
@@ -27408,10 +27407,10 @@ def f_v8_base_ElapsedTimer__type_0__clinit__v8_base_ElapsedTimer__type_0__ : Fun
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "start_ticks_" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "paused_elapsed_" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.ElapsedTimer.<clinit>:v8.base.ElapsedTimer()`  (from `platform/elapsed-timer.h`) -/
@@ -27443,37 +27442,37 @@ def f_v8_base_ElapsedTimer_Start_void_v8_base_TimeTicks_ : Func :=
   { name := "v8.base.ElapsedTimer.Start:void(v8.base.TimeTicks)"
   , params := ["now"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 (.expr
                   (.call
                     "v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)"
                     [(.name "now")]))
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))))) }
+                (.expr (.call "DCHECK" [(.lit .unit)]))))) }
 
 /-- `v8.base.ElapsedTimer.Stop:void()`  (from `platform/elapsed-timer.h`) -/
 def f_v8_base_ElapsedTimer_Stop_void__ : Func :=
   { name := "v8.base.ElapsedTimer.Stop:void()"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               (.expr
                 (.call
                   "v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)"
                   [(.call "TimeTicks" [])]))
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))) }
+              (.expr (.call "DCHECK" [(.lit .unit)])))) }
 
 /-- `v8.base.ElapsedTimer.IsStarted:bool()<const>`  (from `platform/elapsed-timer.h`) -/
 def f_v8_base_ElapsedTimer_IsStarted_bool___const_ : Func :=
   { name := "v8.base.ElapsedTimer.IsStarted:bool()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_NE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_NE" [(.lit .unit)]))
               (.ret (.unop "!" (.mcall (.name "self") "start_ticks_" []))))) }
 
 /-- `v8.base.ElapsedTimer.IsPaused:bool()<const>`  (from `platform/elapsed-timer.h`) -/
@@ -27493,9 +27492,9 @@ def f_v8_base_ElapsedTimer_Restart_v8_base_TimeDelta_v8_base_TimeTicks_ : Func :
   { name := "v8.base.ElapsedTimer.Restart:v8.base.TimeDelta(v8.base.TimeTicks)"
   , params := ["now"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -27503,15 +27502,13 @@ def f_v8_base_ElapsedTimer_Restart_v8_base_TimeDelta_v8_base_TimeTicks_ : Func :
                     "elapsed"
                     (.binop "-" (.name "now") (.field (.name "self") "start_ticks_")))
                   (.seq
-                    (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
+                    (.expr (.call "DCHECK_GE" [(.lit .unit)]))
                     (.seq
                       (.expr
                         (.call
                           "v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)"
                           [(.name "now")]))
-                      (.seq
-                        (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
-                        (.ret (.name "elapsed"))))))))) }
+                      (.seq (.expr (.call "DCHECK" [(.lit .unit)])) (.ret (.name "elapsed"))))))))) }
 
 /-- `v8.base.ElapsedTimer.Pause:void()`  (from `platform/elapsed-timer.h`) -/
 def f_v8_base_ElapsedTimer_Pause_void__ : Func :=
@@ -27528,7 +27525,7 @@ def f_v8_base_ElapsedTimer_Pause_void_v8_base_TimeTicks_ : Func :=
             (.seq
               (.assign "elapsed" (.call "Elapsed" [(.name "now")]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.expr
                   (.call
                     "v8.base.ElapsedTimer.set_paused_elapsed:void(v8.base.TimeDelta)"
@@ -27545,11 +27542,11 @@ def f_v8_base_ElapsedTimer_Resume_void_v8_base_TimeTicks_ : Func :=
   { name := "v8.base.ElapsedTimer.Resume:void(v8.base.TimeTicks)"
   , params := ["now"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
-                (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+                (.expr (.call "DCHECK" [(.lit .unit)]))
                 (.seq
                   .skip
                   (.seq
@@ -27561,7 +27558,7 @@ def f_v8_base_ElapsedTimer_Resume_void_v8_base_TimeTicks_ : Func :=
                         (.call
                           "v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)"
                           [(.binop "-" (.name "now") (.name "elapsed"))]))
-                      (.expr (.call "DCHECK" [(.hole "op:cast:scalar")])))))))) }
+                      (.expr (.call "DCHECK" [(.lit .unit)])))))))) }
 
 /-- `v8.base.ElapsedTimer.Elapsed:v8.base.TimeDelta()<const>`  (from `platform/elapsed-timer.h`) -/
 def f_v8_base_ElapsedTimer_Elapsed_v8_base_TimeDelta___const_ : Func :=
@@ -27574,23 +27571,21 @@ def f_v8_base_ElapsedTimer_Elapsed_v8_base_TimeDelta_v8_base_TimeTicks__const_ :
   { name := "v8.base.ElapsedTimer.Elapsed:v8.base.TimeDelta(v8.base.TimeTicks)<const>"
   , params := ["now"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
                   (.assign "elapsed" (.binop "-" (.name "now") (.call "start_ticks" [])))
-                  (.seq
-                    (.expr (.call "DCHECK_GE" [(.hole "op:cast:scalar")]))
-                    (.ret (.name "elapsed"))))))) }
+                  (.seq (.expr (.call "DCHECK_GE" [(.lit .unit)])) (.ret (.name "elapsed"))))))) }
 
 /-- `v8.base.ElapsedTimer.HasExpired:bool(v8.base.TimeDelta)<const>`  (from `platform/elapsed-timer.h`) -/
 def f_v8_base_ElapsedTimer_HasExpired_bool_v8_base_TimeDelta__const_ : Func :=
   { name := "v8.base.ElapsedTimer.HasExpired:bool(v8.base.TimeDelta)<const>"
   , params := ["time_delta"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.binop ">=" (.call "Elapsed" []) (.name "time_delta")))) }
 
 /-- `v8.base.ElapsedTimer.paused_elapsed:v8.base.TimeDelta()`  (from `platform/elapsed-timer.h`) -/
@@ -27598,9 +27593,9 @@ def f_v8_base_ElapsedTimer_paused_elapsed_v8_base_TimeDelta__ : Func :=
   { name := "v8.base.ElapsedTimer.paused_elapsed:v8.base.TimeDelta()"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.ret (.field (.name "self") "paused_elapsed_")))) }
 
 /-- `v8.base.ElapsedTimer.set_paused_elapsed:void(v8.base.TimeDelta)`  (from `platform/elapsed-timer.h`) -/
@@ -27608,9 +27603,9 @@ def f_v8_base_ElapsedTimer_set_paused_elapsed_void_v8_base_TimeDelta_ : Func :=
   { name := "v8.base.ElapsedTimer.set_paused_elapsed:void(v8.base.TimeDelta)"
   , params := ["delta"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.setField (.name "self") "paused_elapsed_" (.name "delta")))) }
 
 /-- `v8.base.ElapsedTimer.start_ticks:v8.base.TimeTicks()<const>`  (from `platform/elapsed-timer.h`) -/
@@ -27618,7 +27613,7 @@ def f_v8_base_ElapsedTimer_start_ticks_v8_base_TimeTicks___const_ : Func :=
   { name := "v8.base.ElapsedTimer.start_ticks:v8.base.TimeTicks()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.ret (.field (.name "self") "start_ticks_"))) }
 
 /-- `v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)`  (from `platform/elapsed-timer.h`) -/
@@ -27626,7 +27621,7 @@ def f_v8_base_ElapsedTimer_set_start_ticks_void_v8_base_TimeTicks_ : Func :=
   { name := "v8.base.ElapsedTimer.set_start_ticks:void(v8.base.TimeTicks)"
   , params := ["start_ticks"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.setField (.name "self") "start_ticks_" (.name "start_ticks"))) }
 
 /-- `v8.base.ScopedTimer.<clinit>:v8.base.ScopedTimer()`  (from `platform/elapsed-timer.h`) -/
@@ -27643,10 +27638,10 @@ def f_v8_base_ScopedTimer__clinit__v8_base_ScopedTimer__ : Func :=
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "timer_" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "location_" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.ScopedTimer.__init__`  (from `platform/elapsed-timer.h`) -/
@@ -27678,7 +27673,9 @@ def f_v8_base_Realloc_void__void__size_t_ : Func :=
   , params := ["memory", "size"]
   , body := (.seq
             (.expr
-              (.call "CHECK_NE" [(.lit (.int 0)), (.name "size"), (.hole "expr:CONTROL_STRUCTURE")]))
+              (.call
+                "CHECK_NE"
+                [(.lit (.int 0)), (.name "size"), (.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.ret (.call "realloc" [(.name "memory"), (.name "size")]))) }
 
 /-- `v8.base.Free:void(void*)`  (from `platform/memory.h`) -/
@@ -27698,9 +27695,9 @@ def f_v8_base_AlignedAlloc_void__size_t_size_t_ : Func :=
   { name := "v8.base.AlignedAlloc:void*(size_t,size_t)"
   , params := ["size", "alignment"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK" [(.lit .unit)]))
               (.seq
                 .skip
                 (.seq
@@ -27742,7 +27739,7 @@ def f_v8_base_Mutex___v8_base_Mutex__v8_base_Mutex__ : Func :=
 def f_v8_base_Mutex_AssertHeld_void___const_ : Func :=
   { name := "v8.base.Mutex.AssertHeld:void()<const>"
   , params := []
-  , body := (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")])) }
+  , body := (.expr (.call "DCHECK_EQ" [(.lit .unit)])) }
 
 /-- `v8.base.Mutex.AssertHeldAndUnmark:void()`  (from `platform/mutex.h`) -/
 def f_v8_base_Mutex_AssertHeldAndUnmark_void__ : Func :=
@@ -27773,7 +27770,7 @@ def f_v8_base_RecursiveMutex__clinit__v8_base_RecursiveMutex__ : Func :=
                     (.seq
                       (.assign "level_" (.lit (.int 0)))
                       (.seq
-                        (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                        (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                         (.seq (.expr (.call "ANY" [])) (.assign "mutex_" (.name "<tmp>0")))))))))) }
 
 /-- `v8.base.RecursiveMutex.__init__`  (from `platform/mutex.h`) -/
@@ -27798,7 +27795,7 @@ def f_v8_base_RecursiveMutex___v8_base_RecursiveMutex__v8_base_RecursiveMutex__ 
 def f_v8_base_RecursiveMutex_AssertHeld_void___const_ : Func :=
   { name := "v8.base.RecursiveMutex.AssertHeld:void()<const>"
   , params := []
-  , body := (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")])) }
+  , body := (.expr (.call "DCHECK_LT" [(.lit .unit)])) }
 
 /-- `v8.base.MemoryRegion.<clinit>:v8.base.MemoryRegion()`  (from `platform/platform-linux.h`) -/
 def f_v8_base_MemoryRegion__clinit__v8_base_MemoryRegion__ : Func :=
@@ -27824,7 +27821,7 @@ def f_v8_base_SignalSafeMapsParser__clinit__v8_base_SignalSafeMapsParser__ : Fun
                 .skip
                 (.seq
                   (.seq
-                    (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                    (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                     (.seq (.expr (.call "ANY" [])) (.assign "Next" (.name "<tmp>0"))))
                   (.seq
                     (.assign "kBufferSize" (.lit (.int 1024)))
@@ -27869,7 +27866,7 @@ def f_v8_base_PreciseSleepTimer__clinit__v8_base_PreciseSleepTimer__ : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "operator =" (.name "<tmp>0")))))) }
 
 /-- `v8.base.PreciseSleepTimer.__init__`  (from `platform/platform-win32.h`) -/
@@ -27904,10 +27901,10 @@ def f_v8_base_OS_MemoryMappedFile__clinit__v8_base_OS_MemoryMappedFile__ : Func 
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "open" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "create" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.OS.MemoryMappedFile.~MemoryMappedFile:ANY()`  (from `platform/platform.h`) -/
@@ -27978,13 +27975,13 @@ def f_v8_base_OS__clinit__v8_base_OS__ : Func :=
                                   .skip
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "CreateTimezoneCache" (.name "<tmp>0"))))
                                     (.seq
                                       (.seq
-                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign
@@ -27998,13 +27995,13 @@ def f_v8_base_OS__clinit__v8_base_OS__ : Func :=
                                         (.assign "kStackWalkMaxTextLen" (.lit (.int 256)))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetSharedLibraryAddresses" (.name "<tmp>2"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetFirstFreeMemoryRangeWithin" (.name "<tmp>3"))))
@@ -28077,11 +28074,11 @@ def f_v8_base_AddressSpaceReservation_Contains_bool_void__size_t__const_ : Func 
   , body := (.seq
             .skip
             (.seq
-              (.assign "base" (.hole "op:cast:opaque-type"))
+              (.assign "base" (.unop "cast:u64" (.field (.name "self") "base_")))
               (.seq
                 .skip
                 (.seq
-                  (.assign "region_base" (.hole "op:cast:opaque-type"))
+                  (.assign "region_base" (.unop "cast:u64" (.name "region_addr")))
                   (.ret
                     (.binop
                       "&&"
@@ -28183,12 +28180,12 @@ def f_v8_base_Thread__clinit__v8_base_Thread__ : Func :=
                       (.assign "kMaxThreadNameLength" (.lit (.int 16)))
                       (.seq
                         (.seq
-                          (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                          (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                           (.seq (.expr (.call "ANY" [])) (.assign "data_" (.name "<tmp>0"))))
                         (.seq
                           (.expr (.hole "op:arrayInitializer"))
                           (.seq
-                            (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                            (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                             (.seq
                               (.expr (.call "ANY" []))
                               (.assign "start_semaphore_" (.name "<tmp>1")))))))))))) }
@@ -28295,7 +28292,7 @@ def f_v8_base_Stack_StackSlot___init__' : Func :=
 def f_v8_base_Stack_StackSlot_void__void____const_ : Func :=
   { name := "v8.base.Stack.StackSlot.void*:void*()<const>"
   , params := []
-  , body := (.ret (.hole "op:cast:scalar")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `?<duplicate>0:ANY()<const>`  (from `platform/platform.h`) -/
 def f___duplicate_0_ANY___const_ : Func :=
@@ -28333,36 +28330,36 @@ def f_v8_base_Stack__clinit__v8_base_Stack__ : Func :=
                                   .skip
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetStackStart" (.name "<tmp>0"))))
                                     (.seq
                                       (.seq
-                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetReservedStackLimit" (.name "<tmp>1"))))
                                       (.seq
                                         (.seq
-                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetCommittedStackLimit" (.name "<tmp>2"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "GetStackStartUnchecked" (.name "<tmp>3"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "ObtainCurrentThreadStackStart" (.name "<tmp>4"))))
                                         (.seq
-                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign
@@ -28517,26 +28514,26 @@ def f_v8_base_TimeDelta__clinit__v8_base_TimeDelta__ : Func :=
                               .skip
                               (.seq
                                 (.seq
-                                  (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq (.expr (.call "ANY" [])) (.assign "Max" (.name "<tmp>0"))))
                                 (.seq
                                   (.seq
-                                    (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                    (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                     (.seq (.expr (.call "ANY" [])) (.assign "Min" (.name "<tmp>1"))))
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromMachTimespec" (.name "<tmp>2"))))
                                     (.seq
                                       (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromTimespec" (.name "<tmp>3"))))
                                       (.seq
-                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromDouble" (.name "<tmp>4")))))))))))))))))) }
@@ -29043,13 +29040,13 @@ def f_v8_base_time_internal_TimeBase___TimeClass_v8_base_TimeDelta__const_' : Fu
 def f_v8_base_time_internal_TimeBase____ANY_v8_base_TimeDelta_ : Func :=
   { name := "v8.base.time_internal.TimeBase.+=:ANY(v8.base.TimeDelta)"
   , params := ["delta"]
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.time_internal.TimeBase.-=:ANY(v8.base.TimeDelta)`  (from `platform/time.h`) -/
 def f_v8_base_time_internal_TimeBase____ANY_v8_base_TimeDelta_' : Func :=
   { name := "v8.base.time_internal.TimeBase.-=:ANY(v8.base.TimeDelta)"
   , params := ["delta"]
-  , body := (.ret (.hole "op:cast:object")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.time_internal.TimeBase.FromInternalValue:TimeClass(int64_t)`  (from `platform/time.h`) -/
 def f_v8_base_time_internal_TimeBase_FromInternalValue_TimeClass_int64_t_ : Func :=
@@ -29093,36 +29090,36 @@ def f_v8_base_Time__clinit__v8_base_Time__ : Func :=
                                   .skip
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "Now" (.name "<tmp>0"))))
                                     (.seq
                                       (.seq
-                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "NowFromSystemTime" (.name "<tmp>1"))))
                                       (.seq
                                         (.seq
-                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromTimespec" (.name "<tmp>2"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromTimeval" (.name "<tmp>3"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromFiletime" (.name "<tmp>4"))))
                                         (.seq
-                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FromJsTime" (.name "<tmp>5"))))))))))))))))))))) }
@@ -29160,7 +29157,7 @@ def f_v8_base_TimeTicks__clinit__v8_base_TimeTicks__ : Func :=
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "Now" (.name "<tmp>0")))))) }
 
 /-- `v8.base.TimeTicks.__init__`  (from `platform/time.h`) -/
@@ -29206,10 +29203,10 @@ def f_v8_base_ThreadTicks__clinit__v8_base_ThreadTicks__ : Func :=
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "Now" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "GetForThread" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.ThreadTicks.__init__`  (from `platform/time.h`) -/
@@ -29339,33 +29336,35 @@ def f_v8_base_RegionAllocator__clinit__v8_base_RegionAllocator__ : Func :=
                               (.seq
                                 .skip
                                 (.seq
-                                  (.assign "kAllocationFailure" (.hole "op:cast:opaque-type"))
+                                  (.assign
+                                    "kAllocationFailure"
+                                    (.unop "cast:u64" (.unop "-" (.lit (.int 1)))))
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "whole_region_" (.name "<tmp>0"))))
                                     (.seq
                                       (.seq
-                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "free_regions_" (.name "<tmp>1"))))
                                       (.seq
                                         (.seq
-                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FreeListFindRegion" (.name "<tmp>2"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "FreeListFindLargestRegion" (.name "<tmp>3"))))
                                         (.seq
-                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "Split" (.name "<tmp>4")))))))))))))))))))) }
@@ -29454,7 +29453,7 @@ def f_NoSanitizeProbeMemory : Func :=
                 .skip
                 (.seq
                   (.expr (.name "uint8_t"))
-                  (.expr (.call "USE" [(.hole "expr:CONTROL_STRUCTURE")])))))) }
+                  (.expr (.call "USE" [(.hole "expr:CONTROL_STRUCTURE:DO")])))))) }
 
 /-- `v8.base.LsanPageAllocator.<clinit>:v8.base.LsanPageAllocator()`  (from `sanitizer/lsan-page-allocator.h`) -/
 def f_v8_base_LsanPageAllocator__clinit__v8_base_LsanPageAllocator__ : Func :=
@@ -29470,12 +29469,12 @@ def f_v8_base_LsanPageAllocator__clinit__v8_base_LsanPageAllocator__ : Func :=
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq
                         (.expr (.call "ANY" []))
                         (.assign "AllocateSharedPages" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq
                         (.expr (.call "ANY" []))
                         (.assign "not_registered_regions_" (.name "<tmp>1"))))))))) }
@@ -29556,10 +29555,10 @@ def f_v8_base_LsanVirtualAddressSpace__clinit__v8_base_LsanVirtualAddressSpace__
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "AllocateSubspace" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "vas_" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.LsanVirtualAddressSpace.~LsanVirtualAddressSpace:ANY()`  (from `sanitizer/lsan-virtual-address-space.h`) -/
@@ -29663,7 +29662,7 @@ def f_v8_base_HexCharOfValue_char_int_ : Func :=
   { name := "v8.base.HexCharOfValue:char(int)"
   , params := ["value"]
   , body := (.seq
-            (.expr (.call "DCHECK" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK" [(.lit .unit)]))
             (.seq
               (.ifte
                 (.binop "<" (.name "value") (.lit (.int 10)))
@@ -29828,7 +29827,7 @@ def f_v8_base_tuple_head_ANY_Tuple___ : Func :=
                   (.seq
                     (.assign "total_size" (.field (.name "std") "tuple_size_v<std.decay_t<Tuple>>"))
                     (.seq
-                      (.expr (.hole "op:staticAssert"))
+                      (.expr (.lit .unit))
                       (.ret
                         (.call
                           "tuple_slice_impl<0>"
@@ -29853,7 +29852,7 @@ def f_v8_base_tuple_drop_ANY_Tuple___ : Func :=
                   (.seq
                     (.assign "total_size" (.field (.name "std") "tuple_size_v<std.decay_t<Tuple>>"))
                     (.seq
-                      (.expr (.hole "op:staticAssert"))
+                      (.expr (.lit .unit))
                       (.ret
                         (.call
                           "tuple_slice_impl"
@@ -29932,7 +29931,7 @@ def f_v8_base_tuple_map2_ANY_TupleV___TupleU___Function___ : Func :=
                   (.seq
                     (.assign "S" (.field (.name "std") "tuple_size_v<std.decay_t<TupleV>>"))
                     (.seq
-                      (.expr (.hole "op:staticAssert"))
+                      (.expr (.lit .unit))
                       (.ret
                         (.call
                           "tuple_map2_impl"
@@ -30000,11 +29999,11 @@ def f_v8_base_RandomNumberGenerator__clinit__v8_base_RandomNumberGenerator__ : F
                         .skip
                         (.seq
                           (.seq
-                            (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                            (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                             (.seq (.expr (.call "ANY" [])) (.assign "NextSample" (.name "<tmp>0"))))
                           (.seq
                             (.seq
-                              (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                              (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                               (.seq
                                 (.expr (.call "ANY" []))
                                 (.assign "NextSampleSlow" (.name "<tmp>1"))))
@@ -30118,9 +30117,9 @@ def f_v8_base_Vector_SubVector_v8_base_Vector_size_t_size_t__const_ : Func :=
   { name := "v8.base.Vector.SubVector:v8.base.Vector(size_t,size_t)<const>"
   , params := ["from", "to"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.seq
-              (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+              (.expr (.call "DCHECK_LE" [(.lit .unit)]))
               (.ret
                 (.call
                   "Vector"
@@ -30138,7 +30137,7 @@ def f_v8_base_Vector_OverwriteWith_void_v8_base_Vector_ : Func :=
   { name := "v8.base.Vector.OverwriteWith:void(v8.base.Vector)"
   , params := ["other"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.expr (.call "Copy" [(.call "begin" []), (.call "end" []), (.call "begin" [])]))) }
 
 /-- `v8.base.Vector.OverwriteWith:void(std.array&)`  (from `vector.h`) -/
@@ -30146,7 +30145,7 @@ def f_v8_base_Vector_OverwriteWith_void_std_array__ : Func :=
   { name := "v8.base.Vector.OverwriteWith:void(std.array&)"
   , params := ["other"]
   , body := (.seq
-            (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
             (.expr (.call "Copy" [(.call "begin" []), (.call "end" []), (.call "begin" [])]))) }
 
 /-- `v8.base.Vector.length:int()<const>`  (from `vector.h`) -/
@@ -30154,7 +30153,7 @@ def f_v8_base_Vector_length_int___const_ : Func :=
   { name := "v8.base.Vector.length:int()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "CHECK_GE" [(.call "max" []), (.hole "expr:CONTROL_STRUCTURE")]))
+            (.expr (.call "CHECK_GE" [(.call "max" []), (.hole "expr:CONTROL_STRUCTURE:DO")]))
             (.ret (.unop "cast:i32" (.field (.name "self") "length_")))) }
 
 /-- `v8.base.Vector.size:size_t()<const>`  (from `vector.h`) -/
@@ -30174,7 +30173,7 @@ def f_v8_base_Vector____ANY_size_t__const_ : Func :=
   { name := "v8.base.Vector.[]:ANY(size_t)<const>"
   , params := ["index"]
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.ret (.index (.field (.name "self") "start_") (.name "index")))) }
 
 /-- `v8.base.Vector.at:ANY(size_t)<const>`  (from `vector.h`) -/
@@ -30200,7 +30199,7 @@ def f_v8_base_Vector_last_ANY__ : Func :=
   { name := "v8.base.Vector.last:ANY()"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.ret
               (.index
                 (.field (.name "self") "start_")
@@ -30211,7 +30210,7 @@ def f_v8_base_Vector_last_ANY___const_ : Func :=
   { name := "v8.base.Vector.last:ANY()<const>"
   , params := []
   , body := (.seq
-            (.expr (.call "DCHECK_LT" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LT" [(.lit .unit)]))
             (.ret
               (.index
                 (.field (.name "self") "start_")
@@ -30264,7 +30263,7 @@ def f_v8_base_Vector_Truncate_void_size_t_ : Func :=
   { name := "v8.base.Vector.Truncate:void(size_t)"
   , params := ["length"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.setField (.name "self") "length_" (.name "length"))) }
 
 /-- `v8.base.Vector.Dispose:void()`  (from `vector.h`) -/
@@ -30288,7 +30287,7 @@ def f_v8_base_Vector____v8_base_Vector_size_t_ : Func :=
   { name := "v8.base.Vector.+=:v8.base.Vector(size_t)"
   , params := ["offset"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.seq
               (.setField
                 (.name "self")
@@ -30312,17 +30311,17 @@ def f_v8_base_Vector_cast_Vector_v8_base_Vector_ : Func :=
               (.seq
                 .skip
                 (.seq
-                  (.expr (.hole "op:staticAssert"))
+                  (.expr (.lit .unit))
                   (.seq
-                    (.expr (.hole "op:staticAssert"))
+                    (.expr (.lit .unit))
                     (.seq
-                      (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                       (.seq
-                        (.expr (.call "DCHECK_EQ" [(.hole "op:cast:scalar")]))
+                        (.expr (.call "DCHECK_EQ" [(.lit .unit)]))
                         (.ret
                           (.call
                             "Vector"
-                            [ (.hole "op:cast:object")
+                            [ (.hole "op:cast:pointer")
                             , (.binop
                                 "/"
                                 (.binop "*" (.call "size" []) (.hole "op:sizeOf"))
@@ -30361,21 +30360,21 @@ def f_v8_base_OwnedVector__clinit__v8_base_OwnedVector__ : Func :=
                             .skip
                             (.seq
                               (.seq
-                                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                 (.seq (.expr (.call "ANY" [])) (.assign "rbegin" (.name "<tmp>0"))))
                               (.seq
                                 (.seq
-                                  (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq (.expr (.call "ANY" [])) (.assign "rend" (.name "<tmp>1"))))
                                 (.seq
                                   (.seq
-                                    (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                    (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                     (.seq
                                       (.expr (.call "ANY" []))
                                       (.assign "as_vector" (.name "<tmp>2"))))
                                   (.seq
                                     (.seq
-                                      (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                      (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                       (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "data_" (.name "<tmp>3"))))
@@ -30392,7 +30391,7 @@ def f_v8_base_OwnedVector___init__' : Func :=
   { name := "v8.base.OwnedVector.__init__"
   , params := ["data", "length"]
   , body := (.seq
-            (.expr (.call "DCHECK_IMPLIES" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_IMPLIES" [(.lit .unit)]))
             (.seq
               (.setField (.name "self") "data_" (.call "move" [(.name "data")]))
               (.setField (.name "self") "length_" (.name "length")))) }
@@ -30424,7 +30423,7 @@ def f_v8_base_OwnedVector___v8_base_OwnedVector__OwnedVector___ : Func :=
             (.seq
               .skip
               (.seq
-                (.expr (.hole "op:staticAssert"))
+                (.expr (.lit .unit))
                 (.seq
                   (.setField
                     (.name "self")
@@ -30433,7 +30432,7 @@ def f_v8_base_OwnedVector___v8_base_OwnedVector__OwnedVector___ : Func :=
                   (.seq
                     (.setField (.name "self") "length_" (.field (.name "other") "length_"))
                     (.seq
-                      (.expr (.call "DCHECK_NULL" [(.hole "op:cast:scalar")]))
+                      (.expr (.call "DCHECK_NULL" [(.lit .unit)]))
                       (.seq
                         (.setField (.name "other") "length_" (.lit (.int 0)))
                         (.ret (.hole "op:indirection:pointer"))))))))) }
@@ -30546,17 +30545,17 @@ def f_v8_base_EmbeddedVector__clinit__v8_base_EmbeddedVector__ : Func :=
                           .skip
                           (.seq
                             (.seq
-                              (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                              (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                               (.seq (.expr (.call "ANY" [])) (.assign "SubVector" (.name "<tmp>0"))))
                             (.seq
                               (.seq
-                                (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                 (.seq
                                   (.expr (.call "ANY" []))
                                   (.assign "SubVectorFrom" (.name "<tmp>1"))))
                               (.seq
                                 (.seq
-                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                  (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                   (.seq
                                     (.expr (.call "ANY" []))
                                     (.assign "operator +" (.name "<tmp>2"))))
@@ -30605,7 +30604,7 @@ def f_v8_base_EmbeddedVector_Truncate_void_size_t_ : Func :=
   { name := "v8.base.EmbeddedVector.Truncate:void(size_t)"
   , params := ["length"]
   , body := (.seq
-            (.expr (.call "DCHECK_LE" [(.hole "op:cast:scalar")]))
+            (.expr (.call "DCHECK_LE" [(.lit .unit)]))
             (.setField (.name "self") "length_" (.name "length"))) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.<clinit>:v8.base.VirtualAddressSpacePageAllocator()`  (from `virtual-address-space-page-allocator.h`) -/
@@ -30622,12 +30621,12 @@ def f_v8_base_VirtualAddressSpacePageAllocator__clinit__v8_base_VirtualAddressSp
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq
                         (.expr (.call "ANY" []))
                         (.assign "resized_allocations_" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "mutex_" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.VirtualAddressSpacePageAllocator.__init__`  (from `virtual-address-space-page-allocator.h`) -/
@@ -30670,7 +30669,7 @@ def f_v8_base_VirtualAddressSpacePageAllocator_SetRandomMmapSeed_void_int64_t_ :
 def f_v8_base_VirtualAddressSpacePageAllocator_GetRandomMmapAddr_void___ : Func :=
   { name := "v8.base.VirtualAddressSpacePageAllocator.GetRandomMmapAddr:void*()"
   , params := []
-  , body := (.ret (.hole "op:cast:scalar")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.VirtualAddressSpace.<clinit>:v8.base.VirtualAddressSpace()`  (from `virtual-address-space.h`) -/
 def f_v8_base_VirtualAddressSpace__clinit__v8_base_VirtualAddressSpace__ : Func :=
@@ -30686,12 +30685,12 @@ def f_v8_base_VirtualAddressSpace__clinit__v8_base_VirtualAddressSpace__ : Func 
                   .skip
                   (.seq
                     (.seq
-                      (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq
                         (.expr (.call "ANY" []))
                         (.assign "ActiveMemoryProtectionKey" (.name "<tmp>0"))))
                     (.seq
-                      (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                      (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                       (.seq (.expr (.call "ANY" [])) (.assign "AllocateSubspace" (.name "<tmp>1"))))))))) }
 
 /-- `v8.base.VirtualAddressSpace.~VirtualAddressSpace:ANY()`  (from `virtual-address-space.h`) -/
@@ -30744,48 +30743,48 @@ def f_v8_base_VirtualAddressSubspace__clinit__v8_base_VirtualAddressSubspace__ :
                                         .skip
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "ActiveMemoryProtectionKey" (.name "<tmp>0"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>1" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "AllocateSubspace" (.name "<tmp>1"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>2" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "reservation_" (.name "<tmp>2"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>3" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "mutex_" (.name "<tmp>3"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>4" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "region_allocator_" (.name "<tmp>4"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>5" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "rng_" (.name "<tmp>5"))))
                                         (.seq
                                         (.seq
-                                        (.assign "<tmp>6" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>6" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "parent_space_" (.name "<tmp>6"))))
                                         (.seq
-                                        (.assign "<tmp>7" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>7" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "pkey_" (.name "<tmp>7"))))))))))))))))))))))))))) }
@@ -30800,37 +30799,37 @@ def f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__ : Func :=
 def f_V8ToWindowsType__RTL_SRWLOCK__V8_SRWLOCK__ : Func :=
   { name := "V8ToWindowsType:_RTL_SRWLOCK*(V8_SRWLOCK*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `V8ToWindowsType<duplicate>0:_RTL_SRWLOCK*(V8_SRWLOCK*)`  (from `win32-headers.h`) -/
 def f_V8ToWindowsType_duplicate_0__RTL_SRWLOCK__V8_SRWLOCK__ : Func :=
   { name := "V8ToWindowsType<duplicate>0:_RTL_SRWLOCK*(V8_SRWLOCK*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `V8ToWindowsType:_RTL_CONDITION_VARIABLE*(V8_CONDITION_VARIABLE*)`  (from `win32-headers.h`) -/
 def f_V8ToWindowsType__RTL_CONDITION_VARIABLE__V8_CONDITION_VARIABLE__ : Func :=
   { name := "V8ToWindowsType:_RTL_CONDITION_VARIABLE*(V8_CONDITION_VARIABLE*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `V8ToWindowsType<duplicate>0:_RTL_CONDITION_VARIABLE*(V8_CONDITION_VARIABLE*)`  (from `win32-headers.h`) -/
 def f_V8ToWindowsType_duplicate_0__RTL_CONDITION_VARIABLE__V8_CONDITION_VARIABLE__ : Func :=
   { name := "V8ToWindowsType<duplicate>0:_RTL_CONDITION_VARIABLE*(V8_CONDITION_VARIABLE*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `V8ToWindowsType:_RTL_CRITICAL_SECTION*(V8_CRITICAL_SECTION*)`  (from `win32-headers.h`) -/
 def f_V8ToWindowsType__RTL_CRITICAL_SECTION__V8_CRITICAL_SECTION__ : Func :=
   { name := "V8ToWindowsType:_RTL_CRITICAL_SECTION*(V8_CRITICAL_SECTION*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `V8ToWindowsType<duplicate>0:_RTL_CRITICAL_SECTION*(V8_CRITICAL_SECTION*)`  (from `win32-headers.h`) -/
 def f_V8ToWindowsType_duplicate_0__RTL_CRITICAL_SECTION__V8_CRITICAL_SECTION__ : Func :=
   { name := "V8ToWindowsType<duplicate>0:_RTL_CRITICAL_SECTION*(V8_CRITICAL_SECTION*)"
   , params := ["p"]
-  , body := (.ret (.hole "op:cast:opaque-type")) }
+  , body := (.ret (.hole "op:cast:pointer")) }
 
 /-- `v8.base.Copy:ANY(InputIt,InputIt,OutputIt)`  (from `algorithm.h`) -/
 def f_v8_base_Copy_ANY_InputIt_InputIt_OutputIt_ : Func :=
@@ -32096,18 +32095,16 @@ def f_export_template_h__global__cpp_ : Func :=
   { name := "export-template.h:<global><cpp>"
   , params := []
   , body := (.seq
-            (.expr (.hole "op:staticAssert"))
+            (.expr (.lit .unit))
             (.seq
-              (.expr (.hole "op:staticAssert"))
+              (.expr (.lit .unit))
               (.seq
-                (.expr (.hole "op:staticAssert"))
+                (.expr (.lit .unit))
                 (.seq
-                  (.expr (.hole "op:staticAssert"))
+                  (.expr (.lit .unit))
                   (.seq
-                    (.expr (.hole "op:staticAssert"))
-                    (.seq
-                      (.expr (.hole "op:staticAssert"))
-                      (.seq (.expr (.hole "op:staticAssert")) (.expr (.hole "op:staticAssert"))))))))) }
+                    (.expr (.lit .unit))
+                    (.seq (.expr (.lit .unit)) (.seq (.expr (.lit .unit)) (.expr (.lit .unit))))))))) }
 
 /-- `file-utils.cc:<global>`  (from `file-utils.cc`) -/
 def f_file_utils_cc__global_ : Func :=
@@ -32291,9 +32288,7 @@ def f_macros_h__global__cpp_ : Func :=
                                         .skip
                                         (.seq
                                         .skip
-                                        (.seq
-                                        (.expr (.hole "op:staticAssert"))
-                                        (.expr (.hole "op:staticAssert")))))))))))))))))))))) }
+                                        (.seq (.expr (.lit .unit)) (.expr (.lit .unit)))))))))))))))))))))) }
 
 /-- `memcopy.h:<global><cpp>`  (from `memcopy.h`) -/
 def f_memcopy_h__global__cpp_ : Func :=
@@ -32425,9 +32420,7 @@ def f_numerics_basic_ops_impl_h__global__cpp_ : Func :=
 def f_numerics_byte_conversions_h__global__cpp_ : Func :=
   { name := "numerics/byte_conversions.h:<global><cpp>"
   , params := []
-  , body := (.seq
-            .skip
-            (.seq (.expr (.hole "op:staticAssert")) (.seq (.expr (.hole "op:staticAssert")) .skip))) }
+  , body := (.seq .skip (.seq (.expr (.lit .unit)) (.seq (.expr (.lit .unit)) .skip))) }
 
 /-- `numerics/byte_conversions_unittest.cc:<global>`  (from `numerics/byte_conversions_unittest.cc`) -/
 def f_numerics_byte_conversions_unittest_cc__global_ : Func :=
@@ -32746,53 +32739,53 @@ def f_platform_platform_win32_cc__global_ : Func :=
                                 (.seq
                                   .skip
                                   (.seq
-                                    (.expr (.hole "op:staticAssert"))
+                                    (.expr (.lit .unit))
                                     (.seq
-                                      (.expr (.hole "op:staticAssert"))
+                                      (.expr (.lit .unit))
                                       (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.seq
                                         .skip
                                         (.seq

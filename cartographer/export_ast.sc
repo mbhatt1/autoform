@@ -617,6 +617,77 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     "uintptr_t" -> "u64"
   )
 
+  /** The typedef graph, taken from the CPG rather than from a table of names we happen to
+    * recognise.
+    *
+    * V8 does almost no arithmetic on the spelling of a fixed-width type. It writes
+    * `Address`, `word_t`, `Chunk`, `unsigned_type` — names introduced by `using` /
+    * `typedef` inside a class or namespace — and the frontend records each one as a
+    * TypeDecl carrying `aliasTypeFullName`, the type it was declared equal to. Following
+    * that edge is the difference between *knowing* a width and guessing one: an alias
+    * chain that ends at `uint32_t` is a proof that the C++ compiler will truncate to 32
+    * bits, and a chain that ends anywhere else (a template parameter, a Windows type with
+    * no declaration in this translation unit, a function-pointer type) ends the search
+    * with no answer, which is what a hole is for. */
+  lazy val typeAliases: Map[String, String] = {
+    val ds = cpg.typeDecl.l.filter(_.aliasTypeFullName.nonEmpty)
+    val byFull = ds.map(td => bareType(td.fullName) -> bareType(td.aliasTypeFullName.get)).toMap
+    // A cast writes the *qualified* name it can see, and that is usually the TypeDecl's
+    // `fullName`, so the qualified map is the primary one. The unqualified name is used
+    // only when every declaration of that name in the program agrees on the target —
+    // `Address` is `uintptr_t` in nine different V8 classes — because a short name that
+    // means two things is exactly the case where guessing changes arithmetic.
+    val byShort = ds.groupBy(td => bareType(td.name)).collect {
+      case (n, tds) if tds.map(td => bareType(td.aliasTypeFullName.get)).distinct.size == 1 =>
+        n -> bareType(tds.head.aliasTypeFullName.get)
+    }
+    byShort ++ byFull
+  }
+
+  /** The fixed-width tag for `ty`, following typedefs, or `None`.
+    *
+    * The loop is bounded by a visited set because the alias table really does contain
+    * self-edges (Joern records the macro `__BEGIN_DECLS` as an alias of itself), and a
+    * pointer or function type ends the search rather than being followed, so that
+    * `DiscardVirtualMemoryFunction = DWORD(*)(PVOID, SIZE_T)` stays an address and not a
+    * `u32`. There is deliberately no default: an unresolved name yields `None` and the
+    * caller keeps a hole. */
+  def resolveIntType(ty0: String): Option[String] = {
+    var t    = bareType(ty0)
+    var seen = Set.empty[String]
+    var res  = Option.empty[String]
+    var go   = true
+    while (go) {
+      if (intTypeNames.contains(t)) { res = intTypeNames.get(t); go = false }
+      else if (seen.contains(t) || isPointerType(t) || t.contains("(")) go = false
+      else {
+        seen += t
+        typeAliases.get(t) match {
+          case Some(n) => t = n
+          case None    => go = false
+        }
+      }
+    }
+    res
+  }
+
+  /** Is the target of a cast a pointer or a reference?
+    *
+    * This cannot be decided from `typeFullName` alone, and the failure was live: for
+    * `reinterpret_cast<uint8_t*>(address)` the C++ frontend records the type-ref node's
+    * `typeFullName` as `uint8_t`, with the `*` surviving only in the node's `code`. Read
+    * from the type alone, a **pointer reinterpretation became an 8-bit truncation** —
+    * `v8::base::PageAllocator::ReleasePages` translated `reinterpret_cast<uint8_t*>(addr)
+    * + new_size` as `wrap u8 addr + new_size`, which is well-typed, hole-free, and
+    * silently wrong arithmetic. Exactly the class of bug the ledger exists to make
+    * impossible, so the surface syntax is consulted as well and a `*`, `&` or `[]` in the
+    * written type sends the cast to the address hole where it belongs. */
+  def castTargetIsPointer(tref: AstNode, ty: String): Boolean =
+    isPointerType(ty) || {
+      val c = bareType(tref.code)
+      c.endsWith("*") || c.endsWith("&") || c.matches(""".*\[.*\]""")
+    }
+
   /** `char` is deliberately absent from `intTypeNames`: its signedness is
     * implementation-defined, so `static_cast<char>(300)` has no standard-mandated value.
     * Naming it separately keeps the hole label specific instead of guessing a sign. */
@@ -874,6 +945,14 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case t: TypeRef           => typeValue(t.typeFullName)
     case c: Call              => callExpr(c)
     case b: Block             => blockExpr(b)
+    // A control structure reached in *expression* position. This is only ever the tail of
+    // a BLOCK that `blockExpr` was asked for the value of, and on V8 it is macro fallout:
+    // `CHECK_EQ(a, b)` expands to `do { ... } while (false)`, and the frontend hands the
+    // expansion back where an argument was expected. A statement has no value, so there is
+    // nothing to translate — but *which* statement it was decides whether the remedy is a
+    // frontend fix (`DO`, a macro body) or a real language feature Core lacks, so the
+    // label carries it instead of merging them all under one count.
+    case cs: ControlStructure => hole("expr:CONTROL_STRUCTURE:" + cs.controlStructureType)
     case other                => hole("expr:" + other.label)
   }
 
@@ -988,6 +1067,22 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       } yield ujson.Obj("k" -> "alloc", "cls" -> cls,
                         "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1)))
     case _ => None
+  }
+
+  /** Is this childless `<operator>.alloc` sitting in the block shape `ctorAlloc` looks for
+    * — so that the only thing that stopped the fold was `ctorClassOf` finding no class
+    * name? Used purely to give the residual hole an accurate label. */
+  def inCtorShape(alloc: Call): Boolean = {
+    val asg = alloc.astParent
+    val ok = asg match { case c: Call => c.methodFullName == "<operator>.assignment"
+                         case _       => false }
+    ok && (asg.astParent match {
+      case b: Block => kidsOf(b).filterNot(_.isInstanceOf[Local]) match {
+        case (_: Call) :: (ctor: Call) :: (_: Identifier) :: Nil => ctorClassOf(ctor).isEmpty
+        case _ => false
+      }
+      case _ => false
+    })
   }
 
   /** A BLOCK in *expression* position.
@@ -1128,12 +1223,50 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // collapsed into it: reinterpreting an address has no meaning in a language with no
     // addresses. `char` is excluded too — its signedness is implementation-defined — and
     // so is `double`, which is a rounding conversion rather than a truncation.
-    else if (mfn == "<operator>.cast" && kids.size == 2)
-      intTypeNames.get(bareType(staticTypeOf(kids(0)))) match {
+    //
+    // Two refinements on top of that:
+    //
+    // * The target type is resolved **through typedefs** (`resolveIntType`). V8 spells
+    //   almost every integer as a class-local `using` — `Address`, `Chunk`,
+    //   `unsigned_type` — and reading only the surface name reported 128 casts as
+    //   `opaque-type` when the CPG holds a declaration saying what they are. A chain that
+    //   does not reach a fixed-width type still yields a hole; nothing gets a default.
+    //
+    // * A cast **to `void`** is a discarded-value expression. `(void)0` alone is 492 of
+    //   the 939 casts in `src/base`, because it is what `DCHECK`, `USE` and friends expand
+    //   to in a release build. `void` is an incomplete type: `(void)e` has *no value*, and
+    //   no well-formed C++ program can read one from it. So the only thing to preserve is
+    //   the evaluation of `e`, and the translation splits on whether there is anything to
+    //   preserve:
+    //
+    //     - `e` **pure** (a literal, a name, a field or index read of one): nothing
+    //       happens when it is evaluated, so the whole expression is `unit` — the one
+    //       value Core has that stands for "no value". Nothing is dropped and nothing is
+    //       invented. This is the `(void)0` case, and it matters that it is not `0`:
+    //       Joern's macro lowering hands `(void)0` back in *argument* position (`DCHECK`'s
+    //       expansion becomes a call with the discarded expression as its argument), and
+    //       there `0` would be a number the source never produced.
+    //     - `e` **impure** (a call, an assignment, an increment): the effects are the
+    //       entire content of the statement and must survive, so the operand is emitted
+    //       and the cast disappears. The value it yields is one C++ forbids anyone from
+    //       reading, so nothing observes the difference — and the subexpressions inside it
+    //       become visible to the ledger, which is why `op:and` and `cstr:pointer-arith`
+    //       *rise* slightly here: those were previously hidden underneath a cast hole.
+    //
+    //   A cast to `void*` is not this; it is a pointer cast, and `isPointerType` sends it
+    //   to the address hole.
+    else if (mfn == "<operator>.cast" && kids.size == 2) {
+      val tty = staticTypeOf(kids(0))
+      if (castTargetIsPointer(kids(0), tty)) hole("op:cast:pointer")
+      else resolveIntType(tty) match {
         case Some(w) => ujson.Obj("k" -> "unop", "op" -> ("cast:" + w),
                                   "a" -> expr(kids(1)))
-        case None    => hole("op:cast:" + addrKind(staticTypeOf(kids(0))))
+        case None =>
+          if (bareType(tty) == "void")
+            (if (pureExpr(kids(1))) ujson.Obj("k" -> "unit") else expr(kids(1)))
+          else hole("op:cast:" + addrKind(tty))
       }
+    }
     // `&x`.
     //
     // This is the one place where the honest answer depends on what is being addressed,
@@ -1193,8 +1326,45 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // label that says which of the two it was, because they are not the same problem.
     // The childless form is C++ stack object construction and is handled as a whole
     // block by `ctorAlloc`; reaching it here means the block did not have that shape.
+    //
+    // The childless residue was measured rather than guessed at: in V8 `src/base` there
+    // are 233 childless allocs, and **every single one** of the 83 that `ctorAlloc` does
+    // not fold sits in the expected three-sibling block — the shape is fine. What is
+    // missing is the class: the frontend emitted the constructor as `ANY.ANY:void()`,
+    // with `code` literally `"ANY.ANY()"` and the temporary's type `ANY`. There is no
+    // name, no argument, and no type anywhere in the node to recover one from, so this
+    // cannot be closed from the CPG at all, and `op:alloc:ctor-shape` was the wrong name
+    // for it: it pointed at a pattern-matching gap in this exporter when the gap is in
+    // the C++ frontend's name resolution. The two are separated so the count says which.
     else if (mfn == "<operator>.alloc")
-      hole(if (kids.isEmpty) "op:alloc:ctor-shape" else "op:alloc:array-decl")
+      hole(if (kids.nonEmpty) "op:alloc:array-decl"
+           else if (inCtorShape(c)) "op:alloc:ctor-unresolved-class"
+           else "op:alloc:ctor-shape")
+    // `static_assert(cond)` / `static_assert(cond, "msg")`.
+    //
+    // This is the one construct in the C++ ledger that is genuinely *nothing* at run time,
+    // and the argument has to be made carefully because "this has no effect" is how real
+    // behaviour gets dropped.
+    //
+    // `static_assert` is a **declaration**, not a statement ([dcl.pre]). Its first operand
+    // is required to be a constant expression contextually converted to `bool`, so it is
+    // evaluated by the compiler and never by the program: it occupies no storage, emits no
+    // code, and cannot contain a call to anything with a runtime effect, because a
+    // constant expression may not. There are exactly two outcomes. If the condition is
+    // false the program is **ill-formed** — `cc` refuses to produce a binary, so there is
+    // no execution for Core to model and nothing to be faithful to. If it is true the
+    // declaration contributes nothing whatever to the translated program. So for every
+    // program that compiles — the only programs this pipeline claims to translate — the
+    // declaration is observationally equal to the empty statement, and `unit` in
+    // expression position (the frontend wraps it as one) is that.
+    //
+    // What *is* given up is stated plainly: Core will happily run a program whose
+    // `static_assert` is false, where `cc` would reject it. That is a loss of *rejection*
+    // power, not a change to the behaviour of any program that runs — the ledger is a
+    // claim about executions, and this adds no execution that C++ would have run
+    // differently.
+    else if (mfn == "<operator>.staticAssert")
+      ujson.Obj("k" -> "unit")
     else if (mfn.startsWith("<operator>"))
       hole("op:" + mfn.stripPrefix("<operator>."))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.

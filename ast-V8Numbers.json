@@ -1605,7 +1605,7 @@
       "x": "<tmp>0",
       "e": {
        "k": "hole",
-       "label": "op:alloc:ctor-shape"
+       "label": "op:alloc:ctor-unresolved-class"
       }
      },
      "b": {
@@ -3610,7 +3610,7 @@
                    "x": "<tmp>0",
                    "e": {
                     "k": "hole",
-                    "label": "op:alloc:ctor-shape"
+                    "label": "op:alloc:ctor-unresolved-class"
                    }
                   },
                   "b": {
@@ -6173,8 +6173,7 @@
                  "a": {
                   "k": "exprS",
                   "e": {
-                   "k": "hole",
-                   "label": "op:staticAssert"
+                   "k": "unit"
                   }
                  },
                  "b": {
@@ -7084,8 +7083,7 @@
                "a": {
                 "k": "exprS",
                 "e": {
-                 "k": "hole",
-                 "label": "op:staticAssert"
+                 "k": "unit"
                 }
                },
                "b": {
@@ -7100,7 +7098,7 @@
                   "x": "current_uc",
                   "e": {
                    "k": "hole",
-                   "label": "op:cast:opaque-type"
+                   "label": "op:cast:pointer"
                   }
                  },
                  "b": {
@@ -7115,7 +7113,7 @@
                     "x": "end_uc",
                     "e": {
                      "k": "hole",
-                     "label": "op:cast:opaque-type"
+                     "label": "op:cast:pointer"
                     }
                    },
                    "b": {
@@ -7209,7 +7207,7 @@
                           "x": "current",
                           "e": {
                            "k": "hole",
-                           "label": "op:cast:opaque-type"
+                           "label": "op:cast:pointer"
                           }
                          },
                          "b": {
@@ -8767,7 +8765,7 @@
                                    "x": "chars",
                                    "e": {
                                     "k": "hole",
-                                    "label": "op:cast:scalar"
+                                    "label": "op:cast:pointer"
                                    }
                                   },
                                   "b": {
@@ -9269,12 +9267,8 @@
          "v": "isolate"
         },
         {
-         "k": "unop",
-         "op": "cast:u8",
-         "a": {
-          "k": "name",
-          "v": "string"
-         }
+         "k": "hole",
+         "label": "op:cast:pointer"
         },
         {
          "k": "call",
@@ -12515,8 +12509,7 @@
                           "a": {
                            "k": "exprS",
                            "e": {
-                            "k": "hole",
-                            "label": "op:staticAssert"
+                            "k": "unit"
                            }
                           },
                           "b": {

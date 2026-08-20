@@ -372,7 +372,7 @@ def f_v8_internal_SimpleStringBuilder__clinit__v8_internal_SimpleStringBuilder__
             (.seq
               .skip
               (.seq
-                (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                 (.seq (.expr (.call "ANY" [])) (.assign "buffer_" (.name "<tmp>0")))))) }
 
 /-- `v8.internal.SimpleStringBuilder.__init__`  (from `conversions.cc`) -/
@@ -800,7 +800,7 @@ def f_v8_internal_StringToIntHelper__clinit__v8_internal_StringToIntHelper__ : F
                                       .skip
                                       (.seq
                                         (.seq
-                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-shape"))
+                                        (.assign "<tmp>0" (.hole "op:alloc:ctor-unresolved-class"))
                                         (.seq
                                         (.expr (.call "ANY" []))
                                         (.assign "subject_" (.name "<tmp>0"))))
@@ -1405,7 +1405,7 @@ def f_v8_internal_NumberParseIntHelper_HandleBaseTenCase_void_Char__Char__ : Fun
                                         (.name "buffer_pos")
                                         (.name "kMaxSignificantDigits"))
                                       (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.setIndex
                                         (.name "buffer")
                                         (.hole "op:postIncrement:value")
@@ -1653,15 +1653,15 @@ def f_v8_internal_InternalStringToDouble_double_Char__Char__v8_internal_Conversi
                                 (.seq
                                   (.hole "stmt:TYPE_DECL")
                                   (.seq
-                                    (.expr (.hole "op:staticAssert"))
+                                    (.expr (.lit .unit))
                                     (.seq
                                       .skip
                                       (.seq
-                                        (.assign "current_uc" (.hole "op:cast:opaque-type"))
+                                        (.assign "current_uc" (.hole "op:cast:pointer"))
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "end_uc" (.hole "op:cast:opaque-type"))
+                                        (.assign "end_uc" (.hole "op:cast:pointer"))
                                         (.seq
                                         .skip
                                         (.seq
@@ -1685,7 +1685,7 @@ def f_v8_internal_InternalStringToDouble_double_Char__Char__v8_internal_Conversi
                                         (.field (.name "ret") "ptr")
                                         (.name "current_uc"))
                                         (.seq
-                                        (.assign "current" (.hole "op:cast:opaque-type"))
+                                        (.assign "current" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.ifte
                                         (.binop
@@ -2069,7 +2069,7 @@ def f_v8_internal_StringToBigIntHelper_DecimalString_pair_bigint_Processor__ : F
                                         (.seq
                                         .skip
                                         (.seq
-                                        (.assign "chars" (.hole "op:cast:scalar"))
+                                        (.assign "chars" (.hole "op:cast:pointer"))
                                         (.seq
                                         (.expr
                                         (.call
@@ -2202,7 +2202,7 @@ def f_v8_internal_BigIntLiteral_MaybeHandle_IsolateT__char__ : Func :=
                   (.alloc
                     "StringToBigIntHelper"
                     [ (.name "isolate")
-                    , (.unop "cast:u8" (.name "string"))
+                    , (.hole "op:cast:pointer")
                     , (.call "strlen" [(.name "string")]) ]))
                 (.ret (.call "GetResult" []))))) }
 
@@ -2973,7 +2973,7 @@ def f_v8_internal_DoubleToRadixStringView_string_view_double_int_base_Vector_ : 
                                         (.call "GetFlushDenormals" [])
                                         (.assign "delta_is_positive" (.lit (.bool false)))
                                         (.seq
-                                        (.expr (.hole "op:staticAssert"))
+                                        (.expr (.lit .unit))
                                         (.assign "delta" (.call "NextDouble" []))))
                                         .skip)
                                         (.seq
