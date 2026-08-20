@@ -1555,3 +1555,66 @@ non-exhaustive simultaneously — and four agents are mid-build. The split is th
 state; it is blocked on those sites, not on this type. What `Lang` buys now is that a
 divergence found by the new oracle can be attributed: caused by the transpiler, or caused
 by an approximation the build already admits to.
+
+## §31 — Silently wrong beats absent, and 104 nodes were silently wrong
+
+The exporter pass that closed `control:TRY-finally-escaping` (31 → 0) and
+`scope:class-closure` (18 → 0) found something worse than either: **104 call nodes with an
+empty callee name**. `{"k":"call","f":""}` is well-typed. It rendered, it type-checked, it
+counted as *translated* — and at run time it resolved to nothing. Every hole in this
+project is an admission of ignorance the ledger can count. These were not holes. They were
+translated code that did nothing, inflating the coverage number in the one direction the
+ledger cannot detect, because a hole-free function is exactly what the ledger looks for.
+
+Ninety of them were the `with` statement. `pysrc2cpg` lowers `with cm as x:` into
+`manager_tmp0 = cm; enter_tmp0 = manager_tmp0.__enter__; value_tmp0 = enter_tmp0()`, so
+the invocation carries no name — but both halves of the method's identity are present,
+split across two statements: the receiver on the call, the attribute name on the
+assignment that made the temporary. Rejoining them is what made `with` translatable at
+all, and it is why the `_TimedCache`/`TTLCache`/`TLRUCache` timer methods stopped being
+calls into nothing.
+
+Six were genuinely inexpressible — `cached(...)(func)`, a *computed* callee, where
+`Expr.call` is by name and Core has no "apply this value". Those six functions were
+counted hole-free and are not. Coverage went down for the right reason, the third time
+on this project.
+
+Two further results from the same pass:
+
+* **Verifiable core 74 → 97, with no Lean change.** The exporter was discarding Joern's
+  resolved `fullName` and emitting the short name, so `Ctx.resolve`'s unique-suffix
+  fallback could not separate `_cached.py:_wrapper` from `_cachedmethod.py:_wrapper`.
+  Emitting the `fullName` makes the *exact* match fire. Note this interacts with §30: the
+  ledger fix made the free-call path correctly strict, and this makes the exporter supply
+  the name that strictness needs. Neither alone was enough.
+
+* **18 "hole-free" functions were padding.** `<metaClassCallHandler>` synthetics: 30
+  functions removed, of which 18 had counted as hole-free. Denominator and numerator both
+  fell, and none of it was coverage. On the common 208-function basis the real movement is
+  hole-free **147 → 159**, holes **106 → 78**.
+
+### The decision this leaves me: no inheritance from builtin types
+
+`class _HashedTuple(tuple)` translates to an ordinary class, so instances are opaque
+`Val.ref`s. CPython's instance *is* a tuple: `hashkey(0) == (0,)` is `True`. `Val.beq`
+cannot equate a `.ref` with a `.tuple`, and `hashkey` is cachetools' cache-key function —
+so this is a behavioural gap, not an encoding artifact. It was verified against the
+*pre-change* 238-function program, which returns the same `ref 1`, so it predates the
+exporter work and was merely exposed when the harness stopped skipping varargs.
+
+**Decision: it stays a DIVERGENCE.** The tempting move is an oracle-side representability
+rule that reclassifies it INCONCLUSIVE — "we cannot encode this comparison". That would be
+false. The semantics genuinely computes a different answer from CPython, and calling that
+"unrepresentable" would convert a known-wrong result into a not-measured one, which is the
+§17/§30 failure in its most seductive form: the artifact that makes a metric look better
+by narrowing what it measures. A real fix is a Core notion of builtin base classes, or
+`alloc` producing a tagged value for such classes. Until then the divergence is the honest
+output.
+
+### An apparatus hazard that generated phantom results
+
+`scripts/differential.py` writes its harness to a fixed `/tmp/autoform_diff.lean`. With
+several agents running it concurrently they overwrite each other mid-run, so a run can
+report conformance for *another agent's program*. This was live for every concurrent run
+today. §27 said the last divergence was the apparatus; here the apparatus was not even
+measuring the right artifact.
