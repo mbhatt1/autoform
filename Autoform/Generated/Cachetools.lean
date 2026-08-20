@@ -1211,7 +1211,7 @@ def f_cachetools___init___py__module__TTLCache__Link___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache._Link.__init__"
   , params := ["key", "expires"]
   , body := (.seq
-            (.setField (.name "self") "key" (.name "key"))
+            (.setField (.name "self") "key" (.name "expires"))
             (.setField (.name "self") "expires" (.name "expires"))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache._Link.__reduce__`  (from `cachetools/__init__.py`) -/
@@ -3290,7 +3290,7 @@ def f_cachetools__cachedmethod_py__module___warn_instance_dict : Func :=
 def f_cachetools__cachedmethod_py__module___none : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._none"
   , params := ["_"]
-  , body := (.expr (.lit .unit)) }
+  , body := (.ret (.lit .unit)) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.__init__`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=

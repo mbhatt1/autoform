@@ -183,6 +183,18 @@ theorem const_cachetools___init___py__module___DefaultSize___setitem : ((dom_con
 def ob_const_cachetools___init___py__module___DefaultSize___setitem : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true
 
+def dom_conform_cachetools___init___py__module___DefaultSize_pop : List Obs :=
+  [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.int (1)) },
+   { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (1)) },
+   { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
+   { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4)] }, expected := EResult.val (Val.int (1)) }]
+
+theorem conform_cachetools___init___py__module___DefaultSize_pop : ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+
+/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
+def ob_conform_cachetools___init___py__module___DefaultSize_pop : Prop :=
+  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
+
 def dom_nonneg_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
@@ -214,6 +226,30 @@ theorem idempotent_cachetools___init___py__module___DefaultSize_pop : ((dom_idem
 /-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
 def ob_idempotent_cachetools___init___py__module___DefaultSize_pop : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
+
+def dom_const_cachetools___init___py__module___DefaultSize_pop : List Case :=
+  [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1000000)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (7)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
+   { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-7)] }]
+
+theorem const_cachetools___init___py__module___DefaultSize_pop : ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true := by rfl
+
+/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
+def ob_const_cachetools___init___py__module___DefaultSize_pop : Prop :=
+  ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true
+
+theorem uconst_cachetools___init___py__module___DefaultSize_pop :
+    Refines P "cachetools/__init__.py:<module>._DefaultSize.pop" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
+  intro args _
+  refine forall_ge_of_forall_add (N := 8) ?_
+  intro k
+  rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
+  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P]
 
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
@@ -428,22 +464,6 @@ theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize :
 def ob_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true
 
-def dom_conform_cachetools___init___py__module__Cache_currsize : List Obs :=
-  [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (6)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (4), Val.int (4))]), ("_Cache__data", Val.dict [(Val.int (4), Val.int (4))]), ("_Cache__currsize", Val.int (4)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (4)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_negative.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
-   { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) }]
-
-theorem conform_cachetools___init___py__module__Cache_currsize : ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
-
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_conform_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)) = true
-
 def dom_runs_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -475,22 +495,6 @@ theorem returns_cachetools___init___py__module__Cache_currsize : ((dom_returns_c
 /-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
 def ob_returns_cachetools___init___py__module__Cache_currsize : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)) = true
-
-def dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : List Case :=
-  [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (7))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (-1))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (-1)), ("_Cache__maxsize", Val.int (10))] }], self := (some (Val.ref (base + 0))), args := [] },
-   { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_clear_getsizeof.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2)), (Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (6)), ("_Cache__maxsize", Val.int (1000000))] }], self := (some (Val.ref (base + 0))), args := [] }]
-
-theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C FUEL f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true := by rfl
-
-/-- Open: the same statement at **every** fuel budget ≥ `FUEL`. Proved only at `FUEL`. -/
-def ob_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : Prop :=
-  ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true
 
 def dom_conform_cachetools___init___py__module__Cache_getsizeof : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
@@ -1156,8 +1160,10 @@ def obligations : List OpenObligation :=
    { name := "ob_idempotent_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_commutes_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_const_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.__setitem__", reason := "proved at FUEL only; fuel-independence unproved" },
+   { name := "ob_conform_cachetools___init___py__module___DefaultSize_pop", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_nonneg_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_idempotent_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
+   { name := "ob_const_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_conform_cachetools___init___py__module___DefaultSize_clear", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.clear", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_conform_cachetools___init___py__module__Cache___init", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_runs_cachetools___init___py__module__Cache___init", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__init__", reason := "proved at FUEL only; fuel-independence unproved" },
@@ -1172,10 +1178,8 @@ def obligations : List OpenObligation :=
    { name := "ob_runs_cachetools___init___py__module__Cache_maxsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_returns_cachetools___init___py__module__Cache_maxsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_conform_cachetools___init___py__module__Cache_currsize", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_runs_cachetools___init___py__module__Cache_currsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_returns_cachetools___init___py__module__Cache_currsize", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
-   { name := "ob_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_conform_cachetools___init___py__module__Cache_getsizeof", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_nonneg_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
    { name := "ob_idempotent_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.getsizeof", reason := "proved at FUEL only; fuel-independence unproved" },
@@ -1228,13 +1232,12 @@ def obligations : List OpenObligation :=
    { name := "stmt_returns_cachetools___init___py__module__Cache___len", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__len__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_nonneg_cachetools___init___py__module__Cache___len", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__len__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_uproj_cachetools___init___py__module__Cache_maxsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.maxsize", reason := "statement survived refutation; the generated proof portfolio could not close it" },
+   { name := "stmt_conform_cachetools___init___py__module__Cache_currsize", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "statement survived refutation; the generated proof portfolio could not close it" },
+   { name := "stmt_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_uproj_cachetools___init___py__module__Cache_currsize", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.currsize", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_uproj_cachetools___init___py__module___TimedCache_timer", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._TimedCache.timer", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_idempotent_cachetools___init___py__module__TTLCache__Link___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_idempotent_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_conform_cachetools___init___py__module___DefaultSize_pop", source := "cross-runtime (\u00a74.4)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_const_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_uconst_cachetools___init___py__module___DefaultSize_pop", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>._DefaultSize.pop", reason := "statement survived refutation; the generated proof portfolio could not close it" }]
+   { name := "stmt_idempotent_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" }]
 
 #eval IO.println (renderObligations "Cachetools" obligations)
 
@@ -1251,8 +1254,11 @@ def obligations : List OpenObligation :=
 #audit_depends idempotent_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
 #audit_depends commutes_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
 #audit_depends const_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
+#audit_depends conform_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
 #audit_depends nonneg_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
 #audit_depends idempotent_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends const_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends uconst_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
 #audit_depends conform_cachetools___init___py__module___DefaultSize_clear on f_cachetools___init___py__module___DefaultSize_clear
 #audit_depends conform_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
 #audit_depends runs_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
@@ -1267,10 +1273,8 @@ def obligations : List OpenObligation :=
 #audit_depends runs_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
 #audit_depends returns_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
 #audit_depends projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
-#audit_depends conform_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
 #audit_depends runs_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
 #audit_depends returns_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
-#audit_depends projects__Cache__currsize_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
 #audit_depends conform_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
 #audit_depends nonneg_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
 #audit_depends idempotent_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof

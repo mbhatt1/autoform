@@ -274,20 +274,27 @@ def fieldOf (h : Heap) (r : Ref) (f : String) : Val :=
   | none => .unit
 
 /-- **An accessor returns the field it names**, for every heap, every receiver and every
-argument list, at every fuel budget of at least three. Stated for an arbitrary `Func`
-whose body has the accessor shape, so a generated theorem discharges its hypothesis by
-`rfl` against the *generated* definition: change the field name in
-`Autoform/Generated/…` and the `rfl` fails. -/
+argument list, at every fuel budget of at least four.
+
+Stated for an arbitrary `Func` whose body has the accessor shape, so a generated theorem
+discharges both hypotheses by `rfl` against the *generated* definition: change the field
+name in `Autoform/Generated/…` and the `rfl` fails.
+
+`hp : fn.params = []` is not decoration. If a parameter were also called `self` it would
+shadow the receiver in `Env`, and the theorem would be false — the hypothesis is the
+honest way to say the proof depends on that not happening. -/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
-    (r : Ref) (args : List Val) :
-    applyFunc ctx (n + 3) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
+    (hp : fn.params = []) (r : Ref) (args : List Val) :
+    applyFunc ctx (n + 4) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  rw [hb]
-  simp [execStmt, evalExpr, Env.set, Env.get, fieldOf]
-  split <;> simp_all
-  split <;> simp_all
-  split <;> simp_all
+  rw [hb, hp]
+  simp only [execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  rcases hgr : h.get r with _ | o
+  · simp [hgr]
+  · rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;> simp [hgr, hf, hc]
+    · simp [hgr, hf]
 
 /-! ## 4. Open obligations
 

@@ -639,7 +639,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           callee.flatMap(asField) match {
             case Some((recv, m)) =>
               ujson.Obj("k" -> "mcall", "recv" -> expr(recv), "m" -> m, "args" -> exprs(args))
-            case None => boundMethodCall(c, callee, args).getOrElse {
+            // Only a call the frontend left *unnamed* can be one of these; a named call
+            // already says what it invokes, and rerouting it on a name coincidence would
+            // be a guess.
+            case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
+              .getOrElse {
               // A call with no callee name is not a call we can emit. `Expr.call` is *by
               // name*; there is no "apply this value", so `f(x)(y)` — a callee that is
               // itself computed — has no Core form. Emitting `call ""` (as this did) was

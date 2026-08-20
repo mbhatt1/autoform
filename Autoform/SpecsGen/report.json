@@ -188,7 +188,7 @@
  },
  "vacuity_rate_pct": 16.8,
  "emitted": 89,
- "proved": 72,
+ "proved": 73,
  "open_obligations": 89,
  "build_clean": true,
  "by_family": {
@@ -244,7 +244,7 @@
    "candidates": 35,
    "refuted": 22,
    "vacuous": 2,
-   "proved": 10
+   "proved": 11
   },
   "determinism": {
    "candidates": 46,
@@ -256,7 +256,7 @@
    "candidates": 3,
    "refuted": 0,
    "vacuous": 0,
-   "proved": 2
+   "proved": 3
   },
   "commutes": {
    "candidates": 20,
@@ -268,7 +268,7 @@
    "candidates": 97,
    "refuted": 95,
    "vacuous": 0,
-   "proved": 2
+   "proved": 1
   },
   "raises": {
    "candidates": 1,
@@ -653,9 +653,9 @@
    "subject": "cachetools/__init__.py:<module>._DefaultSize.pop",
    "kind": "law",
    "domain": 4,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": {
     "holds": true,
     "domain": 4,
@@ -789,9 +789,9 @@
    "subject": "cachetools/__init__.py:<module>._DefaultSize.pop",
    "kind": "law",
    "domain": 8,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": {
     "holds": true,
     "domain": 8,
@@ -819,9 +819,9 @@
    "subject": "cachetools/__init__.py:<module>._DefaultSize.pop",
    "kind": "universal",
    "domain": 0,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": null,
    "note": "constant on every input, at every fuel budget \u2265 8"
   },
@@ -3147,9 +3147,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.currsize",
    "kind": "law",
    "domain": 8,
-   "status": "proved",
-   "reason": "",
-   "proved": true,
+   "status": "unproved",
+   "reason": "no proof found by the generated portfolio",
+   "proved": false,
    "checked": {
     "holds": true,
     "domain": 8,
@@ -3232,9 +3232,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.currsize",
    "kind": "law",
    "domain": 8,
-   "status": "proved",
-   "reason": "",
-   "proved": true,
+   "status": "unproved",
+   "reason": "no proof found by the generated portfolio",
+   "proved": false,
    "checked": {
     "holds": true,
     "domain": 8,

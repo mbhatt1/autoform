@@ -10,7 +10,12 @@ elaborate; the worst case is wasted time.
 
 Backends, selected by AUTOFORM_NEURAL_BACKEND:
   "ollama" (default) — a locally running model. No API key, no egress beyond localhost.
-  "openai"           — the OpenAI API. Requires OPENAI_API_KEY *in the environment*.
+  "openai"           — the OpenAI API.    Requires OPENAI_API_KEY    *in the environment*.
+  "anthropic"        — the Anthropic API. Requires ANTHROPIC_API_KEY *in the environment*
+                       and the `anthropic` SDK importable by the interpreter that runs
+                       this script (on macOS, mixed arm64/x86_64 Pythons will each need
+                       their own install — the failure is a dlopen arch mismatch, not a
+                       missing package).
 
 The key is never read from a file and never written to one. Do not add it to the repo:
 this project is public, and a committed key is a credential leak, not a configuration
@@ -58,6 +63,38 @@ def ask_ollama(prompt: str) -> str:
         return json.loads(r.read().decode()).get("response", "")
 
 
+def ask_anthropic(prompt: str) -> str:
+    # Official SDK rather than raw HTTP: it owns retries, timeouts and the
+    # thinking-block shape, none of which are worth reimplementing here.
+    # Imported lazily so the ollama backend keeps working without it installed.
+    try:
+        import anthropic
+    except ImportError as e:
+        raise RuntimeError("anthropic SDK not importable: %s (pip install anthropic)" % e) from None
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise RuntimeError("ANTHROPIC_API_KEY is not set in the environment")
+
+    client = anthropic.Anthropic()
+    # Thinking is ON BY DEFAULT on Claude Opus 5, and max_tokens caps thinking
+    # *plus* response text — a tight budget truncates mid-proof. Hence 16000
+    # rather than the few hundred tokens the tactic scripts themselves need.
+    #
+    # No `temperature`: sampling parameters are rejected (400) on this model.
+    # Variety across candidates comes from adaptive thinking, not sampling.
+    msg = client.messages.create(
+        model=os.environ.get("AUTOFORM_NEURAL_MODEL", "claude-opus-5"),
+        max_tokens=16000,
+        output_config={"effort": os.environ.get("AUTOFORM_NEURAL_EFFORT", "high")},
+        messages=[{"role": "user", "content": prompt}],
+    )
+    # A safety decline arrives as a normal 200 with stop_reason "refusal" and
+    # possibly empty content — check before indexing, or this raises IndexError.
+    if msg.stop_reason == "refusal":
+        cat = getattr(msg.stop_details, "category", None)
+        raise RuntimeError("declined by safety classifier (category=%s)" % cat)
+    return "".join(b.text for b in msg.content if b.type == "text")
+
+
 def ask_openai(prompt: str) -> str:
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
@@ -94,7 +131,12 @@ def ask_openai(prompt: str) -> str:
 
 try:
     prompt = PROMPT.format(goal=goal)
-    text = ask_openai(prompt) if backend == "openai" else ask_ollama(prompt)
+    if backend == "anthropic":
+        text = ask_anthropic(prompt)
+    elif backend == "openai":
+        text = ask_openai(prompt)
+    else:
+        text = ask_ollama(prompt)
 except Exception as e:
     # Never fail the build on a proposer outage; the portfolio treats an empty
     # candidate list as "tier 3 produced nothing", which is the honest report.

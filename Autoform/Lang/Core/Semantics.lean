@@ -279,6 +279,34 @@ mathematical model where nothing overflows.
 @[simp] theorem applyBinop_py_modZero (x : Int) :
     applyBinop .python "%" (.int x) (.int 0) = .exn (.str "ZeroDivisionError") := rfl
 
+/-! ### Float equations, and the two that must not regress
+
+`Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
+directions are pinned here, so that replacing `Fl.eqv` with structural bit equality — or
+with `DecidableEq Fl`, which is derived and therefore always in scope — fails the build
+rather than the oracle. This is the executable form of `Float.lean`'s
+`float_beq_is_not_bit_equality`. -/
+
+/-- **NaN is not equal to itself**, even though the two bit patterns are identical. -/
+@[simp] theorem beq_float_nan_self :
+    Val.beq (.float (Fl.nan Format.binary64)) (.float (Fl.nan Format.binary64)) = false := by
+  decide
+
+/-- **`-0.0` equals `+0.0`**, even though the two bit patterns differ. -/
+@[simp] theorem beq_float_negzero :
+    Val.beq (.float (Fl.zero Format.binary64 true))
+            (.float (Fl.zero Format.binary64 false)) = true := by
+  decide
+
+/-- ...and they really are different bit patterns, so the theorem above has content. -/
+theorem float_negzero_bits_differ :
+    (Fl.zero Format.binary64 true).bits ≠ (Fl.zero Format.binary64 false).bits := by
+  decide
+
+/-- `-0.0` is false, like `0.0`. -/
+@[simp] theorem truthy_float_negzero :
+    Val.truthy (.float (Fl.zero Format.binary64 true)) = false := by decide
+
 /-- Representability under the 32-bit signed C configuration. -/
 abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 
@@ -325,6 +353,12 @@ result is representable. `-INT_MIN` is precisely where it does not. -/
     applyUnop .cLike "-" (.int x) = .val (.int (-x)) := by
   simp [applyUnop, numToE, Dialect.toNumConfig, NumConfig.neg, NumConfig.finish,
         NumConfig.c32Wrapv, NumConfig.c32, h]
+
+/-- Unary minus on a float is a sign flip, in every dialect — no rounding, and correct on
+`-0.0` and NaN, where "subtract from zero" would not be. -/
+@[simp] theorem applyUnop_float_neg (d : Dialect) (f : Fl) :
+    applyUnop d "-" (.float f) = .val (.float f.neg) := by cases d <;> rfl
+
 
 /-- Membership test. -/
 def valIn (x c : Val) : EResult :=
