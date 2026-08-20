@@ -1727,3 +1727,53 @@ that quietly absorbs disagreements is laundering. This one is counted.
 are compared. The rest are INCONCLUSIVE. Reach is the binding constraint, not agreement,
 and a conformance rate quoted without its coverage is exactly the metric shape §17, §30
 and §31 keep catching.
+
+## §34 — Correction to §33: I made the same inferential error twice
+
+§31 attributed five conformance divergences to `_HashedTuple` and Core's lack of builtin
+inheritance. §33 "corrected" that, saying all five were mutation contamination. **§33 was
+an over-correction, and it was reached by exactly the reasoning §33 itself condemned.**
+
+The evidence offered for §33 was that `f_..._DefaultSize_pop` appears in
+`mutation-Cachetools.json`'s `decls` list. That establishes `_DefaultSize.pop` *was being
+mutated*. It does not establish that it *caused those divergences* — the identical
+"true fact adjacent to the failure" error §33 was written to record.
+
+Settled first-hand rather than by agent report. `hashkey` is **not** in the mutation
+`decls` list and its body is untouched by the live mutant, so it can be evaluated even
+with the gate running:
+
+```
+Lean:    hashkey (tuple [int 0])  =  Val.ref 0          -- an opaque reference
+CPython: hashkey((0,))            =  ((0,),)            -- type _HashedTuple
+         isinstance(r, tuple)     =  True
+         r == ((0,),)             =  True
+```
+
+So the `_HashedTuple` divergence is **real, and independent of mutation**. §31 was right.
+
+And the contamination is *also* real — in the current tree
+`_DefaultSize.__getitem__` evaluates to `int 1` where the pristine body returns `int 0`,
+because that decl is live-mutated right now.
+
+Both are true because they are **different runs**. Two agents each reported "5
+divergences" from separate invocations at separate times, one against a pristine subject
+in an isolated copy and one against the main repo mid-mutation. Neither was lying and
+neither was wrong about its own run; the error was mine, in assuming two reports of the
+same *count* were reports of the same *event*.
+
+The standing rule needs a clause. "The last divergence was the apparatus" (§27) is a
+prior, not a verdict — and applying it reflexively produced a wrong correction to a right
+finding. A report is evidence about the run that produced it, and two runs are not
+comparable unless something ties them together. `conformance.json` now carries
+`measurement_basis`, `build_stable` and `mutation_in_progress` precisely so that a
+future comparison can check whether it is entitled to compare.
+
+### Standing hazard while agents run concurrently
+
+`Autoform/Generated/Cachetools.lean` currently has **238** functions while
+`ast-Cachetools.json` has **208**: a concurrent pipeline re-rendered the module from an
+AST that is not the checked-in one, three separate times. Any `cachetools` conformance or
+ledger number produced right now describes a build that does not correspond to the
+committed AST. `scripts/check_docs.py` reports this as STALE and should keep failing
+until the module is re-rendered from the AST and both are committed together.
