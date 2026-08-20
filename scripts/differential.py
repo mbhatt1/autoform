@@ -910,7 +910,25 @@ def main():
               "inconclusive": 0, "rate": "n/a", "by_origin": {},
               "skipped": {k: v for k, v in stats.items() if k.startswith("skip")},
               "test_runs": stats["test_runs"], "divergence_detail": [],
-              "unencodable_reasons": stats.get("unencodable_reasons", {})}
+              "unencodable_reasons": stats.get("unencodable_reasons", {}),
+              "no_instance_detail": stats.get("no_instance_detail", {}),
+              "param_mismatch_detail": stats.get("param_mismatch_detail", {}),
+              "coverage": {
+                  # `covered_metric` names the field a coverage-bounded claim should
+                  # read. `compared` is the strong one: functions with at least one
+                  # case the oracle actually adjudicated. `exercised` merely means a
+                  # case was built, which an inconclusive outcome does not vindicate.
+                  "population": len(funcs),
+                  "population_kind": "functions in %s" % os.path.basename(ast_path),
+                  "hole_free": len(holefree),
+                  "exercised": len(set(c["name"] for c in cases)),
+                  "compared": 0,
+                  "covered_metric": "compared",
+                  "compared_fraction": 0.0,
+                  "exercised_fraction": (len(set(c["name"] for c in cases))
+                                         / len(funcs)) if funcs else 0.0,
+                  "compared_fraction_of_hole_free": 0.0,
+                  "by_status": {}, "status_counts": {}}}
 
     if not cases:
         print("no comparable cases in this corpus")
@@ -1039,6 +1057,7 @@ def main():
               % (len(got), len(cases)))
 
     agree = diverge = incon = 0
+    compared_fns = set()          # functions the oracle actually adjudicated
     incon_detail: dict = {}
     per_origin = {}
     for i, c in enumerate(cases):
@@ -1097,6 +1116,7 @@ def main():
             k = "%s: %s" % (c["name"], undecidable)
             incon_detail[k] = incon_detail.get(k, 0) + 1
             continue
+        compared_fns.add(c["name"])
         if ok:
             agree += 1; bucket["agree"] += 1
         else:
@@ -1109,12 +1129,41 @@ def main():
 
     total = agree + diverge
     rate = "%d%%" % (100 * agree // total) if total else "n/a"
+    # ---- coverage, as a first-class output: which functions the oracle actually
+    # adjudicated, which it merely touched, and why the rest were out of reach.
+    status = {}
+    for f in funcs:
+        status[f["name"]] = ("not-translated-fully (holes): untestable until translated"
+                             if has_hole(f["body"]) else "hole-free, no case built")
+    for c in cases:
+        status[c["name"]] = "cases built, all inconclusive"
+    for n in compared_fns:
+        status[n] = "compared"
+    for n, why in stats.get("no_instance_detail", {}).items():
+        for f in funcs:
+            if f["name"].endswith("." + n) and status.get(f["name"], "").startswith(
+                    "hole-free"):
+                status[f["name"]] = "hole-free, no case built: " + why
+    counts = {}
+    for v in status.values():
+        k = v.split(":")[0]
+        counts[k] = counts.get(k, 0) + 1
+    cov = result["coverage"]
+    cov["compared"] = len(compared_fns)
+    cov["compared_fraction"] = len(compared_fns) / len(funcs) if funcs else 0.0
+    cov["compared_fraction_of_hole_free"] = (len(compared_fns) / len(holefree)
+                                             if holefree else 0.0)
+    cov["by_status"] = status
+    cov["status_counts"] = counts
     result["inconclusive_detail"] = incon_detail
     result.update(agree=agree, total=total, divergences=diverge, inconclusive=incon,
                   rate=rate, by_origin=per_origin)
     print("\nmodule %s (%s, %s)" % (module_tag, os.path.abspath(src_root), runtime))
-    print("functions: %d total, %d hole-free, %d actually exercised"
-          % (len(funcs), len(holefree), result["functions_covered"]))
+    print("functions: %d total, %d hole-free, %d exercised, %d COMPARED (%.0f%% of "
+          "all, %.0f%% of hole-free)"
+          % (len(funcs), len(holefree), result["functions_covered"],
+             len(compared_fns), 100 * result["coverage"]["compared_fraction"],
+             100 * result["coverage"]["compared_fraction_of_hole_free"]))
     print("conformance: %d/%d agree (%s) vs %s, %d divergences, %d INCONCLUSIVE "
           "(hole / outOfFuel / unrepresentable)" % (agree, total, rate, runtime,
                                                     diverge, incon))

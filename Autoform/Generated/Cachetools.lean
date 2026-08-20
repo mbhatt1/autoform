@@ -299,7 +299,7 @@ def f_cachetools___init___py__module__Cache_getsizeof : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.getsizeof"
   , params := ["value"]
   , body := (.seq
-            .skip
+            (.expr (.lit (.str "\"\"Return the size of a cache element's value.\"\"")))
             (.ret (.lit (.int 1)))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/

@@ -509,6 +509,32 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
+/-! ### Name-resolution facts
+
+`Ctx.resolve` falls back to a unique-suffix match, and `Ctx.resolveMethod` to a
+class-qualified one. These are the six suffix tests the interpreter performs while running
+`methodkey`, discharged once so the evaluation proofs below do not have to reduce string
+operations inline. -/
+
+private theorem ew_hashkey_hashkey :
+    "cachetools/keys.py:<module>.hashkey".endsWith ".hashkey" = true := by
+  simp +decide [String.endsWith]
+private theorem ew_methodkey_hashkey :
+    "cachetools/keys.py:<module>.methodkey".endsWith ".hashkey" = false := by
+  simp +decide [String.endsWith]
+private theorem ew_hashkey_htinit :
+    "cachetools/keys.py:<module>.hashkey".endsWith "._HashedTuple.__init__" = false := by
+  simp +decide [String.endsWith]
+private theorem ew_methodkey_htinit :
+    "cachetools/keys.py:<module>.methodkey".endsWith "._HashedTuple.__init__" = false := by
+  simp +decide [String.endsWith]
+private theorem ew_hashkey_init :
+    "cachetools/keys.py:<module>.hashkey".endsWith ".__init__" = false := by
+  simp +decide [String.endsWith]
+private theorem ew_methodkey_init :
+    "cachetools/keys.py:<module>.methodkey".endsWith ".__init__" = false := by
+  simp +decide [String.endsWith]
+
 /-! ### Satisfiability first
 
 By `refinesUnder_of_unsatisfiable`, a contract-relative theorem says nothing until its
@@ -604,11 +630,20 @@ theorem methodkey_refinesUnder_value :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+  simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, String.endsWith, Env.set, Env.get,
-    Val.truthy, Heap.alloc, hvf]
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
+    Val.truthy, Heap.alloc, hvf,
+    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
+    ew_hashkey_init, ew_methodkey_init]
+  try simp +decide (maxSteps := 4000000) [List.filter_cons, List.filter_nil, runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get,
+    Val.truthy, Heap.alloc, hvf,
+    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
+    ew_hashkey_init, ew_methodkey_init]
 
 set_option maxHeartbeats 2000000 in
 /-- **A different contract proves a different theorem.**
@@ -669,7 +704,9 @@ theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgram (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
   simp +decide [runFunc, keysProgram, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy]
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,
+    ew_hashkey_hashkey, ew_methodkey_hashkey, ew_hashkey_htinit, ew_methodkey_htinit,
+    ew_hashkey_init, ew_methodkey_init]
 
 /-- **An unconstrained contract proves nothing.**
 

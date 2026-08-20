@@ -402,6 +402,16 @@ _ERR_POS_FIRST = re.compile(r'^(.*?):(\d+):(\d+):\s*error', re.M)
 _ERR_SEV_FIRST = re.compile(r'^error:\s*(\S.*?):(\d+):(\d+):', re.M)
 
 
+def all_error_lines(output):
+    """(basename, line) for every positional error in the build output, whatever file."""
+    out = []
+    for pat in (_ERR_POS_FIRST, _ERR_SEV_FIRST):
+        for m in pat.finditer(output):
+            path = m.group(1).strip()
+            out.append((os.path.basename(path), int(m.group(2))))
+    return out
+
+
 def error_lines(output, target_basename):
     """Line numbers carrying an error, restricted to the named file."""
     out = []
@@ -528,7 +538,7 @@ def main():
     print("baseline ok\n")
 
     stats = {t: {"killed": 0, "survived": 0, "survivors": []} for t in targets}
-    invalid, records, coarse = 0, [], 0
+    invalid, records, coarse, inconclusive = 0, [], 0, 0
 
     try:
         for i, mut in enumerate(mutants, 1):
@@ -543,6 +553,14 @@ def main():
             # these collapse to the original behaviour.
             errs = error_lines(out, base)
             spec_errs = errs if spec_path == path else error_lines(out, spec_base)
+            # Errors in files that are neither the mutated file nor the spec file are
+            # somebody else's problem: a broken dependency, a concurrent edit, a stale
+            # cache. Counting such a build failure as a "kill" would credit the theorem
+            # with catching a bug it never saw — the exact self-deception this gate
+            # exists to prevent — so those mutants are reported INCONCLUSIVE and left
+            # out of the score entirely.
+            foreign = [l for l in all_error_lines(out)
+                       if l[0] not in (base, spec_base)]
             hit_defs = {decl_at(decls, l).name for l in errs
                         if decl_at(decls, l) and decl_at(decls, l).kind in DEF_KINDS}
             hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
@@ -550,7 +568,14 @@ def main():
                         and decl_at(spec_decls, l).kind in THEOREM_KINDS}
 
             rec = mut.to_json()
-            if rc != 0 and hit_defs and not hit_thms:
+            if rc != 0 and not errs and not spec_errs and foreign:
+                rec["verdict"] = "inconclusive"
+                rec["foreign_errors"] = sorted({f for f, _ in foreign})
+                inconclusive += 1
+                print(f"[{i}/{len(mutants)}] INCONCL. {mut.op:22s} L{mut.line} ({mut.decl}) "
+                      f"— build broke in {', '.join(sorted({f for f, _ in foreign}))}, "
+                      f"nothing to attribute")
+            elif rc != 0 and hit_defs and not hit_thms:
                 # the mutation broke the definition itself: not a behavioural bug
                 rec["verdict"] = "invalid"
                 invalid += 1
@@ -597,7 +622,8 @@ def main():
               "spec_module": build_module,
               "decls": sorted({m.decl for m in mutants}),
               "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
-              "invalid": invalid, "theorems": {}, "mutants": records}
+              "invalid": invalid, "inconclusive": inconclusive,
+              "theorems": {}, "mutants": records}
     exit_code = 0
     for t in targets:
         k, s = stats[t]["killed"], stats[t]["survived"]
@@ -614,6 +640,10 @@ def main():
             exit_code = 1
     if invalid:
         print(f"({invalid} mutants discarded: they broke the definition's own typechecking)")
+    if inconclusive:
+        print(f"({inconclusive} mutants INCONCLUSIVE: the build failed in an unrelated "
+              f"file — concurrent edit or broken dependency — so no verdict is honest. "
+              f"They are excluded from the score, not counted as kills.)")
     if coarse:
         print(f"WARNING: {coarse} mutant(s) failed the build with no line attributable to "
               f"either file. Those were credited to EVERY theorem, so the per-theorem "

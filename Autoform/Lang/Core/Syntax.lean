@@ -23,12 +23,46 @@ cannot be proved to do anything at the hole. That is the point, not a limitation
 
 namespace Autoform.Core
 
-/-- Source-language dialect. Integer division and modulo differ across languages, so the
-transpiler records which one produced the program. -/
+/-- Source-language dialect.
+
+**Two constructors are not enough** and this is known (STRATEGY.md §29): six languages
+have been run through the pipeline and they disagree on integer width, string semantics,
+boolean-operator semantics, and equality. `cLike` currently means "32-bit truncating C"
+and is applied to Java, Go, JavaScript and TypeScript, which are none of those things.
+
+The fix is a constructor per language. The prerequisite — done here — is that *every*
+dialect-dependent decision is a named predicate below rather than a `match` scattered
+through the interpreter, so adding `java`/`go`/`javascript` means extending this table
+and nothing else. Every time this project added a dialect axis (integer division, unary
+minus, strings, now booleans and widths) it under-provisioned it; centralizing the
+decisions is what stops the next axis from touching 56 call sites. -/
 inductive Dialect where
   | python
   | cLike
   deriving Repr, Inhabited, DecidableEq
+
+namespace Dialect
+
+/-- Do `and`/`or` evaluate to one of their **operands** (Python, JavaScript) rather than
+to a boolean (C, Java, Go)? `0 and 5` is `0` in Python and `1` in C. -/
+def boolOpsAreValues : Dialect → Bool
+  | .python => true
+  | .cLike  => false
+
+/-- Are strings **values** with content equality and concatenation (Python, Java, Go,
+JavaScript), or pointers with address semantics (C)? Under pointer semantics `+`, `<`,
+`>` and `==` on strings are holes rather than the content operations. -/
+def stringsAreValues : Dialect → Bool
+  | .python => true
+  | .cLike  => false
+
+/-- Does comparing an integer against a float compare **exactly** (Python: `10**23 ==
+1e23` is `False`), or promote the integer to a double first (C)? -/
+def comparesIntFloatExactly : Dialect → Bool
+  | .python => true
+  | .cLike  => false
+
+end Dialect
 
 /-- Float configuration implied by a `Core.Dialect`. `cLike` gets `cDouble`, matching what
 the oracle measures on x86-64 (SSE2, `FLT_EVAL_METHOD = 0`); switch it to
