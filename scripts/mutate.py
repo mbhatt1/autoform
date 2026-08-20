@@ -235,6 +235,23 @@ AST_BINOP_SWAPS = {
 }
 AST_BINOP = re.compile(r'(\.binop\s+")([^"]+)(")')
 AST_UNOP = re.compile(r'(\.unop\s+")([^"]+)(")')
+
+# The generated modules are pretty-printed, so a `.binop` whose arguments are long is
+# emitted with the operator string on its OWN line:
+#
+#     (.binop
+#       "||"
+#       (.binop "==" (.name "rhs") (.lit (.int 0)))
+#       ...)
+#
+# The single-line patterns above cannot see that operator at all, so before this the
+# top-level `||` of V8's `SignedMod32` guard — precisely the operator the documented
+# contract is about — generated no mutant, and the gate scored 100% while never having
+# attacked it. A blind operator is silence reading as success. `AST_OP_ALONE` matches
+# such a continuation line, and it is only applied when the *previous* non-blank line
+# ends in `.binop`/`.unop`, so it cannot fire on an ordinary string literal.
+AST_OP_ALONE = re.compile(r'^(\s*")([^"]+)(")\s*$')
+AST_OP_HEAD = re.compile(r'\.(binop|unop)\s*$')
 AST_UNOP_SWAPS = {"-": "+", "!": "-", "~": "-"}
 
 # `.inOp neg` / `.isOp neg` — the negation flag. Flipping it inverts every membership or
@@ -315,6 +332,19 @@ def gen_mutants_generated(lines, decls):
                 nw = AST_BINOP_SWAPS.get(m.group(2))
                 if nw:
                     sub_at(m, m.group(1) + nw + m.group(3), f"ast-binop:{m.group(2)}->{nw}")
+            # operator string on a continuation line of a pretty-printed `.binop`/`.unop`
+            m = AST_OP_ALONE.match(raw.rstrip("\n"))
+            if m:
+                prev = ln - 1
+                while prev >= d.start and not lines[prev - 1].strip():
+                    prev -= 1
+                head = AST_OP_HEAD.search(lines[prev - 1].rstrip()) if prev >= d.start else None
+                if head:
+                    swaps = AST_BINOP_SWAPS if head.group(1) == "binop" else AST_UNOP_SWAPS
+                    nw = swaps.get(m.group(2))
+                    if nw:
+                        cand.append((m.group(1) + nw + m.group(3) + "\n",
+                                     f"ast-{head.group(1)}:{m.group(2)}->{nw}"))
             for m in AST_UNOP.finditer(raw):
                 nw = AST_UNOP_SWAPS.get(m.group(2))
                 if nw:
@@ -329,7 +359,13 @@ def gen_mutants_generated(lines, decls):
             for m in AST_INT.finditer(raw):
                 v = int(m.group(1))
                 for nv in (v + 1, v - 1):
-                    sub_at(m, f"(.int {nv})", f"ast-int:{v}->{nv}")
+                    # `(.int -1)` is a parse error in Lean, so emitting it produced a
+                    # mutant that was scored INVALID ("does not typecheck") when in fact
+                    # the operator was malformed. Every off-by-one that crossed zero was
+                    # being thrown away that way — a whole class of mutants silently
+                    # never tested. Negative literals are parenthesised.
+                    lit = f"({nv})" if nv < 0 else f"{nv}"
+                    sub_at(m, f"(.int {lit})", f"ast-int:{v}->{nv}")
             for m in AST_BOOL.finditer(raw):
                 nw = "false" if m.group(1) == "true" else "true"
                 sub_at(m, f"(.bool {nw})", f"ast-bool:{m.group(1)}->{nw}")
@@ -541,11 +577,26 @@ def main():
     if rc != 0:
         print("BASELINE FAILS TO BUILD -- fix the file first.")
         print(out[-2000:])
+        # A gate that cannot run must leave a record saying so. Returning with no JSON
+        # is indistinguishable, downstream, from a gate that was never asked to run, and
+        # a missing artifact reads as "nothing to report" rather than "the subject does
+        # not compile". The report is written with an explicit failure status and no
+        # theorem scores at all, so nothing can mistake it for evidence.
+        with open(args.json_path, "w", encoding="utf-8") as f:
+            json.dump({"file": path, "module": args.module,
+                       "spec_file": spec_path if spec_path != path else None,
+                       "spec_module": build_module,
+                       "status": "BASELINE_FAILED",
+                       "reason": "the module under test does not build before any "
+                                 "mutation is applied; no mutation verdict is possible",
+                       "build_tail": out[-4000:],
+                       "theorems": {}, "mutants": []}, f, indent=2)
+        print(f"wrote {os.path.abspath(args.json_path)} (status BASELINE_FAILED)")
         return 3
     print("baseline ok\n")
 
     stats = {t: {"killed": 0, "survived": 0, "survivors": []} for t in targets}
-    invalid, records, coarse, inconclusive = 0, [], 0, 0
+    invalid, records, coarse, inconclusive, pinned = 0, [], 0, 0, 0
 
     try:
         for i, mut in enumerate(mutants, 1):
@@ -581,6 +632,11 @@ def main():
             hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
                         if decl_at(spec_decls, l)
                         and decl_at(spec_decls, l).kind in THEOREM_KINDS}
+            # An error in the spec file that lands on no theorem is (almost always) a
+            # `#guard_msgs` pin: the mutant WAS caught, but not by a theorem. Crediting it
+            # to every theorem would be the coarse fallback wearing a disguise, so it is
+            # recorded separately and changes no theorem's score.
+            pin_only = bool(spec_errs) and not hit_thms
 
             rec = mut.to_json()
             if rc != 0 and not errs and not spec_errs and foreign:
@@ -599,6 +655,9 @@ def main():
             else:
                 rec["verdict"] = {}
                 rec["timeout"] = timed_out
+                if pin_only:
+                    rec["caught_by_pins"] = True
+                    pinned += 1
                 if rc != 0 and not errs and not spec_errs:
                     coarse += 1
                     rec["attribution"] = "coarse"
@@ -633,6 +692,7 @@ def main():
     # attributes G4 (specification non-vacuity) by this field, and the claim being supported
     # is a claim about the subject of the mutations.
     report = {"file": path, "module": args.module, "seed": args.seed,
+              "status": "OK",
               "operators": "generated-ast" if generated else "lean-def",
               "spec_file": spec_path if spec_path != path else None,
               "spec_module": build_module,
@@ -687,7 +747,12 @@ def main():
         print(f"WARNING: {coarse} mutant(s) failed the build with no line attributable to "
               f"either file. Those were credited to EVERY theorem, so the per-theorem "
               f"breakdown for them is not trustworthy — see STRATEGY.md 14's caveat.")
+    if pinned:
+        print(f"({pinned} mutant(s) were caught by a `#guard_msgs` pin rather than by any "
+              f"theorem. Pins are real detection, but they are not proofs, so they are "
+              f"reported here and credited to NO theorem's score.)")
     report["coarse_attributions"] = coarse
+    report["caught_by_pins_only"] = pinned
 
     with open(args.json_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
