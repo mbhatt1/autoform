@@ -16,9 +16,13 @@ Three independent checks, each of which can fail the build:
      reported as a `sorry`.  The Core semantics is *claimed* to be free of all of
      these; this verifies the claim instead of restating it.
 
-  3. KERNEL RECHECK -- `lean4checker` re-verifies the .olean files with an independent
-     kernel.  If it is not installed we say so, loudly, as an UNVERIFIED gap.  A gap
-     that is reported is a gap; a gap that is skipped silently is a lie.
+  3. KERNEL RECHECK -- `leanchecker` (shipped with the Lean toolchain since v4.28.0;
+     formerly the standalone `lean4checker`) replays the compiled `.olean`s through the
+     kernel again, starting from an empty environment (`--fresh`).  This catches
+     environment hacking and any `.olean` that does not correspond to a
+     kernel-accepted derivation.  If the binary is genuinely absent we say so, loudly,
+     as an UNVERIFIED gap.  A gap that is reported is a gap; a gap that is skipped
+     silently is a lie.
 
 Outputs `audit.json` plus a human summary.  Exits non-zero if any trusted-code leak is
 found, so it can gate CI.
@@ -289,41 +293,101 @@ def source_sweep() -> dict:
 # 3. lean4checker
 # --------------------------------------------------------------------------- #
 
-def lean4checker() -> dict:
-    """Externally re-verify the .olean files, or report the gap honestly."""
-    exe = shutil.which("lean4checker", path=elan_env()["PATH"])
-    if exe is None:
-        local = REPO / ".lake" / "packages" / "lean4checker"
-        if local.is_dir():
-            cand = local / ".lake" / "build" / "bin" / "lean4checker"
-            if cand.exists():
-                exe = str(cand)
+def _leanchecker_exe() -> str | None:
+    """Locate `leanchecker`.
+
+    Since Lean v4.28.0 the former standalone `lean4checker` is part of the toolchain
+    and ships as `leanchecker` in every elan toolchain, so no separate build is
+    needed.  Order: $LEANCHECKER, PATH (with elan's bin prepended), the active
+    toolchain's bin directory, then a legacy locally-built `lean4checker`.
+    """
+    override = os.environ.get("LEANCHECKER")
+    if override:
+        return override if Path(override).exists() else None
+
+    env = elan_env()
+    exe = shutil.which("leanchecker", path=env["PATH"])
+    if exe:
+        return exe
+
+    # elan installs toolchains under ~/.elan/toolchains/<name>/bin.
+    try:
+        toolchain = (REPO / "lean-toolchain").read_text().strip()
+    except OSError:
+        toolchain = ""
+    if toolchain:
+        cand = (Path.home() / ".elan" / "toolchains"
+                / toolchain.replace("/", "--").replace(":", "---") / "bin" / "leanchecker")
+        if cand.exists():
+            return str(cand)
+
+    # Legacy: a from-source build of the deprecated standalone repo.
+    exe = shutil.which("lean4checker", path=env["PATH"])
+    if exe:
+        return exe
+    for cand in (REPO / ".lake" / "packages" / "lean4checker" / ".lake" / "build" / "bin" / "lean4checker",):
+        if cand.exists():
+            return str(cand)
+    return None
+
+
+def lean4checker(fresh: bool = True) -> dict:
+    """Externally re-verify the .olean files, or report the gap honestly.
+
+    We invoke it through `lake env` so that LEAN_PATH covers this package *and* its
+    dependencies' build directories.
+
+    `--fresh` replays every constant -- imported ones included -- into an empty
+    environment.  That is the mode we rely on: it is the one demonstrated to reject a
+    tampered `.olean` anywhere in the transitive import graph, at the cost of being
+    single-threaded (~1.5 min for `Autoform`).  Without `--fresh` the checker can
+    silently check almost nothing when the named module is a bare re-export list, which
+    is exactly the shape `Autoform.lean` has; see STRATEGY.md 19 on silent oracles.
+    """
+    exe = _leanchecker_exe()
     if exe is None:
         return {
             "status": "UNVERIFIED",
             "available": False,
             "detail": (
-                "lean4checker is NOT installed. The .olean files have therefore NOT been "
-                "re-verified by an independent kernel: everything below rests on the "
+                "leanchecker was not found. The .olean files have therefore NOT been "
+                "re-verified by an independent kernel run: everything below rests on the "
                 "elaborator's own kernel calls and on the assumption that the .oleans on "
                 "disk correspond to the source. This is STRATEGY.md Tier 4's open gap, "
-                "not a passing check. Install with: "
-                "git clone https://github.com/leanprover/lean4checker && "
-                "(cd lean4checker && lake build) -- it is not installed automatically "
-                "because it requires building against the exact toolchain."
+                "not a passing check. Since Lean v4.28.0 `leanchecker` ships with the "
+                "toolchain, so this normally means elan's bin directory is not on PATH; "
+                "otherwise set $LEANCHECKER to the binary."
             ),
         }
-    proc = subprocess.run(
-        [exe, "--fresh", "Autoform"],
-        cwd=str(REPO), env=elan_env(), capture_output=True, text=True, timeout=3600,
-    )
+
+    cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + ["Autoform"]
+    try:
+        proc = subprocess.run(
+            cmd, cwd=str(REPO), env=elan_env(),
+            capture_output=True, text=True, timeout=3600,
+        )
+    except FileNotFoundError as e:
+        return {"status": "ERROR", "available": True, "exe": exe,
+                "command": " ".join(cmd), "detail": f"could not run: {e}"}
+    except subprocess.TimeoutExpired:
+        return {"status": "ERROR", "available": True, "exe": exe,
+                "command": " ".join(cmd), "detail": "leanchecker timed out"}
+
     return {
-        "status": "PASS" if proc.returncode == 0 else "FAIL",
+        "status": "VERIFIED" if proc.returncode == 0 else "FAILED",
         "available": True,
         "exe": exe,
+        "mode": "fresh" if fresh else "module",
+        "command": " ".join(cmd),
         "returncode": proc.returncode,
         "stdout": proc.stdout[-4000:],
         "stderr": proc.stderr[-4000:],
+        "detail": (
+            "the kernel replayed every constant reachable from `Autoform` into a fresh "
+            "environment and accepted them all"
+            if proc.returncode == 0 else
+            "the independent kernel REJECTED the compiled environment"
+        ),
     }
 
 
@@ -337,7 +401,10 @@ def main() -> int:
     ap.add_argument("--skip-lean", action="store_true",
                     help="source sweep only (no lake invocation)")
     ap.add_argument("--strict", action="store_true",
-                    help="also fail on demonstration sorries and on a missing lean4checker")
+                    help="also fail on demonstration sorries and on a missing leanchecker")
+    ap.add_argument("--no-fresh", action="store_true",
+                    help="run leanchecker without --fresh (faster, weaker: it may check "
+                         "almost nothing for a re-export-only root module)")
     args = ap.parse_args()
 
     report: dict = {"repo": str(REPO)}
@@ -348,7 +415,8 @@ def main() -> int:
         if args.skip_lean else axiom_sweep()
     )
     report["lean4checker"] = (
-        {"status": "SKIPPED", "available": False} if args.skip_lean else lean4checker()
+        {"status": "SKIPPED", "available": False} if args.skip_lean
+        else lean4checker(fresh=not args.no_fresh)
     )
 
     ax = report["axiom_sweep"]
@@ -369,10 +437,12 @@ def main() -> int:
         failures.append("axiom sweep could not run: " + str(ax.get("error"))[:200])
     if real_src_leaks:
         failures.append(f"{len(real_src_leaks)} sorry/native_decide in source")
-    if l4c["status"] == "FAIL":
-        failures.append("lean4checker rejected the .oleans")
+    if l4c["status"] == "FAILED":
+        failures.append("leanchecker rejected the .oleans")
+    if l4c["status"] == "ERROR":
+        failures.append("leanchecker could not run: " + str(l4c.get("detail"))[:200])
     if args.strict and l4c["status"] == "UNVERIFIED":
-        failures.append("lean4checker unavailable (--strict)")
+        failures.append("leanchecker unavailable (--strict)")
 
     report["verdict"] = {"failures": failures, "pass": not failures}
 
@@ -426,15 +496,16 @@ def main() -> int:
         for f in src["core_findings"]:
             p(f"      {f['file']}:{f['line']} [{f['kind']}] {f['text'][:90]}")
     p("")
-    p(f"[3] LEAN4CHECKER  ({l4c['status']})")
-    if l4c["status"] == "UNVERIFIED":
-        p("    " + l4c["detail"])
+    p(f"[3] KERNEL RECHECK / leanchecker  ({l4c['status']})")
+    if l4c["status"] in ("UNVERIFIED", "ERROR"):
+        p("    " + str(l4c.get("detail")))
     elif l4c["status"] == "SKIPPED":
         p("    skipped (--skip-lean)")
     else:
-        p(f"    {l4c.get('exe')} -> returncode {l4c.get('returncode')}")
-        if l4c["status"] == "FAIL":
-            for line in (l4c.get("stderr") or "")[-1500:].splitlines():
+        p(f"    {l4c.get('command')}  -> returncode {l4c.get('returncode')}")
+        p("    " + str(l4c.get("detail")))
+        if l4c["status"] == "FAILED":
+            for line in ((l4c.get("stdout") or "") + (l4c.get("stderr") or ""))[-1500:].splitlines():
                 p("      " + line)
     p("")
     p("-" * 74)
@@ -445,7 +516,7 @@ def main() -> int:
     else:
         p("VERDICT: PASS (no trusted-code leak)")
         if l4c["status"] == "UNVERIFIED":
-            p("  caveat: kernel re-check UNVERIFIED (lean4checker absent)")
+            p("  caveat: kernel re-check UNVERIFIED (leanchecker absent)")
     p(f"wrote {args.output}")
     return 1 if failures else 0
 

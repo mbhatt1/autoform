@@ -122,11 +122,28 @@ doesn't match the runtime is theater — caught automatically rather than by ins
   invisible in the AST, so the ledger reports hole-free, call-closed, and dynamic-hole
   risk as three separate numbers.
 
+## Trust chain
+
+Every link is mechanically checked, and each check is a different kind of oracle:
+
+| link | oracle | status |
+|---|---|---|
+| semantics matches the real runtime | differential testing vs CPython / `cc` | 100% on all corpora |
+| specifications constrain behaviour | source-level mutation gate | 100%, HAS TEETH |
+| proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
+| `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
+| untranslated code is declared | hole counting + SACM assumptions | 102 holes, all named |
+
+`leanchecker` ships with the Lean toolchain (v4.28.0+) — `lean4checker` is deprecated and
+there is no Homebrew formula. **Use `--fresh`**: without it the checker can silently pass
+a root module that has only imports, which is exactly `Autoform.lean`'s shape.
+
 ## Not yet built
 
 Neural/SMT prover tiers, spec synthesis, boxed mutable containers (`Stmt.setIndex` is
-still an honest hole), `lean4checker` in the loop (the `.olean` files have never been
-independently re-verified).
+still an honest hole), cross-scope *writes* (`nonlocal`; reads and closures work), a
+modelled standard library (the 166 hole-free vs 45 call-closed gap is almost entirely
+uncalled stdlib).
 
 ## Dependencies
 

@@ -65,7 +65,8 @@ Reusable open-source pieces, by layer:
   proof states is cheap.
 - **Pantograph** — richer goal-level API, designed for ML agents.
 - **LeanDojo** — trace a whole repo, extract premises, replay tactics.
-- `lake` + `reservoir` for builds; `lean4checker` for external re-verification of `.olean`s;
+- `lake` + `reservoir` for builds; `leanchecker` (ships with the toolchain since v4.28.0;
+  the standalone `lean4checker` is deprecated) for external re-verification of `.olean`s;
   `#print axioms` to detect `sorryAx`/`Classical.choice`/`native_decide` leakage.
 
 ## 2. Architecture
@@ -82,7 +83,7 @@ Cartographer  Semanticist  Transpiler    Specifier      Prover        Auditor
    └────────────┴──────────────┴──────┬───────┴──────────────┴──────────────┘
                                       │
                        ORACLES (non-negotiable ground truth)
-             Lean kernel · lean4checker · differential fuzzing vs real runtime
+             Lean kernel · leanchecker --fresh · differential fuzzing vs real runtime
              · property-based tests · SMT countermodels · #print axioms
 ```
 
@@ -169,7 +170,7 @@ LLM-judged.**
 Independent agent that tries to break the result: hunts `sorry`, `axiom`, `unsafe`,
 `native_decide`, `@[implemented_by]` divergence, opaque holes, vacuous hypotheses,
 spec/implementation drift (does the theorem talk about the AST you actually ship?), and
-re-verifies all `.olean`s with `lean4checker` in a clean environment. Produces the
+re-verifies all `.olean`s with `leanchecker --fresh` in a clean environment. Produces the
 **trust ledger**.
 
 ## 3. The trust ledger (the actual product)
@@ -198,7 +199,7 @@ currently ships, and it's more valuable than a bigger green checkmark.
 ## 4. Sequencing (what to build in what order)
 
 **Phase 0 — Skeleton (weeks 1–3).** Lean repo + `lake`, REPL harness with pickled state,
-theorem/obligation database (SQLite), `#print axioms` + `lean4checker` gate in CI, trust
+theorem/obligation database (SQLite), `#print axioms` + `leanchecker` gate in CI, trust
 ledger renderer. No agents yet. Prove the plumbing on hand-written examples.
 
 **Phase 1 — Pick one narrow language.** *Recommendation: start with Rust via Aeneas*
@@ -312,7 +313,7 @@ Re-audited after CSLib, this is the full component list.
 | Proof-state interaction / search substrate | BUY | `leanprover-community/repl` (pickling), Pantograph |
 | Premise retrieval | BUY | ReProver/LeanDojo (Mathlib tail) + CSLibPremiseBench (CS goals) |
 | Agent orchestration | BUY | Claude Agent SDK or equivalent — **do not write an agent framework** |
-| Build, cache, kernel re-check | BUY | lake, Reservoir, `lean4checker`, `#print axioms` |
+| Build, cache, kernel re-check | BUY | lake, Reservoir, `leanchecker` (in-toolchain), `#print axioms` |
 | Attestation / findings format | BUY | in-toto/SLSA predicates, SARIF |
 | Sandboxed execution | BUY | containers / nsjail |
 
@@ -394,7 +395,7 @@ ecosystem is now good enough to do it:
   needs no MetaCoq analog, because `Lean.Environment` / `ConstantInfo` / `Lean.Meta` are
   first-class in-language. Mutating a definition, re-elaborating dependents, and checking
   whether the proof survives is an ordinary Lean program.
-- **Axiom/trust audit** — `#print axioms`, `lean4checker`, environment diffing: all
+- **Axiom/trust audit** — `#print axioms`, `leanchecker`, environment diffing: all
   in-language. Ledger evidence extraction becomes a Lean `Lake` script, not an external
   scraper parsing logs.
 - **`FVSpec`** (arXiv 2606.01008) — 11,039 real-world Python property-based tests scraped
@@ -597,7 +598,7 @@ The system produces *verifiable* code and proves nothing about it.
 
 ### Tier 4 — engineering
 
-No CI; `lean4checker` not in the loop; Cartographer scoring weights uncalibrated
+No CI; kernel re-check not in the loop; Cartographer scoring weights uncalibrated
 (operator dispatch inflates fan-out); build times dominated by Specimen/Plausible.
 
 ### If you do one thing next
@@ -665,9 +666,8 @@ yet trustworthy and should be refined by isolating theorems into separate module
   `sorry`/`partial`/`unsafe`/`native_decide`/`@[implemented_by]`/`@[extern]`, so the
   README's "total, no sorry" claim is now *checked* rather than asserted.
   Two honest findings: `Autoform/Harness/Audit.lean` uses `partial def transitiveDeps`
-  (the audit tool's own walker is unproven-terminating), and **`lean4checker` is not
-  installed**, so the `.olean` files have never been independently re-verified — Tier 4's
-  gap is still open and now says so out loud.
+  (the audit tool's own walker is unproven-terminating), and at the time **`lean4checker`
+  was not installed** — since closed, see §23.
 * `Autoform/Tactics/Portfolio.lean` implements the escalation ladder with the honesty
   guard that matters: a rung counts as success only if it closes the goal *and* the proof
   term passes `hasSorry`/`hasExprMVar` screening; on exhaustion it errors with a full
@@ -1001,3 +1001,110 @@ disagree with reality, mutation catches specifications that constrain nothing, a
 **proof catches operations that were never given a specification at all.** They are not
 redundant — each sees a failure mode the others are blind to, which is the argument for
 paying for all three.
+
+## 22. Tier 2 items 5 and 6
+
+### Item 6 — C strings are not Python strings
+
+`Val.str` served both, and `applyBinop` applied Python semantics to both. In C:
+
+* `+` on `char*` is **pointer arithmetic**, not concatenation.
+* `<` / `>` compare **addresses**, not contents.
+* `==` compares **addresses**, not contents — and `Val.beq` is structural, so this was
+  silently returning the Python answer for C programs.
+
+All three are now dialect-split: correct under `.python`, precise holes under `.cLike`
+(`str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`,
+`str:pointer-equality-not-modelled`). Third instance of the §12 pattern — the constructs
+that *look* identical across languages are the ones that mistranslate silently.
+
+### Item 5 — scoping: closures and function values
+
+Two additions:
+
+* `Expr.closure f` builds `Val.clos f ρ`, capturing the enclosing bindings **by value**.
+  `applyClosure` uses the captured bindings as the base environment, with parameters
+  shadowing them.
+* `Expr.name x` now falls back to the function table when `x` is not local, so a
+  module-level function referenced as a value resolves to `Val.fn x` instead of `unit`.
+  `Expr.call` dispatches through `Val.fn` / `Val.clos` held in variables.
+
+Together these make decorators, factories, callbacks and other higher-order code
+translatable rather than holed:
+
+```
+def make_adder(n): return inner     # inner(x) = x + n
+use() = apply2(make_adder(10), 5)   ==>  15
+```
+
+**What is deliberately NOT done, and why.** `nonlocal` *writes* remain a hole
+(`scope:nonlocal-write`). Capture is by value, so a closure cannot mutate a binding in its
+enclosing frame. Making that work requires variables to be shared mutable cells — every
+scope a heap frame, `Env` becoming a `Ref` — which is a correct design and a genuinely
+large refactor of the interpreter, and would require re-repairing the 74-theorem
+refinement layer. Global *rebinding* (`global x; x = 5`) is unsupported for the same
+reason.
+
+This is the honest boundary: reads across scopes work and are correct; writes across
+scopes are a hole. Implementing writes by copying values back would appear to work on
+simple cases and be silently wrong on aliased ones, which is the failure mode this project
+exists to prevent.
+
+### Revised Tier 2 status
+
+| item | status |
+|---|---|
+| 1. integer width | **closed** — including unary minus (§21) |
+| 2. short-circuit | **closed** |
+| 3. differential coverage | **closed** |
+| 4. heap / aliasing / mutation | **closed** |
+| 5. scoping | **closed for reads** — closures, function values, higher-order calls; cross-scope *writes* remain an explicit hole with a stated design for closing them |
+| 6. strings conflated | **closed** |
+
+## 23. Kernel re-verification — closed, and a trap avoided
+
+Tier 4's last open gap was that the `.olean` files had never been re-checked by an
+independent kernel. It is now closed, and the way it closed is instructive.
+
+**There was nothing to install.** `lean4checker` is deprecated: it was merged into the
+Lean repository and ships as **`leanchecker`** with every toolchain from v4.28.0. We are
+on v4.30.0-rc1, so it was already present at
+`~/.elan/toolchains/*/bin/leanchecker`. There is no Homebrew formula, and none is needed.
+
+```
+lake env leanchecker --fresh Autoform     exit 0,  ~92s,  status VERIFIED
+```
+
+### The trap: non-fresh mode can silently pass
+
+`leanchecker <Module>` without `--fresh` **can no-op on a module that has only imports and
+no declarations of its own** — which is exactly the shape of `Autoform.lean`. Demonstrated
+directly: a scratch `Bad` module with an env-hacked bogus declaration plus a `Root` module
+importing it — `leanchecker Root` exits 0 silently, while `leanchecker Bad` and
+`leanchecker --fresh Root` both reject it.
+
+So the naive invocation would have produced a confident VERIFIED that checked nothing.
+This is §19's lesson recurring at the very last link in the chain: **an oracle that
+silently passes is worse than no oracle.** The audit therefore uses `--fresh` by default
+and records *which mode ran* in `audit.json`, because the two are not equally strong.
+
+### Proof the checker actually rejects bad input
+
+Two independent demonstrations, since "exit 0" is exactly the shape a no-op takes:
+
+1. **Environment hacking** — `Environment.addDeclCore (doCheck := false)` installing
+   `bogusFalse : False := False`. The elaborator writes the `.olean` happily; `leanchecker`
+   exits 1 with `(kernel) declaration type mismatch`.
+2. **Tampering this project's own build tree** — a copy of `Autoform/Refine.olean`
+   recompiled with an injected bogus declaration. `leanchecker --fresh Autoform` exits 1
+   with `while replaying declaration 'Autoform.tamperedFalse': (kernel) declaration type
+   mismatch`. The untampered copy of the same scratch setup passes, so the failure is
+   caused by the tamper and not by the harness.
+
+Also verified: `LEANCHECKER=/usr/bin/false` → FAILED → VERDICT FAIL; a genuinely absent
+binary → UNVERIFIED (never a pass), and `--strict` turns that into a failure. CI now runs
+`audit_all.py --strict`, so a missing checker fails the build rather than quietly
+downgrading.
+
+Current audit state: **PASS**, axiom sweep clean over 1,696 declarations
+(`propext`, `Quot.sound`, `Classical.choice` only), kernel re-verification **VERIFIED**.

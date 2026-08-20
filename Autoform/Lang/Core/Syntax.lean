@@ -47,6 +47,9 @@ inductive Val where
   | ref   : Ref → Val
   /-- A function or method used as a value (`METHOD_REF`), or a class (`TYPE_REF`). -/
   | fn    : String → Val
+  /-- A closure: a function together with the bindings it captured. Capture is **by
+  value**, which is why `nonlocal` *writes* remain a hole — see `Semantics.lean`. -/
+  | clos  : String → List (String × Val) → Val
   deriving Repr, Inhabited
 
 /-- A heap object: its class and its mutable fields. -/
@@ -104,6 +107,9 @@ inductive Expr where
   | alloc  : String → List Expr → Expr
   /-- A function, method or class used as a value (`METHOD_REF` / `TYPE_REF`). -/
   | fnref  : String → Expr
+  /-- A function value that captures the enclosing scope: decorators, factories, and
+  nested functions that read outer variables. -/
+  | closure : String → Expr
   | listE  : List Expr → Expr
   | tupleE : List Expr → Expr
   | dictE  : List (Expr × Expr) → Expr

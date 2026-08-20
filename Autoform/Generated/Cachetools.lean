@@ -1981,7 +1981,7 @@ def f_cachetools___init___py__module__cached : Func :=
             (.seq
               (.assign "_wrapper" (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
               (.seq
-                (.assign "decorator" (.fnref "cachetools/__init__.py:<module>.cached.decorator"))
+                (.assign "decorator" (.closure "cachetools/__init__.py:<module>.cached.decorator"))
                 (.seq
                   .skip
                   (.seq
@@ -2002,7 +2002,7 @@ def f_cachetools___init___py__module__cached_decorator : Func :=
                   (.call "isinstance" [(.name "cache"), (.name "Cache")])
                   (.assign
                     "make_info"
-                    (.fnref
+                    (.closure
                       "cachetools/__init__.py:<module>.cached.decorator.make_info<redefined>0"))
                   (.ifte
                     (.call
@@ -2010,7 +2010,7 @@ def f_cachetools___init___py__module__cached_decorator : Func :=
                       [(.name "cache"), (.field (.field (.name "collections") "abc") "Mapping")])
                     (.assign
                       "make_info"
-                      (.fnref
+                      (.closure
                         "cachetools/__init__.py:<module>.cached.decorator.make_info<redefined>1"))
                     (.assign
                       "make_info"
@@ -2094,7 +2094,7 @@ def f_cachetools___init___py__module__cachedmethod : Func :=
               (.seq
                 (.assign
                   "decorator"
-                  (.fnref "cachetools/__init__.py:<module>.cachedmethod.decorator"))
+                  (.closure "cachetools/__init__.py:<module>.cachedmethod.decorator"))
                 (.seq
                   .skip
                   (.seq
@@ -2190,15 +2190,15 @@ def f_cachetools__cached_py__module___condition_info : Func :=
               (.seq
                 (.assign
                   "wrapper"
-                  (.fnref "cachetools/_cached.py:<module>._condition_info.wrapper"))
+                  (.closure "cachetools/_cached.py:<module>._condition_info.wrapper"))
                 (.seq
                   (.assign
                     "cache_clear"
-                    (.fnref "cachetools/_cached.py:<module>._condition_info.cache_clear"))
+                    (.closure "cachetools/_cached.py:<module>._condition_info.cache_clear"))
                   (.seq
                     (.assign
                       "cache_info"
-                      (.fnref "cachetools/_cached.py:<module>._condition_info.cache_info"))
+                      (.closure "cachetools/_cached.py:<module>._condition_info.cache_info"))
                     (.seq
                       (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                       (.seq
@@ -2220,7 +2220,7 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._condition_info.wrapper"
   , params := ["args", "kwargs"]
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               (.assign "k" (.call "key" [(.hole "op:starredUnpack")]))
               (.seq
@@ -2337,7 +2337,7 @@ def f_cachetools__cached_py__module___condition_info_cache_clear : Func :=
   { name := "cachetools/_cached.py:<module>._condition_info.cache_clear"
   , params := []
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2396,15 +2396,15 @@ def f_cachetools__cached_py__module___locked_info : Func :=
               (.assign "tmp0" (.lit (.int 0)))
               (.seq (.assign "hits" (.name "tmp0")) (.assign "misses" (.name "tmp0"))))
             (.seq
-              (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._locked_info.wrapper"))
+              (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._locked_info.wrapper"))
               (.seq
                 (.assign
                   "cache_clear"
-                  (.fnref "cachetools/_cached.py:<module>._locked_info.cache_clear"))
+                  (.closure "cachetools/_cached.py:<module>._locked_info.cache_clear"))
                 (.seq
                   (.assign
                     "cache_info"
-                    (.fnref "cachetools/_cached.py:<module>._locked_info.cache_info"))
+                    (.closure "cachetools/_cached.py:<module>._locked_info.cache_info"))
                   (.seq
                     (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                     (.seq
@@ -2420,7 +2420,7 @@ def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._locked_info.wrapper"
   , params := ["args", "kwargs"]
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2480,7 +2480,7 @@ def f_cachetools__cached_py__module___locked_info_cache_clear : Func :=
   { name := "cachetools/_cached.py:<module>._locked_info.cache_clear"
   , params := []
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2539,15 +2539,15 @@ def f_cachetools__cached_py__module___unlocked_info : Func :=
               (.assign "tmp0" (.lit (.int 0)))
               (.seq (.assign "hits" (.name "tmp0")) (.assign "misses" (.name "tmp0"))))
             (.seq
-              (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._unlocked_info.wrapper"))
+              (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._unlocked_info.wrapper"))
               (.seq
                 (.assign
                   "cache_clear"
-                  (.fnref "cachetools/_cached.py:<module>._unlocked_info.cache_clear"))
+                  (.closure "cachetools/_cached.py:<module>._unlocked_info.cache_clear"))
                 (.seq
                   (.assign
                     "cache_info"
-                    (.fnref "cachetools/_cached.py:<module>._unlocked_info.cache_info"))
+                    (.closure "cachetools/_cached.py:<module>._unlocked_info.cache_info"))
                   (.seq
                     (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                     (.seq
@@ -2561,7 +2561,7 @@ def f_cachetools__cached_py__module___unlocked_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._unlocked_info.wrapper"
   , params := ["args", "kwargs"]
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2595,7 +2595,7 @@ def f_cachetools__cached_py__module___unlocked_info_cache_clear : Func :=
   { name := "cachetools/_cached.py:<module>._unlocked_info.cache_clear"
   , params := []
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2623,18 +2623,18 @@ def f_cachetools__cached_py__module___uncached_info : Func :=
   , body := (.seq
             (.assign "misses" (.lit (.int 0)))
             (.seq
-              (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._uncached_info.wrapper"))
+              (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._uncached_info.wrapper"))
               (.seq
                 (.assign
                   "cache_clear"
-                  (.fnref "cachetools/_cached.py:<module>._uncached_info.cache_clear"))
+                  (.closure "cachetools/_cached.py:<module>._uncached_info.cache_clear"))
                 (.seq
                   (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                   (.seq
                     (.setField
                       (.name "wrapper")
                       "cache_info"
-                      (.fnref "cachetools/_cached.py:<module>._uncached_info.<lambda>1"))
+                      (.closure "cachetools/_cached.py:<module>._uncached_info.<lambda>1"))
                     (.seq (.ret (.name "wrapper")) (.seq .skip (.seq .skip .skip)))))))) }
 
 /-- `cachetools/_cached.py:<module>._uncached_info.wrapper`  (from `cachetools/_cached.py`) -/
@@ -2642,7 +2642,7 @@ def f_cachetools__cached_py__module___uncached_info_wrapper : Func :=
   { name := "cachetools/_cached.py:<module>._uncached_info.wrapper"
   , params := ["args", "kwargs"]
   , body := (.seq
-            (.hole "stmt:UNKNOWN:nonlocal")
+            (.hole "scope:nonlocal-write")
             (.seq
               .skip
               (.seq
@@ -2653,7 +2653,7 @@ def f_cachetools__cached_py__module___uncached_info_wrapper : Func :=
 def f_cachetools__cached_py__module___uncached_info_cache_clear : Func :=
   { name := "cachetools/_cached.py:<module>._uncached_info.cache_clear"
   , params := []
-  , body := (.seq (.hole "stmt:UNKNOWN:nonlocal") (.seq .skip (.assign "misses" (.lit (.int 0))))) }
+  , body := (.seq (.hole "scope:nonlocal-write") (.seq .skip (.assign "misses" (.lit (.int 0))))) }
 
 /-- `cachetools/_cached.py:<module>._uncached_info.<lambda>1`  (from `cachetools/_cached.py`) -/
 def f_cachetools__cached_py__module___uncached_info__lambda_1 : Func :=
@@ -2668,11 +2668,11 @@ def f_cachetools__cached_py__module___condition : Func :=
   , body := (.seq
             (.assign "pending" (.call "set" []))
             (.seq
-              (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._condition.wrapper"))
+              (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._condition.wrapper"))
               (.seq
                 (.assign
                   "cache_clear"
-                  (.fnref "cachetools/_cached.py:<module>._condition.cache_clear"))
+                  (.closure "cachetools/_cached.py:<module>._condition.cache_clear"))
                 (.seq
                   (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                   (.seq
@@ -2814,9 +2814,11 @@ def f_cachetools__cached_py__module___locked : Func :=
   { name := "cachetools/_cached.py:<module>._locked"
   , params := ["func", "cache", "key", "lock"]
   , body := (.seq
-            (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._locked.wrapper"))
+            (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._locked.wrapper"))
             (.seq
-              (.assign "cache_clear" (.fnref "cachetools/_cached.py:<module>._locked.cache_clear"))
+              (.assign
+                "cache_clear"
+                (.closure "cachetools/_cached.py:<module>._locked.cache_clear"))
               (.seq
                 (.setField (.name "wrapper") "cache_clear" (.name "cache_clear"))
                 (.seq (.ret (.name "wrapper")) (.seq .skip (.seq .skip .skip)))))) }
@@ -2897,12 +2899,12 @@ def f_cachetools__cached_py__module___unlocked : Func :=
   { name := "cachetools/_cached.py:<module>._unlocked"
   , params := ["func", "cache", "key"]
   , body := (.seq
-            (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._unlocked.wrapper"))
+            (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._unlocked.wrapper"))
             (.seq
               (.setField
                 (.name "wrapper")
                 "cache_clear"
-                (.fnref "cachetools/_cached.py:<module>._unlocked.<lambda>3"))
+                (.closure "cachetools/_cached.py:<module>._unlocked.<lambda>3"))
               (.seq (.ret (.name "wrapper")) .skip))) }
 
 /-- `cachetools/_cached.py:<module>._unlocked.wrapper`  (from `cachetools/_cached.py`) -/
@@ -2939,7 +2941,7 @@ def f_cachetools__cached_py__module___uncached : Func :=
   { name := "cachetools/_cached.py:<module>._uncached"
   , params := ["func"]
   , body := (.seq
-            (.assign "wrapper" (.fnref "cachetools/_cached.py:<module>._uncached.wrapper"))
+            (.assign "wrapper" (.closure "cachetools/_cached.py:<module>._uncached.wrapper"))
             (.seq
               (.setField
                 (.name "wrapper")
@@ -3832,15 +3834,17 @@ def f_cachetools__cachedmethod_py__module___condition : Func :=
   , body := (.seq
             (.assign "pending" (.alloc "WeakKeyDictionary" []))
             (.seq
-              (.assign "wrapper" (.fnref "cachetools/_cachedmethod.py:<module>._condition.wrapper"))
+              (.assign
+                "wrapper"
+                (.closure "cachetools/_cachedmethod.py:<module>._condition.wrapper"))
               (.seq
                 (.assign
                   "cache_clear"
-                  (.fnref "cachetools/_cachedmethod.py:<module>._condition.cache_clear"))
+                  (.closure "cachetools/_cachedmethod.py:<module>._condition.cache_clear"))
                 (.seq
                   (.assign
                     "classmethod_wrapper"
-                    (.fnref "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"))
+                    (.closure "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"))
                   (.seq
                     (.seq
                       (.assign
@@ -4083,11 +4087,11 @@ def f_cachetools__cachedmethod_py__module___locked : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked"
   , params := ["method", "cache", "key", "lock"]
   , body := (.seq
-            (.assign "wrapper" (.fnref "cachetools/_cachedmethod.py:<module>._locked.wrapper"))
+            (.assign "wrapper" (.closure "cachetools/_cachedmethod.py:<module>._locked.wrapper"))
             (.seq
               (.assign
                 "cache_clear"
-                (.fnref "cachetools/_cachedmethod.py:<module>._locked.cache_clear"))
+                (.closure "cachetools/_cachedmethod.py:<module>._locked.cache_clear"))
               (.seq
                 (.seq
                   (.assign
@@ -4236,11 +4240,11 @@ def f_cachetools__cachedmethod_py__module___unlocked : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked"
   , params := ["method", "cache", "key"]
   , body := (.seq
-            (.assign "wrapper" (.fnref "cachetools/_cachedmethod.py:<module>._unlocked.wrapper"))
+            (.assign "wrapper" (.closure "cachetools/_cachedmethod.py:<module>._unlocked.wrapper"))
             (.seq
               (.assign
                 "cache_clear"
-                (.fnref "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"))
+                (.closure "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"))
               (.seq
                 (.seq
                   (.assign
@@ -4488,7 +4492,7 @@ def f_cachetools_func_py__module___cache : Func :=
   { name := "cachetools/func.py:<module>._cache"
   , params := ["cache", "maxsize", "typed"]
   , body := (.seq
-            (.assign "decorator" (.fnref "cachetools/func.py:<module>._cache.decorator"))
+            (.assign "decorator" (.closure "cachetools/func.py:<module>._cache.decorator"))
             (.seq (.ret (.name "decorator")) (.seq .skip (.seq .skip (.seq .skip .skip))))) }
 
 /-- `cachetools/func.py:<module>._cache.decorator`  (from `cachetools/func.py`) -/
@@ -4508,7 +4512,7 @@ def f_cachetools_func_py__module___cache_decorator : Func :=
                 (.setField
                   (.name "wrapper")
                   "cache_parameters"
-                  (.fnref "cachetools/func.py:<module>._cache.decorator.<lambda>0"))
+                  (.closure "cachetools/func.py:<module>._cache.decorator.<lambda>0"))
                 (.seq
                   .skip
                   (.seq
@@ -4792,6 +4796,714 @@ def f_cachetools_keys_py__module__typedmethodkey : Func :=
             (.expr (.lit (.str "\"\"Return a typed cache key for use with cached methods.\"\"")))
             (.seq .skip (.ret (.call "typedkey" [(.hole "op:starredUnpack")])))) }
 
+/-- `cachetools/__init__.py:<module>`  (from `cachetools/__init__.py`) -/
+def f_cachetools___init___py__module_ : Func :=
+  { name := "cachetools/__init__.py:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal "getattr" (.fnref "__builtin.getattr"))
+            (.seq
+              (.setGlobal "isinstance" (.fnref "__builtin.isinstance"))
+              (.seq
+                (.setGlobal "iter" (.fnref "__builtin.iter"))
+                (.seq
+                  (.setGlobal "len" (.fnref "__builtin.len"))
+                  (.seq
+                    (.setGlobal "next" (.fnref "__builtin.next"))
+                    (.seq
+                      (.setGlobal "repr" (.fnref "__builtin.repr"))
+                      (.seq
+                        (.setGlobal "sorted" (.fnref "__builtin.sorted"))
+                        (.seq
+                          (.setGlobal "staticmethod" (.fnref "__builtin.staticmethod"))
+                          (.seq
+                            (.setGlobal "super" (.fnref "__builtin.super"))
+                            (.seq
+                              (.setGlobal "object" (.fnref "__builtin.object<meta>"))
+                              (.seq
+                                (.setGlobal "property" (.fnref "__builtin.property<meta>"))
+                                (.seq
+                                  (.setGlobal "set" (.fnref "__builtin.set<meta>"))
+                                  (.seq
+                                    (.setGlobal "type" (.fnref "__builtin.type<meta>"))
+                                    (.seq
+                                      (.expr
+                                        (.lit
+                                          (.str "\"\"Extensible memoizing collections and decorators.\"\"")))
+                                      (.seq
+                                        (.setGlobal
+                                          "__all__"
+                                          (.tupleE
+                                            [ (.lit (.str "Cache"))
+                                            , (.lit (.str "FIFOCache"))
+                                            , (.lit (.str "LFUCache"))
+                                            , (.lit (.str "LRUCache"))
+                                            , (.lit (.str "RRCache"))
+                                            , (.lit (.str "TLRUCache"))
+                                            , (.lit (.str "TTLCache"))
+                                            , (.lit (.str "cached"))
+                                            , (.lit (.str "cachedmethod")) ]))
+                                        (.seq
+                                          (.setGlobal "__version__" (.lit (.str "7.1.7")))
+                                          (.seq
+                                            (.setGlobal
+                                              "collections"
+                                              (.call
+                                                "import"
+                                                [(.lit .unit), (.hole "lit:unquoted")]))
+                                            (.seq
+                                              (.setGlobal
+                                                "collections"
+                                                (.call
+                                                  "import"
+                                                  [(.lit .unit), (.hole "lit:unquoted")]))
+                                              (.seq
+                                                (.setGlobal
+                                                  "functools"
+                                                  (.call
+                                                    "import"
+                                                    [(.lit .unit), (.hole "lit:unquoted")]))
+                                                (.seq
+                                                  (.setGlobal
+                                                    "heapq"
+                                                    (.call
+                                                      "import"
+                                                      [(.lit .unit), (.hole "lit:unquoted")]))
+                                                  (.seq
+                                                    (.setGlobal
+                                                      "random"
+                                                      (.call
+                                                        "import"
+                                                        [(.lit .unit), (.hole "lit:unquoted")]))
+                                                    (.seq
+                                                      (.setGlobal
+                                                        "time"
+                                                        (.call
+                                                          "import"
+                                                          [(.lit .unit), (.hole "lit:unquoted")]))
+                                                      (.seq
+                                                        (.setGlobal
+                                                          "keys"
+                                                          (.call
+                                                            "import"
+                                                            [ (.hole "lit:unquoted")
+                                                            , (.hole "lit:unquoted") ]))
+                                                        (.seq
+                                                          .skip
+                                                          (.seq
+                                                            (.seq
+                                                              (.setGlobal
+                                                                "_DefaultSize"
+                                                                (.fnref
+                                                                  "cachetools/__init__.py:<module>._DefaultSize<meta>"))
+                                                              (.expr
+                                                                (.call
+                                                                  ""
+                                                                  [ (.fnref
+                                                                      "cachetools/__init__.py:<module>._DefaultSize") ])))
+                                                            (.seq
+                                                              .skip
+                                                              (.seq
+                                                                (.seq
+                                                                  (.setGlobal
+                                                                    "Cache"
+                                                                    (.fnref
+                                                                      "cachetools/__init__.py:<module>.Cache<meta>"))
+                                                                  (.expr (.alloc "" [])))
+                                                                (.seq
+                                                                  .skip
+                                                                  (.seq
+                                                                    (.seq
+                                                                      (.setGlobal
+                                                                        "FIFOCache"
+                                                                        (.fnref
+                                                                          "cachetools/__init__.py:<module>.FIFOCache<meta>"))
+                                                                      (.expr (.alloc "" [])))
+                                                                    (.seq
+                                                                      .skip
+                                                                      (.seq
+                                                                        (.seq
+                                                                          (.setGlobal
+                                                                            "LFUCache"
+                                                                            (.fnref
+                                                                              "cachetools/__init__.py:<module>.LFUCache<meta>"))
+                                                                          (.expr (.alloc "" [])))
+                                                                        (.seq
+                                                                          .skip
+                                                                          (.seq
+                                                                            (.seq
+                                                                              (.setGlobal
+                                                                                "LRUCache"
+                                                                                (.fnref
+                                                                                  "cachetools/__init__.py:<module>.LRUCache<meta>"))
+                                                                              (.expr (.alloc "" [])))
+                                                                            (.seq
+                                                                              .skip
+                                                                              (.seq
+                                                                                (.seq
+                                                                                  (.setGlobal
+                                                                                    "RRCache"
+                                                                                    (.fnref
+                                                                                      "cachetools/__init__.py:<module>.RRCache<meta>"))
+                                                                                  (.expr
+                                                                                    (.alloc "" [])))
+                                                                                (.seq
+                                                                                  .skip
+                                                                                  (.seq
+                                                                                    (.seq
+                                                                                      (.setGlobal
+                                                                                        "_TimedCache"
+                                                                                        (.fnref
+                                                                                          "cachetools/__init__.py:<module>._TimedCache<meta>"))
+                                                                                      (.expr
+                                                                                        (.call
+                                                                                          ""
+                                                                                          [])))
+                                                                                    (.seq
+                                                                                      .skip
+                                                                                      (.seq
+                                                                                        (.seq
+                                                                                          (.setGlobal
+                                                                                            "TTLCache"
+                                                                                            (.fnref
+                                                                                              "cachetools/__init__.py:<module>.TTLCache<meta>"))
+                                                                                          (.expr
+                                                                                            (.alloc
+                                                                                              ""
+                                                                                              [])))
+                                                                                        (.seq
+                                                                                          .skip
+                                                                                          (.seq
+                                                                                            (.seq
+                                                                                              (.setGlobal
+                                                                                                "TLRUCache"
+                                                                                                (.fnref
+                                                                                                  "cachetools/__init__.py:<module>.TLRUCache<meta>"))
+                                                                                              (.expr
+                                                                                                (.alloc
+                                                                                                  ""
+                                                                                                  [])))
+                                                                                            (.seq
+                                                                                              .skip
+                                                                                              (.seq
+                                                                                                (.setGlobal
+                                                                                                  "_CacheInfo"
+                                                                                                  (.mcall
+                                                                                                    (.name
+                                                                                                      "collections")
+                                                                                                    "namedtuple"
+                                                                                                    [ (.lit
+                                                                                                        (.str "CacheInfo"))
+                                                                                                    , (.listE
+                                                                                                        [ (.lit
+                                                                                                            (.str "hits"))
+                                                                                                        , (.lit
+                                                                                                            (.str "misses"))
+                                                                                                        , (.lit
+                                                                                                            (.str "maxsize"))
+                                                                                                        , (.lit
+                                                                                                            (.str "currsize")) ]) ]))
+                                                                                                (.seq
+                                                                                                  .skip
+                                                                                                  (.seq
+                                                                                                    (.setGlobal
+                                                                                                      "cached"
+                                                                                                      (.fnref
+                                                                                                        "cachetools/__init__.py:<module>.cached"))
+                                                                                                    (.seq
+                                                                                                      .skip
+                                                                                                      (.seq
+                                                                                                        (.setGlobal
+                                                                                                          "cachedmethod"
+                                                                                                          (.fnref
+                                                                                                            "cachetools/__init__.py:<module>.cachedmethod"))
+                                                                                                        (.seq
+                                                                                                          .skip
+                                                                                                          (.seq
+                                                                                                            .skip
+                                                                                                            (.seq
+                                                                                                              .skip
+                                                                                                              (.seq
+                                                                                                                .skip
+                                                                                                                (.seq
+                                                                                                                  .skip
+                                                                                                                  (.seq
+                                                                                                                    .skip
+                                                                                                                    (.seq
+                                                                                                                      .skip
+                                                                                                                      (.seq
+                                                                                                                        .skip
+                                                                                                                        (.seq
+                                                                                                                          .skip
+                                                                                                                          (.seq
+                                                                                                                            .skip
+                                                                                                                            (.seq
+                                                                                                                              .skip
+                                                                                                                              (.seq
+                                                                                                                                .skip
+                                                                                                                                (.seq
+                                                                                                                                  .skip
+                                                                                                                                  (.seq
+                                                                                                                                    .skip
+                                                                                                                                    (.seq
+                                                                                                                                      .skip
+                                                                                                                                      (.seq
+                                                                                                                                        .skip
+                                                                                                                                        (.seq
+                                                                                                                                          .skip
+                                                                                                                                          (.seq
+                                                                                                                                            .skip
+                                                                                                                                            (.seq
+                                                                                                                                              .skip
+                                                                                                                                              (.seq
+                                                                                                                                                .skip
+                                                                                                                                                (.seq
+                                                                                                                                                  .skip
+                                                                                                                                                  (.seq
+                                                                                                                                                    .skip
+                                                                                                                                                    (.seq
+                                                                                                                                                      .skip
+                                                                                                                                                      (.seq
+                                                                                                                                                        .skip
+                                                                                                                                                        (.seq
+                                                                                                                                                          .skip
+                                                                                                                                                          (.seq
+                                                                                                                                                            .skip
+                                                                                                                                                            (.seq
+                                                                                                                                                              .skip
+                                                                                                                                                              (.seq
+                                                                                                                                                                .skip
+                                                                                                                                                                .skip))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+
+/-- `cachetools/_cached.py:<module>`  (from `cachetools/_cached.py`) -/
+def f_cachetools__cached_py__module_ : Func :=
+  { name := "cachetools/_cached.py:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal "set" (.fnref "__builtin.set<meta>"))
+            (.seq
+              (.expr (.lit (.str "\"\"Function decorator helpers.\"\"")))
+              (.seq
+                (.setGlobal "__all__" (.tupleE []))
+                (.seq
+                  (.setGlobal "functools" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                  (.seq
+                    (.setGlobal
+                      "_condition_info"
+                      (.fnref "cachetools/_cached.py:<module>._condition_info"))
+                    (.seq
+                      (.setGlobal
+                        "_locked_info"
+                        (.fnref "cachetools/_cached.py:<module>._locked_info"))
+                      (.seq
+                        (.setGlobal
+                          "_unlocked_info"
+                          (.fnref "cachetools/_cached.py:<module>._unlocked_info"))
+                        (.seq
+                          (.setGlobal
+                            "_uncached_info"
+                            (.fnref "cachetools/_cached.py:<module>._uncached_info"))
+                          (.seq
+                            (.setGlobal
+                              "_condition"
+                              (.fnref "cachetools/_cached.py:<module>._condition"))
+                            (.seq
+                              (.setGlobal
+                                "_locked"
+                                (.fnref "cachetools/_cached.py:<module>._locked"))
+                              (.seq
+                                (.setGlobal
+                                  "_unlocked"
+                                  (.fnref "cachetools/_cached.py:<module>._unlocked"))
+                                (.seq
+                                  (.setGlobal
+                                    "_uncached"
+                                    (.fnref "cachetools/_cached.py:<module>._uncached"))
+                                  (.seq
+                                    (.setGlobal
+                                      "_wrapper"
+                                      (.fnref "cachetools/_cached.py:<module>._wrapper"))
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                          .skip
+                                          (.seq
+                                            .skip
+                                            (.seq
+                                              .skip
+                                              (.seq
+                                                .skip
+                                                (.seq
+                                                  .skip
+                                                  (.seq
+                                                    .skip
+                                                    (.seq
+                                                      .skip
+                                                      (.seq
+                                                        .skip
+                                                        (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))))))))) }
+
+/-- `cachetools/_cachedmethod.py:<module>`  (from `cachetools/_cachedmethod.py`) -/
+def f_cachetools__cachedmethod_py__module_ : Func :=
+  { name := "cachetools/_cachedmethod.py:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal "isinstance" (.fnref "__builtin.isinstance"))
+            (.seq
+              (.setGlobal "super" (.fnref "__builtin.super"))
+              (.seq
+                (.setGlobal "property" (.fnref "__builtin.property<meta>"))
+                (.seq
+                  (.setGlobal "set" (.fnref "__builtin.set<meta>"))
+                  (.seq
+                    (.setGlobal "type" (.fnref "__builtin.type<meta>"))
+                    (.seq
+                      (.expr (.lit (.str "\"\"Method decorator helpers.\"\"")))
+                      (.seq
+                        (.setGlobal "__all__" (.tupleE []))
+                        (.seq
+                          (.setGlobal
+                            "functools"
+                            (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                          (.seq
+                            (.setGlobal
+                              "warnings"
+                              (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                            (.seq
+                              (.setGlobal
+                                "weakref"
+                                (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                              (.seq
+                                (.setGlobal
+                                  "_warn_classmethod"
+                                  (.fnref "cachetools/_cachedmethod.py:<module>._warn_classmethod"))
+                                (.seq
+                                  (.setGlobal
+                                    "_warn_instance_dict"
+                                    (.fnref
+                                      "cachetools/_cachedmethod.py:<module>._warn_instance_dict"))
+                                  (.seq
+                                    (.setGlobal
+                                      "_none"
+                                      (.fnref "cachetools/_cachedmethod.py:<module>._none"))
+                                    (.seq
+                                      (.seq
+                                        (.setGlobal
+                                          "_WrapperBase"
+                                          (.fnref
+                                            "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>"))
+                                        (.expr (.call "" [])))
+                                      (.seq
+                                        (.seq
+                                          (.setGlobal
+                                            "_DescriptorBase"
+                                            (.fnref
+                                              "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>"))
+                                          (.expr (.call "" [])))
+                                        (.seq
+                                          (.seq
+                                            (.setGlobal
+                                              "_DeprecatedDescriptorBase"
+                                              (.fnref
+                                                "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>"))
+                                            (.expr (.call "" [])))
+                                          (.seq
+                                            (.setGlobal
+                                              "_condition_info"
+                                              (.fnref
+                                                "cachetools/_cachedmethod.py:<module>._condition_info"))
+                                            (.seq
+                                              (.setGlobal
+                                                "_locked_info"
+                                                (.fnref
+                                                  "cachetools/_cachedmethod.py:<module>._locked_info"))
+                                              (.seq
+                                                (.setGlobal
+                                                  "_unlocked_info"
+                                                  (.fnref
+                                                    "cachetools/_cachedmethod.py:<module>._unlocked_info"))
+                                                (.seq
+                                                  (.setGlobal
+                                                    "_condition"
+                                                    (.fnref
+                                                      "cachetools/_cachedmethod.py:<module>._condition"))
+                                                  (.seq
+                                                    (.setGlobal
+                                                      "_locked"
+                                                      (.fnref
+                                                        "cachetools/_cachedmethod.py:<module>._locked"))
+                                                    (.seq
+                                                      (.setGlobal
+                                                        "_unlocked"
+                                                        (.fnref
+                                                          "cachetools/_cachedmethod.py:<module>._unlocked"))
+                                                      (.seq
+                                                        (.setGlobal
+                                                          "_wrapper"
+                                                          (.fnref
+                                                            "cachetools/_cachedmethod.py:<module>._wrapper"))
+                                                        (.seq
+                                                          .skip
+                                                          (.seq
+                                                            .skip
+                                                            (.seq
+                                                              .skip
+                                                              (.seq
+                                                                .skip
+                                                                (.seq
+                                                                  .skip
+                                                                  (.seq
+                                                                    .skip
+                                                                    (.seq
+                                                                      .skip
+                                                                      (.seq
+                                                                        .skip
+                                                                        (.seq
+                                                                          .skip
+                                                                          (.seq
+                                                                            .skip
+                                                                            (.seq
+                                                                              .skip
+                                                                              (.seq
+                                                                                .skip
+                                                                                (.seq
+                                                                                  .skip
+                                                                                  (.seq
+                                                                                    .skip
+                                                                                    (.seq
+                                                                                      .skip
+                                                                                      (.seq
+                                                                                        .skip
+                                                                                        (.seq
+                                                                                          .skip
+                                                                                          (.seq
+                                                                                            .skip
+                                                                                            (.seq
+                                                                                              .skip
+                                                                                              (.seq
+                                                                                                .skip
+                                                                                                (.seq
+                                                                                                  .skip
+                                                                                                  (.seq
+                                                                                                    .skip
+                                                                                                    (.seq
+                                                                                                      .skip
+                                                                                                      (.seq
+                                                                                                        .skip
+                                                                                                        (.seq
+                                                                                                          .skip
+                                                                                                          (.seq
+                                                                                                            .skip
+                                                                                                            .skip))))))))))))))))))))))))))))))))))))))))))))))))) }
+
+/-- `cachetools/func.py:<module>`  (from `cachetools/func.py`) -/
+def f_cachetools_func_py__module_ : Func :=
+  { name := "cachetools/func.py:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal "callable" (.fnref "__builtin.callable"))
+            (.seq
+              (.setGlobal "property" (.fnref "__builtin.property<meta>"))
+              (.seq
+                (.expr
+                  (.lit
+                    (.str "\"\"`functools.lru_cache` compatible memoizing function decorators.\"\"")))
+                (.seq
+                  (.setGlobal
+                    "__all__"
+                    (.tupleE
+                      [ (.lit (.str "fifo_cache"))
+                      , (.lit (.str "lfu_cache"))
+                      , (.lit (.str "lru_cache"))
+                      , (.lit (.str "rr_cache"))
+                      , (.lit (.str "ttl_cache")) ]))
+                  (.seq
+                    (.setGlobal "math" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                    (.seq
+                      (.setGlobal "random" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                      (.seq
+                        (.setGlobal "time" (.call "import" [(.lit .unit), (.hole "lit:unquoted")]))
+                        (.seq
+                          (.setGlobal
+                            "Condition"
+                            (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                          (.seq
+                            (.seq
+                              (.setGlobal
+                                "FIFOCache"
+                                (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                              (.seq
+                                (.setGlobal
+                                  "LFUCache"
+                                  (.call "import" [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                (.seq
+                                  (.setGlobal
+                                    "LRUCache"
+                                    (.call
+                                      "import"
+                                      [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                  (.seq
+                                    (.setGlobal
+                                      "RRCache"
+                                      (.call
+                                        "import"
+                                        [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                    (.seq
+                                      (.setGlobal
+                                        "TTLCache"
+                                        (.call
+                                          "import"
+                                          [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                      (.seq
+                                        (.setGlobal
+                                          "cached"
+                                          (.call
+                                            "import"
+                                            [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))
+                                        (.setGlobal
+                                          "keys"
+                                          (.call
+                                            "import"
+                                            [(.hole "lit:unquoted"), (.hole "lit:unquoted")]))))))))
+                            (.seq
+                              (.seq
+                                (.setGlobal
+                                  "_UnboundTTLCache"
+                                  (.fnref "cachetools/func.py:<module>._UnboundTTLCache<meta>"))
+                                (.expr
+                                  (.call
+                                    ""
+                                    [(.fnref "cachetools/func.py:<module>._UnboundTTLCache")])))
+                              (.seq
+                                (.setGlobal "_cache" (.fnref "cachetools/func.py:<module>._cache"))
+                                (.seq
+                                  (.setGlobal
+                                    "fifo_cache"
+                                    (.fnref "cachetools/func.py:<module>.fifo_cache"))
+                                  (.seq
+                                    (.setGlobal
+                                      "lfu_cache"
+                                      (.fnref "cachetools/func.py:<module>.lfu_cache"))
+                                    (.seq
+                                      (.setGlobal
+                                        "lru_cache"
+                                        (.fnref "cachetools/func.py:<module>.lru_cache"))
+                                      (.seq
+                                        (.setGlobal
+                                          "rr_cache"
+                                          (.fnref "cachetools/func.py:<module>.rr_cache"))
+                                        (.seq
+                                          .skip
+                                          (.seq
+                                            (.setGlobal
+                                              "ttl_cache"
+                                              (.fnref "cachetools/func.py:<module>.ttl_cache"))
+                                            (.seq
+                                              .skip
+                                              (.seq
+                                                .skip
+                                                (.seq
+                                                  .skip
+                                                  (.seq
+                                                    .skip
+                                                    (.seq
+                                                      .skip
+                                                      (.seq
+                                                        .skip
+                                                        (.seq
+                                                          .skip
+                                                          (.seq
+                                                            .skip
+                                                            (.seq
+                                                              .skip
+                                                              (.seq
+                                                                .skip
+                                                                (.seq
+                                                                  .skip
+                                                                  (.seq
+                                                                    .skip
+                                                                    (.seq
+                                                                      .skip
+                                                                      (.seq
+                                                                        .skip
+                                                                        (.seq
+                                                                          .skip
+                                                                          (.seq
+                                                                            .skip
+                                                                            (.seq
+                                                                              .skip
+                                                                              (.seq
+                                                                                .skip
+                                                                                (.seq
+                                                                                  .skip
+                                                                                  (.seq .skip .skip))))))))))))))))))))))))))))))))))))) }
+
+/-- `cachetools/keys.py:<module>`  (from `cachetools/keys.py`) -/
+def f_cachetools_keys_py__module_ : Func :=
+  { name := "cachetools/keys.py:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal "hash" (.fnref "__builtin.hash"))
+            (.seq
+              (.setGlobal "sorted" (.fnref "__builtin.sorted"))
+              (.seq
+                (.setGlobal "tuple" (.fnref "__builtin.tuple<meta>"))
+                (.seq
+                  (.setGlobal "type" (.fnref "__builtin.type<meta>"))
+                  (.seq
+                    (.expr (.lit (.str "\"\"Key functions for memoizing decorators.\"\"")))
+                    (.seq
+                      (.setGlobal
+                        "__all__"
+                        (.tupleE
+                          [ (.lit (.str "hashkey"))
+                          , (.lit (.str "methodkey"))
+                          , (.lit (.str "typedkey"))
+                          , (.lit (.str "typedmethodkey")) ]))
+                      (.seq
+                        (.seq
+                          (.setGlobal
+                            "_HashedTuple"
+                            (.fnref "cachetools/keys.py:<module>._HashedTuple<meta>"))
+                          (.expr (.call "" [(.fnref "cachetools/keys.py:<module>._HashedTuple")])))
+                        (.seq
+                          (.setGlobal "_kwmark" (.tupleE [(.name "_HashedTuple")]))
+                          (.seq
+                            (.setGlobal "hashkey" (.fnref "cachetools/keys.py:<module>.hashkey"))
+                            (.seq
+                              (.setGlobal
+                                "methodkey"
+                                (.fnref "cachetools/keys.py:<module>.methodkey"))
+                              (.seq
+                                (.setGlobal
+                                  "typedkey"
+                                  (.fnref "cachetools/keys.py:<module>.typedkey"))
+                                (.seq
+                                  .skip
+                                  (.seq
+                                    (.setGlobal
+                                      "typedmethodkey"
+                                      (.fnref "cachetools/keys.py:<module>.typedmethodkey"))
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                          .skip
+                                          (.seq
+                                            .skip
+                                            (.seq
+                                              .skip
+                                              (.seq
+                                                .skip
+                                                (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))))) }
+
+/-- Module-level initializers: run these to populate the globals frame
+before calling any entry point. -/
+def moduleInits : List Func := [f_cachetools___init___py__module_, f_cachetools__cached_py__module_, f_cachetools__cachedmethod_py__module_, f_cachetools_func_py__module_, f_cachetools_keys_py__module_]
+
 /-- Source dialect: `.python` (integer division/modulo convention). -/
 def program : Program := { dialect := .python, funcs := [
   f_cachetools___init___py__module___DefaultSize___getitem__,
@@ -5026,7 +5738,12 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools_keys_py__module__hashkey,
   f_cachetools_keys_py__module__methodkey,
   f_cachetools_keys_py__module__typedkey,
-  f_cachetools_keys_py__module__typedmethodkey
+  f_cachetools_keys_py__module__typedmethodkey,
+  f_cachetools___init___py__module_,
+  f_cachetools__cached_py__module_,
+  f_cachetools__cachedmethod_py__module_,
+  f_cachetools_func_py__module_,
+  f_cachetools_keys_py__module_
 ] }
 
 end Autoform.Generated

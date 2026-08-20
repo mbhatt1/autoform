@@ -45,6 +45,11 @@ jobs:
         run: |
           lean --version
           lake --version
+          # `leanchecker` (formerly the standalone `lean4checker`) ships with the
+          # toolchain since v4.28.0, so there is nothing to build or cache. If this
+          # line ever fails, the audit's check [3] would go UNVERIFIED rather than
+          # silently passing -- but we would rather know here.
+          lake env leanchecker --help >/dev/null 2>&1 || which leanchecker
 
       - name: Cache .lake
         uses: actions/cache@v4
@@ -66,10 +71,15 @@ jobs:
           python-version: '3.12'
 
       # Fails the job on any trusted-code leak (sorryAx / ofReduceBool /
-      # ofReduceNat, or a stray `sorry` outside Demo.lean). See
-      # scripts/audit_all.py and STRATEGY.md Tier 4.
-      - name: Trust audit sweep
-        run: python3 scripts/audit_all.py
+      # ofReduceNat, or a stray `sorry` outside Demo.lean), and on any .olean the
+      # independent kernel replay rejects. See scripts/audit_all.py and
+      # STRATEGY.md Tier 4.
+      #
+      # --strict additionally fails if `leanchecker` is missing, so the kernel
+      # re-check can never be silently skipped in CI: an oracle that no-ops is
+      # worse than no oracle (STRATEGY.md 19).
+      - name: Trust audit sweep (incl. kernel re-verification)
+        run: python3 scripts/audit_all.py --strict
 
       - name: Upload audit.json
         if: always()

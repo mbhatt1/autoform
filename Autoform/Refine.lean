@@ -247,8 +247,18 @@ theorem evalExpr_lit_bool (b : Bool) :
     evalExpr ctx (k+1) h ρ (.lit (.bool b)) = (h, .val (.bool b)) := rfl
 theorem evalExpr_lit_unit :
     evalExpr ctx (k+1) h ρ (.lit .unit) = (h, .val .unit) := rfl
-theorem evalExpr_name (x : String) :
-    evalExpr ctx (k+1) h ρ (.name x) = (h, .val (ρ.get x)) := rfl
+/-- A name bound locally evaluates to its binding. Unbound names now fall back to the
+function table (a module-level function used as a value), so this lemma is conditional on
+the name actually being local — see `evalExpr_name_free` for the other case. -/
+theorem evalExpr_name (x : String) {v : Val} (hx : ρ.find? (·.1 == x) = some (x, v)) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .val v) := by
+  simp [evalExpr, hx]
+
+/-- A name that is neither local nor a known function evaluates to `unit`. -/
+theorem evalExpr_name_free (x : String)
+    (hx : ρ.find? (·.1 == x) = none) (hf : ctx.resolve x = none) :
+    evalExpr ctx (k+1) h ρ (.name x) = (h, .val .unit) := by
+  simp [evalExpr, hx, hf]
 theorem evalExpr_fnref (f : String) :
     evalExpr ctx (k+1) h ρ (.fnref f) = (h, .val (.fn f)) := rfl
 theorem evalExpr_hole (l : String) :
@@ -548,7 +558,17 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
   intro e pe
   induction pe with
   | lit l => intro k h ρ; cases k with | zero => rfl | succ m => cases l <;> rfl
-  | name x => intro k h ρ; cases k <;> rfl
+  | name x =>
+      intro k h ρ
+      cases k with
+      | zero => rfl
+      | succ m =>
+          -- The name case now branches on local lookup then on table resolution; the
+          -- heap is returned unchanged on every branch.
+          simp only [evalExpr]
+          split
+          · rfl
+          · split <;> rfl
   | fnref f => intro k h ρ; cases k <;> rfl
   | unop op _ ih =>
       intro k h ρ; cases k with

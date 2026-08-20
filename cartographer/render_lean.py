@@ -106,6 +106,9 @@ def expr_shape(n):
     if k == "mcall":  return ".mcall", [("e", f('recv')), ("atom", lean_str(f('m'))), ("es", f('args'))]
     if k == "alloc":  return ".alloc", [("atom", lean_str(f('cls'))), ("es", f('args'))]
     if k == "fnref":  return ".fnref", [("atom", lean_str(f('v')))]
+    # A function value that reads variables of an enclosing function. `fnref` is the
+    # cheaper form and is used wherever the exporter proved there is nothing to capture.
+    if k == "closure": return ".closure", [("atom", lean_str(f('f')))]
     if k == "listE":  return ".listE", [("es", f('items'))]
     if k == "tupleE": return ".tupleE", [("es", f('items'))]
     if k == "dictE":  return ".dictE", [("ps", f('pairs'))]
@@ -136,6 +139,9 @@ def stmt_shape(n):
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
     if k == "raise":    return ".raise", [("e", f('e'))]
     if k == "del":      return ".del", [("atom", lean_str(f('x')))]
+    # --- module-level scope ---
+    if k == "setGlobal":  return ".setGlobal", [("atom", lean_str(f('x'))), ("e", f('e'))]
+    if k == "declGlobal": return ".declGlobal", [("atom", lean_str(f('x')))]
     raise ValueError(f"unknown stmt node kind {k!r} (node: {json.dumps(n)[:200]})")
 
 SHAPE = {"e": expr_shape, "s": stmt_shape}
@@ -296,6 +302,16 @@ def main():
             raise SystemExit(f"render_lean: in function {f.get('name')!r} "
                              f"(from {f.get('file','?')}): {e}")
 
+    # Module-level bindings are exported as zero-argument *initializer* functions, one
+    # per source file, whose bodies are runs of `Stmt.setGlobal`. Running them is what
+    # makes module-level constants, classes and `def`s resolvable, so the entry points
+    # that need them have to know which functions they are.
+    inits = [n for f, n in zip(funcs, names)
+             if f["name"].endswith(":<module>") or f["name"].endswith(":<global>")]
+    out.append("/-- Module-level initializers: run these to populate the globals frame")
+    out.append("before calling any entry point. -/")
+    out.append("def moduleInits : List Func := [" + ", ".join(inits) + "]")
+    out.append("")
     out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
     out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))

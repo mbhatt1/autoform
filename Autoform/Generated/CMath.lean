@@ -64,13 +64,24 @@ def f_cmod : Func :=
             (.ifte (.binop "==" (.name "b") (.lit (.int 0))) (.ret (.lit (.int 0))) .skip)
             (.ret (.binop "%" (.name "a") (.name "b")))) }
 
+/-- `math.c:<global>`  (from `math.c`) -/
+def f_math_c__global_ : Func :=
+  { name := "math.c:<global>"
+  , params := []
+  , body := (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))) }
+
+/-- Module-level initializers: run these to populate the globals frame
+before calling any entry point. -/
+def moduleInits : List Func := [f_math_c__global_]
+
 /-- Source dialect: `.cLike` (integer division/modulo convention). -/
 def program : Program := { dialect := .cLike, funcs := [
   f_clamp,
   f_poly,
   f_sumto,
   f_cdiv,
-  f_cmod
+  f_cmod,
+  f_math_c__global_
 ] }
 
 end Autoform.Generated

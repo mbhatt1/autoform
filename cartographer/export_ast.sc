@@ -11,6 +11,13 @@
 // dropped, and nothing is guessed: where a construct cannot be translated faithfully the
 // hole label says precisely which shape defeated us.
 //
+// Beyond the per-node mapping, the exporter answers three whole-program questions that
+// the node vocabulary alone cannot: which names are module-level (exported as one
+// `setGlobal` initializer per file), which function values capture an enclosing scope
+// (`closure` rather than `fnref`), and — because the CPG is multi-language — which
+// operators change meaning under the source dialect (a C `char*` is an address, so `+`
+// and `<` are not the string operations they look like).
+//
 // Run: joern --script cartographer/export_ast.sc --param cpgPath=... --param out=ast.json
 
 import io.shiftleft.codepropertygraph.generated.nodes._
@@ -37,6 +44,23 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     "<operator>.notEquals" -> "!=", "<operator>.logicalAnd" -> "&&",
     "<operator>.logicalOr" -> "||"
   )
+  // Operators whose Core meaning is wrong when an operand is a C `char*`. `+`/`-` are
+  // pointer arithmetic, not concatenation; the orderings and equalities compare
+  // addresses, not contents. Each keeps its own hole label so the cause is separable in
+  // the ledger.
+  val cStringUnsafe = Map(
+    "<operator>.addition"           -> "cstr:pointer-arith",
+    "<operator>.subtraction"        -> "cstr:pointer-arith",
+    "<operator>.assignmentPlus"     -> "cstr:pointer-arith",
+    "<operator>.assignmentMinus"    -> "cstr:pointer-arith",
+    "<operator>.lessThan"           -> "cstr:address-compare",
+    "<operator>.lessEqualsThan"     -> "cstr:address-compare",
+    "<operator>.greaterThan"        -> "cstr:address-compare",
+    "<operator>.greaterEqualsThan"  -> "cstr:address-compare",
+    "<operator>.equals"             -> "cstr:address-equality",
+    "<operator>.notEquals"          -> "cstr:address-equality"
+  )
+
   val unops = Map(
     "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "!"
   )
@@ -117,6 +141,127 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       .filter(_.method.name.l.contains("<body>"))
       .map(_.name).filterNot(_.contains("<")).toSet
 
+  // ---- lexical scope analysis ------------------------------------------------
+  //
+  // Joern's `fullName` *is* the lexical nesting path: `f.py:<module>.outer.inner`,
+  // `f.py:<module>.Cls.<body>.meth`. So the scope chain is recoverable by prefix, with no
+  // need to walk AST parent edges (which differ between frontends).
+  //
+  // We need it for exactly one decision: is a `METHOD_REF` a plain `fnref` (a top-level
+  // function, resolvable by name) or a `closure` (it reads a variable of an enclosing
+  // *function*)? Module-level names are not captures — `Expr.name` falls back to the
+  // globals frame — and class bodies are not a closure scope in Python, so only enclosing
+  // function scopes count.
+  val allMethods   = cpg.method.isExternal(false).l
+  val methodByName = allMethods.map(m => m.fullName -> m).toMap
+
+  /** Names a method binds itself: parameters plus identifier assignment targets — which
+    * is exactly Python's rule (a name assigned anywhere in a body is local throughout),
+    * minus the names a `global`/`nonlocal` statement explicitly un-localises.
+    *
+    * `m.local` is deliberately **not** used. A CPG fact that defeats the obvious version
+    * of this analysis: pysrc2cpg emits a LOCAL in the *inner* method for every name it
+    * closes over, and for module-level names it reads — `inner` has `locals = [k]` even
+    * though `k` is the enclosing function's parameter. LOCAL here is a *reference*
+    * declaration, not a binding, so trusting it reports that nothing ever captures. */
+  val boundOf: Map[String, Set[String]] = allMethods.map { m =>
+    val assigned = m.body.ast.isCall
+      .filter(c => c.methodFullName.startsWith("<operator>.assignment"))
+      .l.flatMap(c => kidsOf(c).headOption).collect { case i: Identifier => i.name }.toSet
+    val unlocalised = m.body.ast.collect {
+      case u: Unknown if u.code.trim.startsWith("global ") || u.code.trim.startsWith("nonlocal ") =>
+        u.code.trim.dropWhile(_ != ' ').split(",").map(_.trim).filter(_.nonEmpty)
+    }.l.flatten.toSet
+    m.fullName -> ((m.parameter.name.toSet ++ assigned) -- unlocalised)
+  }.toMap
+
+  /** Identifier names a method mentions in its own body (not its nested methods'). */
+  val usedOf: Map[String, Set[String]] = allMethods.map { m =>
+    m.fullName -> m.body.ast.isIdentifier.filter(_.method.fullName == m.fullName).name.toSet
+  }.toMap
+
+  /** Methods lexically nested one level inside `fn`. */
+  val nestedOf: Map[String, List[String]] =
+    allMethods.map(_.fullName).groupBy { fn =>
+      val i = fn.lastIndexOf('.')
+      if (i < 0) "" else fn.substring(0, i)
+    }.withDefaultValue(Nil)
+
+  /** Free names of a method, including those its nested definitions leave free:
+    *   free(m) = (used(m) ∪ ⋃ free(nested)) \ bound(m)
+    * The nesting relation is a prefix order, so this terminates. */
+  def freeOf(fn: String): Set[String] = {
+    val used   = usedOf.getOrElse(fn, Set.empty)
+    val inner  = nestedOf(fn).filter(_ != fn).flatMap(freeOf).toSet
+    (used ++ inner) -- boundOf.getOrElse(fn, Set.empty)
+  }
+
+  /** Names bound by the enclosing *function* scopes of `fn` — skipping `<module>`
+    * (globals) and `<body>`/`<meta>` (class bodies, which Python does not close over). */
+  def enclosingFunctionBindings(fn: String): Set[String] = {
+    def go(cur: String, acc: Set[String]): Set[String] = {
+      val i = cur.lastIndexOf('.')
+      if (i < 0) acc
+      else {
+        val parent = cur.substring(0, i)
+        // The *simple* name has to come from the node, not from splitting the fullName:
+        // `cachetools/keys.py:<module>` ends in a dot-segment `py:<module>`, so string
+        // surgery would classify the module scope as an ordinary function and report that
+        // every module-level `def` captures the module.
+        val isFunctionScope =
+          methodByName.get(parent).exists(p => !p.name.startsWith("<"))
+        go(parent, if (isFunctionScope) acc ++ boundOf.getOrElse(parent, Set.empty) else acc)
+      }
+    }
+    go(fn, Set.empty)
+  }
+
+  /** A function value that reads a variable of an enclosing function is a *closure*;
+    * one that does not is an `fnref`, which is cheaper and needs no captured frame. */
+  val capturesEnv: Map[String, Boolean] = allMethods.map { m =>
+    m.fullName -> freeOf(m.fullName).intersect(enclosingFunctionBindings(m.fullName)).nonEmpty
+  }.toMap
+
+  def fnValue(target: String): ujson.Obj =
+    if (capturesEnv.getOrElse(target, false)) ujson.Obj("k" -> "closure", "f" -> target)
+    else ujson.Obj("k" -> "fnref", "v" -> target)
+
+  /** A class used as a value. Usually an `fnref` — but a class *defined inside a
+    * function* whose methods read that function's variables is a capturing value too, and
+    * `Expr.closure` names a function, not a class, so there is nothing to emit. Rather
+    * than hand back an `fnref` whose methods would later find those names unbound, say so. */
+  def typeValue(target: String): ujson.Obj = {
+    val cls = target.stripSuffix("<meta>")
+    val captures = allMethods.exists(m =>
+      m.fullName.startsWith(cls + ".") && capturesEnv.getOrElse(m.fullName, false))
+    if (captures) hole("scope:class-closure") else ujson.Obj("k" -> "fnref", "v" -> target)
+  }
+
+  // ---- per-method translation state ------------------------------------------
+  // `moduleScope` is set while translating a `<module>`/`<global>` pseudo-method: every
+  // identifier assignment there defines a module-level binding, so it becomes `setGlobal`.
+  // `declaredGlobals` holds the names a `global x` statement rebound in the current
+  // function, whose assignments must also write the globals frame rather than a local.
+  var moduleScope     = false
+  var declaredGlobals = Set.empty[String]
+  // Set while translating a method from a C-family file, where a `char*` is an address,
+  // not a string value.
+  var cLikeFile       = false
+
+  /** Static evidence that an operand is a C string/array-of-char. Joern's C frontend
+    * types both `char *s` and `"abc"` as `char*`, including on literals. */
+  def isCString(n: AstNode): Boolean = {
+    def t(x: AstNode): String = x match {
+      case c: Call              => c.typeFullName
+      case i: Identifier        => i.typeFullName
+      case l: Literal           => l.typeFullName
+      case p: MethodParameterIn => p.typeFullName
+      case _                    => ""
+    }
+    val ty = t(n).replace(" ", "")
+    ty.matches("""(const|volatile|signed|unsigned)*char(\*|\[.*\]).*""")
+  }
+
   // ---- expressions ----------------------------------------------------------
   def expr(n: AstNode): ujson.Obj = n match {
     case l: Literal =>
@@ -141,9 +286,10 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       }
     case i: Identifier        => ujson.Obj("k" -> "name", "v" -> i.name)
     case p: MethodParameterIn => ujson.Obj("k" -> "name", "v" -> p.name)
-    // A function/method or a class used as a value.
-    case m: MethodRef         => ujson.Obj("k" -> "fnref", "v" -> m.methodFullName)
-    case t: TypeRef           => ujson.Obj("k" -> "fnref", "v" -> t.typeFullName)
+    // A function/method or a class used as a value. Whether it needs to carry the
+    // enclosing environment is decided by `capturesEnv`, above.
+    case m: MethodRef         => fnValue(m.methodFullName)
+    case t: TypeRef           => typeValue(t.typeFullName)
     case c: Call              => callExpr(c)
     case other                => hole("expr:" + other.label)
   }
@@ -153,7 +299,16 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
     val mfn  = c.methodFullName
-    if (binops.contains(mfn) && kids.size == 2)
+    // A `char*` is an address, not a string value. Core has one `Val.str` for Python's
+    // `str` and C's `char*`, and its `+` concatenates while `<`/`>`/`==` compare contents
+    // — all three are the wrong answer in C, where they are pointer arithmetic and
+    // address comparison. This is the §12 lesson again: the constructs that *look* alike
+    // across languages are the dangerous ones. So under a C-family dialect, an operand
+    // with static `char*` evidence turns the whole operator into a hole.
+    if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
+        cStringUnsafe.contains(mfn))
+      hole(cStringUnsafe(mfn))
+    else if (binops.contains(mfn) && kids.size == 2)
       ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
@@ -296,8 +451,15 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       case Some(op) => ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> rhsE)
     }
     val core = lhs match {
+      // `s += n` on a `char*` advances a pointer; see `cStringUnsafe`. The augmented form
+      // never reaches `callExpr`, so it is guarded here too.
+      case _ if cLikeFile && aug.isDefined && (isCString(lhs) || isCString(rhs)) =>
+        holeS("cstr:pointer-arith")
       case i: Identifier =>
-        ujson.Obj("k" -> "assign", "x" -> i.name,
+        // At module scope, and for a name a `global` statement rebound, an assignment
+        // writes the module-level frame rather than creating a local.
+        val k = if (moduleScope || declaredGlobals.contains(i.name)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> i.name,
                   "e" -> combine(ujson.Obj("k" -> "name", "v" -> i.name)))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
@@ -315,6 +477,10 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     }
     seqOf(prelude :+ core)
   }
+
+  /** `global a, b` — the names it rebinds. */
+  def globalDeclNames(u: Unknown): List[String] =
+    u.code.trim.stripPrefix("global").split(",").map(_.trim).filter(_.nonEmpty).toList
 
   def stmt(n: AstNode): ujson.Obj = n match {
     case b: Block =>
@@ -382,6 +548,22 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     case m: MethodRef  => skip   // a nested `def`; its body is exported as its own function
     case t: TypeRef    => skip   // a nested `class`, likewise
     case j: JumpTarget => skip
+    // `global x` / `nonlocal x` arrive as UNKNOWN nodes carrying their source text; the
+    // Python frontend models neither.
+    //
+    // `global` *is* representable: it rebinds `x` to the module-level frame, and
+    // `declGlobal` records that. (The assignments themselves are independently rewritten
+    // to `setGlobal` in `assignTo`, so the translation is correct even if `declGlobal`
+    // carries no weight in the semantics.)
+    //
+    // `nonlocal` is **not**. `Expr.closure` captures the enclosing scope *by value*, so a
+    // write can never be observed by the frame that owns the variable. Emitting an
+    // `assign` here would produce a program that runs and quietly computes the wrong
+    // answer, which is the one outcome worse than a hole.
+    case u: Unknown if u.code.trim.startsWith("global ") =>
+      seqOf(globalDeclNames(u).map(x => ujson.Obj("k" -> "declGlobal", "x" -> x)))
+    case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
+      holeS("scope:nonlocal-write")
     case u: Unknown    => holeS("stmt:UNKNOWN:" + u.code.trim.takeWhile(_ != ' '))
     case other         => holeS("stmt:" + other.label)
   }
@@ -429,21 +611,60 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   // ---- drive ----------------------------------------------------------------
   // Joern synthesises `<metaClassAdapter>` wrappers that duplicate real methods, plus
-  // `<global>`/`<body>` container pseudo-methods. Counting them inflates every coverage
-  // number, so they are excluded rather than quietly padding the verifiable core.
+  // `<body>` class-body pseudo-methods. Counting them inflates every coverage number, so
+  // they are excluded rather than quietly padding the verifiable core. The file-level
+  // `<module>`/`<global>` pseudo-methods are excluded from *this* list too, and re-added
+  // below as initializers, so they never inflate the function count either.
+  val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
+
+  /** Translate one method with the right scope/dialect state installed. `isModule` marks
+    * the file-level pseudo-method, where every identifier assignment is a global write. */
+  def emit(m: Method, isModule: Boolean): ujson.Obj = {
+    moduleScope = isModule
+    cLikeFile   = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    declaredGlobals =
+      m.body.ast.collect { case u: Unknown if u.code.trim.startsWith("global ") => u }
+        .flatMap(globalDeclNames).toSet
+    val body = stmt(m.body)
+    moduleScope = false
+    declaredGlobals = Set.empty
+    ujson.Obj(
+      "name"   -> m.fullName,
+      "file"   -> m.filename,
+      "params" -> ujson.Arr.from(m.parameter.name.l.filterNot(_ == "self")),
+      "body"   -> body
+    )
+  }
+
   val synthetic = List("<metaClassAdapter>", "<global>", "<body>", "<fakeNew>")
   val methods = cpg.method.isExternal(false)
     .whereNot(_.nameExact("<module>"))
     .l.filterNot(m => synthetic.exists(m.fullName.contains))
     .take(maxMethods)
-  val funcs = methods.map { m =>
-    ujson.Obj(
-      "name"   -> m.fullName,
-      "file"   -> m.filename,
-      "params" -> ujson.Arr.from(m.parameter.name.l.filterNot(_ == "self")),
-      "body"   -> stmt(m.body)
-    )
+
+  // The file-level pseudo-method. It was previously excluded outright, which meant every
+  // module-level constant, class and `def` was an unresolvable free name — the single
+  // biggest contributor to the call-closure gap. It is now exported as an *initializer*:
+  // a zero-argument function whose body is a run of `setGlobal`s establishing the
+  // module-level frame. `<global>` is the C frontend's spelling of the same thing.
+  val moduleMethods = cpg.method.isExternal(false)
+    .l.filter(m => m.name == "<module>" || m.name == "<global>")
+    .filterNot(m => m.fullName.contains("<includes>"))
+    .sortBy(_.fullName)
+
+  val funcs = methods.map(emit(_, false))
+  val inits = moduleMethods.map(emit(_, true))
+  val all   = funcs ++ inits
+
+  os.write.over(os.Path(out, os.pwd), ujson.write(ujson.Arr.from(all), indent = 1))
+
+  def countKind(v: ujson.Value, k: String): Int = v match {
+    case o: ujson.Obj => (if (o.value.get("k").exists(_.str == k)) 1 else 0) +
+                         o.value.values.map(countKind(_, k)).sum
+    case a: ujson.Arr => a.value.map(countKind(_, k)).sum
+    case _            => 0
   }
-  os.write.over(os.Path(out, os.pwd), ujson.write(ujson.Arr.from(funcs), indent = 1))
-  println(s"exported ${funcs.size} functions to $out")
+  val doc = ujson.Arr.from(all)
+  println(s"exported ${funcs.size} functions + ${inits.size} module initializers to $out "
+        + s"(${countKind(doc, "closure")} closures, ${countKind(doc, "setGlobal")} global writes)")
 }

@@ -55,6 +55,7 @@ def Val.beq : Val → Val → Bool
   | .unit,    .unit    => true
   | .ref a,   .ref b   => a == b
   | .fn a,    .fn b    => a == b
+  | .clos a _, .clos b _ => a == b
   | .list a,  .list b  => Val.beqL a b
   | .tuple a, .tuple b => Val.beqL a b
   | .dict a,  .dict b  => Val.beqP a b
@@ -84,6 +85,7 @@ def Val.truthy : Val → Bool
   | .dict kvs => !kvs.isEmpty
   | .ref _    => true
   | .fn _     => true
+  | .clos _ _ => true
 
 /-- What a value iterates over, if anything. -/
 def Val.iterable : Val → Option (List Val)
@@ -154,7 +156,14 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
   | "+",  .int x,   .int y   => numToE (nc.add x y)
-  | "+",  .str x,   .str y   => .val (.str (x ++ y))
+  -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
+  -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
+  -- for both, so applying Python's string semantics under `.cLike` would be a silent
+  -- wrong answer of exactly the kind §12 is about. Under `.cLike` these are holes.
+  | "+",  .str _,   .str _   =>
+      match d with
+      | .python => .val (.str (match a, b with | .str x, .str y => x ++ y | _, _ => ""))
+      | .cLike  => .hole "str:pointer-arithmetic-not-modelled"
   | "+",  .list x,  .list y  => .val (.list (x ++ y))
   | "+",  .tuple x, .tuple y => .val (.tuple (x ++ y))
   | "-",  .int x, .int y => numToE (nc.sub x y)
@@ -165,8 +174,24 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "<=", .int x, .int y => .val (.bool (x ≤ y))
   | ">",  .int x, .int y => .val (.bool (x > y))
   | ">=", .int x, .int y => .val (.bool (x ≥ y))
-  | "<",  .str x, .str y => .val (.bool (x < y))
-  | ">",  .str x, .str y => .val (.bool (x > y))
+  | "<",  .str x, .str y =>
+      match d with
+      | .python => .val (.bool (x < y))
+      | .cLike  => .hole "str:pointer-compare-not-modelled"
+  | ">",  .str x, .str y =>
+      match d with
+      | .python => .val (.bool (x > y))
+      | .cLike  => .hole "str:pointer-compare-not-modelled"
+  -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
+  -- structural, so it is right for Python and wrong for C.
+  | "==", .str _, .str _ =>
+      match d with
+      | .python => .val (.bool (Val.beq a b))
+      | .cLike  => .hole "str:pointer-equality-not-modelled"
+  | "!=", .str _, .str _ =>
+      match d with
+      | .python => .val (.bool (!Val.beq a b))
+      | .cLike  => .hole "str:pointer-equality-not-modelled"
   | "==", x, y           => .val (.bool (Val.beq x y))
   | "!=", x, y           => .val (.bool (!Val.beq x y))
   | "&&", x, y           => .val (.bool (x.truthy && y.truthy))
@@ -294,8 +319,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .lit (.str s)  => (h, .val (.str s))
   | _+1, h, _, .lit (.bool b) => (h, .val (.bool b))
   | _+1, h, _, .lit .unit     => (h, .val .unit)
-  | _+1, h, ρ, .name x        => (h, .val (ρ.get x))
+  | _+1, h, ρ, .name x        =>
+      match ρ.find? (·.1 == x) with
+      | some (_, v) => (h, .val v)
+      | none        =>
+        -- Item 5: a bare name that is not a local may still be a module-level function.
+        -- Resolving it to a function value is what lets higher-order code (decorators,
+        -- callbacks) be translated instead of holed.
+        match ctx.resolve x with
+        | some _ => (h, .val (.fn x))
+        | none   => (h, .val .unit)
   | _+1, h, _, .fnref f       => (h, .val (.fn f))
+  | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
   | _+1, h, _, .hole l        => (h, .hole l)
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
@@ -383,8 +418,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr vs) =>
         match ctx.resolve f with
-        | none    => (h₁, .hole s!"call:{f}")
         | some fn => applyFunc ctx n h₁ fn none vs
+        | none    =>
+          -- Not a statically known function: it may be a function value or closure held
+          -- in a variable (`f = g; f(x)`, decorators, callbacks).
+          match ρ.get f with
+          | .fn g      => match ctx.resolve g with
+                          | some fn => applyFunc ctx n h₁ fn none vs
+                          | none    => (h₁, .hole s!"call:{g}")
+          | .clos g cap => match ctx.resolve g with
+                          | some fn => applyClosure ctx n h₁ fn cap vs
+                          | none    => (h₁, .hole s!"call:{g}")
+          | _          => (h₁, .hole s!"call:{f}")
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
@@ -427,6 +472,26 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
       | (h₁, .hole l)   => (h₁, .hole l)
       | (h₁, .outOfFuel)=> (h₁, .outOfFuel)
       | (h₁, _)         => (h₁, .hole "call:stray-control-flow")
+
+/-- Apply a closure: the captured bindings form the base environment, then parameters
+shadow them.
+
+Capture is by value. Reads of enclosing variables therefore work, which covers decorators
+and factory functions; a `nonlocal` **write** would need the binding to be a shared
+mutable cell, so the transpiler keeps it as an explicit hole rather than pretending. -/
+def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) → List Val →
+    Heap × EResult
+  | 0,   h, _,  _,   _  => (h, .outOfFuel)
+  | n+1, h, fn, cap, vs =>
+      let base : Env := cap
+      let ρ : Env := (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
+      match execStmt ctx n h ρ fn.body with
+      | (h₁, .ret v)     => (h₁, .val v)
+      | (h₁, .normal _)  => (h₁, .val .unit)
+      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+      | (h₁, _)          => (h₁, .hole "call:stray-control-flow")
 
 /-- Evaluate a list of expressions left to right, short-circuiting on the first
 non-value. -/
