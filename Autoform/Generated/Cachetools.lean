@@ -299,7 +299,7 @@ def f_cachetools___init___py__module__Cache_getsizeof : Func :=
   { name := "cachetools/__init__.py:<module>.Cache.getsizeof"
   , params := ["value"]
   , body := (.seq
-            (.expr (.lit (.str "\"\"Return the size of a cache element's value.\"\"")))
+            .skip
             (.ret (.lit (.int 1)))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
@@ -1003,7 +1003,7 @@ def f_cachetools___init___py__module___TimedCache__Timer___init__ : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache._Timer.__init__"
   , params := ["timer"]
   , body := (.seq
-            (.setField (.name "self") "_Timer__timer" (.name "timer"))
+            .skip
             (.setField (.name "self") "_Timer__nesting" (.lit (.int 0)))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache._Timer.__call__`  (from `cachetools/__init__.py`) -/
@@ -1211,7 +1211,7 @@ def f_cachetools___init___py__module__TTLCache__Link___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache._Link.__init__"
   , params := ["key", "expires"]
   , body := (.seq
-            (.setField (.name "self") "expires" (.name "key"))
+            (.setField (.name "self") "key" (.name "key"))
             (.setField (.name "self") "expires" (.name "expires"))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache._Link.__reduce__`  (from `cachetools/__init__.py`) -/

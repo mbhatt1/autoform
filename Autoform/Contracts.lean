@@ -509,79 +509,6 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
-/-- `methodkey` with its single hole implemented by `e`. Written out so that name
-resolution in the instantiated program can be discharged once, as three small lemmas,
-instead of inside every proof. -/
-def methodkeyWith (e : Expr) : Func :=
-  { f_cachetools_keys_py__module__methodkey with
-    body := (.seq (.expr (.lit (.str "\"\"Return a cache key for use with cached methods.\"\"")))
-              (.seq .skip (.ret (.call "hashkey" [e])))) }
-
-/-- The instantiated program. -/
-def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
-  [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
-
-/-- Any implementation of the one contracted label instantiates `keysProgram` to
-`keysProgramWith`. -/
-theorem onProgram_keysProgram {σ : Impl} {e : Expr}
-    (he : σ.lookup "op:starredUnpack" = some e) :
-    σ.onProgram keysProgram = keysProgramWith e := by
-  simp [Impl.onProgram, Impl.onFunc, keysProgram, keysProgramWith, methodkeyWith,
-    substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey]
-
-/-- The function table of the instantiated program. -/
-theorem table_keysProgramWith (e : Expr) : (keysProgramWith e).table =
-    [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
-    , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] := by
-  simp [Program.table, keysProgramWith, methodkeyWith,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
-
-private theorem filt_hashkey (e : Expr) :
-    List.filter (fun p : String × Func => p.1.endsWith ("." ++ "hashkey"))
-      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
-      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ]
-      = [("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)] := by
-  simp +decide [String.endsWith]
-
-private theorem filt_hashedTupleInit (e : Expr) :
-    List.filter (fun p : String × Func =>
-        p.1.endsWith ("." ++ "_HashedTuple" ++ "." ++ "__init__"))
-      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
-      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] = [] := by
-  simp +decide [String.endsWith]
-
-private theorem filt_init (e : Expr) :
-    List.filter (fun p : String × Func => p.1.endsWith ("." ++ "__init__"))
-      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
-      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] = [] := by
-  simp +decide [String.endsWith]
-
-/-- Substitution does not disturb name resolution: the entry point still resolves, by
-exact match on the fully qualified CPG name. -/
-theorem resolve_methodkey (e : Expr) :
-    (ctxOf (keysProgramWith e)).resolve "cachetools/keys.py:<module>.methodkey"
-      = some (methodkeyWith e) := by
-  simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
-  simp +decide
-
-/-- …and the call to `hashkey` still resolves, by `Ctx.resolve`'s unique-suffix rule.
-This is the one thing a two-function slice could get wrong; the `#eval`s at the end of the
-section check the same resolution in the full 238-function program. -/
-theorem resolve_hashkey (e : Expr) :
-    (ctxOf (keysProgramWith e)).resolve "hashkey"
-      = some f_cachetools_keys_py__module__hashkey := by
-  simp only [Ctx.resolve, ctxOf, table_keysProgramWith, filt_hashkey]
-  simp +decide
-
-/-- `_HashedTuple` has no translated `__init__`, so `Expr.alloc` returns the fresh
-reference without running one. -/
-theorem resolveMethod_hashedTuple_init (e : Expr) :
-    (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp only [Ctx.resolveMethod, Ctx.resolve, ctxOf, table_keysProgramWith,
-    filt_hashedTupleInit, filt_init]
-  simp +decide
-
 /-! ### Satisfiability first
 
 By `refinesUnder_of_unsatisfiable`, a contract-relative theorem says nothing until its
@@ -671,14 +598,16 @@ theorem methodkey_refinesUnder_value :
     simp only []
     rw [h2]
     exact Prod.ext h1 h2
-  rw [onProgram_keysProgram he] at hvf
+  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+    he, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hvf
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  rw [onProgram_keysProgram he]
-  simp [runFunc, resolve_methodkey, resolve_hashkey, resolveMethod_hashedTuple_init,
-    keysProgramWith, methodkeyWith, f_cachetools_keys_py__module__hashkey,
-    applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get,
+  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, String.endsWith, Env.set, Env.get,
     Val.truthy, Heap.alloc, hvf]
 
 set_option maxHeartbeats 2000000 in
@@ -703,13 +632,16 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
     exact Option.isSome_iff_exists.mp h1
   have hpost := hc.2 _ hmem e he
   simp only [raisesContract] at hpost
-  rw [onProgram_keysProgram he] at hpost
+  simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgram, substS, substE, substEL,
+    he, f_cachetools_keys_py__module__hashkey,
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  rw [onProgram_keysProgram he]
-  simp [runFunc, resolve_methodkey, keysProgramWith, methodkeyWith,
-    applyFunc, execStmt, evalExpr, evalList, Env.set, hpost]
+  simp +decide [runFunc, Impl.onProgram, Impl.onFunc, keysProgram,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
+    substS, substE, substEL, he, Ctx.resolve, Program.table,
+    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/

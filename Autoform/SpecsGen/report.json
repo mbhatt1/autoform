@@ -188,7 +188,7 @@
  },
  "vacuity_rate_pct": 16.8,
  "emitted": 89,
- "proved": 73,
+ "proved": 77,
  "open_obligations": 89,
  "build_clean": true,
  "by_family": {
@@ -268,7 +268,7 @@
    "candidates": 97,
    "refuted": 95,
    "vacuous": 0,
-   "proved": 1
+   "proved": 2
   },
   "raises": {
    "candidates": 1,
@@ -280,7 +280,7 @@
    "candidates": 3,
    "refuted": 0,
    "vacuous": 0,
-   "proved": 0
+   "proved": 3
   }
  },
  "specs": [
@@ -1632,9 +1632,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.__contains__",
    "kind": "law",
    "domain": 6,
-   "status": "proved",
-   "reason": "",
-   "proved": true,
+   "status": "unproved",
+   "reason": "no proof found by the generated portfolio",
+   "proved": false,
    "checked": {
     "holds": true,
     "domain": 6,
@@ -3134,9 +3134,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.maxsize",
    "kind": "universal",
    "domain": 0,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": null,
    "note": "accessor: returns receiver field _Cache__maxsize on every heap"
   },
@@ -3147,9 +3147,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.currsize",
    "kind": "law",
    "domain": 8,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": {
     "holds": true,
     "domain": 8,
@@ -3232,9 +3232,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.currsize",
    "kind": "law",
    "domain": 8,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": {
     "holds": true,
     "domain": 8,
@@ -3330,9 +3330,9 @@
    "subject": "cachetools/__init__.py:<module>.Cache.currsize",
    "kind": "universal",
    "domain": 0,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": null,
    "note": "accessor: returns receiver field _Cache__currsize on every heap"
   },
@@ -5488,9 +5488,9 @@
    "subject": "cachetools/__init__.py:<module>._TimedCache.timer",
    "kind": "universal",
    "domain": 0,
-   "status": "unproved",
-   "reason": "no proof found by the generated portfolio",
-   "proved": false,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
    "checked": null,
    "note": "accessor: returns receiver field _TimedCache__timer on every heap"
   },

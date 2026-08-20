@@ -1,0 +1,4099 @@
+{
+  "file": "/Users/mbhatt/autoform/Autoform/Generated/Cachetools.lean",
+  "module": "Autoform.Generated.Cachetools",
+  "seed": 20260819,
+  "operators": "generated-ast",
+  "spec_file": "/Users/mbhatt/autoform/Autoform/Specs/CachetoolsSpec.lean",
+  "spec_module": "Autoform.Specs.CachetoolsSpec",
+  "decls": [
+    "f_cachetools___init___py__module__Cache___contains__",
+    "f_cachetools___init___py__module__Cache_currsize",
+    "f_cachetools___init___py__module__Cache_getsizeof",
+    "f_cachetools___init___py__module__Cache_maxsize",
+    "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+    "f_cachetools___init___py__module__TTLCache__Link___init__",
+    "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+    "f_cachetools___init___py__module___DefaultSize___getitem__",
+    "f_cachetools___init___py__module___DefaultSize_pop",
+    "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+    "f_cachetools___init___py__module___TimedCache__Timer___init__",
+    "f_cachetools___init___py__module___TimedCache_expire",
+    "f_cachetools__cached_py__module___uncached_info_cache_clear",
+    "f_cachetools__cachedmethod_py__module___none"
+  ],
+  "mutants_generated": 57,
+  "mutants_run": 57,
+  "invalid": 1,
+  "theorems": {
+    "Cache_getsizeof_refines": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "DefaultSize_getitem_refines": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "DefaultSize_pop_refines": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "DefaultSize_setitem_mrefines": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Cache_maxsize_mrefines": {
+      "killed": 43,
+      "survived": 13,
+      "score": 0.7678571428571429,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        }
+      ]
+    },
+    "Cache_currsize_mrefines": {
+      "killed": 42,
+      "survived": 14,
+      "score": 0.75,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Cache_size_fields_distinct": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Cache_contains_mrefines": {
+      "killed": 42,
+      "survived": 14,
+      "score": 0.75,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Cache_contains_discriminates": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "TLRUItem_lt_mrefines": {
+      "killed": 42,
+      "survived": 14,
+      "score": 0.75,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "TLRUItem_lt_irrefl": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Timer_exit_mrefines": {
+      "killed": 44,
+      "survived": 12,
+      "score": 0.7857142857142857,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Timer_exit_decrements": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "Timer_init_mrefines": {
+      "killed": 43,
+      "survived": 13,
+      "score": 0.7678571428571429,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        }
+      ]
+    },
+    "Timer_init_sets_both": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "TTLLink_init_mrefines": {
+      "killed": 43,
+      "survived": 13,
+      "score": 0.7678571428571429,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "TTLSetstate_lambda_mrefines": {
+      "killed": 42,
+      "survived": 14,
+      "score": 0.75,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "TimedCache_expire_raises": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "cachedmethod_none_refines": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "cache_clear_reaches_hole": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    },
+    "cache_clear_not_refinable": {
+      "killed": 41,
+      "survived": 15,
+      "score": 0.7321428571428571,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-field:expires->expires__mutated",
+          "line": 1536,
+          "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+          "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+          "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }"
+        },
+        {
+          "op": "ast-name:self->exc",
+          "line": 1045,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.name \"self\")",
+          "after": "            (.name \"exc\")"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 3293,
+          "decl": "f_cachetools__cachedmethod_py__module___none",
+          "before": "  , body := (.ret (.lit .unit)) }",
+          "after": "  , body := (.expr (.lit .unit)) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 2835,
+          "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+          "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+          "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 287,
+          "decl": "f_cachetools___init___py__module__Cache_maxsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+          "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }"
+        },
+        {
+          "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+          "line": 295,
+          "decl": "f_cachetools___init___py__module__Cache_currsize",
+          "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+          "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }"
+        },
+        {
+          "op": "ast-name:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))"
+        },
+        {
+          "op": "ast-name:self->other",
+          "line": 1725,
+          "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+          "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+          "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 302,
+          "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+          "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:key->self",
+          "line": 205,
+          "decl": "f_cachetools___init___py__module__Cache___contains__",
+          "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+          "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }"
+        },
+        {
+          "op": "ast-setfield:key->expires",
+          "line": 1214,
+          "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+          "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+          "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 1047,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+          "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+          "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 1006,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+          "after": "            .skip"
+        },
+        {
+          "op": "ast-name:self->timer",
+          "line": 1007,
+          "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+          "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+          "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }"
+        }
+      ]
+    }
+  },
+  "mutants": [
+    {
+      "op": "ast-field:expires->expires__mutated",
+      "line": 1536,
+      "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+      "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+      "after": "  , body := (.ret (.field (.name \"obj\") \"expires__mutated\")) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 1536,
+      "decl": "f_cachetools___init___py__module__TTLCache___setstate____lambda_0",
+      "before": "  , body := (.ret (.field (.name \"obj\") \"expires\")) }",
+      "after": "  , body := (.expr (.field (.name \"obj\") \"expires\")) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 1214,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+      "after": "            .skip",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-polarity:false->true",
+      "line": 205,
+      "decl": "f_cachetools___init___py__module__Cache___contains__",
+      "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "after": "  , body := (.ret (.inOp true (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:self->exc",
+      "line": 1047,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "after": "            (.binop \"-\" (.field (.name \"exc\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-expr->ret",
+      "line": 294,
+      "decl": "f_cachetools___init___py__module__Cache_currsize",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))",
+      "after": "            (.ret (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 303,
+      "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+      "before": "            (.ret (.lit (.int 1)))) }",
+      "after": "            (.ret (.lit (.int 0)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-setfield:_Timer__nesting->_Timer__timer",
+      "line": 1007,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+      "after": "            (.setField (.name \"self\") \"_Timer__timer\" (.lit (.int 0)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 303,
+      "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+      "before": "            (.ret (.lit (.int 1)))) }",
+      "after": "            (.ret (.lit (.int 2)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-field:_Cache__maxsize->_Cache__maxsize__mutated",
+      "line": 287,
+      "decl": "f_cachetools___init___py__module__Cache_maxsize",
+      "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+      "after": "            (.ret (.field (.name \"self\") \"_Cache__maxsize__mutated\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 294,
+      "decl": "f_cachetools___init___py__module__Cache_currsize",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"The current size of the cache.\\\"\\\"\")))",
+      "after": "            .skip",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:0->1",
+      "line": 1007,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+      "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 30,
+      "decl": "f_cachetools___init___py__module___DefaultSize_pop",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.ret (.lit (.int 0))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 1007,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+      "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int -1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-field:expires->expires__mutated",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires__mutated\") (.field (.name \"other\") \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:NotImplementedError->time",
+      "line": 1197,
+      "decl": "f_cachetools___init___py__module___TimedCache_expire",
+      "before": "  , body := (.seq (.raise (.name \"NotImplementedError\")) .skip) }",
+      "after": "  , body := (.seq (.raise (.name \"time\")) .skip) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:self->exc",
+      "line": 1045,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.name \"self\")",
+      "after": "            (.name \"exc\")",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 3293,
+      "decl": "f_cachetools__cachedmethod_py__module___none",
+      "before": "  , body := (.ret (.lit .unit)) }",
+      "after": "  , body := (.expr (.lit .unit)) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->1",
+      "line": 2835,
+      "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+      "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+      "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 1))))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-field:_Cache__data->_Cache__data__mutated",
+      "line": 205,
+      "decl": "f_cachetools___init___py__module__Cache___contains__",
+      "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "after": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data__mutated\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:self->key",
+      "line": 1214,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+      "after": "            (.setField (.name \"key\") \"key\" (.name \"key\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-field:expires->expires__mutated",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires__mutated\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 287,
+      "decl": "f_cachetools___init___py__module__Cache_maxsize",
+      "before": "            (.ret (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+      "after": "            (.expr (.field (.name \"self\") \"_Cache__maxsize\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-binop:-->+",
+      "line": 1047,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "after": "            (.binop \"+\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-field:_Cache__currsize->_Cache__currsize__mutated",
+      "line": 295,
+      "decl": "f_cachetools___init___py__module__Cache_currsize",
+      "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+      "after": "            (.ret (.field (.name \"self\") \"_Cache__currsize__mutated\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:key->expires",
+      "line": 1214,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+      "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 2835,
+      "decl": "f_cachetools__cached_py__module___uncached_info_cache_clear",
+      "before": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int 0))))) }",
+      "after": "  , body := (.seq (.hole \"scope:nonlocal-write\") (.seq .skip (.assign \"misses\" (.lit (.int -1))))) }",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-name:self->other",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.ret (.binop \"<\" (.field (.name \"other\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:self->timer",
+      "line": 1006,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+      "after": "            (.setField (.name \"timer\") \"_Timer__timer\" (.name \"timer\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 30,
+      "decl": "f_cachetools___init___py__module___DefaultSize_pop",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.expr (.lit (.int 1))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 18,
+      "decl": "f_cachetools___init___py__module___DefaultSize___getitem__",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.expr (.lit (.int 1))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 303,
+      "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+      "before": "            (.ret (.lit (.int 1)))) }",
+      "after": "            (.expr (.lit (.int 1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-field:_Timer__nesting->_Timer__nesting__mutated",
+      "line": 1047,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting__mutated\") (.lit (.int 1)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.expr (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:expires->key",
+      "line": 1215,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"expires\" (.name \"expires\"))) }",
+      "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:other->self",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"self\") \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 286,
+      "decl": "f_cachetools___init___py__module__Cache_maxsize",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))",
+      "after": "            .skip",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-binop:<-><=",
+      "line": 1725,
+      "decl": "f_cachetools___init___py__module__TLRUCache__Item___lt__",
+      "before": "  , body := (.ret (.binop \"<\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "after": "  , body := (.ret (.binop \"<=\" (.field (.name \"self\") \"expires\") (.field (.name \"other\") \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 18,
+      "decl": "f_cachetools___init___py__module___DefaultSize___getitem__",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.ret (.lit (.int 0))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 295,
+      "decl": "f_cachetools___init___py__module__Cache_currsize",
+      "before": "            (.ret (.field (.name \"self\") \"_Cache__currsize\"))) }",
+      "after": "            (.expr (.field (.name \"self\") \"_Cache__currsize\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-expr->ret",
+      "line": 302,
+      "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+      "after": "            (.ret (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 1047,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 0)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:self->key",
+      "line": 205,
+      "decl": "f_cachetools___init___py__module__Cache___contains__",
+      "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "after": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"key\") \"_Cache__data\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 205,
+      "decl": "f_cachetools___init___py__module__Cache___contains__",
+      "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "after": "  , body := (.expr (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 18,
+      "decl": "f_cachetools___init___py__module___DefaultSize___getitem__",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.ret (.lit (.int 2))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 30,
+      "decl": "f_cachetools___init___py__module___DefaultSize_pop",
+      "before": "  , body := (.ret (.lit (.int 1))) }",
+      "after": "  , body := (.ret (.lit (.int 2))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-setfield:_Timer__timer->_Timer__nesting",
+      "line": 1006,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+      "after": "            (.setField (.name \"self\") \"_Timer__nesting\" (.name \"timer\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-expr->ret",
+      "line": 286,
+      "decl": "f_cachetools___init___py__module__Cache_maxsize",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))",
+      "after": "            (.ret (.lit (.str \"\\\"\\\"The maximum size of the cache.\\\"\\\"\")))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:self->key",
+      "line": 1215,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"expires\" (.name \"expires\"))) }",
+      "after": "            (.setField (.name \"key\") \"expires\" (.name \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-name:timer->self",
+      "line": 1006,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+      "after": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"self\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-setfield:expires->key",
+      "line": 1215,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"expires\" (.name \"expires\"))) }",
+      "after": "            (.setField (.name \"self\") \"key\" (.name \"expires\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "killed",
+        "DefaultSize_getitem_refines": "killed",
+        "DefaultSize_pop_refines": "killed",
+        "DefaultSize_setitem_mrefines": "killed",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "killed",
+        "Cache_size_fields_distinct": "killed",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "killed",
+        "TLRUItem_lt_mrefines": "killed",
+        "TLRUItem_lt_irrefl": "killed",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "killed",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "killed",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "killed",
+        "TimedCache_expire_raises": "killed",
+        "cachedmethod_none_refines": "killed",
+        "cache_clear_reaches_hole": "killed",
+        "cache_clear_not_refinable": "killed"
+      },
+      "timeout": false,
+      "attribution": "coarse"
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 302,
+      "decl": "f_cachetools___init___py__module__Cache_getsizeof",
+      "before": "            (.expr (.lit (.str \"\\\"\\\"Return the size of a cache element's value.\\\"\\\"\")))",
+      "after": "            .skip",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:key->self",
+      "line": 205,
+      "decl": "f_cachetools___init___py__module__Cache___contains__",
+      "before": "  , body := (.ret (.inOp false (.name \"key\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "after": "  , body := (.ret (.inOp false (.name \"self\") (.field (.name \"self\") \"_Cache__data\"))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "killed",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-setfield:key->expires",
+      "line": 1214,
+      "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+      "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+      "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "killed",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 1047,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___exit__",
+      "before": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 1)))) }",
+      "after": "            (.binop \"-\" (.field (.name \"self\") \"_Timer__nesting\") (.lit (.int 2)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "killed",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "survived",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 1006,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__timer\" (.name \"timer\"))",
+      "after": "            .skip",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "survived",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:self->timer",
+      "line": 1007,
+      "decl": "f_cachetools___init___py__module___TimedCache__Timer___init__",
+      "before": "            (.setField (.name \"self\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+      "after": "            (.setField (.name \"timer\") \"_Timer__nesting\" (.lit (.int 0)))) }",
+      "verdict": {
+        "Cache_getsizeof_refines": "survived",
+        "DefaultSize_getitem_refines": "survived",
+        "DefaultSize_pop_refines": "survived",
+        "DefaultSize_setitem_mrefines": "survived",
+        "Cache_maxsize_mrefines": "killed",
+        "Cache_currsize_mrefines": "survived",
+        "Cache_size_fields_distinct": "survived",
+        "Cache_contains_mrefines": "survived",
+        "Cache_contains_discriminates": "survived",
+        "TLRUItem_lt_mrefines": "survived",
+        "TLRUItem_lt_irrefl": "survived",
+        "Timer_exit_mrefines": "survived",
+        "Timer_exit_decrements": "survived",
+        "Timer_init_mrefines": "killed",
+        "Timer_init_sets_both": "survived",
+        "TTLLink_init_mrefines": "survived",
+        "TTLSetstate_lambda_mrefines": "survived",
+        "TimedCache_expire_raises": "survived",
+        "cachedmethod_none_refines": "survived",
+        "cache_clear_reaches_hole": "survived",
+        "cache_clear_not_refinable": "survived"
+      },
+      "timeout": false
+    }
+  ],
+  "coarse_attributions": 41
+}
