@@ -343,6 +343,29 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     else None
   }
 
+  /** `moduleAt`, tolerating the package prefix the parse root already stands for.
+    *
+    * An absolute import names a module by its *installed* path: `from ansible.errors
+    * import AnsibleError`. But a CPG is built from a directory, and that directory is
+    * usually the package itself — parse `ansible/lib/ansible` and `ansible.errors` lives
+    * at `errors.py`, not `ansible/errors.py`. `moduleAt` therefore missed every
+    * first-party absolute import and reported it `import:unresolved`, which on Ansible was
+    * 3,550 holes — the single largest category in the corpus, and not a language gap at
+    * all.
+    *
+    * So: try the path as given, then try dropping leading segments one at a time. Only a
+    * module that actually exists in this CPG can match, and a shorter path is tried only
+    * after every longer one has failed, so this cannot prefer a wrong module over a right
+    * one. It CAN match a same-named module from a different package if the real target is
+    * absent from the CPG — a genuine risk, and the reason the resolved name is recorded
+    * rather than assumed. */
+  def moduleAtTolerant(path: String): Option[String] = {
+    val segs = path.split('/').filter(_.nonEmpty).toList
+    (0 until segs.length).view
+      .map(i => moduleAt(segs.drop(i).mkString("/")))
+      .collectFirst { case Some(m) => m }
+  }
+
   /** A function value that reads a variable of an enclosing function is a *closure*;
     * one that does not is an `fnref`, which is cheaper and needs no captured frame. */
   val capturesEnv: Map[String, Boolean] = allMethods.map { m =>
@@ -453,14 +476,14 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       val base = if (dots == 0) Nil else dir
       val segs = base ++ rest.split('.').filter(_.nonEmpty).toList
       val path = segs.mkString("/")
-      moduleAt(path) match {
+      moduleAtTolerant(path) match {
         case None => hole("import:unresolved")
         case Some(mod) =>
           val target = mod + "." + name
           if (methodByName.contains(target))        fnValue(target)
           else if (classByFullName.contains(target)) typeValue(target + "<meta>")
           // `from . import keys` where `keys` is a sibling *module*, not a member.
-          else if (moduleAt(path + "/" + name).isDefined) hole("import:module-value")
+          else if (moduleAtTolerant(path + "/" + name).isDefined) hole("import:module-value")
           else hole("import:unresolved")
       }
     }
