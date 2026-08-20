@@ -976,3 +976,28 @@ All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.
 Open obligations, stated rather than admitted: general fuel monotonicity for the full
 language; loop invariants (`sumto`, `gcdish` are hole-free but need an invariant rule);
 heap-mutating methods (need a representation predicate).
+
+## 21. One more silent wrong number, found by the refinement layer
+
+Wiring `Numeric` into `applyBinop` left `applyUnop` untouched, so unary minus still
+returned mathematical negation unconditionally. Under `.cLike` that made `-INT_MIN`
+evaluate to `2147483648` — a value that does not exist in a 32-bit signed integer.
+
+Exactly the defect class `Numeric.lean` was built to eliminate, surviving on the path
+nobody thought to check. Found not by the differential oracle (no test negated `INT_MIN`)
+but by the **refinement layer**, which had to state `applyUnop_int_neg` as an unconditional
+`rfl` and noticed that the unconditionality was itself the bug.
+
+Now: negation routes through `NumConfig.neg`, and the C equation carries a `Fits32`
+hypothesis like every other operator.
+
+```
+applyUnop .cLike  "-" (-2147483648)  ==>  -2147483648   (wraps, matching cc -fwrapv)
+applyUnop .python "-" (-2147483648)  ==>   2147483648   (bignum, correct)
+```
+
+Third distinct oracle, third class of finding: differential testing catches semantics that
+disagree with reality, mutation catches specifications that constrain nothing, and
+**proof catches operations that were never given a specification at all.** They are not
+redundant — each sees a failure mode the others are blind to, which is the argument for
+paying for all three.

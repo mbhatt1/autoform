@@ -224,11 +224,26 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
     applyBinop .cLike "/" (.int x) (.int 0) = .exn (.str "ZeroDivisionError") := rfl
 
 /-- Built-in unary operators. -/
-def applyUnop (op : String) (a : Val) : EResult :=
+def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
-  | "-", .int x => .val (.int (-x))
+  -- Negation goes through `NumConfig` for the same reason the binary operators do:
+  -- `-INT_MIN` is not representable, so under a fixed-width dialect it must wrap, trap,
+  -- or become a hole — never the unrepresentable number. This path was left unchecked
+  -- when `Numeric` was first wired in, and `Autoform/Refine.lean` caught it.
+  | "-", .int x => numToE ((d.toNumConfig).neg x)
   | "!", x      => .val (.bool (!x.truthy))
   | _, _        => .hole s!"unop:{op}"
+
+/-- Negation is definitional under the unbounded (Python) config. -/
+@[simp] theorem applyUnop_py_neg (x : Int) :
+    applyUnop .python "-" (.int x) = .val (.int (-x)) := rfl
+
+/-- Under a fixed-width dialect negation only equals mathematical negation where the
+result is representable. `-INT_MIN` is precisely where it does not. -/
+@[simp] theorem applyUnop_c_neg {x : Int} (h : Fits32 (-x)) :
+    applyUnop .cLike "-" (.int x) = .val (.int (-x)) := by
+  simp [applyUnop, numToE, Dialect.toNumConfig, NumConfig.neg, NumConfig.finish,
+        NumConfig.c32Wrapv, NumConfig.c32, h]
 
 /-- Membership test. -/
 def valIn (x c : Val) : EResult :=
@@ -284,7 +299,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .hole l        => (h, .hole l)
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop op v)
+      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with

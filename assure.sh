@@ -33,6 +33,10 @@ hdr "2/5 conformance vs real runtime"
 python3 scripts/differential.py "ast-$MOD.json" "$SRC" "$MOD" 5 || echo "  conformance: divergences found (recorded)"
 
 hdr "3/5 axiom + escape-hatch audit"
+# The audit sweeps every declaration in the built library, so the WHOLE library must be
+# built first. autoform.sh only builds the generated module; without this the sweep aborts
+# on a missing .olean and reports FAIL for a reason that has nothing to do with soundness.
+lake build >/dev/null 2>&1 || echo "  (library build failed; audit will report it)"
 python3 scripts/audit_all.py || echo "  audit: findings recorded"
 
 hdr "4/5 specification teeth (mutation gate)"
