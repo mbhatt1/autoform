@@ -1467,3 +1467,51 @@ dialect axis it has under-provisioned it: one for integer division, then unary m
 strings, now widths and boolean-operator semantics. The right shape is a dialect per
 *language*, wired to the `NumConfig`s that already exist, with `infer_dialect` refusing
 rather than guessing — not another boolean.
+
+## §30 — The verifiable core survives execution about 40% of the time
+
+`scripts/core_oracle.py` ran the claimed verifiable core and refuted it. The claim was
+74 of 238 `cachetools` functions hole-free *and* call-closed. Executed over 1,056 cases
+with 100% of the claimed core exercised — 46 of them on arguments recorded from
+cachetools' own pytest suite under `sys.settrace` — **30 of 74 never holed**, and **21
+were refuted on a real input a CPython test actually passed**. Against the earlier
+45-function claim the same harness gave 24/45. The ratio is stable at roughly 40%.
+
+This is §17 again, measured. §17 said static hole-freedom is an upper bound on runtime
+hole-freedom. It is, and the factor is about 2.5x.
+
+Two distinct errors were tangled together, and separating them mattered:
+
+1. **A real bug in the ledger, now fixed.** `Ctx.resolvable` was widened to mirror
+   `Ctx.resolveMethod`'s first-match rule — correct for method calls, where `clear` has
+   9 candidates and the interpreter dispatches fine. But `Analysis.eCalls` flattened
+   `.call` and `.mcall` into one untagged `List String`, so the method rule was applied
+   to **free** calls too, which really use `Ctx.resolve` and its *unique*-match
+   requirement. `_wrapper` and `cache_clear` have several definitions each: the ledger
+   called them resolvable, `Ctx.resolve` returns `none` on the ambiguity, and the
+   interpreter holes. Calls are now tagged with their dispatch path and answered per
+   path. Cachetools' core: **74 → 69**.
+
+   Note the shape. The first version was too strict, understating the core by 14. The
+   fix for that overshot into too loose. Both were single-rule answers to a two-path
+   question, and a flat `List String` made the second error unstatable rather than
+   merely unnoticed.
+
+2. **Not a bug — the remaining gap.** The ambiguity fix accounts for 5 functions; the
+   oracle's 44 refutations are mostly something else. `setField:<f>:non-object` (89),
+   `mcall:clear:non-object` (90), `in:non-container` (80): setting an attribute on a
+   `Val.fn` (decorating a function) is not modelled, and `key in self` has no object
+   receiver. These are gaps in the *semantics*, not in the ledger's description of it,
+   and no amount of care in `Ledger.lean` would have found them. Only execution did.
+
+The recurring rule holds a fourth time: a metric computed from the same artifact it
+describes will flatter itself. `verifiableCore` is computed from the AST and the program
+table; the only thing that refuted it was running the program.
+
+Two apparatus defects the oracle's author caught in their own harness, worth recording
+because both would have produced a *better-looking* number: `differential.py`'s
+`parse_result` rejects `Val.clos`, which would have turned three genuine closure results
+into fake INCONCLUSIVEs; and a synthetic receiver with no fields makes every attribute
+access hole for reasons that are ours, not the program's, so `harness:` holes are
+excluded from the evidence entirely. §27 said the last divergence was the apparatus. It
+keeps being the apparatus.

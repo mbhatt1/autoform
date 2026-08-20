@@ -46,9 +46,9 @@ namespace Analysis
 
 mutual
 /-- Names called by an expression, via `call` or `mcall`. -/
-def eCalls : Expr → List String
-  | .call f as    => f :: eCallsL as
-  | .mcall r m as => m :: eCalls r ++ eCallsL as
+def eCalls : Expr → List (Bool × String)
+  | .call f as    => (false, f) :: eCallsL as
+  | .mcall r m as => (true, m) :: eCalls r ++ eCallsL as
   | .binop _ a b  => eCalls a ++ eCalls b
   | .unop _ a     => eCalls a
   | .index a b    => eCalls a ++ eCalls b
@@ -62,11 +62,11 @@ def eCalls : Expr → List String
   | .inOp _ a b   => eCalls a ++ eCalls b
   | _             => []
 /-- Names called across a list of expressions. -/
-def eCallsL : List Expr → List String
+def eCallsL : List Expr → List (Bool × String)
   | []      => []
   | e :: es => eCalls e ++ eCallsL es
 /-- Names called across key/value pairs. -/
-def eCallsP : List (Expr × Expr) → List String
+def eCallsP : List (Expr × Expr) → List (Bool × String)
   | []           => []
   | (k, v) :: ps => eCalls k ++ eCalls v ++ eCallsP ps
 end
@@ -99,7 +99,7 @@ def eRiskP : List (Expr × Expr) → Nat
 end
 
 /-- Names called by a statement. -/
-def sCalls : Stmt → List String
+def sCalls : Stmt → List (Bool × String)
   | .expr e         => eCalls e
   | .assign _ e     => eCalls e
   | .setField r _ v => eCalls r ++ eCalls v
@@ -130,40 +130,58 @@ def sRisk : Stmt → Nat
 
 end Analysis
 
-/-- Every name this function calls. -/
-def Func.calls (f : Func) : List String := Analysis.sCalls f.body
+/-- Calls in this function, each tagged with the dispatch path the interpreter will
+take: `true` for a method call (`mcall`, resolved by `Ctx.resolveMethod`), `false` for a
+free call (`call`, resolved by `Ctx.resolve`). The tag is the whole point — the two paths
+have *different* resolution rules, and a flat `List String` cannot say which applies. -/
+def Func.calls (f : Func) : List (Bool × String) := Analysis.sCalls f.body
 
 /-- How many constructs in this function could hole at runtime. -/
 def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
 
-/-- Can the interpreter resolve this callee?
+/-- Can the interpreter resolve this callee, on the path it will actually take?
 
-Must mirror what `evalExpr` actually does, not something stricter. `Ctx.resolve` requires
-a **unique** suffix match, but the `mcall` path uses `Ctx.resolveMethod`, which takes the
-first match — so names like `clear` (9 candidate methods), `__init__` (22) or `pop` (3)
-were being reported unresolvable while the interpreter dispatches them fine. That
-discrepancy alone understated the verifiable core by 14 functions on `cachetools`.
+Must mirror what `evalExpr` actually does — neither stricter nor looser. The two call
+paths do not agree, and collapsing them is how this went wrong twice in opposite
+directions:
 
-A ledger that is stricter than the artifact it describes is wrong in the *safe*
-direction, which makes it easy to leave unnoticed — but it is still wrong, and it hides
-where the real gap is. -/
-def Ctx.resolvable (ctx : Ctx) (n : String) : Bool :=
-  (ctx.resolve n).isSome
-  || ctx.table.any (fun q => q.1.endsWith ("." ++ n))
-  -- Modelled builtins are resolvable too. `knowsFree` is exact at the name level and is
-  -- the *guard* in front of `builtin`, so an unlisted case is dead code rather than a
-  -- ledger overstatement — the drift direction that matters cannot rot.
-  --
-  -- `knowsMethod` is deliberately NOT consulted. It is only an upper bound: methods are
-  -- modelled per receiver shape (`pop` is answered on a dict, refused on a str), and a
-  -- static ledger has no receiver. Its author measured the pure methods as worth +1
-  -- function, so excluding them costs almost nothing and buys an honest number.
-  || Stdlib.knowsFree ctx.dialect n
+* **Too strict.** `Ctx.resolve` requires a *unique* suffix match, and applying that rule
+  to method calls reported `clear` (9 candidate methods), `__init__` (22) and `pop` (3)
+  as unresolvable while the interpreter dispatches them fine — understating the core by
+  14 functions. A ledger stricter than the artifact it describes is wrong in the *safe*
+  direction, which makes it easy to leave unnoticed, but it still hides the real gap.
+
+* **Too loose.** The fix for that applied `resolveMethod`'s first-match rule to *free*
+  calls as well, and `scripts/core_oracle.py` refuted it by execution: `_wrapper` and
+  `cache_clear` have several definitions, so the ledger called them resolvable while
+  `Ctx.resolve` — which the `call` path really uses — returns `none` on the ambiguity and
+  the interpreter holes. That loosening is most of why the claimed core jumped 45 → 74.
+
+So the predicate now takes the dispatch tag from `Func.calls` and answers per path. -/
+def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
+  if isMethod then
+    -- Mirrors `Ctx.resolveMethod`, which takes the *first* match. Still an upper bound:
+    -- it asks only whether some class defines the name, not whether *this* receiver's
+    -- class does — a static ledger has no receiver.
+    ctx.table.any (fun q => q.1.endsWith ("." ++ n))
+  else
+    -- Mirrors `Ctx.resolve` exactly, ambiguity and all: two suffix matches resolve to
+    -- nothing, so two matches must not count as resolvable.
+    (ctx.resolve n).isSome
+    -- Modelled builtins are resolvable too. `knowsFree` is exact at the name level and is
+    -- the *guard* in front of `builtin`, so an unlisted case is dead code rather than a
+    -- ledger overstatement — the drift direction that matters cannot rot.
+    --
+    -- `knowsMethod` is deliberately NOT consulted. It is only an upper bound: methods are
+    -- modelled per receiver shape (`pop` is answered on a dict, refused on a str), and a
+    -- static ledger has no receiver. Its author measured the pure methods as worth +1
+    -- function, so excluding them costs almost nothing and buys an honest number.
+    || Stdlib.knowsFree ctx.dialect n
 
 /-- Hole-free **and** every call target resolves inside the program. -/
 def Program.callClosed (p : Program) : List Func :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table }
-  p.verifiableCore.filter (fun f => f.calls.all ctx.resolvable)
+  p.verifiableCore.filter (fun f => f.calls.all (fun c => ctx.resolvable c.1 c.2))
 
 /-- Per-program translation evidence. -/
 structure Coverage where
