@@ -1,8 +1,10 @@
-# Does this survive a large codebase?
+# Scale: behaviour on a large codebase
 
 Every number in `README.md` and `STRATEGY.md` comes from one corpus: `cachetools`, 1,637
-lines, 238 functions at the time of writing (now 209). "Point it at an arbitrary codebase" was never tested. This is that
-test, on seven open-source Python repositories from 8.8k to 165k lines.
+lines, 238 functions at the time of writing (now 209). "Point it at an arbitrary codebase"
+was never tested. This document records that test, on seven open-source Python
+repositories from 8.8k to 165k lines. Figures move with every change to the pipeline;
+where a document and an artifact disagree, the artifact wins.
 
 Reproduce with `scripts/scale_test.py`, which runs the same stages as `autoform.sh` but
 times, memory-profiles and error-captures each one separately, and writes nothing into
@@ -13,7 +15,7 @@ scripts/scale_test.py --scratch /tmp/scale --out scale-results.json \
   --target ScaleRequests /path/to/requests
 ```
 
-## The short answer
+## Summary
 
 **Largest codebase that works end to end on the pipeline as committed: `requests`,
 12,032 lines / 751 functions.** Everything larger fails, and the first thing that breaks
@@ -25,8 +27,8 @@ Python's default 1,000-frame recursion limit.
 produces a 54 MB neutral AST, the renderer emits 503,485 lines of Lean, Lean elaborates
 it in 110 s at 10.3 GB peak RSS, and the ledger reports 5,574 call-closed functions.
 
-So the architecture scales. The *implementation* has three fixed-size limits that were
-never parameterized, and one genuinely superlinear stage.
+The architecture scales. The *implementation* has three fixed-size limits that were never
+parameterized, and one superlinear stage.
 
 "Arbitrary codebase" is therefore **aspirational as shipped and plausible as designed**:
 the two blocking failures are one-line configuration changes, the third (the ledger) is a
@@ -52,14 +54,14 @@ Every row except `requests` needed `--recursion-limit`; `django` additionally ne
 `-DmaxRecDepth=60000` (all rows above `requests` ran with 8,000, which is why `django`'s
 `build` column is the 60,000 rerun). Neither workaround edits the pipeline: the first
 runs `render_lean.py` unmodified on a big-stack thread, the second passes an option to
-`lean`. Both exist so the run could go on to find what breaks *next*.
+`lean`.
 
 **These timings are noisy.** Several agents were building the same Lean project
-concurrently throughout. The clearest evidence is the control row: `requests` measured
-6/7/8/2/6/3 s in one run and 15/22/28/9/33/11 s in another, on identical input — a 4-5x
-spread from machine load alone. Treat the *shape* of the growth as the result and the
-absolute seconds as an upper bound. The one number too large to be explained by
-contention is the Django ledger at 363 s (see below).
+concurrently throughout. The control row: `requests` measured 6/7/8/2/6/3 s in one run and
+15/22/28/9/33/11 s in another, on identical input — a 4-5x spread from machine load alone.
+Treat the *shape* of the growth as the result and the absolute seconds as an upper bound.
+The one number too large to be explained by contention is the Django ledger at 363 s (see
+below).
 
 ### Coverage, from the ledger
 
@@ -74,18 +76,25 @@ contention is the Django ledger at 363 s (see below).
 | `rich`     | 2,087  | 914 (44%) | 675 (32%) | 3,361  | 119,630 | 13,045 |
 | `django/`  | 10,623 | 6,926 (65%) | **5,574 (52%)** | 12,010 | 397,571 | 76,694 |
 
-**Coverage does not collapse at scale — it improves.** The call-closed fraction on Django
-is 52%, nearly three times the 19% published for `cachetools`. That is not the transpiler
-getting better; it is §18's call-closure gap being an artifact of corpus *size*. A small
-library calls mostly outward, into a stdlib that is not modelled, so almost nothing is
-call-closed. A large framework calls mostly inward, into itself, so its callees resolve
-inside the translated program. The honest reading is that `cachetools`' 19% understated
-what the method achieves on the kind of codebase it was designed for, and that the
-"modelled standard library" identified as the next piece of work matters *less* the
-bigger the target is.
+**Coverage does not collapse at scale.** The call-closed fraction on Django is 52%.
+
+The `cachetools` figure this was originally compared against was 19%, and the comparison
+was read as evidence that call closure is largely an artifact of corpus *size*: a small
+library calls mostly outward into an unmodelled stdlib, while a large framework calls
+mostly inward and its callees resolve inside the translated program.
+
+**That reading no longer follows from these two numbers.** `cachetools` is now 101/209 =
+48%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
+`fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
+`<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
+original gap was a resolution defect in the exporter, not a property of corpus size.
+
+The size effect may still exist; it is simply not measurable from a 48%-versus-52%
+comparison. Establishing it would require re-running Django with the current exporter,
+which has not been done — every Django figure in this table predates that work.
 
 Hole *density* is stable — 2.4%-3.0% of AST nodes across every corpus including Django's
-397,571 nodes — so translation quality itself is size-independent. The hole causes shift:
+397,571 nodes — so translation quality is size-independent. The hole causes shift:
 Django's top cause is `import:unresolved` (5,122), which barely registers on `cachetools`.
 
 ## Where it breaks, in the order it breaks
@@ -97,7 +106,7 @@ Django's top cause is `import:unresolved` (5,122), which barely registers on `ca
 1,000-frame limit. `Stmt.seq` is right-nested, so a module body of *n* top-level
 statements is an AST of depth *n*.
 
-Bisected exactly, with a synthetic module of *n* consecutive assignments:
+Bisected, with a synthetic module of *n* consecutive assignments:
 
 > **the stock renderer handles 246 top-level statements in a single file and fails at 247**
 > with `RecursionError: maximum recursion depth exceeded`.
@@ -115,17 +124,17 @@ Observed depths (the deepest `<module>` initializer per repo):
 | `click` | `tests/test_options.py` | 675 | **RecursionError** |
 | `sqlparse` | `sqlparse/keywords.py` | 576 | **RecursionError** |
 
-This is the whole reason the ceiling is 12k lines. Note that it is **not** a function of
-repository size at all: `sqlparse` at 8.8k lines fails and `requests` at 12k lines passes,
-because the trigger is one file's top-level statement count. `sqlparse/keywords.py` is a
-long list of regex/keyword bindings; that one file, in a repo a fifth of Django's size,
-defeats the pipeline. Any repo with a generated table, a long `__all__`-style block, or a
-big constants module hits this — which is most real Python.
+This is why the ceiling is 12k lines. It is **not** a function of repository size:
+`sqlparse` at 8.8k lines fails and `requests` at 12k lines passes, because the trigger is
+one file's top-level statement count. `sqlparse/keywords.py` is a long list of
+regex/keyword bindings; that one file, in a repo a fifth of Django's size, defeats the
+pipeline. Any repo with a generated table, a long `__all__`-style block, or a big
+constants module hits this.
 
 **Fix:** either raise the limit and the thread stack in `render_lean.py`, or make the
 printer iterative over the `seq` spine (a module body is a *list* of statements masquerading
 as a right-nested tree, so an explicit worklist is the structurally honest version). The
-second is better: `set_option`-style limit raising just moves the cliff.
+second is better: raising the limit moves the cliff.
 
 ### 2. Lean's `maxRecDepth` overflows on the `program` function list
 
@@ -159,11 +168,10 @@ The ledger is the only stage whose cost grows faster than its input:
 | `django/` | 10,623 | **363** | **0.034** |
 
 Five times the functions cost **55 times** the wall-clock, and unlike the other stages
-this cannot be blamed on contention — it is a single-threaded `lean` process, and the
+this cannot be attributed to contention — it is a single-threaded `lean` process, and the
 per-function cost rises by an order of magnitude across the range.
 
-The cause is visible in the source and predicted by it. `Program.table` is an association
-`List`:
+The cause is in the source. `Program.table` is an association `List`:
 
 ```lean
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -184,18 +192,17 @@ ledger problem — `Ctx.resolve` is on the interpreter's hot path (`evalExpr`'s 
 `.mcall` and `.alloc` cases all go through it), so every future evaluation and every
 conformance run pays the same O(F) per call on a large program.
 
-### 4. Memory grows with the generated module, and it grows fast
+### 4. Memory grows with the generated module
 
 Peak RSS is dominated by `lean` elaborating the generated module, and it grows faster
 than the module does: 6.5 MB of Lean → 2.4 GB, 11.9 MB → 3.7 GB, 34.8 MB → 10.3 GB. That
 is roughly 300 MB of RSS per MB of generated Lean, near-linear in file size but with a
-large constant, and it is the constraint that will bite first on a machine with less than
+large constant, and it is the constraint that binds first on a machine with less than
 16 GB. Nothing OOM'd here; Django at 10.3 GB is the largest observed and it completed.
 
-Joern is the other memory consumer and is much better behaved: 5.2 GB parsing Django's
+Joern is the other memory consumer and is better behaved: 5.2 GB parsing Django's
 165k lines, 4.8 GB exporting it, both well inside default JVM settings. **Joern never
-failed, never OOM'd and never timed out on any target** — the front end that was expected
-to be the fragile part is the sturdiest stage in the pipeline.
+failed, never OOM'd and never timed out on any target.**
 
 ## What was *not* measured
 
@@ -204,8 +211,7 @@ to be the fragile part is the sturdiest stage in the pipeline.
   cost, so it is exercised by `scripts/differential.py`, not by translation or
   elaboration, and no differential run was made on these corpora — running one requires
   each repo's test suite as the specimen source. The quadratic is legible in the source
-  and consistent with the `Program.table` finding, but it is **unmeasured**, and it is
-  named here rather than asserted.
+  and consistent with the `Program.table` finding, but it is **unmeasured**.
 * **`assure.sh`** end to end (axiom sweep, mutation gate, SACM) on a large corpus. Only
   the `autoform.sh` stages were run.
 * **Conformance percentages at scale.** The 100% figures in `README.md` remain
