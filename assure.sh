@@ -11,7 +11,8 @@
 #   2. conformance          Lean interpreter vs the real runtime     (differential.py)
 #   3. axiom + escape audit every declaration, every escape hatch    (audit_all.py)
 #   4. specification teeth  mutation gate over the Lean theorems     (mutate.py)
-#   5. assurance case       SACM argument + in-toto attestation      (sacm.py)
+#   5. contract registry    which theorems are conditional          (emit_contracts.py)
+#   6. assurance case       SACM argument + in-toto attestation      (sacm.py)
 #
 # Steps 2-4 may legitimately FAIL — a divergence, a leaked axiom, a surviving mutant are
 # all real findings. The pipeline records them and continues, because a suppressed finding
@@ -52,6 +53,12 @@ else
 fi
 
 hdr "5/5 assurance case"
+# Contract-relative theorems must be emitted BEFORE the assurance case is built: if
+# contracts-$MOD.json is absent, sacm.py simply omits the G.CONTRACT branch, and a
+# conditional theorem that never reaches the case reads exactly like an unconditional
+# one. A failure here is therefore not "|| true" -- it is a missing argument branch.
+python3 scripts/emit_contracts.py "$MOD"
+
 python3 scripts/sacm.py --module "$MOD"
 STATUS=$?
 

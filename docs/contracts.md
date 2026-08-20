@@ -99,7 +99,12 @@ In order. A theorem that fails any of these is not weak evidence, it is no evide
    visible; they do not make it true.
 5. **Check the fuel budget.** `Contract.fuel` is the cost assumed for the untranslated
    construct. It is what keeps the `N` in a `RefinesUnder` theorem from being a lie.
-6. **Check the program the theorem is about.** The demonstrations here are stated over a
+6. **Check the name-resolution lemmas.** `resolve_methodkey`, `resolve_hashkey`,
+   `resolve_kwargs` and `resolveMethod_hashedTuple_init` are stated separately rather than
+   buried in an evaluation proof, because they are the facts that make the demonstration's
+   program slice equivalent to the whole corpus, and they are the ones a reader should
+   check against the real `cachetools`.
+7. **Check the program the theorem is about.** The demonstrations here are stated over a
    two-function slice of the translated `cachetools`, using the generated `Func` values
    verbatim. The only thing a slice can change is name resolution, since `Ctx.resolve`
    falls back to a unique-suffix match over the function table. `#eval`s at the end of the
@@ -133,6 +138,8 @@ function is outside the verifiable core.
 * `methodkey_refinesUnder_raise` — under a *different* contract, the same function refines
   `raise payload` instead. The contract is load-bearing: it determines the conclusion, it
   does not merely permit a fixed one.
+* `methodkey_raise_result` — the raising theorem paired with the one payload whose
+  satisfiability is proved.
 * `satisfiable_raises_zeroDiv` — and satisfiability of a raising contract is not free.
   Core can raise `ZeroDivisionError` (witness: `1 / 0`), so that payload is meetable; an
   assumption that the hole raises some arbitrary payload is *not* automatically meetable,

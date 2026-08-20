@@ -276,6 +276,9 @@ def build_case(module, root):
         # AST alone cannot report (STRATEGY.md §17).
         "ledger": os.path.join(root, f"ledger-{module}.json"),
         "axioms": os.path.join(root, "axioms.json"),
+        # Contract-relative theorems: which results are conditional, on what, and
+        # whether the conditions are known to be satisfiable (scripts/emit_contracts.py).
+        "contracts": os.path.join(root, f"contracts-{module}.json"),
         # Fallback: the repo-wide audit sweep, if the per-module axiom dump is absent.
         "audit": os.path.join(root, "audit.json"),
     }
@@ -486,6 +489,80 @@ def build_case(module, root):
                 count=n, sites=sites.get(label))
             c.link(aid, cov, "SUPPORTS")
             c.link(aid, top, "SUPPORTS")
+
+        # ---- Contract-relative theorems ------------------------------------
+        # A theorem proved under a contract is a *conditional* claim, and the condition
+        # belongs to that theorem, not to the module: discharging `op:starredUnpack` for
+        # one function says nothing about the other 32 occurrences. So each `relativeTo`
+        # entry becomes an Assumption attached to the theorem's own claim, and is NOT
+        # linked to the top goal the way a module-wide hole assumption is.
+        #
+        # Two rules, both from theorems in `Autoform/Contracts.lean` rather than taste:
+        #
+        #   `refinesUnder_of_unsatisfiable` — an unsatisfiable contract environment
+        #   proves EVERY spec. So `satisfiable: false` is a disqualification, not a
+        #   caveat: the claim is recorded DEFEATED and linked COUNTERS, because it
+        #   carries no information at all.
+        #
+        #   `methodkey_not_refinable_under_top` — `topContract` ("the hole may do
+        #   anything") is satisfiable and still proves nothing. So `satisfiable: true`
+        #   is necessary and NOT sufficient, and this consumer must not treat it as a
+        #   green light on its own.
+        con = art.get("contracts")
+        if isinstance(con, dict) and con.get("module") == module:
+            ths = con.get("theorems") or []
+            # The parent cannot outrank its children. A first cut had this SUPPORTED
+            # whenever any contract-relative theorem existed, so a DEFEATED child sat
+            # under a green parent — the same shape as a metric computed from the
+            # artifact it describes. Status is the weakest of the children.
+            nsat = sum(1 for t in ths if not t.get("satisfiable"))
+            cong = c.claim(
+                "G.CONTRACT",
+                f"Every contract-relative result about {module} is recorded as "
+                f"conditional, with its assumptions attached to the theorem that "
+                f"carries them ({len(ths)} such theorems"
+                + (f"; {nsat} with NO satisfiability proof and therefore vacuous)."
+                   if nsat else ")."),
+                status=(UNDEVELOPED if not ths
+                        else DEFEATED if nsat else SUPPORTED),
+                evidence_kind=PROOF, scope=module)
+            c.link(cong, top, "SUPPORTS")
+            c.reason("R.CONTRACT",
+                     "A contract-relative theorem and an unconditional one are "
+                     "different claims. Satisfiability of the contract environment is "
+                     "necessary for the former to say anything "
+                     "(`refinesUnder_of_unsatisfiable`) and is not sufficient "
+                     "(`methodkey_not_refinable_under_top`).",
+                     strategy="argument-over-assumptions")
+            for t in ths:
+                name = t.get("theorem", "?")
+                rel = t.get("relativeTo") or []
+                sat = bool(t.get("satisfiable"))
+                proof = t.get("satisfiabilityProof")
+                short = name.rsplit(".", 1)[-1]
+                tid = c.claim(
+                    "G.CONTRACT." + short,
+                    f"`{name}` holds relative to {len(rel)} contract(s). "
+                    + (f"Satisfiability proved by `{proof}`."
+                       if sat else
+                       "NO satisfiability proof: by `refinesUnder_of_unsatisfiable` an "
+                       "unsatisfiable environment proves every spec, so this theorem "
+                       "carries no information."),
+                    status=SUPPORTED if sat else DEFEATED,
+                    evidence_kind=PROOF, scope=name)
+                c.link(tid, cong, "SUPPORTS" if sat else "COUNTERS")
+                for a in rel:
+                    lbl = a.get("label", "?")
+                    aid2 = c.assume(
+                        f"A.{short}.{lbl}".replace(" ", "-"),
+                        f"Assumed of `{name}` only: the hole `{lbl}` satisfies "
+                        f"\"{a.get('statement', '')}\" at fuel >= "
+                        f"{a.get('fuelBound', '?')}. This is an assumption of THIS "
+                        f"theorem, not of {module}: the same label occurs elsewhere "
+                        f"and is not discharged there.",
+                        count=1)
+                    # Attached to the theorem's goal, never to the module's top goal.
+                    c.link(aid2, tid, "SUPPORTS")
         # ---- The restricted core -------------------------------------------
         # §17: static hole-freedom is an UPPER BOUND, not a guarantee — the
         # interpreter introduces holes at runtime that the AST cannot show. So the

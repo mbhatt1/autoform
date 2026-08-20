@@ -813,6 +813,34 @@ are evidence for a reader, not part of any proof. -/
   [pureValueContract "op:starredUnpack"]
   (some "Autoform.Contracts.Demo.satisfiable_pureValue")).pretty
 
+/-! ### The registry `scripts/sacm.py` consumes
+
+One record per contract-relative theorem in this module. Keeping it beside the theorems
+is deliberate: a registry maintained anywhere else drifts, and a contract-relative
+theorem that is *missing* from the assurance case reads exactly like an unconditional
+one. `scripts/emit_contracts.py` renders this to `contracts-<Module>.json`. -/
+
+def contractRecords : List Lean.Json :=
+  [ assumptionsJson
+      "Autoform.Contracts.Demo.methodkey_refinesUnder_value"
+      [pureValueContract "op:starredUnpack"]
+      (some "Autoform.Contracts.Demo.satisfiable_pureValue")
+  , assumptionsJson
+      "Autoform.Contracts.Demo.methodkey_refinesUnder_raise"
+      [raisesContract "op:starredUnpack" (.int 0)]
+      (some "Autoform.Contracts.Demo.satisfiable_raises_zeroDiv")
+  ]
+-- `methodkey_not_refinable_under_top` is deliberately NOT in this list. It is a
+-- *negative* result -- `topContract` is satisfiable (`satisfiable_top`) and still proves
+-- nothing -- so listing it beside the positive records would file a refutation as
+-- support. What it establishes belongs in the consumer's justification instead:
+-- `satisfiable: true` is necessary for a contract-relative theorem to carry
+-- information, and it is not sufficient. See `scripts/sacm.py`.
+
+/-- Rendered registry, for the emitter. -/
+def contractRecordsJson (module : String) : Lean.Json :=
+  Lean.Json.mkObj [("module", .str module), ("theorems", .arr contractRecords.toArray)]
+
 end Demo
 
 end Autoform.Contracts

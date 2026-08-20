@@ -16,3 +16,4 @@ __pycache__/
 *.key
 Autoform/Generated/Scale*.lean
 Autoform/Generated/Lang*.lean
+contracts-*.json
