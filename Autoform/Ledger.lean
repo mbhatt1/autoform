@@ -148,7 +148,17 @@ A ledger that is stricter than the artifact it describes is wrong in the *safe*
 direction, which makes it easy to leave unnoticed — but it is still wrong, and it hides
 where the real gap is. -/
 def Ctx.resolvable (ctx : Ctx) (n : String) : Bool :=
-  (ctx.resolve n).isSome || ctx.table.any (fun q => q.1.endsWith ("." ++ n))
+  (ctx.resolve n).isSome
+  || ctx.table.any (fun q => q.1.endsWith ("." ++ n))
+  -- Modelled builtins are resolvable too. `knowsFree` is exact at the name level and is
+  -- the *guard* in front of `builtin`, so an unlisted case is dead code rather than a
+  -- ledger overstatement — the drift direction that matters cannot rot.
+  --
+  -- `knowsMethod` is deliberately NOT consulted. It is only an upper bound: methods are
+  -- modelled per receiver shape (`pop` is answered on a dict, refused on a str), and a
+  -- static ledger has no receiver. Its author measured the pure methods as worth +1
+  -- function, so excluding them costs almost nothing and buys an honest number.
+  || Stdlib.knowsFree ctx.dialect n
 
 /-- Hole-free **and** every call target resolves inside the program. -/
 def Program.callClosed (p : Program) : List Func :=

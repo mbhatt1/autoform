@@ -109,6 +109,10 @@ def expr_shape(n):
     # A function value that reads variables of an enclosing function. `fnref` is the
     # cheaper form and is used wherever the exporter proved there is nothing to capture.
     if k == "closure": return ".closure", [("atom", lean_str(f('f')))]
+    # A *class* that captures its defining scope: instances carry the captured frame, so
+    # their methods can read the enclosing function's variables. `closure` names a
+    # function and cannot stand in for this.
+    if k == "classClosure": return ".classClosure", [("atom", lean_str(f('c')))]
     if k == "listE":  return ".listE", [("es", f('items'))]
     if k == "tupleE": return ".tupleE", [("es", f('items'))]
     if k == "dictE":  return ".dictE", [("ps", f('pairs'))]
@@ -137,6 +141,10 @@ def stmt_shape(n):
     if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
+    # `try: body finally: fin`. Distinct from `tryCatch` because it intercepts *every* way
+    # control leaves the body — return/break/continue as well as exceptions — and then
+    # re-raises that outcome unless the finalizer itself leaves abnormally.
+    if k == "tryFinally": return ".tryFinally", [("s", f('body')), ("s", f('fin'))]
     if k == "raise":    return ".raise", [("e", f('e'))]
     if k == "del":      return ".del", [("atom", lean_str(f('x')))]
     # --- module-level scope ---

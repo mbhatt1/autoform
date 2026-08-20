@@ -326,15 +326,19 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     else ujson.Obj("k" -> "fnref", "v" -> out)
   }
 
-  /** A class used as a value. Usually an `fnref` — but a class *defined inside a
-    * function* whose methods read that function's variables is a capturing value too, and
-    * `Expr.closure` names a function, not a class, so there is nothing to emit. Rather
-    * than hand back an `fnref` whose methods would later find those names unbound, say so. */
+  /** A class used as a value. Usually an `fnref` — but a class *defined inside a function*
+    * whose methods read that function's variables carries an environment, and `Expr.closure`
+    * names a function, not a class. `Expr.classClosure` is the constructor for that case:
+    * it captures the environment at the point the `class` statement runs, `Expr.alloc`
+    * stores it on the instance, and method dispatch on such an instance resolves free
+    * names against it. Handing back a plain `fnref` here — the thing this refused to do
+    * while there was no constructor — would have produced methods whose names were unbound. */
   def typeValue(target: String): ujson.Obj = {
     val cls = target.stripSuffix("<meta>")
     val captures = allMethods.exists(m =>
       m.fullName.startsWith(cls + ".") && capturesEnv.getOrElse(m.fullName, false))
-    if (captures) hole("scope:class-closure") else ujson.Obj("k" -> "fnref", "v" -> target)
+    if (captures) ujson.Obj("k" -> "classClosure", "c" -> target)
+    else ujson.Obj("k" -> "fnref", "v" -> target)
   }
 
   // ---- per-method translation state ------------------------------------------
@@ -352,6 +356,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   // Serial number for the flag variable `try/except/else` needs; nested `try`s in one
   // function must not share it, or the inner one's flag would drive the outer's `else`.
   var elseFlagSeq     = 0
+  /** `t -> (receiver, method)` for every `t = r.m` in the method being translated, where
+    * `r` is a plain identifier. The Python frontend's `with` lowering binds the context
+    * manager's `__enter__`/`__exit__` this way and then calls the *temporary*, which
+    * leaves a call with no name at all. See `boundMethodCall`. */
+  var boundMethods    = Map.empty[String, (String, String)]
 
   /** Static evidence that an operand is a C string/array-of-char. Joern's C frontend
     * types both `char *s` and `"abc"` as `char*`, including on literals. */
@@ -506,6 +515,36 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     }
   }
 
+  /** A call whose callee is a *bound method held in a variable*.
+    *
+    * `with cm as x:` is lowered by pysrc2cpg to
+    *
+    *     manager_tmp0 = <cm>;  enter_tmp0 = manager_tmp0.__enter__
+    *     exit_tmp0 = manager_tmp0.__exit__;  value_tmp0 = enter_tmp0()
+    *     try: ... finally: __exit__()
+    *
+    * so the invocation carries no name — the callee is the temporary — while still
+    * repeating the receiver at argument index 0, which is where the frontend always puts
+    * the implicit `self`. Both halves of the method's identity are therefore present, just
+    * split across two statements: the receiver on the call, the attribute name on the
+    * assignment that produced the temporary. Rejoining them recovers the `mcall` exactly,
+    * which is what makes `with` translatable rather than an unnamed call into nothing.
+    *
+    * The binding must name the *same* receiver the call passes, so this cannot mistake
+    * `g = a.m; g()` for a call on some other object. */
+  def boundMethodCall(c: Call, callee: Option[AstNode],
+                      args: List[AstNode]): Option[ujson.Obj] =
+    for {
+      cal      <- callee
+      t        <- Option(cal).collect { case i: Identifier => i.name }
+      (r, m)   <- boundMethods.get(t)
+      recvNode <- c.astChildren.collect { case a: AstNode => a }.l
+                    .find(k => aidx(k) == 0 && k.isInstanceOf[Identifier] &&
+                               k.asInstanceOf[Identifier].name == r)
+      _ = recvNode
+    } yield ujson.Obj("k" -> "mcall", "recv" -> ujson.Obj("k" -> "name", "v" -> r),
+                      "m" -> m, "args" -> exprs(args))
+
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
     val mfn  = c.methodFullName
@@ -570,14 +609,46 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           case Some(i: Identifier) if classNames.contains(i.name) && i.name == c.name => Some(i.name)
           case _                                                                      => None
         }
-      ctor match {
+      // `Cls.<fakeNew>(args)` — the frontend's spelling of allocation inside the metaclass
+      // machinery. The receiver at index 0 is the TYPE_REF, so the real arguments start at
+      // 1 exactly as for any other call.
+      val fakeNew: Option[String] = callee.flatMap(asField).collect {
+        case (t: TypeRef, "<fakeNew>") => t.typeFullName.stripSuffix("<meta>").split('.').last
+      }
+      // `Cls.<body>()` — evaluating a class body *produces the class object*. This is the
+      // one shape where an empty call name meant something we can say exactly.
+      val classBody: Option[String] = callee.collect {
+        case m: MethodRef if m.methodFullName.endsWith(".<body>") =>
+          m.methodFullName.stripSuffix(".<body>")
+      }
+      if (fakeNew.isDefined)
+        ujson.Obj("k" -> "alloc", "cls" -> fakeNew.get, "args" -> exprs(args))
+      else if (classBody.isDefined) typeValue(classBody.get + "<meta>")
+      else ctor match {
         case Some(cls) => ujson.Obj("k" -> "alloc", "cls" -> cls, "args" -> exprs(args))
         case None =>
           callee.flatMap(asField) match {
             case Some((recv, m)) =>
               ujson.Obj("k" -> "mcall", "recv" -> expr(recv), "m" -> m, "args" -> exprs(args))
-            case None =>
-              ujson.Obj("k" -> "call", "f" -> c.name, "args" -> exprs(args))
+            case None => boundMethodCall(c, callee, args).getOrElse {
+              // A call with no callee name is not a call we can emit. `Expr.call` is *by
+              // name*; there is no "apply this value", so `f(x)(y)` — a callee that is
+              // itself computed — has no Core form. Emitting `call ""` (as this did) was
+              // worse than a hole: it type-checked, counted as translated, and then
+              // resolved to nothing at run time. That is the silently-wrong category the
+              // ledger exists to prevent, so it is now a hole that says which shape it was.
+              if (c.name.isEmpty)
+                hole(if (callee.exists(_.isInstanceOf[Call])) "call:computed-callee"
+                     else "call:no-callee-name")
+              // Joern often resolves the callee to a method of this program. Emitting that
+              // `fullName` rather than the short name is what makes `_wrapper` in
+              // `_cached.py` distinguishable from `_wrapper` in `_cachedmethod.py`:
+              // `Ctx.resolve` matches the full name exactly, where its short-name fallback
+              // needs a *unique* suffix and so resolved neither.
+              else if (methodByName.contains(mfn))
+                ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn), "args" -> exprs(args))
+              else ujson.Obj("k" -> "call", "f" -> c.name, "args" -> exprs(args))
+            }
           }
       }
     }
@@ -587,16 +658,6 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def seqOf(xs: List[ujson.Obj]): ujson.Obj =
     if (xs.isEmpty) skip
     else xs.reduceRight((a, b) => ujson.Obj("k" -> "seq", "a" -> a, "b" -> b))
-
-  /** Does this statement transfer control out of its enclosing block? Used to decide
-    * whether a `finally` can be duplicated safely. Conservative: any occurrence counts. */
-  def escapes(o: ujson.Value): Boolean = o match {
-    case obj: ujson.Obj =>
-      val k = obj.value.get("k").map(_.str).getOrElse("")
-      k == "ret" || k == "brk" || k == "cont" || obj.value.values.exists(escapes)
-    case arr: ujson.Arr => arr.value.exists(escapes)
-    case _              => false
-  }
 
   /** Python's frontend turns statement-expressions (comprehensions, display literals)
     * into a BLOCK whose last child is the value. Split it into prelude statements and
@@ -802,57 +863,58 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     val bodyNodes = kids.filterNot(_.isInstanceOf[ControlStructure])
     val body      = seqOf(bodyNodes.map(stmt))
     if (bodyNodes.isEmpty) holeS("control:TRY-shape")
-    // `try: B except: H else: E`.
-    //
-    // `E` must run only when `B` raised nothing, and `E`'s own exceptions must not reach
-    // `H`. One `tryCatch` cannot say that — but a flag can, and the flag is not an
-    // invention: it is exactly the "did we reach the end of the body" bit the construct
-    // is about.
-    //
-    //     ok = true; tryCatch(B, e, { ok = false; H }); if ok then E
-    //
-    // `E` sits outside the tryCatch, so its exceptions propagate rather than being caught.
-    // Every other way out of `B` — return, break, continue, or an exception the handler
-    // re-raises — leaves before the `if`, which is Python's rule: `else` is skipped
-    // whenever the body did not complete normally. The flag is per-`try`, because a nested
-    // `try/else` completing normally would otherwise re-arm the enclosing one's `else`.
-    else if (elses.nonEmpty && catches.size == 1 && finallys.isEmpty) {
-      elseFlagSeq += 1
-      val flag = "__else_ok" + elseFlagSeq
-      val elseBody = seqOf(elses.map(stmt))
-      seqOf(List(
-        ujson.Obj("k" -> "assign", "x" -> flag, "e" -> ujson.Obj("k" -> "bool", "v" -> true)),
-        ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
-                  "handler" -> ujson.Obj("k" -> "seq",
-                    "a" -> ujson.Obj("k" -> "assign", "x" -> flag,
-                                     "e" -> ujson.Obj("k" -> "bool", "v" -> false)),
-                    "b" -> stmt(catches.head))),
-        ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> flag),
-                  "t" -> elseBody, "e" -> skip)))
-    }
-    // `else` alongside `finally`, or alongside a handler choice we cannot make, is not
-    // covered by the encoding above.
-    else if (elses.nonEmpty) holeS("control:TRY-else")
     // Which handler runs depends on the exception type, which the CPG discarded.
     else if (catches.size > 1) holeS("control:TRY-multiCatch")
-    else if (catches.size == 1 && finallys.isEmpty)
-      ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
-                "handler" -> stmt(catches.head))
-    else if (catches.isEmpty && finallys.size == 1) {
-      // `try: B finally: F` == `tryCatch(B, e, F; raise e); F` — F runs exactly once on
-      // both paths — but only when B cannot leave by return/break/continue, since those
-      // escape the tryCatch and would skip the trailing copy.
-      val fin = stmt(finallys.head)
-      if (escapes(body) || escapes(fin)) holeS("control:TRY-finally-escaping")
-      else
-        ujson.Obj("k" -> "seq",
-          "a" -> ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
-                           "handler" -> ujson.Obj("k" -> "seq", "a" -> fin,
-                             "b" -> ujson.Obj("k" -> "raise",
-                                              "e" -> ujson.Obj("k" -> "name", "v" -> "__exc")))),
-          "b" -> fin)
+    else {
+      // `try: B except: H else: E finally: F` is three independent layers, and now that
+      // `Stmt.tryFinally` exists each one has a constructor, so they compose:
+      //
+      //   inner = B                                    (no handler)
+      //         | tryCatch(B, e, H)                     (handler, no else)
+      //         | ok = true; tryCatch(B, e, {ok = false; H}); if ok then E
+      //   whole = inner | tryFinally(inner, F)
+      //
+      // The `else` encoding is the only one that needs an explanation. `E` must run only
+      // when `B` raised nothing, and `E`'s own exceptions must not reach `H`. The flag is
+      // not an invention: it is exactly the "did the body complete normally" bit the
+      // construct is about. `E` sits outside the `tryCatch`, so its exceptions propagate;
+      // every other way out of `B` — return, break, continue, or a handler that re-raises
+      // — leaves before the `if`, which is Python's rule that `else` is skipped whenever
+      // the body did not complete normally. The flag is numbered per `try`, because a
+      // nested `try/else` completing normally would otherwise re-arm the enclosing one's.
+      //
+      // `finally` is outermost, which is what makes it run on the `return`/`break`/
+      // `continue` paths as well: `Stmt.tryFinally` intercepts every `Ctl`, re-raising the
+      // body's outcome after the finalizer unless the finalizer itself leaves abnormally.
+      // The previous encoding — `tryCatch(B, e, F; raise e); F` — could not, because `ret`
+      // passes straight through a `tryCatch` and would have skipped the trailing copy;
+      // that is the whole of what `control:TRY-finally-escaping` was recording.
+      val inner =
+        if (catches.isEmpty && elses.isEmpty) body
+        else if (catches.size == 1 && elses.isEmpty)
+          ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
+                    "handler" -> stmt(catches.head))
+        else if (catches.size == 1) {
+          elseFlagSeq += 1
+          val flag = "__else_ok" + elseFlagSeq
+          seqOf(List(
+            ujson.Obj("k" -> "assign", "x" -> flag,
+                      "e" -> ujson.Obj("k" -> "bool", "v" -> true)),
+            ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
+                      "handler" -> ujson.Obj("k" -> "seq",
+                        "a" -> ujson.Obj("k" -> "assign", "x" -> flag,
+                                         "e" -> ujson.Obj("k" -> "bool", "v" -> false)),
+                        "b" -> stmt(catches.head))),
+            ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> flag),
+                      "t" -> seqOf(elses.map(stmt)), "e" -> skip)))
+        }
+        // `else` with no `except` is not legal Python; if the CPG says so, say so.
+        else holeS("control:TRY-else-without-except")
+      if (finallys.isEmpty) inner
+      else if (finallys.size == 1)
+        ujson.Obj("k" -> "tryFinally", "body" -> inner, "fin" -> stmt(finallys.head))
+      else holeS("control:TRY-multiFinally")
     }
-    else holeS("control:TRY-catch-and-finally")
   }
 
   // ---- drive ----------------------------------------------------------------
@@ -873,10 +935,24 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     declaredGlobals =
       m.body.ast.collect { case u: Unknown if u.code.trim.startsWith("global ") => u }
         .flatMap(globalDeclNames).toSet
+    // `t = r.attr` for a plain identifier receiver, collected once per method. A name
+    // bound more than once is dropped: which binding a later call sees would be a
+    // flow-sensitive question, and this analysis is not.
+    boundMethods = m.body.ast.isCall
+      .filter(_.methodFullName == "<operator>.assignment").l
+      .flatMap { a =>
+        kidsOf(a) match {
+          case (t: Identifier) :: rhs :: Nil =>
+            asField(rhs).collect { case (r: Identifier, f) => t.name -> (r.name, f) }
+          case _ => None
+        }
+      }
+      .groupBy(_._1).collect { case (k, List(one)) => k -> one._2 }.toMap
     val body = stmt(m.body)
     moduleScope = false
     currentClass = None
     declaredGlobals = Set.empty
+    boundMethods = Map.empty
     ujson.Obj(
       "name"   -> mangledFullName(m.fullName),
       "file"   -> m.filename,
@@ -885,7 +961,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     )
   }
 
-  val synthetic = List("<metaClassAdapter>", "<global>", "<body>", "<fakeNew>")
+  // `<metaClassCallHandler>` joins the list §24 left it off. It is generated *per class*
+  // and its body is `cls.__init__(<fakeNew>(...))` — the allocation Joern already models
+  // at every real construction site — so it is neither user code nor reachable from user
+  // code. Counting it inflated both the denominator and the hole-free numerator; excluding
+  // it removes padding, not coverage, and the numbers below separate the two.
+  val synthetic = List("<metaClassAdapter>", "<metaClassCallHandler>",
+                       "<global>", "<body>", "<fakeNew>")
   val methods = cpg.method.isExternal(false)
     .whereNot(_.nameExact("<module>"))
     .l.filterNot(m => synthetic.exists(m.fullName.contains))

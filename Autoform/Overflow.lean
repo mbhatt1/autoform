@@ -1,4 +1,5 @@
 import Autoform.Refine
+import Autoform.Generated.CMath
 
 /-!
 # Overflow — inferring representability domains from the AST
@@ -257,7 +258,7 @@ sidesteps the nested-inductive recursor for `List Expr`. -/
 
 /-- Nesting depth: the fuel `evalExpr` needs for the fragment. -/
 def depth : Expr → Nat
-  | .binop _ a b => 1 + Nat.max (depth a) (depth b)
+  | .binop _ a b => 1 + depth a + depth b
   | .unop _ a    => 1 + depth a
   | _            => 1
 
@@ -360,7 +361,6 @@ theorem nodeOK_of_condsHold {c : NumConfig} {ρ : Env} {op : String} {a b : Expr
         exact ⟨hy, hr, hs⟩
   · -- comparisons and unknown operators contribute nothing
     simp only [nodeOK]
-    split <;> trivial
 
 /-- Unary minus, likewise: `neg` is `finish (-x)` (§21), so it needs its own obligation. -/
 theorem applyUnop_neg_agrees {d : Dialect} {x : Int}
@@ -399,50 +399,38 @@ theorem exact_sound (ctx : Ctx) (h : Heap) (ρ : Env) :
     | .unop op a =>
         simp only [exact] at hex
         split at hex
-        · rename_i x hop hxa
+        · rename_i _ x hxa
           cases hex
-          have hda : depth a ≤ m := by simp [depth] at hd; omega
-          have hca : CondsHold ctx.dialect.toNumConfig ρ (conds a) := by
-            have := (condsHold_append _ _ _ _).1 (by simpa [conds] using hc)
-            exact this.1
-          have hneg : CondsHold ctx.dialect.toNumConfig ρ [Expr.unop "-" a] := by
-            have := (condsHold_append _ _ _ _).1 (by simpa [conds] using hc)
-            exact this.2
-          obtain ⟨⟨i, hi, hr⟩, -⟩ := hneg
-          simp only [exact, hxa] at hi
-          cases hi
-          have := ih a (.int x) hda hxa hca
-          simp [evalExpr, this, applyUnop_neg_agrees hr]
-        · rename_i b hop hxa
+          have hda : depth a ≤ m := by simp only [depth] at hd; omega
+          have hsp := (condsHold_append _ _ _ _).1 (by simpa only [conds] using hc)
+          obtain ⟨⟨i, hi, hr⟩, -⟩ := hsp.2
+          simp only [exact, hxa, Option.some.injEq, Val.int.injEq] at hi
+          subst hi
+          simp [evalExpr, ih a (.int x) hda hxa hsp.1, applyUnop_neg_agrees hr]
+        · rename_i _ b hxa
           cases hex
-          have hda : depth a ≤ m := by simp [depth] at hd; omega
-          have hca : CondsHold ctx.dialect.toNumConfig ρ (conds a) := by
-            simpa [conds] using (condsHold_append _ _ _ _).1 (by simpa [conds] using hc) |>.1
-          have := ih a (.bool b) hda hxa hca
-          simp [evalExpr, this, applyUnop]
+          have hda : depth a ≤ m := by simp only [depth] at hd; omega
+          have hca : CondsHold ctx.dialect.toNumConfig ρ (conds a) :=
+            ((condsHold_append _ _ _ _).1 (by simpa only [conds] using hc)).1
+          simp [evalExpr, ih a (.bool b) hda hxa hca, applyUnop, Val.truthy]
         · exact absurd hex (by simp)
     | .binop op a b =>
         simp only [exact] at hex
         split at hex
-        · rename_i x y hxa hxb
-          have hda : depth a ≤ m := by simp [depth] at hd; omega
-          have hdb : depth b ≤ m := by simp [depth] at hd; omega
-          have hsplit := (condsHold_append _ _ _ _).1 (by simpa [conds] using hc)
-          have hsplit2 := (condsHold_append _ _ _ _).1 hsplit.2
-          have hea := ih a (.int x) hda hxa hsplit.1
-          have heb := ih b (.int y) hdb hxb hsplit2.1
-          have hn := nodeOK_of_condsHold hxa hxb hsplit2.2
+        · rename_i _ _ x y hxa hxb
+          simp only [depth] at hd
+          have hda : depth a ≤ m := by omega
+          have hdb : depth b ≤ m := by omega
+          have hsplit := (condsHold_append _ _ _ _).1 (by simpa only [conds] using hc)
+          have hsplit2 := (condsHold_append _ _ _ _).1 hsplit.1
+          have hea := ih a (.int x) hda hxa hsplit2.1
+          have heb := ih b (.int y) hdb hxb hsplit2.2
+          have hn := nodeOK_of_condsHold hxa hxb hsplit.2
           have hop := applyBinop_agrees (d := ctx.dialect) hex hn
-          have hne1 : (op == "&&") = false := by
-            by_contra hcon
-            simp only [Bool.not_eq_false, beq_iff_eq] at hcon
-            subst hcon
-            exact absurd hex (by simp [binExact])
-          have hne2 : (op == "||") = false := by
-            by_contra hcon
-            simp only [Bool.not_eq_false, beq_iff_eq] at hcon
-            subst hcon
-            exact absurd hex (by simp [binExact])
+          have hne1 : ¬ (op = "&&") := by
+            rintro rfl; exact absurd hex (by simp [binExact])
+          have hne2 : ¬ (op = "||") := by
+            rintro rfl; exact absurd hex (by simp [binExact])
           simp [evalExpr, hea, heb, hne1, hne2, hop]
         · exact absurd hex (by simp)
     | .call _ _ | .index _ _ | .field _ _ | .mcall _ _ _ | .alloc _ _
@@ -476,3 +464,218 @@ theorem terminates_of_condsHold (ctx : Ctx) (h : Heap) (ρ : Env) (n : Nat) (e :
     (evalExpr ctx n h ρ e).2 ≠ .outOfFuel ∧ (∀ w, (evalExpr ctx n h ρ e).2 ≠ .exn w) := by
   rw [exact_sound ctx h ρ n e v hd hex hc]
   exact ⟨by simp, by intro w; simp⟩
+
+/-! ## 7. Demonstration on the real translated functions
+
+`Autoform/Refine.lean` re-declares `CMath`'s functions locally; this file imports it and
+uses those same terms, so the comparison is against the very AST the hand-written
+theorems were proved about. -/
+
+section CMath
+
+open Autoform.Refine Autoform.Refine.Demo
+
+/-- The 32-bit signed C configuration the `.cLike` dialect denotes. -/
+abbrev cfg : NumConfig := Dialect.toNumConfig .cLike
+
+theorem cfg_type : cfg.type = .signed .w32 := rfl
+
+/-! ### `poly` — the three hand-written conjuncts, generated
+
+The analysis produces exactly three obligations, one per arithmetic node, in evaluation
+order — which is the granularity the hand-written domain used, and the granularity
+`poly_not_refinable` shows is necessary. -/
+
+/-- The generated obligations for `poly`, as a syntactic identity. -/
+theorem poly_conds :
+    (analyzeFunc f_poly).conds =
+      [ .binop "*" (.name "a") (.name "b")
+      , .binop "+" (.binop "*" (.name "a") (.name "b")) (.name "c")
+      , .binop "-" (.binop "+" (.binop "*" (.name "a") (.name "b")) (.name "c"))
+                   (.name "a") ] := rfl
+
+/-- The analysis reports itself complete on `poly`. -/
+theorem poly_complete : (analyzeFunc f_poly).complete = true := rfl
+
+/-- **The generated domain is exactly the hand-written one.** This is the obligation
+`Refine.lean` §5 left open, discharged as an `Iff` rather than asserted. -/
+theorem poly_domain_eq (a b c : Int) :
+    Domain cfg f_poly [.int a, .int b, .int c]
+      ↔ (fits32 (a * b) ∧ fits32 (a * b + c) ∧ fits32 (a * b + c - a)) := by
+  simp [Domain, paramEnv, f_poly, analyzeFunc, analyzeStmt, exprAnalysis, substE,
+        conds, nodeConds, CondsHold, Fits, exact, binExact, fits32, Fits32, cfg_type]
+
+/-- …and therefore `poly_refines` holds on the **generated** domain, with no hand-written
+`fits32` conjunct anywhere in the statement. -/
+theorem poly_refines_generated :
+    Refines₃ (α := Int) (β := Int) (γ := Int) (δ := Int)
+      CMathProgram "poly" 9
+      (fun a b c => Domain cfg f_poly [.int a, .int b, .int c])
+      (fun a b c => a * b + c - a) := by
+  intro a b c hdom
+  exact poly_refines a b c ((poly_domain_eq a b c).1 hdom)
+
+/-! ### `clamp` — no arithmetic, hence no obligations
+
+The asymmetry with `poly` is the evidence that the analysis tracks the actual arithmetic
+rather than emitting a blanket disclaimer: `clamp` only compares and returns, so its
+generated domain is literally `True`. -/
+
+theorem clamp_conds : (analyzeFunc f_clamp).conds = [] := rfl
+theorem clamp_complete : (analyzeFunc f_clamp).complete = true := rfl
+
+theorem clamp_domain_eq (x lo hi : Int) :
+    Domain cfg f_clamp [.int x, .int lo, .int hi] ↔ True := by
+  simp [Domain, analyzeFunc, f_clamp, analyzeStmt, exprAnalysis, substE, conds,
+        nodeConds, CondsHold]
+
+theorem clamp_refines_generated :
+    Refines₃ (α := Int) (β := Int) (γ := Int) (δ := Int)
+      CMathProgram "clamp" 12
+      (fun x lo hi => Domain cfg f_clamp [.int x, .int lo, .int hi]) clampS := by
+  intro x lo hi _
+  exact clamp_refines x lo hi trivial
+
+/-! ### `cdiv` — the generated domain is *stronger* than the hand-written one
+
+The hand-written domain is `fits32 (Int.tdiv a b)` alone: the source's own `b == 0` guard
+makes the divide-by-zero path unreachable, and *that* is a path-sensitivity argument the
+analysis does not make. Being path-insensitive, the analysis takes the union over both
+arms of the `if` and additionally demands `b ≠ 0`, since a division node has no exact
+mathematical value at a zero divisor.
+
+That is the honest direction to be wrong in: the generated domain **implies** the
+hand-written one, so refinement transfers, and the gap is a stated limitation
+(open obligation 1 below) rather than a silent unsoundness. -/
+
+theorem cdiv_conds :
+    (analyzeFunc f_cdiv).conds = [ .binop "/" (.name "a") (.name "b") ] := rfl
+theorem cdiv_complete : (analyzeFunc f_cdiv).complete = true := rfl
+
+theorem cdiv_domain_eq (a b : Int) :
+    Domain cfg f_cdiv [.int a, .int b] ↔ (b ≠ 0 ∧ fits32 (Int.tdiv a b)) := by
+  simp [Domain, paramEnv, f_cdiv, analyzeFunc, analyzeStmt, exprAnalysis, substE,
+        conds, nodeConds, CondsHold, Fits, exact, binExact, fits32, Fits32,
+        NumConfig.quot, NumConfig.c32Wrapv, NumConfig.c32, Dialect.toNumConfig]
+  constructor
+  · rintro ⟨i, ⟨hb, rfl⟩, hr⟩; exact ⟨hb, hr⟩
+  · rintro ⟨hb, hr⟩; exact ⟨_, ⟨hb, rfl⟩, hr⟩
+
+/-- The generated domain implies the hand-written one, so `cdiv_refines` transfers. -/
+theorem cdiv_refines_generated :
+    Refines₂ (α := Int) (β := Int) (γ := Int)
+      CMathProgram "cdiv" 10
+      (fun a b => Domain cfg f_cdiv [.int a, .int b])
+      (fun a b => if b = 0 then 0 else Int.tdiv a b) := by
+  intro a b hdom
+  exact cdiv_refines a b ((cdiv_domain_eq a b).1 hdom).2
+
+/-! ### `cmod` — the `%` obligation pair, never written by hand
+
+`cmod` has no hand-written refinement theorem in `Refine.lean`, so this is the analysis
+producing a domain for a function nobody had analysed: the quotient obligation (which is
+what makes `INT_MIN % -1` undefined) *and* the remainder obligation. -/
+
+theorem cmod_conds :
+    (analyzeFunc f_cmod).conds =
+      [ .binop "/" (.name "a") (.name "b"), .binop "%" (.name "a") (.name "b") ] := rfl
+theorem cmod_complete : (analyzeFunc f_cmod).complete = true := rfl
+
+/-! ### `sumto` — a loop, and the analysis says so
+
+`sumto` is hole-free but contains `Stmt.loop`. The analysis emits no obligations and sets
+`complete := false`, which is the machine-checkable form of "I did not enumerate this".
+Reading `conds = []` as "no overflow possible" would be precisely the silent wrongness
+this file exists to avoid, and `complete` is what makes that misreading impossible. -/
+
+theorem sumto_incomplete : (analyzeFunc f_sumto).complete = false := rfl
+
+end CMath
+
+/-! ## 8. Coverage over the C corpus
+
+`math.c` translates to six `Func`s (five, in `Refine.lean`'s copy, which omits the module
+initializer). All but one are analysable end to end (`complete = true`); the exception is
+`sumto`, which is a loop. -/
+
+section Coverage
+
+open Autoform.Refine Autoform.Refine.Demo
+
+/-- Functions the analysis can generate a domain for. -/
+def analysable (p : Program) : List Func := p.funcs.filter (fun f => (analyzeFunc f).complete)
+
+/-- Fraction, as a pair (analysable, total). -/
+def coverage (p : Program) : Nat × Nat := ((analysable p).length, p.funcs.length)
+
+/-- **Measured, not estimated**, on `Refine.lean`'s character-identical copy of the
+generated `math.c` module: 4 of its 5 functions get a domain automatically. The one that
+does not is `sumto`, the loop — the same construct `Refine.lean` §3 lists as its own open
+obligation. -/
+theorem cmath_coverage : coverage CMathProgram = (4, 5) := by decide
+
+theorem cmath_analysable_names :
+    (analysable CMathProgram).map Func.name = ["clamp", "poly", "cdiv", "cmod"] := by decide
+
+/-- The same measurement against the **machine-generated** module itself, which also
+carries `math.c`'s module-level initializer: 5 of 6. -/
+theorem cmath_generated_coverage :
+    coverage Autoform.Generated.program = (5, 6) := by decide
+
+end Coverage
+
+/-! ## 9. What is proved, and what is not
+
+**Proved.**
+
+* `applyBinop_agrees`, `applyUnop_neg_agrees` — every fragment operator agrees with its
+  exact mathematical value under the node obligation. All four `NumResult` branches are
+  accounted for: `ok` is the conclusion, `ub`/`trap` are made unreachable by the
+  representability obligation, `divZero` by the divisor obligation.
+* `nodeOK_of_condsHold` — the *syntactic* obligations imply the *semantic* side
+  conditions.
+* `exact_sound` — the whole-expression theorem: obligations ⟹ `evalExpr` returns exactly
+  the mathematical value, for every fuel above the expression's depth.
+* `no_ub_of_condsHold` — the corollary that matters: no `.hole "ub:…"`.
+* `poly_domain_eq` — the generated domain for `poly` is *equivalent* to the three
+  hand-written `fits32` conjuncts, and `poly_refines_generated` restates `poly_refines`
+  with no hand-written conjunct in it.
+* `cmath_coverage` / `cmath_generated_coverage` — 4/5 and 5/6 of the C corpus, by
+  evaluation rather than by claim.
+
+**Open obligations, stated rather than admitted.**
+
+1. **Path sensitivity.** `analyzeStmt` takes the union over both arms of an `ifte`. That
+   is sound but not complete: `cdiv`'s own `b == 0` guard already discharges the divisor
+   obligation, and the analysis cannot see it, so `cdiv_domain_eq` carries a `b ≠ 0` the
+   hand-written domain did not need. Closing this needs a path condition threaded through
+   `analyzeStmt` and a decision procedure to discharge obligations against it.
+
+2. **Statement-level soundness.** `exact_sound` is proved for `Expr`. The corresponding
+   theorem for `Stmt` — "if `(analyzeStmt σ s).complete` and its obligations hold then
+   `execStmt` reaches no `Ctl.hole` tagged `ub:`" — is *not* proved here. It needs an
+   invariant relating the symbolic store `σ` to the runtime `Env`, and a join for `ifte`
+   arms that assign. The demonstrations in §7 do not depend on it: each is proved by
+   reducing the generated domain to a hand-written one and invoking the existing
+   expression-level refinement theorem, so nothing in this file rests on the unproved
+   statement-level claim.
+
+3. **Loops.** `analyzeStmt` reports `complete := false` on `Stmt.loop`/`Stmt.forIn`.
+   Generating a domain for `sumto` needs the loop-invariant rule that `Refine.lean` §3
+   also lists as missing; the obligation there is `∀ i ≤ n, fits32 (i * (i+1) / 2)`-shaped
+   and is not derivable by a syntactic walk.
+
+4. **Calls.** An `Expr.call` is outside the fragment, so a function whose body calls
+   another gets `complete := false`. Interprocedural domains need a summary — the callee's
+   generated domain instantiated at the call site — which is the natural next step and is
+   purely mechanical given (2).
+
+5. **Shifts and bitwise operators.** `nodeConds` handles them by producing nothing, which
+   is safe only because `Core.applyBinop` has no `<<`/`>>`/`&`/`|`/`^` cases at all: such a
+   node is already an `Expr.hole` by the time it reaches this file. If `Semantics.lean`
+   ever gains those operators, `nodeConds` must gain the `shiftCount` obligations from
+   `Numeric.shl`/`shr` at the same time, or this analysis becomes unsound. That coupling
+   is a liability and is recorded here deliberately.
+-/
+
+end Autoform.Overflow

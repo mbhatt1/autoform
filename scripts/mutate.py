@@ -10,9 +10,36 @@ bug into the *implementation*, rebuild, and see whether the theorem still proves
   * mutant compiles unchanged    -> the mutant SURVIVED: the theorem is vacuous with
                                     respect to that bug, and must be scored a FAILURE.
 
+Two modes:
+
+  1. **Hand-written Lean** (the original). Theorems and definitions live in one file;
+     mutate the definitions, rebuild that file.
+
+         mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Semantics
+
+  2. **Translated modules** (`Autoform/Generated/*.lean`). A generated module is a data
+     literal and contains no theorems at all, so the file that is mutated and the file
+     that is rebuilt are different, and the interesting operators are perturbations of
+     the *embedded* program rather than of Lean tokens (see `gen_mutants_generated`).
+
+         mutate.py Autoform/Generated/Cachetools.lean Autoform.Generated.Cachetools \
+                   --spec-file Autoform/Specs/CachetoolsSpec.lean \
+                   --spec-module Autoform.Specs.CachetoolsSpec \
+                   --decls f_...,f_...
+
+     `--decls` restricts the mutation population to the functions the theorems are about.
+     Without it the score measures *coverage* (how much of a 233-function module is
+     specified) rather than *vacuity* (whether the specifications that exist have teeth),
+     and the two must not be conflated. Report both, separately.
+
+The `module` field written to the JSON report is the module that was MUTATED, because
+`scripts/sacm.py` attributes G4 (specification non-vacuity) by that field, and the subject
+of the claim is the subject of the mutations.
+
 Usage:
-    mutate.py <lean-file> <module-name> [--theorems a,b,c] [--max-mutants N]
-              [--timeout S] [--json PATH] [--seed N]
+    mutate.py <lean-file> <module-name> [--theorems a,b,c] [--decls d,e,f]
+              [--spec-file PATH] [--spec-module MOD] [--generated]
+              [--max-mutants N] [--timeout S] [--json PATH] [--seed N]
 
 Only definitions (`def`/`abbrev`/`instance`) are mutated; theorems are left alone --
 mutating the proof would prove nothing about the specification.

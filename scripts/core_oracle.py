@@ -525,7 +525,10 @@ def main():
         else:
             verified.append(n)
 
-    exercised = [n for n in core if per[n]["answered"] > 0]
+    # "exercised" means the interpreter produced a real outcome — a value, an exception
+    # or a hole. A function that only ever ran out of fuel was not exercised: fuel
+    # exhaustion is evidence of nothing.
+    exercised = [n for n in core if per[n]["ok"] or per[n]["holes"]]
     # the strictest honest number: never holed AND actually exercised
     corrected = len(verified)
     corrected_real = len([n for n in core if per[n]["real_cases"] > 0

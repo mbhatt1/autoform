@@ -369,6 +369,22 @@ def movesFor (goal : MVarId) (allowHeavy : Bool) (depth : Nat) : TermElabM (Arra
           if allowHeavy && iv.isRec then
             ms := ms.push ⟨s!"induction {n}", 5⟩
       | _ => pure ()
+    -- definitional unfolding of *project* constants: a goal about `evalStmt` is not
+    -- going anywhere until the interpreter's equations are in play. Restricted to
+    -- `Autoform.*` so the search never tries to unfold the standard library.
+    let mut unfolded := 0
+    for c in (← instantiateMVars (← goal.getType)).getUsedConstants do
+      if unfolded ≥ 3 then break
+      if !(`Autoform).isPrefixOf c then continue
+      let cs := c.toString
+      if c.isInternal then continue
+      if (cs.splitOn "match_").length > 1 || (cs.splitOn "inst").length > 1 then continue
+      match (← getEnv).find? c with
+      | some (.defnInfo _) =>
+        unfolded := unfolded + 1
+        ms := ms.push ⟨s!"simp only [{c}]", 3⟩
+        ms := ms.push ⟨s!"unfold {c}", 4⟩
+      | _ => pure ()
     -- generalization of a numeral in the target (heavy: only at tier 5)
     if allowHeavy then
       let lits := ty.getUsedConstants  -- cheap guard; the real scan is below
@@ -443,7 +459,7 @@ partial def searchGoal (cfg : SearchCfg) (st : IO.Ref SearchState) (goal : MVarI
       for g in gs do
         sz := sz + exprSize (← instantiateMVars (← g.getType))
       s.restore
-      scored := scored.push (m, sz + 12 * gs.length + m.cost)
+      scored := scored.push (m, sz + 6 * gs.length + m.cost)
   let ranked := scored.qsort (fun a b => a.2 < b.2)
   for (m, sc) in ranked do
     if (← st.get).fuel == 0 then return false
@@ -563,7 +579,7 @@ def runPortfolio (goal : MVarId) (maxTier : Nat) : TermElabM Report := do
   if maxTier ≥ 4 then
     let heavy := maxTier ≥ 5
     let cfg : SearchCfg :=
-      { maxDepth := if heavy then 4 else 3, budget := if heavy then 600 else 300
+      { maxDepth := if heavy then 6 else 4, budget := if heavy then 1200 else 400
         allowHeavy := heavy, closerTier := 2 }
     let st ← IO.mkRef { fuel := cfg.budget, log := #[] : SearchState }
     let ok ← searchGoal cfg st goal 0 ""
@@ -619,9 +635,13 @@ syntax (name := portfolioCheckStx)
 
 open Lean.Elab.Command in
 @[command_elab portfolioCheckStx] def elabPortfolioCheck : CommandElab := fun stx => do
-  let maxTier :=
-    if stx[1].isNone then 2
-    else match stx[1][0][3].isNatLit? with | some k => k | none => 2
+  -- the optional `(maxTier := n)` group: find the numeral wherever it sits
+  let maxTier : Nat := Id.run do
+    for a in stx[1].getArgs do
+      if let some k := a.isNatLit? then return k
+      for b in a.getArgs do
+        if let some k := b.isNatLit? then return k
+    return 2
   let t : Term := ⟨stx[2]⟩
   liftTermElabM do
     let e ← Term.elabTerm t none

@@ -61,6 +61,44 @@ SUPPORTED = "SUPPORTED"       # threshold met, no unaddressed defeater
 ORDER = {UNDEVELOPED: 0, DEFEATED: 0, UNSUPPORTED: 1, WEAK: 2, SUPPORTED: 3}
 GLYPH = {UNDEVELOPED: "◇", DEFEATED: "✗", UNSUPPORTED: "✗", WEAK: "~", SUPPORTED: "✔"}
 
+# ---------------------------------------------------------------------------
+# Evidence kinds (R8/R9). SACM keeps *what kind of thing was done* separate from
+# *how strong the result was*: a claim discharged by kernel-checked proof and one
+# discharged by 104 passing test cases are not the same assertion even when both
+# reach threshold. The trust ledger already draws this line — it prints
+# `NOT PROVED : transpiler faithfulness` — so the assurance case must draw it too
+# rather than blurring test evidence into a green tick that reads as proof.
+# ---------------------------------------------------------------------------
+PROOF = "PROOF"       # kernel-checked; holds for all inputs
+TEST = "TEST"         # sampled execution against an independent oracle
+STATIC = "STATIC"     # computed from the artifact itself; an upper bound (§17)
+
+# A claim quantified over a population may only be SUPPORTED when the evidence
+# actually touches all of that population. Below that, either narrow the claim
+# (preferred) or cap the status.
+COVERAGE_FULL = 1.0
+COVERAGE_WEAK = 0.80   # ≥ this, a population claim may reach WEAK; below, UNSUPPORTED
+
+
+def coverage_cap(status, covered, population):
+    """R8: bound a population-quantified claim by the fraction of its subject the
+    evidence exercised. Returns (status, coverage-fraction or None).
+
+    This is the defect this function exists to prevent: `divergences == 0` over 104
+    cases touching 92 of 238 functions said nothing whatsoever about the other 146,
+    yet flipped the claim to SUPPORTED. Support is now bounded by coverage.
+    """
+    if not population:
+        return status, None
+    frac = (covered or 0) / population
+    if frac >= COVERAGE_FULL:
+        cap = SUPPORTED
+    elif frac >= COVERAGE_WEAK:
+        cap = WEAK
+    else:
+        cap = UNSUPPORTED
+    return (status if ORDER[status] <= ORDER[cap] else cap), frac
+
 
 def weakest(statuses):
     """Conjunctive combination: an argument is as strong as its weakest leg.

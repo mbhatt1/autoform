@@ -49,10 +49,15 @@ The design choices that make this non-vacuous are all in that sentence:
 1. `Outcome`, `Refines`, and the arity/type-specialised wrappers.
 2. Non-vacuity theorems: refinement rules out holes, exceptions-as-holes, and divergence.
 3. Mechanical evaluation lemmas for every `Expr`/`Stmt` constructor (`evalSimp` set).
-4. A genuine fuel-independence theorem for the pure expression fragment.
+4. A genuine fuel-independence theorem for the pure expression fragment, then a
+   Hoare-style **loop rule** with a termination measure (`execStmt_loop_rule`,
+   `execFor_rule`) and a **heap representation predicate** (`Represents`) with its frame
+   and update rules — the two pieces straight-line pure code does not need and real code
+   cannot do without.
 5. End-to-end refinement theorems for real translated functions from
    `Generated/CMath.lean` (C) and `Generated/Stress.lean`, `Generated/Sample.lean`
-   (Python), including the dialect-sensitive division/modulo pair.
+   (Python), including the dialect-sensitive division/modulo pair, the two loops
+   (`sumto`, `gcdish`), and a class whose method mutates its receiver.
 6. Two *negative* results: a function containing a reachable hole provably refines
    nothing (`sample_id_not_refinable`), and a C function provably does **not** refine its
    mathematical model on an unrestricted domain once fixed-width arithmetic is in play
@@ -769,6 +774,62 @@ theorem Represents.update {α : Type} {R : HeapRep α} {h : Heap} {r : Ref} {a a
   refine ⟨{ o with fields := (f, v) :: o.fields }, ?_, hc, ha⟩
   simp [Heap.get_setField, ho]
 
+/-! ### Evaluation lemmas for the object fragment
+
+The `evalSimp` set of §2 stops at the pure fragment. Field access, field assignment,
+method dispatch, object construction and `for`-iteration each get one equation here, in
+the same value-passing style, so that a proof about a method never has to unfold the
+interpreter by hand. Each carries the side conditions the interpreter actually checks —
+notably `o.captured = []`, because a class captured from an enclosing scope dispatches
+through `applyClosure`, not `applyFunc`, and a lemma that ignored that would be unsound
+for exactly the code the closure work was added to support. -/
+
+theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {a : Expr} {h₁ : Heap} {r : Ref} {o : Obj} {f : String} {v : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
+    (ho : h₁.get r = some o)
+    (hf : o.fields.find? (·.1 == f) = some (f, v)) :
+    evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
+  simp [evalExpr, ha, ho, hf]
+
+theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
+    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w)) :
+    execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r f w, .normal ρ) := by
+  simp [execStmt, ha, he]
+
+theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
+    {m : String} {args : List Expr} {vs : List Val}
+    (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
+    (has : evalList ctx k h₁ ρ args = (h₂, .inr vs))
+    (ho : h₂.get r = some o)
+    (hcap : o.captured = [])
+    (hm : ctx.resolveMethod o.cls m = some fn) :
+    evalExpr ctx (k+1) h ρ (.mcall recv m args)
+      = applyFunc ctx k h₂ fn (some (.ref r)) vs := by
+  simp [evalExpr, hr, has, ho, hm, hcap]
+
+theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val} {fn : Func} {w : Val}
+    (has : evalList ctx k h ρ args = (h₁, .inr vs))
+    (hcap : (∀ c cap, ρ.get cls ≠ .clsClos c cap))
+    (hm : ctx.resolveMethod cls "__init__" = some fn)
+    (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
+        (some (.ref h₁.length)) vs = (h₃, .val w)) :
+    evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by
+  have hc : (match ρ.get cls with | .clsClos _ c => c | _ => []) = ([] : List (String × Val)) := by
+    cases hg : ρ.get cls <;> simp [hg]
+    case clsClos c cap => exact absurd hg (hcap c cap)
+  simp only [evalExpr, has, hc, Heap.alloc, hm, hinit]
+
+theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {x : String} {e : Expr} {body : Stmt} {h₁ : Heap} {v : Val} {vs : List Val}
+    (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs) :
+    execStmt ctx (k+1) h ρ (.forIn x e body) = execFor ctx k h₁ ρ x vs body := by
+  simp [execStmt, he, hv]
+
 /-! ## 4. End-to-end: real translated functions
 
 Entry points are named by their **fully-qualified CPG name** (`ops.py:<module>.absval`,
@@ -1267,6 +1328,676 @@ theorem clamp_deep_idem (x lo hi : Int) (h : lo ≤ hi) (fuel : Nat) (hf : 12 �
   simp only [Marshal.toVal, clampS_idem x lo hi h] at key
   exact key
 
+
+/-! ### C: `sumto` from `math.c` — the first loop
+
+Source: `int sumto(int n){ int acc=0; for(int i=0;i<=n;i++) acc+=i; return acc; }`.
+Deep term: `f_sumto`, verbatim above. Shallow model: `n*(n+1)/2`.
+
+The invariant is indexed by the number of iterations still to run, `m`, and the state is
+pinned by `d = n+1-m`: `i` holds `d` and `acc` holds the `d`-th triangular number. The
+`fits32` obligations are discharged per iteration from a *closed-form* domain by
+monotonicity of `triN`, which is what stops the domain from being a per-step quantified
+mess: every partial sum is between `0` and the final one.
+
+Two things the fuel bound makes visible. First, a loop's cost depends on its input, so
+the `Refines₁` instance below quantifies a *concrete* bound `65547` and must restrict the
+domain to `n ≤ 65535` to justify it — the parametric `sumto_run` is the sharp statement
+and `sumto_refines` is its constant-bound corollary. Second, `n ≤ 65535` is not an extra
+assumption in substance: `Fits32 (n*(n+1)/2)` already forces it. It is stated rather than
+derived because deriving it needs nonlinear arithmetic that is not available here. -/
+
+def triN : Nat → Int
+  | 0 => 0
+  | k+1 => triN k + (k : Int)
+
+theorem triN_nonneg : ∀ k, 0 ≤ triN k
+  | 0 => Int.le_refl 0
+  | k+1 => by have := triN_nonneg k; simp [triN]; omega
+
+theorem triN_mono {d e : Nat} (h : d ≤ e) : triN d ≤ triN e := by
+  induction e with
+  | zero => simp [Nat.le_zero.mp h]
+  | succ e ih =>
+    rcases Nat.lt_or_ge d (e+1) with hd | hd
+    · have := ih (by omega); simp [triN]; omega
+    · have : d = e+1 := by omega
+      subst this; exact Int.le_refl _
+
+theorem two_mul_triN : ∀ k : Nat, 2 * triN k = (k : Int) * ((k : Int) - 1)
+  | 0 => by simp [triN]
+  | k+1 => by
+    have ih := two_mul_triN k
+    have e1 : (k : Int) * ((k:Int) - 1) = (k:Int)*(k:Int) - (k:Int) := by
+      rw [Int.mul_sub, Int.mul_one]
+    have e2 : (((k:Int)+1)) * ((((k:Int)+1)) - 1) = (k:Int)*(k:Int) + (k:Int) := by
+      have h : (((k:Int)+1)) - 1 = (k:Int) := by omega
+      rw [h, Int.add_mul, Int.one_mul]
+    rw [e1] at ih
+    show 2 * (triN k + (k:Int)) = ((k:Int) + 1) * (((k:Int) + 1) - 1)
+    rw [e2]; revert ih; generalize (k:Int)*(k:Int) = q; omega
+
+theorem triN_closed {n : Int} (hn : 0 ≤ n) : triN (n.toNat + 1) = n * (n + 1) / 2 := by
+  have h := two_mul_triN (n.toNat + 1)
+  have hc : ((n.toNat + 1 : Nat) : Int) = n + 1 := by omega
+  rw [hc] at h
+  have h2 : (n + 1) * (n + 1 - 1) = n * (n + 1) := by
+    have e : n + 1 - 1 = n := by omega
+    rw [e, Int.mul_comm]
+  rw [h2] at h
+  revert h; generalize n * (n+1) = q; omega
+
+theorem fits32_of_le {x y : Int} (h0 : 0 ≤ x) (hxy : x ≤ y) (hy : Fits32 y) : Fits32 x := by
+  simp only [Fits32, IntType.inRange, Width.bits, decide_eq_true_eq, Bool.and_eq_true] at hy ⊢
+  have h : (2:Int)^(32-1) = 2147483648 := by rfl
+  omega
+
+theorem fits32_small {x : Int} (h0 : 0 ≤ x) (h1 : x ≤ 100000) : Fits32 x := by
+  simp only [Fits32, IntType.inRange, Width.bits, decide_eq_true_eq, Bool.and_eq_true]
+  have h : (2:Int)^(32-1) = 2147483648 := by rfl
+  omega
+
+/-- The invariant. -/
+def sumtoInv (n : Int) (m : Nat) (h : Heap) (ρ : Env) : Prop :=
+  h = [] ∧ ∃ d : Nat, d + m = n.toNat + 1 ∧
+    ρ.find? (·.1 == "n") = some ("n", .int n) ∧
+    ρ.find? (·.1 == "i") = some ("i", .int (d : Int)) ∧
+    ρ.find? (·.1 == "acc") = some ("acc", .int (triN d)) ∧
+    ρ.find? (·.1 == "<glob>acc") = none ∧
+    ρ.find? (·.1 == "<glob>i") = none
+
+def sumtoPost (n : Int) (h : Heap) (ρ : Env) : Prop :=
+  h = [] ∧ ρ.find? (·.1 == "acc") = some ("acc", .int (triN (n.toNat + 1)))
+
+abbrev ctxC : Ctx := ctxOf CMathProgram
+
+theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
+    (hfitN : Fits32 (triN (n.toNat + 1))) :
+    ∀ m h ρ k, 4 ≤ k → sumtoInv n m h ρ →
+      ∃ h₁ v, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
+        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxC k h₁ ρ
+            (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
+                  (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
+            = (h₂, .normal ρ') ∧ sumtoInv n m' h₂ ρ') ∧
+        (v.truthy = false → sumtoPost n h₁ ρ) := by
+  intro m h ρ k hk hI
+  obtain ⟨rfl, d, hdm, hnv, hiv, haccv, hga, hgi⟩ := hI
+  obtain ⟨k1, rfl⟩ : ∃ q, k = q + 4 := ⟨k - 4, by omega⟩
+  have hcond : evalExpr ctxC (k1+4) [] ρ (.binop "<=" (.name "i") (.name "n"))
+      = ([], .val (.bool (decide ((d:Int) ≤ n)))) := by
+    rw [evalExpr_binop_val ctxC (k1+3) [] ρ "<=" (by decide) (by decide)
+          (evalExpr_name ctxC (k1+2) [] ρ "i" hiv) (evalExpr_name ctxC (k1+2) [] ρ "n" hnv)]
+    rfl
+  refine ⟨[], .bool (decide ((d:Int) ≤ n)), hcond, ?_, ?_⟩
+  · intro hv
+    have hdn : (d:Int) ≤ n := by
+      simpa [Val.truthy] using hv
+    have hdN : d < n.toNat + 1 := by omega
+    -- Fits32 side conditions
+    have hf1 : Fits32 (triN d + (d:Int)) := by
+      have e : triN d + (d:Int) = triN (d+1) := rfl
+      rw [e]
+      exact fits32_of_le (triN_nonneg _) (triN_mono (by omega)) hfitN
+    have hf2 : Fits32 ((d:Int) + 1) := fits32_small (by omega) (by omega)
+    have e1 : evalExpr ctxC (k1+2) [] ρ (.binop "+" (.name "acc") (.name "i"))
+        = ([], .val (.int (triN d + (d:Int)))) := by
+      rw [evalExpr_binop_val ctxC (k1+1) [] ρ "+" (by decide) (by decide)
+            (evalExpr_name ctxC k1 [] ρ "acc" haccv) (evalExpr_name ctxC k1 [] ρ "i" hiv)]
+      simp [applyBinop_c_add hf1, ctxC, ctxOf, CMathProgram]
+    have hgA : (ρ.get ("<glob>" ++ "acc")).truthy = false := by
+      simp [Env.get, hga, Val.truthy]
+    have a1 : execStmt ctxC (k1+3) [] ρ (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
+        = ([], .normal (ρ.set "acc" (.int (triN d + (d:Int))))) :=
+      execStmt_assign_val ctxC (k1+2) [] ρ e1 hgA
+    have hiv1 : (ρ.set "acc" (.int (triN d + (d:Int)))).find? (·.1 == "i") = some ("i", .int (d:Int)) := by
+      simp [Env.set, hiv]
+    have e2 : evalExpr ctxC (k1+2) [] (ρ.set "acc" (.int (triN d + (d:Int)))) (.binop "+" (.name "i") (.lit (.int 1)))
+        = ([], .val (.int ((d:Int) + 1))) := by
+      rw [evalExpr_binop_val ctxC (k1+1) [] (ρ.set "acc" (.int (triN d + (d:Int)))) "+" (by decide) (by decide)
+            (evalExpr_name ctxC k1 [] (ρ.set "acc" (.int (triN d + (d:Int)))) "i" hiv1) (evalExpr_lit_int ctxC k1 [] (ρ.set "acc" (.int (triN d + (d:Int)))) 1)]
+      simp [applyBinop_c_add hf2, ctxC, ctxOf, CMathProgram]
+    have hgI : ((ρ.set "acc" (.int (triN d + (d:Int)))).get ("<glob>" ++ "i")).truthy = false := by
+      simp [Env.set, Env.get, hgi, Val.truthy]
+    have a2 : execStmt ctxC (k1+3) [] (ρ.set "acc" (.int (triN d + (d:Int)))) (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))
+        = ([], .normal ((ρ.set "acc" (.int (triN d + (d:Int)))).set "i" (.int ((d:Int) + 1)))) :=
+      execStmt_assign_val ctxC (k1+2) [] (ρ.set "acc" (.int (triN d + (d:Int)))) e2 hgI
+    refine ⟨m - 1, [], (ρ.set "acc" (.int (triN d + (d:Int)))).set "i" (.int ((d:Int) + 1)), by omega, ?_, ?_⟩
+    · rw [execStmt_seq_normal ctxC (k1+3) [] ρ a1]; exact a2
+    · refine ⟨rfl, d + 1, by omega, ?_, ?_, ?_, ?_, ?_⟩
+      · simp [Env.set, hnv]
+      · have : ((d+1 : Nat) : Int) = (d:Int) + 1 := by omega
+        simp [Env.set, this]
+      · have : triN (d+1) = triN d + (d:Int) := rfl
+        simp [Env.set, this]
+      · simp [Env.set, hga]
+      · simp [Env.set, hgi]
+  · intro hv
+    have hdn : ¬ ((d:Int) ≤ n) := by simpa [Val.truthy] using hv
+    have : d = n.toNat + 1 := by omega
+    subst this
+    exact ⟨rfl, haccv⟩
+
+theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
+    (hfit : Fits32 (n * (n + 1) / 2)) (fuel : Nat) (hf : n.toNat + 12 ≤ fuel) :
+    runFunc CMathProgram fuel "sumto" [.int n] = .val (.int (n * (n + 1) / 2)) := by
+  have hfitN : Fits32 (triN (n.toNat + 1)) := by rw [triN_closed hn]; exact hfit
+  obtain ⟨G, rfl⟩ : ∃ q, fuel = q + 8 := ⟨fuel - 8, by omega⟩
+  have hG : n.toNat + 4 ≤ G := by omega
+  rw [runFunc_of_resolve _ _ _ _ f_sumto rfl]
+  have s1 : execStmt ctxC (G+6) [] [("n", Val.int n)] .skip
+      = ([], .normal [("n", Val.int n)]) := execStmt_skip ctxC (G+5) [] _
+  have s2 : execStmt ctxC (G+5) [] [("n", Val.int n)] (.assign "acc" (.lit (.int 0)))
+      = ([], .normal [("acc", Val.int 0), ("n", Val.int n)]) :=
+    execStmt_assign_val ctxC (G+4) [] _ (evalExpr_lit_int ctxC (G+3) [] _ 0) (by rfl)
+  have s3 : execStmt ctxC (G+4) [] [("acc", Val.int 0), ("n", Val.int n)] .skip
+      = ([], .normal [("acc", Val.int 0), ("n", Val.int n)]) := execStmt_skip ctxC (G+3) [] _
+  have s4 : execStmt ctxC (G+3) [] [("acc", Val.int 0), ("n", Val.int n)]
+        (.assign "i" (.lit (.int 0)))
+      = ([], .normal [("i", Val.int 0), ("acc", Val.int 0), ("n", Val.int n)]) :=
+    execStmt_assign_val ctxC (G+2) [] _ (evalExpr_lit_int ctxC (G+1) [] _ 0) (by rfl)
+  have hinv : sumtoInv n (n.toNat + 1) []
+      [("i", Val.int 0), ("acc", Val.int 0), ("n", Val.int n)] := by
+    refine ⟨rfl, 0, by omega, by rfl, ?_, ?_, by rfl, by rfl⟩
+    · simp [triN]
+    · simp [triN]
+  obtain ⟨h', ρ', hloop, hpost⟩ :=
+    execStmt_loop_rule ctxC (.binop "<=" (.name "i") (.name "n"))
+      (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
+            (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
+      4 (sumtoInv n) (sumtoPost n) (sumto_step n hn hb hfitN)
+      (G+2) (n.toNat + 1) [] [("i", Val.int 0), ("acc", Val.int 0), ("n", Val.int n)]
+      hinv (by omega)
+  obtain ⟨rfl, hacc⟩ := hpost
+  have hret : execStmt ctxC (G+2) [] ρ' (.ret (.name "acc"))
+      = ([], .ret (.int (triN (n.toNat + 1)))) :=
+    execStmt_ret_val ctxC (G+1) [] ρ' (evalExpr_name ctxC G [] ρ' "acc" hacc)
+  have hbody : execStmt ctxC (G+7) [] [("n", Val.int n)] f_sumto.body
+      = ([], .ret (.int (triN (n.toNat + 1)))) := by
+    simp only [f_sumto]
+    rw [execStmt_seq_normal ctxC (G+6) [] _ s1,
+        execStmt_seq_normal ctxC (G+5) [] _ s2,
+        execStmt_seq_normal ctxC (G+4) [] _ s3,
+        execStmt_seq_normal ctxC (G+3) [] _ s4,
+        execStmt_seq_normal ctxC (G+2) [] _ hloop,
+        hret]
+  rw [triN_closed hn] at hbody
+  simp only [f_sumto, ctxC] at hbody
+  simp [applyFunc, f_sumto, Env.set, hbody]
+
+theorem sumto_refines :
+    Refines₁ (α := Int) (β := Int)
+      CMathProgram "sumto" 65547
+      (fun n => 0 ≤ n ∧ n ≤ 65535 ∧ Fits32 (n * (n + 1) / 2))
+      (fun n => n * (n + 1) / 2) := by
+  rintro n ⟨hn, hb, hfit⟩ fuel hf
+  exact sumto_run n hn hb hfit fuel (by omega)
+
+
+
+/-! ### Python: `gcdish` from `ops.py` — a loop whose measure is not a counter
+
+`while b != 0: t=b; b=a%b; a=t`. Here the invariant's index is not an iteration count that
+can be computed up front — it is a *bound* on `b`, and each iteration must prove it
+strictly decreases. That is exactly what the `m' < m` obligation of `execStmt_loop_rule`
+asks for, and it is why the rule takes a measure rather than a step count.
+
+The correctness half is `Int.gcd`-preservation, `gcd a b = gcd b (a % b)`, on the
+nonnegative domain. `%` here is `.python`, i.e. `Int.fmod`, which on nonnegative operands
+agrees with `Int.emod` — the dialect split of `fmod_refines` reappearing inside a loop. -/
+
+theorem nat_gcd_step (X Y : Nat) : Nat.gcd X Y = Nat.gcd Y (X % Y) := by
+  rw [Nat.gcd_comm X Y, Nat.gcd_rec Y X, Nat.gcd_comm (X % Y) Y]
+
+theorem int_gcd_step {x y : Int} (hx : 0 ≤ x) (hy : 0 < y) :
+    Int.gcd x y = Int.gcd y (x % y) := by
+  show Nat.gcd x.natAbs y.natAbs = Nat.gcd y.natAbs (x % y).natAbs
+  rw [Int.natAbs_emod_of_nonneg hx]
+  exact nat_gcd_step _ _
+
+abbrev ctxS : Ctx := ctxOf StressProgram
+
+def gcdInv (g : Nat) (m : Nat) (h : Heap) (ρ : Env) : Prop :=
+  h = [] ∧ ∃ x y : Int, 0 ≤ x ∧ 0 ≤ y ∧ y.toNat ≤ m ∧ Int.gcd x y = g ∧
+    ρ.find? (·.1 == "a") = some ("a", .int x) ∧
+    ρ.find? (·.1 == "b") = some ("b", .int y) ∧
+    ρ.find? (·.1 == "<glob>a") = none ∧
+    ρ.find? (·.1 == "<glob>b") = none ∧
+    ρ.find? (·.1 == "<glob>t") = none
+
+def gcdPost (g : Nat) (h : Heap) (ρ : Env) : Prop :=
+  h = [] ∧ ρ.find? (·.1 == "a") = some ("a", .int (g : Int))
+
+theorem gcdish_step (g : Nat) :
+    ∀ m h ρ k, 5 ≤ k → gcdInv g m h ρ →
+      ∃ h₁ v, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
+        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxS k h₁ ρ
+            (.seq (.assign "t" (.name "b"))
+              (.seq (.assign "b" (.binop "%" (.name "a") (.name "b")))
+                    (.assign "a" (.name "t"))))
+            = (h₂, .normal ρ') ∧ gcdInv g m' h₂ ρ') ∧
+        (v.truthy = false → gcdPost g h₁ ρ) := by
+  intro m h ρ k hk hI
+  obtain ⟨rfl, x, y, hx, hy, hym, hgcd, hav, hbv, hga, hgb, hgt⟩ := hI
+  obtain ⟨k1, rfl⟩ : ∃ q, k = q + 5 := ⟨k - 5, by omega⟩
+  have hcond : evalExpr ctxS (k1+5) [] ρ (.binop "!=" (.name "b") (.lit (.int 0)))
+      = ([], .val (.bool (!(y == 0)))) := by
+    rw [evalExpr_binop_val ctxS (k1+4) [] ρ "!=" (by decide) (by decide)
+          (evalExpr_name ctxS (k1+3) [] ρ "b" hbv) (evalExpr_lit_int ctxS (k1+3) [] ρ 0)]
+    rfl
+  refine ⟨[], .bool (!(y == 0)), hcond, ?_, ?_⟩
+  · intro hv
+    have hy0 : y ≠ 0 := by
+      simp [Val.truthy] at hv; omega
+    have hypos : 0 < y := by omega
+    -- t := b
+    have hgT : (ρ.get ("<glob>" ++ "t")).truthy = false := by simp [Env.get, hgt, Val.truthy]
+    have a1 : execStmt ctxS (k1+4) [] ρ (.assign "t" (.name "b"))
+        = ([], .normal (ρ.set "t" (.int y))) :=
+      execStmt_assign_val ctxS (k1+3) [] ρ (evalExpr_name ctxS (k1+2) [] ρ "b" hbv) hgT
+    have hav1 : (ρ.set "t" (.int y)).find? (·.1 == "a") = some ("a", .int x) := by
+      simp [Env.set, hav]
+    have hbv1 : (ρ.set "t" (.int y)).find? (·.1 == "b") = some ("b", .int y) := by
+      simp [Env.set, hbv]
+    have e2 : evalExpr ctxS (k1+2) [] (ρ.set "t" (.int y)) (.binop "%" (.name "a") (.name "b"))
+        = ([], .val (.int (x % y))) := by
+      rw [evalExpr_binop_val ctxS (k1+1) [] _ "%" (by decide) (by decide)
+            (evalExpr_name ctxS k1 [] _ "a" hav1) (evalExpr_name ctxS k1 [] _ "b" hbv1)]
+      simp [ctxS, ctxOf, StressProgram, applyBinop_py_mod x y hy0,
+            Int.fmod_eq_emod_of_nonneg x (Int.le_of_lt hypos)]
+    have hgB : ((ρ.set "t" (.int y)).get ("<glob>" ++ "b")).truthy = false := by
+      simp [Env.set, Env.get, hgb, Val.truthy]
+    have a2 : execStmt ctxS (k1+3) [] (ρ.set "t" (.int y))
+          (.assign "b" (.binop "%" (.name "a") (.name "b")))
+        = ([], .normal ((ρ.set "t" (.int y)).set "b" (.int (x % y)))) :=
+      execStmt_assign_val ctxS (k1+2) [] _ e2 hgB
+    have htv2 : ((ρ.set "t" (.int y)).set "b" (.int (x % y))).find? (·.1 == "t")
+        = some ("t", .int y) := by simp [Env.set]
+    have hgA : (((ρ.set "t" (.int y)).set "b" (.int (x % y))).get ("<glob>" ++ "a")).truthy
+        = false := by simp [Env.set, Env.get, hga, Val.truthy]
+    have a3 : execStmt ctxS (k1+3) [] ((ρ.set "t" (.int y)).set "b" (.int (x % y)))
+          (.assign "a" (.name "t"))
+        = ([], .normal (((ρ.set "t" (.int y)).set "b" (.int (x % y))).set "a" (.int y))) :=
+      execStmt_assign_val ctxS (k1+2) [] _
+        (evalExpr_name ctxS (k1+1) [] _ "t" htv2) hgA
+    have hmod0 : 0 ≤ x % y := Int.emod_nonneg x hy0
+    have hmodlt : x % y < y := Int.emod_lt_of_pos x hypos
+    refine ⟨m - 1, [], ((ρ.set "t" (.int y)).set "b" (.int (x % y))).set "a" (.int y), by omega, ?_, ?_⟩
+    · rw [execStmt_seq_normal ctxS (k1+4) [] ρ a1,
+          execStmt_seq_normal ctxS (k1+3) [] _ a2]
+      exact a3
+    · refine ⟨rfl, y, x % y, Int.le_of_lt hypos, hmod0, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      · rw [← int_gcd_step hx hypos]; exact hgcd
+      · simp [Env.set]
+      · simp [Env.set]
+      · simp [Env.set, hga]
+      · simp [Env.set, hgb]
+      · simp [Env.set, hgt]
+  · intro hv
+    have hy0 : y = 0 := by simp [Val.truthy] at hv; omega
+    subst hy0
+    refine ⟨rfl, ?_⟩
+    have : Int.gcd x 0 = x.natAbs := by simp [Int.gcd]
+    rw [this] at hgcd
+    have hxg : x = (g : Int) := by omega
+    rw [← hxg]; exact hav
+
+theorem gcdish_run (a b : Int) (ha : 0 ≤ a) (hb : 0 ≤ b) (fuel : Nat)
+    (hf : b.toNat + 8 ≤ fuel) :
+    runFunc StressProgram fuel "ops.py:<module>.gcdish" [.int a, .int b]
+      = .val (.int ((Int.gcd a b : Nat) : Int)) := by
+  obtain ⟨G, rfl⟩ : ∃ q, fuel = q + 6 := ⟨fuel - 6, by omega⟩
+  have hG : b.toNat + 2 ≤ G := by omega
+  rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__gcdish rfl]
+  have hinv : gcdInv (Int.gcd a b) b.toNat [] [("b", Val.int b), ("a", Val.int a)] := by
+    exact ⟨rfl, a, b, ha, hb, Nat.le_refl _, rfl, by rfl, by rfl, by rfl, by rfl, by rfl⟩
+  obtain ⟨h', ρ', hloop, hpost⟩ :=
+    execStmt_loop_rule ctxS (.binop "!=" (.name "b") (.lit (.int 0)))
+      (.seq (.assign "t" (.name "b"))
+        (.seq (.assign "b" (.binop "%" (.name "a") (.name "b")))
+              (.assign "a" (.name "t"))))
+      5 (gcdInv (Int.gcd a b)) (gcdPost (Int.gcd a b)) (gcdish_step (Int.gcd a b))
+      (G+4) b.toNat [] [("b", Val.int b), ("a", Val.int a)] hinv (by omega)
+  obtain ⟨rfl, hav⟩ := hpost
+  have hskip : execStmt ctxS (G+3) [] ρ' .skip = ([], .normal ρ') := execStmt_skip ctxS (G+2) [] _
+  have hret : execStmt ctxS (G+3) [] ρ' (.ret (.name "a"))
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) :=
+    execStmt_ret_val ctxS (G+2) [] ρ' (evalExpr_name ctxS (G+1) [] ρ' "a" hav)
+  have hbody : execStmt ctxS (G+5) [] [("b", Val.int b), ("a", Val.int a)]
+        f_ops_py__module__gcdish.body
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) := by
+    simp only [f_ops_py__module__gcdish]
+    rw [execStmt_seq_normal ctxS (G+4) [] _ hloop,
+        execStmt_seq_normal ctxS (G+3) [] _ hskip,
+        hret]
+  simp only [f_ops_py__module__gcdish, ctxS] at hbody
+  simp [applyFunc, f_ops_py__module__gcdish, Env.set, hbody]
+
+theorem gcdish_refines :
+    Refines₂ (α := Int) (β := Int) (γ := Int)
+      StressProgram "ops.py:<module>.gcdish" 1000008
+      (fun a b => 0 ≤ a ∧ 0 ≤ b ∧ b ≤ 1000000)
+      (fun a b => ((Int.gcd a b : Nat) : Int)) := by
+  rintro a b ⟨ha, hb, hbb⟩ fuel hf
+  exact gcdish_run a b ha hb fuel (by omega)
+
+
+/-! ### A heap-mutating method: `Counter` and `total`
+
+The refinement layer's remaining gap was objects. This is the smallest program that has
+all of it: a class with an `__init__` that binds a field, a `bump` method that **mutates
+its receiver** and returns the new value, and a `total` function that constructs an
+instance and calls the method once per element of a list.
+
+The `Func` values are written out here rather than imported, in the same style as the
+generated modules above (`Autoform/Generated/Cachetools.lean` has classes of this shape;
+this one is kept minimal so the theorem is about the mechanism, not the library).
+
+What makes the proof go through is `Represents counterRep h r a` — "address `r` holds a
+`Counter` abstracting to the integer `a`" — plus the two rules of §3b. `bump_step` proves
+one method call in full: receiver evaluation, argument evaluation, dynamic dispatch
+through `resolveMethod`, field read, field write, and the return, ending in a heap that
+`counter_set` shows still represents, now at `a + k`. `total_for_step` then feeds that to
+`execFor_rule`, and the loop invariant is "the counter holds the sum of the elements
+consumed so far".
+
+One incidental discovery: `String.endsWith` does not reduce definitionally (it is defined
+through `String.Slice` pattern matching), so `Ctx.resolveMethod` — which resolves a method
+by *suffix* — cannot be discharged by `rfl` the way `Ctx.resolve` can on an exact name.
+The `ew1`…`ew6` lemmas below are that obstacle made explicit. -/
+
+def f_counter_init : Func :=
+  { name := "cnt.py:<module>.Counter.__init__"
+  , params := ["n0"]
+  , body := (.seq (.setField (.name "self") "n" (.name "n0")) .skip) }
+
+def f_counter_bump : Func :=
+  { name := "cnt.py:<module>.Counter.bump"
+  , params := ["k"]
+  , body := (.seq
+              (.setField (.name "self") "n"
+                (.binop "+" (.field (.name "self") "n") (.name "k")))
+              (.ret (.field (.name "self") "n"))) }
+
+def f_counter_total : Func :=
+  { name := "cnt.py:<module>.total"
+  , params := ["xs"]
+  , body := (.seq
+              (.assign "c" (.alloc "Counter" [(.lit (.int 0))]))
+              (.seq
+                (.forIn "x" (.name "xs") (.expr (.mcall (.name "c") "bump" [(.name "x")])))
+                (.ret (.field (.name "c") "n")))) }
+
+def CounterProgram : Program :=
+  { dialect := .python, funcs := [f_counter_init, f_counter_bump, f_counter_total] }
+
+abbrev ctxT : Ctx := ctxOf CounterProgram
+
+def counterRep : HeapRep Int :=
+  { cls := "Counter"
+  , abs := fun o => if o.captured = [] then
+                      (match o.fields.find? (·.1 == "n") with
+                       | some (_, .int i) => some i
+                       | _                => none)
+                    else none }
+
+theorem counter_getField {h : Heap} {r : Ref} {a : Int}
+    (hR : Represents counterRep h r a) : h.getField r "n" = .int a := by
+  obtain ⟨o, ho, _, ha⟩ := hR
+  simp only [counterRep] at ha
+  simp only [Heap.getField, ho]
+  by_cases hcap : o.captured = [] <;> simp only [hcap, if_true, if_false, if_neg, reduceIte] at ha
+  · cases hf : o.fields.find? (·.1 == "n") with
+    | none => rw [hf] at ha; simp at ha
+    | some p =>
+      obtain ⟨kk, w⟩ := p
+      rw [hf] at ha
+      cases w <;> simp at ha
+      subst ha; rfl
+  · simp at ha
+
+theorem counter_set {h : Heap} {r : Ref} {a b : Int} (hR : Represents counterRep h r a) :
+    Represents counterRep (h.setField r "n" (.int b)) r b := by
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  have hcap : o.captured = [] := by
+    by_cases hcap : o.captured = []
+    · exact hcap
+    · simp only [counterRep, if_neg hcap] at ha; simp at ha
+  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hcap])
+
+/-- Suffix facts, needed because `String.endsWith` does not reduce definitionally. -/
+theorem ew1 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.bump" = false := by simp [String.endsWith]; decide
+theorem ew2 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.bump" = true := by simp [String.endsWith]; decide
+theorem ew3 : "cnt.py:<module>.total".endsWith ".Counter.bump" = false := by simp [String.endsWith]; decide
+theorem ew4 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.__init__" = true := by simp [String.endsWith]; decide
+theorem ew5 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
+theorem ew6 : "cnt.py:<module>.total".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
+
+theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump := by
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
+        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  rw [show ("." ++ "Counter" ++ "." ++ "bump") = ".Counter.bump" from rfl, ew1, ew2, ew3]
+
+theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
+  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
+        f_counter_init, f_counter_bump, f_counter_total, List.filter]
+  rw [show ("." ++ "Counter" ++ "." ++ "__init__") = ".Counter.__init__" from rfl, ew4, ew5, ew6]
+
+
+
+theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep h r a) :
+    ∃ o, h.get r = some o ∧ o.cls = "Counter" ∧
+      o.fields.find? (·.1 == "n") = some ("n", .int a) ∧ o.captured = [] := by
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  have hcap : o.captured = [] := by
+    by_cases hcap : o.captured = []
+    · exact hcap
+    · simp only [counterRep, if_neg hcap] at ha; simp at ha
+  simp only [counterRep, if_pos hcap] at ha
+  refine ⟨o, ho, hc, ?_, hcap⟩
+  cases hf : o.fields.find? (·.1 == "n") with
+  | none => rw [hf] at ha; simp at ha
+  | some p =>
+    obtain ⟨kk, w⟩ := p
+    have hk : kk = "n" := by
+      have hp := List.find?_some hf
+      simpa using hp
+    rw [hf] at ha
+    cases w <;> simp at ha
+    subst ha; subst hk; rfl
+
+/-- One `bump` call: the heap-mutating method dispatch, proved end to end. -/
+theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
+    (hR : Represents counterRep h r acc)
+    (hc : ρ.find? (·.1 == "c") = some ("c", .ref r))
+    (hx : ρ.find? (·.1 == "x") = some ("x", .int iv)) :
+    execStmt ctxT (j+8) h ρ (.expr (.mcall (.name "c") "bump" [(.name "x")]))
+      = (h.setField r "n" (.int (acc + iv)), .normal ρ) := by
+  obtain ⟨o, ho, hcls, hfind, hcap⟩ := counter_find hR
+  obtain ⟨o', ho', hcls', hfind', hcap'⟩ := counter_find (counter_set (b := acc + iv) hR)
+  have hslf : ([("k", Val.int iv), ("self", Val.ref r)] : Env).find? (·.1 == "self")
+      = some ("self", .ref r) := by simp
+  have hkk : ([("k", Val.int iv), ("self", Val.ref r)] : Env).find? (·.1 == "k")
+      = some ("k", .int iv) := by simp
+  have hfield : evalExpr ctxT (j+2) h [("k", Val.int iv), ("self", Val.ref r)]
+        ((Expr.name "self").field "n") = (h, .val (.int acc)) :=
+    evalExpr_field_obj ctxT (j+1) h _
+      (evalExpr_name ctxT j h _ "self" hslf) ho hfind
+  have hplus : evalExpr ctxT (j+3) h [("k", Val.int iv), ("self", Val.ref r)]
+        (.binop "+" ((Expr.name "self").field "n") (.name "k"))
+      = (h, .val (.int (acc + iv))) := by
+    rw [evalExpr_binop_val ctxT (j+2) h _ "+" (by decide) (by decide)
+          hfield (evalExpr_name ctxT (j+1) h _ "k" hkk)]
+    simp [ctxT, ctxOf, CounterProgram]
+  have hsf : execStmt ctxT (j+4) h [("k", Val.int iv), ("self", Val.ref r)]
+        (.setField (.name "self") "n" (.binop "+" ((Expr.name "self").field "n") (.name "k")))
+      = (h.setField r "n" (.int (acc + iv)), .normal [("k", Val.int iv), ("self", Val.ref r)]) :=
+    execStmt_setField_val ctxT (j+3) h _
+      (evalExpr_name ctxT (j+2) h _ "self" hslf) hplus
+  have hret : execStmt ctxT (j+4) (h.setField r "n" (.int (acc + iv)))
+        [("k", Val.int iv), ("self", Val.ref r)] (.ret ((Expr.name "self").field "n"))
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) :=
+    execStmt_ret_val ctxT (j+3) _ _
+      (evalExpr_field_obj ctxT (j+2) _ _
+        (evalExpr_name ctxT (j+1) _ _ "self" hslf) ho' hfind')
+  have hbody : execStmt ctxT (j+5) h [("k", Val.int iv), ("self", Val.ref r)]
+        f_counter_bump.body
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) := by
+    simp only [f_counter_bump]
+    rw [execStmt_seq_normal ctxT (j+4) h _ hsf]
+    exact hret
+  have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv]
+      = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
+    rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv]]
+    simp only [f_counter_bump, List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+    rw [hbody]
+  have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
+      = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
+    rw [evalExpr_mcall_obj ctxT (j+6) h ρ
+      (evalExpr_name ctxT (j+5) h ρ "c" hc)
+      (evalList_cons_val ctxT (j+5) h ρ (evalExpr_name ctxT (j+4) h ρ "x" hx)
+        (evalList_nil ctxT (j+4) h ρ))
+      ho hcap (by rw [hcls]; exact resolve_bump)]
+    exact happ
+  exact execStmt_expr_val ctxT (j+7) h ρ hmc
+
+def isum : List Int → Int
+  | []     => 0
+  | a :: r => a + isum r
+
+def totalInv (S : Int) (vs : List Val) (h : Heap) (ρ : Env) : Prop :=
+  ∃ (ys : List Int) (acc : Int), vs = ys.map Val.int ∧ acc + isum ys = S ∧
+    Represents counterRep h 0 acc ∧ ρ.find? (·.1 == "c") = some ("c", .ref 0)
+
+theorem total_for_step (S : Int) :
+    ∀ v vs h ρ k, 8 ≤ k → totalInv S (v :: vs) h ρ →
+      ∃ h' ρ', execStmt ctxT k h (ρ.set "x" v)
+          (.expr (.mcall (.name "c") "bump" [(.name "x")])) = (h', .normal ρ') ∧
+        totalInv S vs h' ρ' := by
+  intro v vs h ρ k hk hI
+  obtain ⟨ys, acc, hys, hsum, hR, hc⟩ := hI
+  obtain ⟨j, rfl⟩ : ∃ q, k = q + 8 := ⟨k - 8, by omega⟩
+  cases ys with
+  | nil => simp at hys
+  | cons y ys' =>
+    simp only [List.map_cons, List.cons.injEq] at hys
+    obtain ⟨rfl, rfl⟩ := hys
+    have hc' : (ρ.set "x" (Val.int y)).find? (·.1 == "c") = some ("c", .ref 0) := by
+      simp [Env.set, hc]
+    have hx' : (ρ.set "x" (Val.int y)).find? (·.1 == "x") = some ("x", .int y) := by
+      simp [Env.set]
+    refine ⟨h.setField 0 "n" (.int (acc + y)), ρ.set "x" (Val.int y),
+      bump_step j hR hc' hx', ys', acc + y, rfl, ?_, counter_set hR, hc'⟩
+    simp only [isum] at hsum
+    omega
+
+theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
+    runFunc CounterProgram fuel "cnt.py:<module>.total" [.list (ys.map Val.int)]
+      = .val (.int (isum ys)) := by
+  obtain ⟨G, rfl⟩ : ∃ q, fuel = q + 13 := ⟨fuel - 13, by omega⟩
+  have hG : ys.length ≤ G := by omega
+  rw [runFunc_of_resolve _ _ _ _ f_counter_total rfl]
+  -- allocation and __init__
+  have hinitbody : execStmt ctxT (G+8) [{ cls := "Counter", fields := [], captured := [] }]
+        [("n0", Val.int 0), ("self", Val.ref 0)] f_counter_init.body
+      = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }],
+         .normal [("n0", Val.int 0), ("self", Val.ref 0)]) := by
+    have hslf : ([("n0", Val.int 0), ("self", Val.ref 0)] : Env).find? (·.1 == "self")
+        = some ("self", .ref 0) := by simp
+    have hn0 : ([("n0", Val.int 0), ("self", Val.ref 0)] : Env).find? (·.1 == "n0")
+        = some ("n0", .int 0) := by simp
+    have hsf : execStmt ctxT (G+7) [{ cls := "Counter", fields := [], captured := [] }]
+          [("n0", Val.int 0), ("self", Val.ref 0)]
+          (.setField (.name "self") "n" (.name "n0"))
+        = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }],
+           .normal [("n0", Val.int 0), ("self", Val.ref 0)]) :=
+      execStmt_setField_val ctxT (G+6) _ _
+        (evalExpr_name ctxT (G+5) _ _ "self" hslf)
+        (evalExpr_name ctxT (G+5) _ _ "n0" hn0)
+    simp only [f_counter_init]
+    rw [execStmt_seq_normal ctxT (G+7) _ _ hsf]
+    exact execStmt_skip ctxT (G+6) _ _
+  have hinit : applyFunc ctxT (G+9) [{ cls := "Counter", fields := [], captured := [] }]
+        f_counter_init (some (.ref 0)) [Val.int 0]
+      = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val .unit) := by
+    rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0]]
+    simp only [f_counter_init, List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
+    rw [hinitbody]
+  have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
+        (.alloc "Counter" [(.lit (.int 0))])
+      = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val (.ref 0)) := by
+    have h := evalExpr_alloc_obj ctxT (G+9) [] [("xs", Val.list (ys.map Val.int))]
+      (evalList_cons_val ctxT (G+8) [] _ (evalExpr_lit_int ctxT (G+7) [] _ 0)
+        (evalList_nil ctxT (G+7) [] _))
+      (by intro c cap; simp [Env.get])
+      resolve_init hinit
+    simpa using h
+  have hgc : (Env.get ([("xs", Val.list (ys.map Val.int))] : Env) ("<glob>" ++ "c")).truthy = false := by
+    simp [Env.get, Val.truthy]
+  have hassign : execStmt ctxT (G+11) [] [("xs", Val.list (ys.map Val.int))]
+        (.assign "c" (.alloc "Counter" [(.lit (.int 0))]))
+      = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }],
+         .normal [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]) :=
+    execStmt_assign_val ctxT (G+10) [] _ halloc hgc
+  have hR0 : Represents counterRep
+      [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }] 0 0 := by
+    refine ⟨_, rfl, rfl, ?_⟩
+    simp [counterRep]
+  have hcc : ([("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))] : Env).find? (·.1 == "c")
+      = some ("c", .ref 0) := by simp
+  obtain ⟨h', ρ', hfor, hpost⟩ :=
+    execFor_rule ctxT "x" (.expr (.mcall (.name "c") "bump" [(.name "x")])) 8
+      (totalInv (isum ys)) (total_for_step (isum ys))
+      (G+9) (ys.map Val.int) [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }]
+      [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]
+      ⟨ys, 0, rfl, by simp, hR0, hcc⟩ (by simp; omega)
+  obtain ⟨zs, acc, hzs, hsum, hR', hc'⟩ := hpost
+  have hacc : acc = isum ys := by
+    cases zs with
+    | nil => simp only [isum] at hsum; omega
+    | cons a t => simp at hzs
+  subst hacc
+  obtain ⟨o', ho', hcls', hfind', hcap'⟩ := counter_find hR'
+  have hforIn : execStmt ctxT (G+10)
+        [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }]
+        [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]
+        (.forIn "x" (.name "xs") (.expr (.mcall (.name "c") "bump" [(.name "x")])))
+      = (h', .normal ρ') := by
+    rw [execStmt_forIn_val ctxT (G+9) _ _
+      (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)]
+    exact hfor
+  have hret : execStmt ctxT (G+10) h' ρ' (.ret ((Expr.name "c").field "n"))
+      = (h', .ret (.int (isum ys))) :=
+    execStmt_ret_val ctxT (G+9) _ _
+      (evalExpr_field_obj ctxT (G+8) _ _ (evalExpr_name ctxT (G+7) _ _ "c" hc') ho' hfind')
+  have hbody : execStmt ctxT (G+12) [] [("xs", Val.list (ys.map Val.int))] f_counter_total.body
+      = (h', .ret (.int (isum ys))) := by
+    simp only [f_counter_total]
+    rw [execStmt_seq_normal ctxT (G+11) [] _ hassign,
+        execStmt_seq_normal ctxT (G+10) _ _ hforIn]
+    exact hret
+  rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)]]
+  simp only [f_counter_total, List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+  rw [hbody]
+
+/-- The concrete run the project history records: `total([5,7,9]) = 21`, through object
+construction, a heap-mutating method call per element, and a `for`-loop. -/
+theorem total_21 :
+    runFunc CounterProgram 20 "cnt.py:<module>.total" [.list [.int 5, .int 7, .int 9]]
+      = .val (.int 21) := by
+  have h := total_run [5, 7, 9] 20 (by simp)
+  simpa [isum] using h
+
+/-- …and in the `Refines` relation proper, so the non-vacuity theorems of §1 apply to it:
+`total` provably reaches no hole and terminates within `|ys| + 13` fuel. -/
+theorem total_refines (ys : List Int) :
+    Refines CounterProgram "cnt.py:<module>.total" (ys.length + 13)
+      (fun args => args = [.list (ys.map Val.int)])
+      (fun _ => .ret (.int (isum ys))) := by
+  rintro args rfl fuel hf
+  exact total_run ys fuel hf
+
 end Demo
 
 /-! ## 5. Open obligations
@@ -1289,16 +2020,29 @@ so they are visible in the ledger rather than papered over.
    cases. No demonstration here uses a boolean connective, so the short-circuit path is
    lemma-covered but not exercised end to end.
 
-3. **Loops.** `sumto` (C) and `gcdish` (Python) are hole-free but contain `Stmt.loop`.
-   Refining them needs a loop-invariant lemma relating `execStmt ctx k h ρ (.loop c body)`
-   to a shallow `Nat`-recursive function together with a decreasing measure. The
-   single-step lemma `execStmt_loop_step` is the base for it; the invariant rule is not
-   built.
+3. **Loops — closed.** `execStmt_loop_rule` is the while-rule: an invariant indexed by a
+   termination measure that must strictly decrease, and a fuel bound `B + m + 1` derived
+   from it. `execFor_rule` is its `for` counterpart, with the remaining sequence as the
+   measure. Both are used: `sumto_run`/`sumto_refines` (C, `math.c`) prove
+   `sumto n = n*(n+1)/2` on the no-overflow domain, and `gcdish_run`/`gcdish_refines`
+   (Python, `ops.py`) prove `gcdish a b = Int.gcd a b` for nonnegative arguments, with
+   `b.natAbs` as the measure. What is *not* closed: the fuel bound of a loop depends on
+   its input, so a `Refines` instance — whose bound is a constant — needs a bounded
+   domain (`n ≤ 65535`, `b ≤ 1000000` above). The parametric `_run` theorems are the sharp
+   statements; making `Refines` carry an argument-dependent bound is the honest fix and is
+   not done here.
 
-4. **Heap-allocating functions.** `evalExpr_pure_heap_inert` establishes heap inertness
-   only for the pure fragment. Refining a method that mutates fields needs a
-   representation predicate relating a `Heap` region to a shallow record — the standard
-   separation-style story — which is not started.
+4. **Heap-mutating methods — closed.** `HeapRep`/`Represents` is the representation
+   predicate, with `Represents.frame` (a write to another address preserves it) and
+   `Represents.update` (a write to this address re-establishes it) proved against the real
+   `Heap.setField`. `bump_step` uses them to prove one dispatch of a method that mutates
+   its receiver, and `total_run`/`total_21` put that inside a `for`-loop over a list:
+   object construction, `__init__`, per-element heap mutation, and a final field read,
+   `total [5,7,9] = 21`. What remains open is generality: `counterRep` abstracts a
+   one-field object to an `Int`. A representation predicate for the *container* classes in
+   `Generated/Cachetools.lean` needs boxed containers first (`Stmt.setIndex` is still
+   `hole "setIndex:immutable-containers"`), so the separation-style frame reasoning here
+   covers field-mutating objects only.
 
 5. **Integer width — closed, and it changed the theorems.** `Numeric.lean` is now wired
    into `applyBinop`, so `.cLike` is 32-bit two's complement and `NumResult.ub` maps to

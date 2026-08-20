@@ -274,8 +274,8 @@ theorem Cache_contains_mrefines :
 
 /-- Membership is not constant: it answers `true` for a present key and `false` for an
 absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
-specification satisfied by `fun _ => true` would still pass the theorem above only if the
-theorem itself were wrong, and this makes that concrete. -/
+specification satisfied by `fun _ => true` would pass the equation above only if that
+equation were itself wrong, and this makes the discrimination concrete. -/
 theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
     (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 1]).2 = .val (.bool true)
@@ -429,7 +429,7 @@ statement therefore says "raises", not "raises `NotImplementedError`" — see ob
 in §4. -/
 
 /-- Evaluating a bare name never holes and never consumes the heap: every branch of the
-`Expr.name` case — local, global, function value, unbound — returns a value. Needed here
+`Expr.name` case — local, global, function value, unbound — returns a value. Needed
 because `NotImplementedError` is an unbound builtin, and `Ctx.resolve` on a 233-entry
 table does not reduce in the kernel. -/
 theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String) :
@@ -508,7 +508,8 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    raise but not its class, because `NotImplementedError` is an unbound builtin name that
    the semantics evaluates to `unit`. Modelling builtin exception classes is a transpiler
    and semantics change, not something this file can repair, and until it happens no
-   theorem here can distinguish `raise NotImplementedError` from `raise KeyError`.
+   statement in this file can distinguish `raise NotImplementedError` from `raise
+   KeyError`.
 
 4. **`Cache.get` is not specified.** Its body is `if key in self: return self[key]`, and
    `Expr.inOp`/`Expr.index` applied to a `ref` receiver hole out (`in:non-container`)
