@@ -1,0 +1,1741 @@
+{
+ "module": "LinuxLib",
+ "language": "C",
+ "generated": "2026-08-20",
+ "note": "ledger-*.json and sacm-*.json are gitignored; this file preserves their numbers. See docs/evidence-LinuxLib.md.",
+ "ledger": {
+  "verifiableCore": 843,
+  "nodes": 106399,
+  "module": "LinuxLib",
+  "holesByLabel": [
+   {
+    "label": "op:addressOf:local:unknown-type",
+    "count": 2782
+   },
+   {
+    "label": "op:addressOf:field:unknown-type",
+    "count": 709
+   },
+   {
+    "label": "stmt:UNKNOWN:static",
+    "count": 574
+   },
+   {
+    "label": "control:FOR",
+    "count": 492
+   },
+   {
+    "label": "control:GOTO",
+    "count": 402
+   },
+   {
+    "label": "assign:lhs:indirection",
+    "count": 350
+   },
+   {
+    "label": "op:indirection:pointer",
+    "count": 322
+   },
+   {
+    "label": "op:and",
+    "count": 296
+   },
+   {
+    "label": "op:arrayInitializer",
+    "count": 289
+   },
+   {
+    "label": "op:addressOf:local:scalar",
+    "count": 251
+   },
+   {
+    "label": "op:sizeOf",
+    "count": 235
+   },
+   {
+    "label": "op:cast:pointer",
+    "count": 156
+   },
+   {
+    "label": "expr:CONTROL_STRUCTURE:DO",
+    "count": 150
+   },
+   {
+    "label": "op:addressOf:field:opaque-type",
+    "count": 139
+   },
+   {
+    "label": "op:postIncrement:value",
+    "count": 137
+   },
+   {
+    "label": "cstr:pointer-arith",
+    "count": 137
+   },
+   {
+    "label": "import:operand",
+    "count": 115
+   },
+   {
+    "label": "op:or",
+    "count": 112
+   },
+   {
+    "label": "op:shiftLeft",
+    "count": 111
+   },
+   {
+    "label": "op:addressOf:local:opaque-type",
+    "count": 104
+   },
+   {
+    "label": "control:SWITCH",
+    "count": 103
+   },
+   {
+    "label": "op:indirection:unknown-type",
+    "count": 97
+   },
+   {
+    "label": "op:addressOf:local:pointer",
+    "count": 89
+   },
+   {
+    "label": "op:pointerCall",
+    "count": 89
+   },
+   {
+    "label": "op:addressOf:element:unknown-type",
+    "count": 82
+   },
+   {
+    "label": "op:arithmeticShiftRight",
+    "count": 78
+   },
+   {
+    "label": "op:assignment",
+    "count": 77
+   },
+   {
+    "label": "op:alloc:array-decl",
+    "count": 74
+   },
+   {
+    "label": "op:postIncrement:pointer",
+    "count": 71
+   },
+   {
+    "label": "expr:BLOCK-impure",
+    "count": 69
+   },
+   {
+    "label": "stmt:UNKNOWN:void",
+    "count": 67
+   },
+   {
+    "label": "op:cast:scalar",
+    "count": 66
+   },
+   {
+    "label": "cstr:address-compare",
+    "count": 53
+   },
+   {
+    "label": "stmt:UNKNOWN:k",
+    "count": 47
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_LICENSE(\"GPL\");",
+    "count": 47
+   },
+   {
+    "label": "expr:BLOCK-prelude",
+    "count": 41
+   },
+   {
+    "label": "stmt:UNKNOWN:int",
+    "count": 40
+   },
+   {
+    "label": "cstr:address-equality",
+    "count": 37
+   },
+   {
+    "label": "stmt:UNKNOWN:)",
+    "count": 36
+   },
+   {
+    "label": "stmt:TYPE_DECL",
+    "count": 36
+   },
+   {
+    "label": "op:xor",
+    "count": 33
+   },
+   {
+    "label": "op:preDecrement:value",
+    "count": 33
+   },
+   {
+    "label": "stmt:UNKNOWN:e",
+    "count": 32
+   },
+   {
+    "label": "op:cast:opaque-type",
+    "count": 29
+   },
+   {
+    "label": "op:preIncrement:pointer",
+    "count": 29
+   },
+   {
+    "label": "op:postDecrement:value",
+    "count": 29
+   },
+   {
+    "label": "expr:CONTROL_STRUCTURE:IF",
+    "count": 28
+   },
+   {
+    "label": "stmt:UNKNOWN:__param(int,",
+    "count": 26
+   },
+   {
+    "label": "op:assignmentMultiplication",
+    "count": 22
+   },
+   {
+    "label": "op:indirection:scalar",
+    "count": 19
+   },
+   {
+    "label": "op:addressOf:field:scalar",
+    "count": 16
+   },
+   {
+    "label": "op:preIncrement:value",
+    "count": 14
+   },
+   {
+    "label": "op:postIncrement:unsupported-target",
+    "count": 13
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Test",
+    "count": 12
+   },
+   {
+    "label": "op:addressOf:method_ref:unknown-type",
+    "count": 12
+   },
+   {
+    "label": "stmt:UNKNOWN:struct",
+    "count": 10
+   },
+   {
+    "label": "stmt:UNKNOWN:GENERATE_2_CONTEXT_TESTCASE_FOR_ALL_OUTER(spinlock,",
+    "count": 9
+   },
+   {
+    "label": "op:conditional",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:GENERATE_2_CONTEXT_TESTCASE_FOR_ALL_OUTER(mutex,",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:t",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:s",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:GENERATE_2_CONTEXT_TESTCASE_FOR_ALL_OUTER(raw_spinlock,",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:unsigned",
+    "count": 9
+   },
+   {
+    "label": "stmt:UNKNOWN:STATIC",
+    "count": 8
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_LICENSE(\"Dual",
+    "count": 8
+   },
+   {
+    "label": "stmt:UNKNOWN:GENERATE_2_CONTEXT_TESTCASE_FOR_ALL_OUTER(RCU,",
+    "count": 8
+   },
+   {
+    "label": "op:addressOf:field:pointer",
+    "count": 7
+   },
+   {
+    "label": "stmt:UNKNOWN:size_t",
+    "count": 7
+   },
+   {
+    "label": "stmt:UNKNOWN:b",
+    "count": 7
+   },
+   {
+    "label": "stmt:UNKNOWN:};",
+    "count": 6
+   },
+   {
+    "label": "stmt:UNKNOWN:long",
+    "count": 6
+   },
+   {
+    "label": "op:cast:object",
+    "count": 6
+   },
+   {
+    "label": "stmt:UNKNOWN:__param(bool,",
+    "count": 6
+   },
+   {
+    "label": "expr:UNKNOWN",
+    "count": 5
+   },
+   {
+    "label": "stmt:UNKNOWN:TEST_SPINLOCK_COMMON(spinlock,\n\t\t",
+    "count": 5
+   },
+   {
+    "label": "stmt:UNKNOWN:TEST_SPINLOCK_COMMON(write_lock,\n\t\t",
+    "count": 5
+   },
+   {
+    "label": "stmt:UNKNOWN:TEST_SPINLOCK_COMMON(raw_spinlock,\n\t\t",
+    "count": 5
+   },
+   {
+    "label": "expr:CONTROL_STRUCTURE:WHILE",
+    "count": 5
+   },
+   {
+    "label": "op:postDecrement:unsupported-target",
+    "count": 5
+   },
+   {
+    "label": "stmt:UNKNOWN:TEST_SPINLOCK_COMMON(read_lock,\n\t\t",
+    "count": 5
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Akinobu",
+    "count": 5
+   },
+   {
+    "label": "op:indirection:opaque-type",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(priority,",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(priority,",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:__param(ullong,",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:u64",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_LICENSE(\"GPL",
+    "count": 4
+   },
+   {
+    "label": "expr:CONTROL_STRUCTURE:FOR",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Jiri",
+    "count": 4
+   },
+   {
+    "label": "assign:lhs:CALL",
+    "count": 4
+   },
+   {
+    "label": "stmt:UNKNOWN:if",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Matthew",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:const",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:noinstr",
+    "count": 3
+   },
+   {
+    "label": "lit:float",
+    "count": 3
+   },
+   {
+    "label": "op:addressOf:call:unknown-type",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Kernel",
+    "count": 3
+   },
+   {
+    "label": "op:assignmentDivision",
+    "count": 3
+   },
+   {
+    "label": "op:postDecrement:pointer",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(&pool_lock)\n{\n\tstruct",
+    "count": 3
+   },
+   {
+    "label": "stmt:UNKNOWN:DD_SYS_WRAP(disjoint_bits,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:DD_SYS_WRAP(level_names,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_FALLBACK(l,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Bit",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:DD_SYS_WRAP(disjoint_names,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_OP(q,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:ssize_t",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(iterations,",
+    "count": 2
+   },
+   {
+    "label": "op:unknown",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:h",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_FALLBACK(q,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:asmlinkage",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Jason",
+    "count": 2
+   },
+   {
+    "label": "assign:lhs:multiplication",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:__param(uint,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_FALLBACK(b,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_OP(b,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:DD_SYS_WRAP(level_num,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(&ht->mutex)\n{\n\tstruct",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:extern",
+    "count": 2
+   },
+   {
+    "label": "op:assignmentMinus",
+    "count": 2
+   },
+   {
+    "label": "expr:CONTROL_STRUCTURE:SWITCH",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_OP(w,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:word_type",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Kees",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Michel",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Luis",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_OP(l,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MAKE_FALLBACK(w,",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Testsuite",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:bool",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(mas->tree->ma_lock)\n{\n\tunsigned",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:return",
+    "count": 2
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(start_driver,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(ratelimit_burst,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(lock_spinlock_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:late_initcall(closure_debug_init)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:EXPORT_SYMBOL_NS_GPL(cache_coherency_ops_instance_unregister,",
+    "count": 1
+   },
+   {
+    "label": "op:assignmentPlus",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(start_test_fs,\n\t\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(EAGAIN",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(15)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(2)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DEFINE_SIMPLE_ATTRIBUTE(fops_ul,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:}",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_sb_umount,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"memory",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"no_hash_pointers\",",
+    "count": 1
+   },
+   {
+    "label": "op:postIncrement:impure-target",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_array(test_range,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:SP(8)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Reference",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Jinbum",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(iowait,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(all_cpus,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(tcount,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_cb(run,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Netdevice",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(size,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(time_secs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Andy",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(measure_lock_wait,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(parm_entries,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(time_nsecs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(ARRAY_SIZE(counter_names)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"module",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"OID",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(alloc_pages_nr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_single,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Interval",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_named(lock_mapping,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Greg",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:,\n#if",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(lock_wait_threshold,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(8)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(lock_mmap_sem,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DECLARE_DYNDBG_CLASSMAP(map_level_names,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Breno",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"OF",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Konstantin",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(tcount,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"KUnit",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__setup(\"dyndbg=\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(size,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(shrinking,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"kmod",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:out:\n\tdebug_objects_fixups",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(disable_softirq,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(spm_addr_dev1,\n\t\t\"Specify",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:)\nDEFINE_LOCK_GUARD_0(NOTTHREADED_HARDIRQ,\n\tdo",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(alloc_pages_nr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"UCS2",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:INIT_CLASS_FUNC(X)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Ivan",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(lock_mutex_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Decoder",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(force_init_test,\n\t\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:(*put)(struct",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(SMALL",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_IMPORT_NS(\"TEST_FIRMWARE\");",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__diag_ignore(GCC,",
+    "count": 1
+   },
+   {
+    "label": "assign:aug-impure-target",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:EXPORT_SYMBOL_NS_GPL(cpu_cache_has_invalidate_memregion,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(disable_preempt,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(cooldown_secs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(6)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_mmap_sem,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(cooldown_nsecs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Red",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Red",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(17)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(force_init_test,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"proc",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(verbose,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtou16_from_user,\tkstrtou16,\tu16)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(touch_softlockup,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_not_hold(&pool_lock)\n{\n\tconst",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_string(test_suite,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:EXPORT_SYMBOL_NS_GPL(cpu_cache_invalidate_memregion,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(EREFUSED",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:NULL,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_rcu,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(mas->tree->ma_lock)\n{\n\tenum",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"debug_objects\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Module",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Geert",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DECLARE_DYNDBG_CLASSMAP(map_level_num,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:EXPORT_SYMBOL_NS_GPL(_cache_coherency_ops_instance_alloc,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(iowait,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(verbose,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_mutex_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(alloc_pages_gfp,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(nr_threads,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:decompress_fn",
+    "count": 1
+   },
+   {
+    "label": "op:postDecrement:impure-target",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DEFINE_DEBUGFS_ATTRIBUTE(test_fpu_fops,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_wait_threshold,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(reallocate_pages,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(1)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(touch_hardlockup,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(start_test_fs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__debug_check_no_obj_freed(&obj,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"no_debug_objects\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(lock_rcu,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(reacquire_locks,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(spm_addr_dev0,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Check",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(runs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(cooldown_nsecs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:,\n\tSP(16)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DECLARE_DYNDBG_CLASSMAP(map_disjoint_bits,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(all_cpus,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:INIT_CLASS_FUNC(Y)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(disable_irq,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtou8_from_user,\tkstrtou8,\tu8)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Generic",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__visible",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(alloc_pages_order,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:HARDIRQ_ENTER()",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(lock_single,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Priority-based",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:)\n\n/*",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"stack_depot_max_pools\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_cb(do_prints,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Mike",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtoll_from_user,\tkstrtoll,\tlong",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_not_hold(&pool_lock)\n{\n\tunsigned",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(spm_addr_dev0,\n\t\t\"Specify",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(4)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"XArray",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__setup(\"debug_locks_verbose=\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(alloc_pages_order,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(start_driver,\n\t\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_string(file_path,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Knuth-Morris-Pratt",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"naive",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Dhrystone",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(test_id,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"sysctl.vm.mem_profiling\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(ZEROPAD",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(file_path,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"PM",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:debug_object_init(&obj,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(time_nsecs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:SOFTIRQ_ENTER()",
+    "count": 1
+   },
+   {
+    "label": "op:preIncrement:unsupported-target",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(max_size,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtol_from_user,\tkstrtol,\tlong)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(9)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Liam",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtos8_from_user,\tkstrtos8,\ts8)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"linear-ranges",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_named(disable_irq,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"debug_boot_weak_hash\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:CONFIGFS_ATTR_NAMED(fault_,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DEFINE_SIMPLE_ATTRIBUTE(fops_stacktrace_depth,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:INIT_CLASS_FUNC(Z)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(touch_softlockup,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"xxHash\");",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(reacquire_locks,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtoull_from_user,\tkstrtoull,\tunsigned",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"lru_cache",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(runs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(enomem_retry,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Binary",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Johannes",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(3)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtos16_from_user,\tkstrtos16,\ts16)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(sizeof(struct",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(11)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"interface",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(state,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Uladzislau",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(require_start,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Simple",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(mas->tree->ma_lock)\n{\n\tmas_put_in_tree(mas,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_rwsem_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(12)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"david",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(lock_rwlock_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_named(lock_sb_umount,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(13)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Joern",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(max_size,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(xas->xa->xa_lock)\n{\n\tunsigned",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:typedef",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Philipp",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(use_hrtimer,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(nr_threads,\n\t\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(measure_lock_wait,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(reject_end,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(state,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(18)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_mapping,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtoul_from_user,\tkstrtoul,\tunsigned",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(7)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtoint_from_user,\tkstrtoint,\tint)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"KHO",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(19)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_string(test_name,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Nikolay",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_inode,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(mas->tree->ma_lock)\n{\n\tif",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Stress/performance",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:EXPORT_SYMBOL_NS_GPL(cache_coherency_ops_instance_register,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(spm_addr_dev1,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:kstrto_from_user(kstrtouint_from_user,\tkstrtouint,\tunsigned",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"vmalloc",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"stack_depot_disable\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(ratelimit_interval,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(backtrace_idle,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Object",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Jesse",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(shrinking,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(run,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(iterations,\n\t\t\"Number",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_named(lock_inode,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(alloc_pages_gfp,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(10)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(alloc_pages_atomic,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_rwlock_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:depot_stack_handle_t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(alloc_pages_atomic,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(iterations,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DECLARE_DYNDBG_CLASSMAP(map_disjoint_names,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(enomem_retry,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(5)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(&pool_lock)\n{\n\tlockdep_assert_held(&pool_lock);\n\n\tif",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(cooldown_secs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(task_filter,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DEFINE_SIMPLE_ATTRIBUTE_SIGNED(fops_errno,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__setup(\"fail_usercopy=\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"UBSAN",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(14)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_AUTHOR(\"Jim",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"percpu",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(lock_read,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:early_param(\"hash_pointers\",",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:static_assert(ECANCELLED",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(wq_items,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(wq_items,\n\t\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:debug_object_activate(&obj,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:__must_hold(&pool_lock)\n{\n\tlockdep_assert_held(&pool_lock);\n\n\t/*\n\t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(parm_entries,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(call_cond_resched,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"HMM",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_read,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"glob(7)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Resizable,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(use_hrtimer,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(call_cond_resched,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:TRT_ALLOC(16)",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(touch_hardlockup,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(reallocate_pages,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(require_end,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:T",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:DEFINE_LOCK_GUARD_0(HARDIRQ,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param(max_mem,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(time_secs,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Notifier",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:&fault_attr_stacktrace_depth,\n\t&fault_attr_require_start,\n\t&fault_attr_require_end,\n\t&fault_attr_reject_start,\n\t&fault_attr_reject_end,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:)\nDEFINE_LOCK_GUARD_0(SOFTIRQ,",
+    "count": 1
+   },
+   {
+    "label": "op:indirection:object",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:pr_info(\"selftest",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"Boyer-Moore",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_DESCRIPTION(\"maple",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:while(0),",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(disable_softirq,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:module_param_unsafe(lock_rwsem_ptr,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:uint16_t",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(disable_preempt,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:FAULT_CONFIGFS_ATTR_NAMED(reject_start,",
+    "count": 1
+   },
+   {
+    "label": "stmt:UNKNOWN:MODULE_PARM_DESC(lock_spinlock_ptr,",
+    "count": 1
+   }
+  ],
+  "holes": 10105,
+  "holeFree": 1168,
+  "functions": 3368,
+  "dynamicHoleRisk": 25412,
+  "dialect": "c-like"
+ },
+ "ledger_top_hole_labels_note": "full label histogram is in ledger-LinuxLib.json (regenerable in 5s)",
+ "sacm": {
+  "topStatus": "UNDEVELOPED",
+  "claims": {
+   "G1": "UNDEVELOPED",
+   "G2": "UNDEVELOPED",
+   "G3": "UNSUPPORTED",
+   "G3.1": "SUPPORTED",
+   "D3.1": "DEFEATED",
+   "G3.2": "DEFEATED",
+   "D3": "UNSUPPORTED",
+   "G4": "UNDEVELOPED",
+   "G5": "UNDEVELOPED"
+  },
+  "artifactsMissing": [
+   "audit",
+   "axioms",
+   "conformance",
+   "contracts",
+   "graph",
+   "mutation"
+  ]
+ },
+ "oracle": {
+  "inputs": "synthetic only; 8 per function; NO test-suite inputs exist for kernel C",
+  "claim": {
+   "functions": 3368,
+   "hole_free": 1168,
+   "verifiable_core_static": 843
+  },
+  "executed": {
+   "cases": 6744,
+   "answered": 6744,
+   "core_functions_exercised": 843,
+   "core_functions_with_real_inputs": 0
+  },
+  "result": {
+   "verifiable_core_executed": 466,
+   "verifiable_core_executed_real_inputs_only": 0,
+   "holed_on_some_input": 377,
+   "holed_on_a_real_input": 0,
+   "inconclusive_never_exercised": 0
+  },
+  "static_over_runtime_overstatement": 1.81,
+  "refutations_resting_only_on_receiver_shape_labels": 104,
+  "overstatement_band_excluding_those": [
+   1.48,
+   1.81
+  ],
+  "top_hole_labels": {
+   "op:addressOf:local:scalar": 752,
+   "op:indirection:pointer": 568,
+   "op:arrayInitializer": 120,
+   "binop:+": 80,
+   "call:va_start": 56,
+   "field:parent:non-object": 52,
+   "field:mask:non-object": 42,
+   "control:FOR": 40,
+   "op:alloc:array-decl": 40,
+   "field:mas:non-object": 40,
+   "index:unsupported": 34,
+   "field:node:non-object": 32,
+   "op:addressOf:field:unknown-type": 32,
+   "call:BIT": 32,
+   "control:SWITCH": 28
+  }
+ }
+}

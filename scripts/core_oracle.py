@@ -326,7 +326,12 @@ private def orun (c : OCase) : EResult :=
   else
     match octx.resolve c.fn with
     | none    => .hole s!"entry:{{c.fn}}"
-    | some fn => (applyFunc octx {fuel} h fn c.slf c.args).2
+    -- `applyFunc` gained a keyword-argument list (`List (String x Val)`) when the
+    -- calling convention landed; this harness passed five arguments and every case
+    -- failed to ELABORATE, which the driver could only see as "no answer" and so
+    -- reported as INCONCLUSIVE. Silence read as ignorance instead of as breakage.
+    -- We pass no keywords: the oracle calls positionally.
+    | some fn => (applyFunc octx {fuel} h fn c.slf c.args []).2
 """
 
 FOOTER = """
@@ -486,6 +491,17 @@ def main():
     t0 = time.time()
     for i in range(0, len(order), CHUNK):
         got.update(drv.eval(cases, order[i:i + CHUNK]))
+        # Loud canary. When `applyFunc` gained its keyword-argument list the harness
+        # stopped ELABORATING, every case came back unanswered, and the run would have
+        # reported 843/843 INCONCLUSIVE as though it had merely failed to reach the
+        # code. A harness that answers nothing at all is broken, not ignorant, and it
+        # must say so instead of emitting a well-formed artifact full of zeros.
+        if i == 0 and not got:
+            print("ABORT: the Lean harness answered nothing for the very first batch.\n"
+                  "This is apparatus failure, not evidence: inspect %s and run it under\n"
+                  "`lake env lean` to see the elaboration error. Reporting nothing."
+                  % drv.path)
+            return 2
         if i % 200 == 0:
             print("  ran %d/%d cases (%.0fs)" % (min(i + CHUNK, len(order)),
                                                  len(order), time.time() - t0))
