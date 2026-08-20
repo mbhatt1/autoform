@@ -29,6 +29,8 @@ Usage: differential.py <ast.json> <source-dir> <lean-module> [n-cases] [--tests 
 import os, sys
 import json, subprocess, random, importlib.util, re, glob, io
 import contextlib, inspect, functools
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wasm_backend
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
@@ -830,6 +832,50 @@ def call_in_child(fn, args):
         return None
 
 
+def call_in_child_twice(fn, args):
+    """Call the same function twice with the same arguments in one forked child.
+
+    Returns (v1, v2), either of which is None if the child died.
+
+    This is the allocation-dependence discriminator for the wasm UB oracle. A function
+    that returns a freshly `malloc`ed pointer (`sdsempty`, `sds_malloc`) hands back a
+    different value on the second call; a pure integer function hands back the same one.
+    Without this test, every pointer-returning function looks like a native/wasm
+    disagreement -- native reports a 64-bit heap address, wasm reports a 32-bit linear
+    memory offset -- and the UB count fills up with results that are nothing but two
+    different address spaces. That would be a self-flattering metric pointed the other
+    way: an impressive-sounding pile of "UB found" that is entirely an artifact.
+    """
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:                                    # child
+        try:
+            os.close(r)
+            v1 = fn(*args); v2 = fn(*args)
+            os.write(w, ("%d,%d" % (v1, v2)).encode())
+            os.close(w)
+        except BaseException:                       # noqa: BLE001
+            pass
+        os._exit(0)
+    os.close(w)
+    out = b""
+    try:
+        while True:
+            chunk = os.read(r, 64)
+            if not chunk: break
+            out += chunk
+    finally:
+        os.close(r)
+        _, status = os.waitpid(pid, 0)
+    if not os.WIFEXITED(status) or b"," not in out:
+        return None, None
+    try:
+        a, b = out.split(b",", 1)
+        return int(a), int(b)
+    except ValueError:
+        return None, None
+
+
 def load_module(path, root):
     name = re.sub(r'[^A-Za-z0-9_]', '_', os.path.relpath(path, root))
     spec = importlib.util.spec_from_file_location(name, path)
@@ -1241,6 +1287,12 @@ def main():
     tests_override = None
     if "--tests" in argv:
         i = argv.index("--tests"); tests_override = argv[i + 1]; del argv[i:i + 2]
+    # `--wasm` turns on the sandboxed second C implementation. It is OPT-IN, and
+    # deliberately so: it changes which cases are attempted and which are withheld from
+    # the Lean comparison, so it changes the denominator. A flag that silently altered
+    # the basis would make new rates look comparable to old ones when they are not.
+    wasm_mode = "--wasm" in argv
+    if wasm_mode: argv.remove("--wasm")
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
     funcs = json.load(open(ast_path))
@@ -1292,8 +1344,30 @@ def main():
                   "Rates from the earlier `varargs-skipped-v1` basis (e.g. 104/104) are "
                   "a different measurement and must not be compared." % "v2")
 
+    if wasm_mode and is_c:
+        # The denominator moves under `--wasm`: calls where native and wasm-clang
+        # disagree are withheld from the Lean comparison and counted as `ub-suspected`
+        # instead. That is a DIFFERENT measurement from the native-only C basis, and it
+        # says so rather than letting a reader assume the rates line up.
+        BASIS = "c-dual-oracle-v3"
+        BASIS_NOTE = (
+            "Basis c-dual-oracle-v3: C is executed under BOTH native `cc` and a "
+            "freestanding wasm32 build, on identical inputs. Calls where the two "
+            "conforming implementations return different values are recorded as "
+            "`ub-suspected` and WITHHELD from the Lean comparison -- Core maps UB to "
+            "`Expr.hole` (`NumResult.ub`), so scoring those against Lean would penalise "
+            "the semantics for being correct. The conclusive denominator therefore "
+            "excludes them and is NOT comparable to the native-only C basis. Arguments "
+            "are additionally drawn from a boundary-biased pool (INT_MIN/INT_MAX, shift "
+            "counts >= 32) rather than only randint(-20, 20), so the inputs differ from "
+            "the native-only basis as well. Two separate categories are reported and "
+            "NOT counted as UB: `width-sensitive` (functions using `long`/`size_t`, "
+            "which are 32-bit on wasm32 and 64-bit natively) and `excluded_from_ub` "
+            "(pointer returns and results unstable across two identical native calls).")
+
     # cases: dict(name, heap, self, args, outcome, origin)
     cases = []
+    C_WASM_REPORT = []      # filled by the C backend below; surfaced in conformance.json
 
     backend_info, backend_skipped, backend_status = {}, {}, "available"
     if missing:
@@ -1321,23 +1395,156 @@ def main():
         cget = c_runtime(src_root)
         cands = [f for f in holefree
                  if f["params"] and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', f["name"])]
+        # Fix the argument vectors up front so the native and wasm runs see EXACTLY the
+        # same inputs. Generating them twice from the same seeded RNG would drift the
+        # moment either side skips a function, and a cross-implementation comparison on
+        # mismatched inputs is worse than none: it manufactures disagreements.
+        # Under `--wasm` the arguments are drawn from a boundary-biased pool as well as
+        # the small range. `randint(-20, 20)` can never trigger the behaviour this
+        # oracle exists to find: signed overflow needs operands near INT_MAX, and
+        # shift-past-width needs a count >= 32. Searching for UB with inputs that cannot
+        # produce it and reporting "none found" would be an empty result dressed as a
+        # clean one. This widens what is attempted, which is part of why the basis
+        # changes.
+        UB_POOL = [0, 1, -1, 2, 3, 7, 8, 16, 31, 32, 33, 63, 64, 65,
+                   255, 256, 65535, 65536, 1 << 20,
+                   (1 << 31) - 1, -(1 << 31), (1 << 31) - 2, -(1 << 31) + 1,
+                   (1 << 30), -(1 << 30), 0x55555555 - (1 << 32), 0x7ffffffe]
+
+        def c_arg():
+            if wasm_mode and random.random() < 0.55:
+                return random.choice(UB_POOL)
+            return random.randint(-20, 20)
+
+        plan = []
         for f in cands:
+            for _ in range(ncases):
+                plan.append((f, [c_arg() for _ in f["params"]]))
+
+        # ---- native leg (the existing `cc` backend)
+        native, native2 = {}, {}
+        for k, (f, args) in enumerate(plan):
             fn = cget(f["name"], len(f["params"])) if cget else None
             if fn is None: continue
-            for _ in range(ncases):
-                args = [random.randint(-20, 20) for _ in f["params"]]
-                # The AST carries no C types, so an `int` we pass may be a pointer
-                # parameter. On a real corpus (`sds`) that segfaults and takes the whole
-                # harness with it, so each call runs in a forked child: a crash costs
-                # one case, not the run.
-                got = call_in_child(fn, args)
-                if got is None:
-                    stats["skip_c_crash"] = stats.get("skip_c_crash", 0) + 1
+            # The AST carries no C types, so an `int` we pass may be a pointer
+            # parameter. On a real corpus (`sds`) that segfaults and takes the whole
+            # harness with it, so each call runs in a forked child: a crash costs
+            # one case, not the run.
+            if wasm_mode:
+                # Two invocations, so the UB oracle can tell an allocation-dependent
+                # result (a fresh pointer each call) from a stable computed value.
+                native[k], native2[k] = call_in_child_twice(fn, args)
+            else:
+                native[k] = call_in_child(fn, args)
+
+        # ---- wasm leg (sandbox + second implementation)
+        wres, wasm_report = {}, None
+        if wasm_mode:
+            tc = wasm_backend.toolchain()
+            if not tc["ok"]:
+                # LOUD. A missing toolchain is a gap in the evidence; it must never be
+                # allowed to look like a clean run with nothing to report.
+                wasm_report = {"status": "UNSUPPORTED: no wasm toolchain",
+                               "reason": tc["reason"]}
+                print("  wasm UNSUPPORTED: %s — the sandbox and the UB oracle did NOT "
+                      "run. This is a missing check, not a pass." % tc["reason"])
+            else:
+                wdir = os.path.join(WORK, "wasm"); os.makedirs(wdir, exist_ok=True)
+                srcs = glob.glob(os.path.join(src_root, "**", "*.c"), recursive=True)
+                wpath, winfo = wasm_backend.compile_wasm(srcs, wdir, tc)
+                if wpath is None:
+                    wasm_report = {"status": "UNSUPPORTED: wasm build failed",
+                                   "reason": winfo.get("error"), "build": winfo}
+                    print("  wasm UNSUPPORTED: %s" % winfo.get("error"))
+                else:
+                    caller = wasm_backend.WasmCaller(wpath, tc, wdir)
+                    wres = caller.run([{"id": k, "name": f["name"], "args": a}
+                                       for k, (f, a) in enumerate(plan)])
+                    wasm_report = {"status": "ran", "toolchain": tc, "build": winfo}
+
+        # ---- adjudicate the two C implementations against each other
+        wtally, ub_findings, trap_detail, excluded = {}, [], {}, []
+        width_findings = []
+        width_fns = (wasm_backend.width_sensitive_functions(src_root)
+                     if wasm_mode and wres else set())
+        for k, (f, args) in enumerate(plan):
+            nat = native.get(k)
+            if wasm_mode and wres:
+                kind, det = wasm_backend.adjudicate(nat, wres.get(k),
+                                                    native2.get(k))
+                wtally[kind] = wtally.get(kind, 0) + 1
+                if kind in ("address-valued", "nondeterministic"):
+                    # Recorded, not hidden: these differ for a reason the harness can
+                    # point at (two address spaces / an unstable native result), so
+                    # they are neither UB evidence nor a fair Lean comparison.
+                    if len(excluded) < 40:
+                        excluded.append(dict(function=f["name"], args=args,
+                                             why=kind, **det))
                     continue
-                cases.append({"name": f["name"], "heap": [], "self": None,
-                              "args": [("int", a) for a in args],
-                              "outcome": ("val", ("int", got)), "origin": "random",
-                              "objs": {}})
+                if kind == "trap":
+                    tk = "%s: %s" % (f["name"], det.get("kind"))
+                    trap_detail[tk] = trap_detail.get(tk, 0) + 1
+                if kind == "ub-suspected":
+                    ws = f["name"] in width_fns
+                    if ws:
+                        # Fully defined on both targets, just computed at different
+                        # widths. Retallied so the UB headline stays honest.
+                        wtally["ub-suspected"] -= 1
+                        wtally["width-sensitive"] = wtally.get("width-sensitive", 0) + 1
+                    (width_findings if ws else ub_findings).append({
+                        "function": f["name"], "args": args,
+                        "native": det["native"], "wasm": det["wasm"],
+                        "width_sensitive": ws,
+                        "reading": wasm_backend.classify_ub(f["name"], args,
+                                                            det["native"], det["wasm"]),
+                        "reading_is_a_hint": True})
+                    # NOT a conformance divergence. Core maps UB to `Expr.hole`
+                    # (`NumResult.ub`), so where two conforming C implementations
+                    # disagree the hole is the CORRECT answer -- scoring this against
+                    # Lean would penalise the semantics for being right. The case is
+                    # withheld from the Lean comparison and counted in its own
+                    # category, which is why the measurement basis changes below.
+                    continue
+            if nat is None:
+                stats["skip_c_crash"] = stats.get("skip_c_crash", 0) + 1
+                continue
+            cases.append({"name": f["name"], "heap": [], "self": None,
+                          "args": [("int", a) for a in args],
+                          "outcome": ("val", ("int", nat)), "origin": "random",
+                          "objs": {}})
+        if wasm_report is not None:
+            wasm_report.update(calls_planned=len(plan), tally=wtally,
+                               trap_detail=dict(sorted(trap_detail.items(),
+                                                       key=lambda kv: -kv[1])[:30]),
+                               ub_suspected=len(ub_findings),
+                               ub_findings=ub_findings[:60],
+                               width_sensitive=len(width_findings),
+                               width_findings=width_findings[:40],
+                               width_note=(
+                                   "Native/wasm disagreements in functions that use a "
+                                   "pointer-width type (`long`, `size_t`, ...). wasm32 "
+                                   "makes those 32-bit and the native build 64-bit, so "
+                                   "these differ WITHOUT undefined behaviour -- it is "
+                                   "the NumConfig width axis `Core/Numeric.lean` "
+                                   "models. Kept out of `ub_suspected` so that number "
+                                   "means what it says."),
+                               excluded_from_ub=excluded,
+                               excluded_note=(
+                                   "Native/wasm value differences the harness can "
+                                   "attribute to something other than the program's "
+                                   "semantics: a pointer return (two address spaces) "
+                                   "or a native result that is not stable across two "
+                                   "identical calls. Counted here rather than in "
+                                   "`ub_suspected`, and withheld from the Lean "
+                                   "comparison, because neither number answers the "
+                                   "same question."))
+            if wasm_report["status"] == "ran" and not wtally:
+                wasm_report["status"] = ("SKIPPED: wasm built but zero calls were "
+                                         "comparable — nothing was checked")
+            print("  wasm: %s; %d calls, tally %s, %d ub-suspected"
+                  % (wasm_report["status"], len(plan), json.dumps(wtally),
+                     len(ub_findings)))
+            C_WASM_REPORT.append(wasm_report)
     elif lang == "python":
         wanted, methods, modlevel = set(), [], []
         for f in holefree:
@@ -1417,6 +1624,13 @@ def main():
               "backend_info": backend_info,
               "backend_skipped": dict(list(backend_skipped.items())[:40]),
               "backend_skipped_total": len(backend_skipped),
+              # The wasm leg is a SEPARATE ORACLE, reported alongside the Lean
+              # comparison rather than folded into it. `ub_suspected` counts programs
+              # two conforming C compilers disagree about; those are evidence about the
+              # program under test, not about our semantics.
+              "wasm_c_oracle": (C_WASM_REPORT[0] if C_WASM_REPORT else
+                                ({"status": "not requested (pass --wasm)"} if is_c
+                                 else {"status": "n/a: not a C corpus"})),
               "dialect_expected": want_dialect,
               "dialect_is_exact": exact,
               "dialect_note": (None if exact else
