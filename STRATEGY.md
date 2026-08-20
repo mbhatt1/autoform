@@ -1777,3 +1777,83 @@ AST that is not the checked-in one, three separate times. Any `cachetools` confo
 ledger number produced right now describes a build that does not correspond to the
 committed AST. `scripts/check_docs.py` reports this as STALE and should keep failing
 until the module is re-rendered from the AST and both are committed together.
+
+## §35 — Closing the `_HashedTuple` gap: the payload has to be in the value
+
+§34 settled that the divergence is real: `hashkey (tuple [int 0])` was `Val.ref 0` where
+CPython's `hashkey(0)` is `(0,)`, of type `_HashedTuple`, and `== (0,)` is `True`. This
+section is the fix and, more usefully, why the cheap version of the fix does not exist.
+
+### The representation, and why the other one is not available
+
+The obvious cheap move is `Obj.builtin : Option Val` — leave the instance a `Val.ref` and
+have equality consult the heap. **It is not implementable without a much larger change
+than the alternative**, and the reason is structural rather than aesthetic: `Val.beq`,
+`applyBinop`, `valIn` and `Val.truthy` are pure functions of values and do not take a
+`Heap`. They are also precisely the functions that have to agree with the builtin. Making
+an `Obj` payload visible to them means threading a heap through `Val.beq` — which is the
+`BEq Val` instance, is called from `Val.beqL`/`beqP`, from `Stdlib`'s association-list
+helpers, and from dozens of `Refine.lean` theorems — and it leaves every one of those call
+sites able to *forget* to consult the heap. That is the silent-wrong shape this project
+keeps finding, bought at a higher price than the alternative.
+
+So the payload lives in the value: `Val.bobj : String → Val → Val`, the class name plus
+the underlying `tuple`/`list`/`dict`/`str`. There is exactly one copy of the state and no
+way for a value and a heap object to disagree about it.
+
+The predicted cost of a new `Val` constructor — "every existing match goes non-exhaustive
+at once" — was **not** what the change cost. Lean flagged four matchers, all of which had
+catch-alls that were already honest. What it did cost was two things nobody would have
+predicted:
+
+* Making `Val.truthy`, `Val.iterable` and `Stdlib.elems` *recursive* (`| .bobj _ v => f v`)
+  compiles them through `brecOn`, and that broke ~30 `Refine.lean` proofs and the
+  `whnf`-based proof of `Stdlib.builtin_heap_unchanged`. Writing the four base cases out
+  by hand keeps them plain matchers that reduce by `rfl`. The same constraint forced
+  `Val.beq`'s twelve explicit `bobj` cases: every recursive call has to be on a subterm of
+  the *first* argument or the definition falls off structural recursion into well-founded
+  recursion, and a well-founded `Val.beq` is not reducible by `decide` — which
+  `beq_float_nan_self` and much of `Refine.lean` depend on.
+* One case genuinely did not fit: `len` of a builtin-based instance. Adding it to
+  `Stdlib.builtinCore` defeats the brute-force branch enumeration in
+  `builtin_heap_unchanged`, and raising `maxHeartbeats` does not help. It is a **hole**
+  with a test pinning it (`excluded_len`), not a silent `none`. `list`, `tuple`, `sorted`,
+  `sum`, `min` and `max` all reach the base through `Stdlib.elems` and do work.
+
+`FuelMono.lean` needed two new cases and no weakening: `alloc` splits on
+`Ctx.builtinBase` before the existing proof (the builtin branch is a fuel-free
+computation, so there is nothing to induct on), and `mcall` gains a `bobj` receiver case
+mirroring the `ref` one. `fuelMonoExclusions` is unchanged at `["Stmt.tryFinally"]`.
+
+### The refusals are the load-bearing part
+
+`Val.beq` compares a `bobj` by contents and **ignores the class**, because CPython does:
+`A((0,)) == B((0,))` is `True` for two distinct subclasses of `tuple`. That is only sound
+for a class that does not override `__eq__`, so `allocBuiltin` **refuses** to build a
+`bobj` for a class that defines its own `__eq__` or `__init__`, emitting
+`alloc:builtin-base:<cls>:own-__eq__`. A refusal is a counted hole; honouring the class
+while ignoring the override would be a silent wrong answer of the exact kind this whole
+mechanism exists to remove. Same for `str(x)` of a non-string, `dict(pairs)`, a
+non-iterable argument, and more than one constructor argument.
+
+The feature is also **opt-in per class**: `Program.builtinBases` is empty by default, so a
+class the exporter did not record behaves exactly as before — an opaque `Val.ref`. Every
+existing corpus is byte-for-byte unaffected, which is what makes the 113 `Refine.lean` and
+79 `SpecsGen` theorems a meaningful regression check rather than a coincidence.
+
+### What is still open, and it is the exporter
+
+`cartographer/export_ast.sc` now reads `TypeDecl.inheritsFromTypeFullName` and emits a
+`classBases` map on the module initializer; `render_lean.py` turns it into
+`Program.builtinBases`. **Neither has been run**: this environment has no Joern and no
+corpus source, so `ast-Cachetools.json` still carries no `classBases` and the shipped
+`Autoform/Generated/Cachetools.lean` therefore still has an empty `builtinBases`. The Lean
+side is demonstrated against the *committed* `hashkey` body with the one base supplied at
+the test site (`Autoform/BuiltinBase.lean`). That is a real gap and it is named rather
+than papered over: until the exporter is re-run, the capability exists and the corpus does
+not use it.
+
+`Autoform/Generated/Cachetools.lean` is also still stale against its AST (238 functions
+against 208, §34's standing hazard). Re-rendering it would delete declarations
+`Autoform/SpecsGen/Cachetools.lean` depends on, so it stays a separate change and
+`scripts/check_render.py` keeps failing on exactly that one module, as it did before.

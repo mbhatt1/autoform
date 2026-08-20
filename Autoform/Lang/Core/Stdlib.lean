@@ -152,6 +152,13 @@ def elems : Val → Option (List Val)
   | .tuple vs => some vs
   | .dict kvs => some (kvs.map (·.1))
   | .str s    => some (s.toList.map (fun c => .str c.toString))
+  -- An instance of a class with a builtin base iterates as its base does. Written out
+  -- per base rather than recursing: making `elems` recursive compiles it through
+  -- `brecOn`, which defeats the `whnf`-based proof of `builtin_heap_unchanged`.
+  | .bobj _ (.list vs)  => some vs
+  | .bobj _ (.tuple vs) => some vs
+  | .bobj _ (.dict kvs) => some (kvs.map (·.1))
+  | .bobj _ (.str s)    => some (s.toList.map (fun c => .str c.toString))
   | _         => none
 
 /-- All-integers view of a value list; `none` if any element is not an `int`. -/
@@ -211,6 +218,15 @@ private def instOf : Val → Option String
   | .tuple _ => some "tuple"
   | .dict _  => some "dict"
   | .unit    => some "NoneType"
+  -- `isinstance(A((0,)), tuple)` is `True` in CPython for `class A(tuple)`. The *class's
+  -- own* name stays undecidable here (it is not a builtin type name), so `isInstance`
+  -- answers `none` for it — a hole, not a wrong `False`.
+  | .bobj _ (.bool _)  => some "bool"
+  | .bobj _ (.int _)   => some "int"
+  | .bobj _ (.str _)   => some "str"
+  | .bobj _ (.list _)  => some "list"
+  | .bobj _ (.tuple _) => some "tuple"
+  | .bobj _ (.dict _)  => some "dict"
   | _        => none
 
 /-- `isinstance` for the cases where the answer is certain.
@@ -295,6 +311,12 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     | "len", [.tuple vs] => v (.int vs.length)
     | "len", [.dict kvs] => v (.int kvs.length)
     | "len", [.str s]    => v (.int s.length)
+    -- **Excluded, deliberately.** `len(A((0,)))` is `1` in CPython for `class A(tuple)`,
+    -- but adding a `.bobj` case here defeats the branch enumeration in
+    -- `builtin_heap_unchanged` below (a `whnf` timeout that raising the heartbeat budget
+    -- does not fix). `len` of a builtin-based instance is therefore a `call:len` hole —
+    -- counted ignorance, not a wrong number. `list`, `tuple`, `sorted`, `sum`, `min` and
+    -- `max` all go through `elems` and *do* see through the base.
     -- abs: Python integers are unbounded, so this cannot overflow.
     | "abs", [.int i] => v (.int i.natAbs)
     -- bool / truthiness. Core's `Val.truthy` is the shared dynamic-language notion.
