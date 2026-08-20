@@ -135,7 +135,7 @@ def lean_val(v):
     if t == "bool": return "Val.bool " + ("true" if v[1] else "false")
     if t == "int":  return "Val.int (%d)" % v[1]
     if t == "str":  return "Val.str " + json.dumps(v[1])
-    if t == "ref":  return "Val.ref %d" % v[1]
+    if t == "ref":  return "Val.ref (base + %d)" % v[1]
     if t == "fn":   return "Val.fn " + json.dumps(v[1])
     if t in ("list", "tuple"):
         return "Val.%s [%s]" % (t, ", ".join(lean_val(x) for x in v[1]))
@@ -234,7 +234,7 @@ def parse_result(line):
 
 # ---------------------------------------------------------------------- comparison
 
-def same(py, ln, encoder):
+def same(py, ln, base):
     """Compare an encoded Python value against a parsed Lean value.
 
     Dicts compare order-insensitively: Core's `Val.dict` is an association list whose
@@ -247,16 +247,16 @@ def same(py, ln, encoder):
     t = py[0]
     if t in ("unit",): return True
     if t in ("int", "bool", "str", "fn"): return py[1] == ln[1]
-    if t == "ref": return py[1] == ln[1]
+    if t == "ref": return py[1] + base == ln[1]
     if t in ("list", "tuple"):
-        return len(py[1]) == len(ln[1]) and all(same(a, b, encoder)
+        return len(py[1]) == len(ln[1]) and all(same(a, b, base)
                                                 for a, b in zip(py[1], ln[1]))
     if t == "dict":
         if len(py[1]) != len(ln[1]): return False
         rest = list(ln[1])
         for k, v in py[1]:
             for j, (k2, v2) in enumerate(rest):
-                if same(k, k2, encoder) and same(v, v2, encoder):
+                if same(k, k2, base) and same(v, v2, base):
                     rest.pop(j); break
             else:
                 return False
@@ -603,43 +603,85 @@ def main():
     # cannot get an answer for are INCONCLUSIVE, never agreement.
     env = dict(os.environ,
                PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # A stale `.olean` silently answers with the *previous* semantics — which shows up
     # as fictitious divergences. Rebuild the module before trusting anything it says.
     b = subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod],
-                       capture_output=True, text=True, env=env)
+                       capture_output=True, text=True, env=env, cwd=repo)
     if b.returncode != 0:
         print("WARNING: `lake build Autoform.Generated.%s` failed; results below are "
               "against a possibly stale build:\n%s" % (lean_mod, b.stderr[:300]))
+    gen = os.path.join(repo, "Autoform", "Generated", lean_mod + ".lean")
+    has_inits = (os.path.exists(gen)
+                 and "def moduleInits" in open(gen, encoding="utf-8").read())
+    inits = "moduleInits" if has_inits else "([] : List Func)"
+
+    # Module-level bindings (`Stmt.setGlobal` / `Expr.closure`) only exist after the
+    # module initializers have run, so we start from `initGlobals` rather than the empty
+    # heap. The globals frame occupies ref 0, so every receiver object the harness
+    # materialises must be allocated at `base = h0.length` and upward; all `Val.ref`
+    # literals below are emitted relative to `base`. `drun` re-checks that arithmetic
+    # against the class name Python recorded — an off-by-one that aliased the globals
+    # frame would otherwise be silently wrong rather than loudly wrong.
     header = ["import Autoform.Generated.%s" % lean_mod,
               "open Autoform.Core Autoform.Generated", "",
-              "private def dctx : Ctx := ⟨program.dialect, program.table⟩", "",
-              "private def drun (h : Heap) (nm : String) (slf : Option Val) "
-              "(as : List Val) : EResult :=",
-              "  match dctx.resolve nm with",
-              '  | none    => .hole s!"entry:{nm}"',
-              "  | some fn => (applyFunc dctx %d h fn slf as).2" % FUEL, "",
-              "private abbrev Case := Nat × Heap × String × Option Val × List Val", ""]
+              "private def gp : Heap × Ref := initGlobals program %d %s" % (FUEL, inits),
+              "private def h0 : Heap := gp.1",
+              "private def gref : Ref := gp.2",
+              "private def base : Nat := h0.length",
+              "private def dctx : Ctx := "
+              "{ dialect := program.dialect, table := program.table, globals := gref }",
+              "",
+              "private structure DCase where",
+              "  idx  : Nat",
+              "  objs : List Obj",
+              "  fn   : String",
+              "  slf  : Option Val",
+              "  args : List Val",
+              "  chk  : List (Nat × String)", "",
+              "private def drun (c : DCase) : EResult :=",
+              "  let h := h0 ++ c.objs",
+              "  -- the globals frame must survive, and each receiver must land where",
+              "  -- the harness said it would",
+              "  if (h.get gref).map (·.cls) != some \"<globals>\" then",
+              "    .hole \"harness:globals-frame-clobbered\"",
+              "  else if c.chk.any (fun p => (h.get (base + p.1)).map (·.cls) "
+              "!= some p.2) then",
+              "    .hole \"harness:receiver-alias\"",
+              "  else",
+              "    match dctx.resolve c.fn with",
+              '    | none    => .hole s!"entry:{c.fn}"',
+              "    | some fn => (applyFunc dctx %d h fn c.slf c.args).2" % FUEL, ""]
     footer = ["]", "",
-              '#eval cases.forM (fun c => IO.println ("@@" ++ toString c.1 ++ "@@" '
-              '++ (repr (drun c.2.1 c.2.2.1 c.2.2.2.1 c.2.2.2.2)).pretty '
-              "(width := 1000000)))"]
+              '#eval IO.println ("@@meta@@" ++ toString base ++ " " ++ toString gref)',
+              '#eval cases.forM (fun c => IO.println ("@@" ++ toString c.idx ++ "@@" '
+              '++ (repr (drun c)).pretty (width := 1000000)))']
 
     def case_lit(i, c):
         slf = "none" if c["self"] is None else "(some (%s))" % lean_val(c["self"])
-        return "  (%d, %s, %s, %s, [%s])" % (i, lean_heap(c["heap"]),
-                                             json.dumps(c["name"]), slf,
-                                             ", ".join(lean_val(a) for a in c["args"]))
+        chk = ", ".join('(%d, %s)' % (k, json.dumps(cls))
+                        for k, (cls, _) in enumerate(c["heap"]))
+        return ("  { idx := %d, objs := %s, fn := %s, slf := %s, args := [%s], "
+                "chk := [%s] }"
+                % (i, lean_heap(c["heap"]), json.dumps(c["name"]), slf,
+                   ", ".join(lean_val(a) for a in c["args"]), chk))
+
+    meta = {"base": 0, "gref": 0}
 
     def lean_eval(idxs, depth=0):
         """idxs -> {idx: repr line}. Missing keys are cases Lean could not answer."""
         if not idxs: return {}
-        src = header + ["private def cases : List Case := ["] \
+        src = header + ["private def cases : List DCase := ["] \
             + [",\n".join(case_lit(i, cases[i]) for i in idxs)] + footer
         open("/tmp/autoform_diff.lean", "w").write("\n".join(src) + "\n")
         out = subprocess.run(["lake", "env", "lean", "/tmp/autoform_diff.lean"],
-                             capture_output=True, text=True, env=env)
+                             capture_output=True, text=True, env=env, cwd=repo)
         got = {}
         for l in out.stdout.splitlines():
+            m = re.match(r'@@meta@@(\d+) (\d+)', l)
+            if m:
+                meta["base"], meta["gref"] = int(m.group(1)), int(m.group(2))
+                continue
             m = re.match(r'@@(\d+)@@(.*)', l)
             if m and int(m.group(1)) in idxs: got[int(m.group(1))] = m.group(2)
         if len(got) < len(idxs) and len(idxs) > 1:
@@ -689,7 +731,7 @@ def main():
             continue
         ok = False
         if py[0] == "val" and lr[0] == "val":
-            ok = same(py[1], lr[1], None)
+            ok = same(py[1], lr[1], meta["base"])
             desc = "%s=%s lean=%s" % (runtime, show(py[1]), show(lr[1]))
         elif py[0] == "exn" and lr[0] == "exn":
             lname = lr[1][1] if lr[1][0] == "str" else show(lr[1])

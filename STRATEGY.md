@@ -1163,3 +1163,53 @@ with the artifact will flatter itself.
 * **`<metaClassCallHandler>` synthetics** pad the function count; the `synthetic` filter
   excludes `<metaClassAdapter>` but not these. Left alone so that this pass's numbers move
   for one reason only.
+
+## 25. The oracle recovered, and found the next silent mistranslation
+
+Adding globals regressed the differential harness to 0/0 — it started from an empty heap,
+so every global read resolved to `unit`. Re-integrated via `initGlobals`, with two details
+worth recording:
+
+* **Receiver addresses are computed Lean-side.** The globals frame occupies ref 0, so
+  receiver objects must be allocated from `h₀.length` onward. Rather than trust Python
+  arithmetic to get that offset right, the harness emits `Val.ref (base + k)` with
+  `base := h₀.length` evaluated in Lean.
+* **The harness checks its own setup before reporting.** Each case carries the class name
+  Python recorded for every receiver; the runner refuses to compare unless the object at
+  `gref` is still `<globals>` and each receiver's class matches, returning
+  `harness:receiver-alias` / `harness:globals-frame-clobbered` as INCONCLUSIVE. Verified by
+  fault injection: with `base - 1` — the exact off-by-one that would alias the globals
+  frame — it reports the alias rather than a false agreement.
+
+That is §19's rule applied to the oracle itself: an oracle must establish it is measuring
+what it thinks it is measuring before it reports anything.
+
+Reach went from 42 compared cases across 7 functions to **87 across 61**.
+
+### The finding: Python private name mangling
+
+All 16 divergences share one root cause. Inside a class body, CPython rewrites `__name` to
+`_ClassName__name` at compile time. We emit
+
+    .field (.name "self") "__maxsize"
+
+while CPython stores `_Cache__maxsize`. The read misses and returns `unit`:
+
+    Cache.maxsize():  cpython = 2,  lean = unit
+
+Silently wrong, not absent — the same category as `floorDiv` and the bitwise `and`/`or`
+mapping. Notably the harness author declined to make the *value encoder* also expose
+unmangled aliases, which would have made the numbers agree while leaving the transpiler
+wrong. Fixing the measurement to match a broken artifact is the most tempting failure mode
+in this whole design, and refusing it is what keeps the conformance number meaningful.
+
+### Honest ceilings on this corpus
+
+The structural losses are now larger than the fixable ones: `skip_self_not_object` 1,527
+(receivers that are `tuple`/`dict` subclasses, which Core cannot represent as objects),
+`skip_unencodable_args` 534 (floats, locks, sets), `skip_varargs` 340. The 57 "no instance
+reached by the test suite" skips are unrelated to globals and did not move.
+
+Dominant inconclusive labels, i.e. what would buy the most oracle reach next:
+`setField:non-object` (49), `call:set` (25), `mcall:__init__:non-object` (20),
+`in:non-container` (15).
