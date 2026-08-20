@@ -12,11 +12,7 @@ import Autoform.Lang.Core.Semantics
 -- which elaborates as nested cons cells -- one frame or more per function, and
 -- Ansible has 5,546. So the limit has to scale with the module's function count,
 -- not with how deep its code happens to be.
-<<<<<<< HEAD
-set_option maxRecDepth 9664
-=======
 set_option maxRecDepth 9672
->>>>>>> worktree-agent-aaa117a74274c3524
 
 /-!
 # Cachetools — machine-generated
@@ -5468,21 +5464,6 @@ def f_cachetools___init___py__module_ : Func :=
                                         (.seq
                                         (.setGlobal "__version__" (.lit (.str "7.1.7")))
                                         (.seq
-<<<<<<< HEAD
-                                        (.setGlobal "collections" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "collections" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "functools" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "heapq" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "random" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "time" (.hole "import:module-value"))
-                                        (.seq
-                                        (.setGlobal "keys" (.hole "import:module-value"))
-=======
                                         (.setGlobal "collections" (.hole "import:absent:external"))
                                         (.seq
                                         (.setGlobal "collections" (.hole "import:absent:external"))
@@ -5496,7 +5477,6 @@ def f_cachetools___init___py__module_ : Func :=
                                         (.setGlobal "time" (.hole "import:absent:external"))
                                         (.seq
                                         (.setGlobal "keys" (.name "<module>cachetools/keys.py"))
->>>>>>> worktree-agent-aaa117a74274c3524
                                         (.seq
                                         .skip
                                         (.seq
@@ -5918,11 +5898,7 @@ def f_cachetools_func_py__module_ : Func :=
                                         (.setGlobal
                                         "cached"
                                         (.fnref "cachetools/__init__.py:<module>.cached"))
-<<<<<<< HEAD
-                                        (.setGlobal "keys" (.hole "import:module-value"))))))))
-=======
                                         (.setGlobal "keys" (.name "<module>cachetools/keys.py"))))))))
->>>>>>> worktree-agent-aaa117a74274c3524
                             (.seq
                               (.seq
                                 (.setGlobal
