@@ -26,14 +26,15 @@ not actually compared is never reported as passing — that is the cardinal sin 
 
 Usage: differential.py <ast.json> <source-dir> <lean-module> [n-cases] [--tests DIR]
 """
-import json, sys, subprocess, random, importlib.util, os, re, glob, io, contextlib
+import json, sys, subprocess, random, importlib.util, os, re, glob, io
+import contextlib, inspect, functools
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
 FUEL = 5000
 MAX_TOTAL_CASES = 600      # keep the generated Lean file compile-bounded
-MAX_DEPTH = 4              # value-encoding depth limit
-MAX_ELEMS = 64             # value-encoding breadth limit
+MAX_DEPTH = 8              # value-encoding depth limit
+MAX_ELEMS = 256            # value-encoding breadth limit
 
 
 # --------------------------------------------------------------------------- AST
@@ -70,13 +71,28 @@ class Unencodable(Exception):
 
 
 class Encoder:
+    """Python value -> Core `Val`, with one encoding per value in *every* position.
+
+    Invariants, all of them load-bearing for the oracle's honesty:
+
+    * A given Python object encodes to the same `Val.ref` whether it appears as the
+      receiver, inside a receiver's field, as an argument, or in the result — the memo
+      is keyed on `id` and shared across the whole case.
+    * `tuple`/`list`/`dict` *subclasses* (e.g. cachetools' `_HashedTuple`) encode
+      structurally, by value, in every position — never sometimes-value/sometimes-ref.
+    * Nothing is dropped. If any value, however deeply nested inside a receiver, has
+      no faithful Core representation, the encoder raises and the *whole case* is
+      abandoned. A partially-encoded receiver reads back as `unit` in Core and would
+      surface as a confident divergence the harness itself manufactured.
+    """
+
     def __init__(self):
         self.heap = []          # list of (cls, [(field, Val)])
         self.byid = {}          # id(obj) -> ref index
-        self.objs = {}          # ref index -> the live object (for identity checks)
-        self.dropped_fields = 0
+        self.objs = {}          # ref index -> the live object (keeps ids alive)
+        self.pin = set()        # ids present before the result was encoded
 
-    def enc(self, v, depth=0):
+    def enc(self, v, depth=0, in_key=False):
         if depth > MAX_DEPTH: raise Unencodable("depth")
         if v is None: return ("unit",)
         if isinstance(v, bool): return ("bool", v)
@@ -85,25 +101,36 @@ class Encoder:
         if isinstance(v, (list, tuple)):
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             k = "tuple" if isinstance(v, tuple) else "list"
-            return (k, [self.enc(x, depth + 1) for x in v])
+            return (k, [self.enc(x, depth + 1, in_key) for x in v])
         if isinstance(v, dict):
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
-            return ("dict", [(self.enc(k, depth + 1), self.enc(x, depth + 1))
-                             for k, x in v.items()])
-        if callable(v):
+            # Keys are the subtle case: CPython looks them up by `__hash__`/`__eq__`,
+            # which user classes override (cachetools' own tests define a
+            # `RecursiveEquals` whose *distinct* instances compare equal), while Core
+            # compares `Val`s structurally with `.ref` identity. Any object inside a
+            # key therefore makes the lookup unfaithful in either direction, so the
+            # case is refused rather than compared.
+            return ("dict", [(self.enc(k, depth + 1, True),
+                              self.enc(x, depth + 1, in_key)) for k, x in v.items()])
+        if isinstance(v, type) or inspect.isroutine(v) or isinstance(v, (
+                staticmethod, classmethod, property, functools.partial)):
             # `METHOD_REF`/`TYPE_REF` values: Core models them by name only.
             n = getattr(v, "__qualname__", None) or getattr(v, "__name__", None)
             if n: return ("fn", n)
             raise Unencodable("callable")
+        # a callable *instance* is still an object with fields — encode it as one
         if isinstance(v, (float, complex, bytes, frozenset, set)):
             raise Unencodable(type(v).__name__)
+        if in_key:
+            raise Unencodable("object-as-dict-key")
         return ("ref", self.alloc(v, depth))
 
     def alloc(self, obj, depth):
         """Snapshot a plain Python object into the heap. Cycles resolve to the same
         ref, which is exactly the identity semantics `Val.ref` has."""
         if id(obj) in self.byid: return self.byid[id(obj)]
-        if callable(obj) or isinstance(obj, type): raise Unencodable("callable")
+        if isinstance(obj, type) or inspect.isroutine(obj):
+            raise Unencodable("callable")
         fields = {}
         if hasattr(obj, "__dict__"):
             fields.update(vars(obj))
@@ -114,19 +141,29 @@ class Encoder:
                       for c in type(obj).__mro__)
         if not fields and not hasattr(obj, "__dict__") and not slotted:
             raise Unencodable("opaque")     # C-level object with no inspectable state
+        if len(fields) > MAX_ELEMS: raise Unencodable("wide-object")
         idx = len(self.heap)
         self.heap.append(None)                  # reserve the slot before recursing
         self.byid[id(obj)] = idx
         self.objs[idx] = obj
-        out = []
-        for k, val in list(fields.items())[:MAX_ELEMS]:
-            try:
-                out.append((str(k), self.enc(val, depth + 1)))
-            except Unencodable:
-                self.dropped_fields += 1        # honest: a missing field yields a hole,
-                continue                        # never a fabricated agreement
+        out = [(str(k), self.enc(val, depth + 1)) for k, val in fields.items()]
         self.heap[idx] = (type(obj).__name__, out)
         return idx
+
+    def freeze(self):
+        """Mark the objects that existed before the call returned."""
+        self.pin = set(self.byid)
+
+    def enc_result(self, v):
+        """Encode a returned value in the *same* namespace as the arguments.
+
+        An object the callee freshly allocated has no counterpart in the heap Core was
+        given, so its `Val.ref` would be a number with no shared meaning — refuse it
+        instead of comparing addresses across two different allocators."""
+        r = self.enc(v)
+        if any(i not in self.pin for i in self.byid):
+            raise Unencodable("result-allocates-fresh-object")
+        return r
 
 
 def lean_val(v):
@@ -246,7 +283,14 @@ def same(py, ln, base):
         return False
     t = py[0]
     if t in ("unit",): return True
-    if t in ("int", "bool", "str", "fn"): return py[1] == ln[1]
+    if t in ("int", "bool", "str"): return py[1] == ln[1]
+    if t == "fn":
+        # `Val.fn` names are spelled differently on the two sides: CPython reports a
+        # `__qualname__` (`TTLCache._Link`), Joern a fully-qualified one
+        # (`pkg/mod.py:<module>.TTLCache._Link`). Core's own `Ctx.resolve` matches
+        # callables by dotted suffix, so accept exactly that and nothing looser.
+        a, b = py[1].split(":")[-1], ln[1].split(":")[-1]
+        return a == b or a.endswith("." + b) or b.endswith("." + a)
     if t == "ref": return py[1] + base == ln[1]
     if t in ("list", "tuple"):
         return len(py[1]) == len(ln[1]) and all(same(a, b, base)
@@ -293,6 +337,36 @@ def find_tests(src_root):
     for d in seen:
         if d not in out: out.append(d)
     return out
+
+
+def resolve_src_root(src_root, rel_files):
+    """Find the directory the AST's relative paths are actually rooted at.
+
+    Joern's paths are relative to whatever directory was parsed, which for the modern
+    `src/` layout is `<repo>/src` while the tests live at `<repo>/tests`. Pointing the
+    harness at the repo root is the natural thing to do and used to silently yield zero
+    test-derived cases, so correct it here instead."""
+    rels = [r for r in rel_files if r]
+    if not rels: return src_root
+
+    def hits(root):
+        return sum(1 for r in rels if os.path.exists(os.path.join(root, r)))
+    best, n = os.path.abspath(src_root), hits(src_root)
+    if n == len(rels): return best
+    cands = [os.path.join(src_root, d) for d in ("src", "lib", "python")]
+    try:
+        cands += [os.path.join(src_root, d.name) for d in os.scandir(src_root)
+                  if d.is_dir() and not d.name.startswith(".")]
+    except OSError:
+        pass
+    for c in cands:
+        if not os.path.isdir(c): continue
+        m = hits(c)
+        if m > n: best, n = os.path.abspath(c), m
+    if os.path.abspath(best) != os.path.abspath(src_root):
+        print("source root corrected: %s -> %s (%d/%d AST paths resolve there)"
+              % (src_root, best, n, len(rels)))
+    return best
 
 
 def build_lineno_index(src_root, wanted_files):
@@ -398,9 +472,13 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
                 rec["outcome"] = ("exn", st["exn"])
             else:
                 try:
-                    rec["outcome"] = ("val", Encoder().enc(arg))
-                except Unencodable:
+                    rec["outcome"] = ("val", st["enc"].enc_result(arg))
+                except Unencodable as e:
                     stats["skip_unencodable_ret"] += 1
+                    r = stats.setdefault("unencodable_reasons", {})
+                    k = "%s: result %s" % (rec["name"].split(".")[-1],
+                                           e.args[0] if e.args else "?")
+                    r[k] = r.get(k, 0) + 1
                     rec = None
             state_by_frame.pop(id(frame), None)
             if rec is not None: records.append(rec)
@@ -418,10 +496,11 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats):
         if snap is None: return None
         enc, slf, args = snap
         counts[key] = counts.get(key, 0) + 1
+        enc.freeze()
         state_by_frame[id(frame)] = {
             "rec": {"name": key, "heap": enc.heap, "self": slf, "args": args,
-                    "outcome": None, "dropped": enc.dropped_fields},
-            "exn": None}
+                    "outcome": None},
+            "enc": enc, "exn": None}
         return local2
 
     old_path = list(sys.path)
@@ -547,15 +626,19 @@ def main():
             (methods if is_meth else modlevel).append((f, rel, qual))
 
         # (1) the repository's own test suite — the highest-value source of arguments
+        rel_files = sorted(set(f.get("file", "") for f in funcs))
+        src_root = resolve_src_root(src_root, rel_files)
         test_dirs = [tests_override] if tests_override else find_tests(src_root)
-        rel_files = sorted(set(f.get("file", "") for f in holefree))
         index = build_lineno_index(src_root, rel_files)
         traced = []
         if test_dirs and index:
             print("test suite: %s" % ", ".join(test_dirs))
             traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats)
+        elif not test_dirs:
+            print("test suite: none discovered under %s (pass --tests DIR)" % src_root)
         else:
-            print("test suite: none discovered under %s" % src_root)
+            print("test suite: %s found, but none of the AST's source files resolve "
+                  "under %s — nothing to instrument" % (", ".join(test_dirs), src_root))
         for r in traced:
             r["origin"] = "test-suite"
             cases.append(r)
@@ -573,9 +656,10 @@ def main():
             for _ in range(ncases):
                 args = [random.randint(-20, 20) for _ in f["params"]]
                 enc = Encoder()
+                enc.freeze()
                 try:
                     got = fn(*args)
-                    out = ("val", enc.enc(got))
+                    out = ("val", enc.enc_result(got))
                 except Unencodable:
                     stats["skip_unencodable_ret"] += 1; continue
                 except Exception as e:                      # noqa: BLE001

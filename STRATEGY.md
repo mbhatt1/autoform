@@ -1270,3 +1270,73 @@ codebase this oracle can reach *regardless* of translation coverage.
 One practical note: `find_tests` did not locate `tests/` when given the repo root, because
 the AST paths are relative to `src/`. The `src/`-layout-with-sibling-tests arrangement is
 the modern default, so discovery needs to walk up from `src_root`.
+
+## 27. The last divergence was the apparatus — and the diagnosis is a scope boundary
+
+Resolved, with a sharper cause than the encoding inconsistency I guessed at in §26.
+
+The failing case is `LFUCache.__touch` driven by `test_func.py`, whose helper is:
+
+```python
+class RecursiveEquals:
+    def __hash__(self):      return hash(self._use_cache)
+    def __eq__(self, other): return self._use_cache == other._use_cache
+```
+
+The test primes the cache with one instance and then looks up a **different instance that
+compares equal**. CPython's dict lookup succeeds through `__hash__`/`__eq__`; Core compares
+`Val`s structurally with `.ref` identity, misses, and raises `KeyError`.
+
+**This is a scope boundary, not a bug.** A Python dict keyed by objects with user-defined
+equality is outside what a structural `Val` comparison can model at all. 27 cases are now
+refused on that ground and appear in `conformance.json` under `unencodable_reasons`
+rather than being compared. Naming the boundary is the deliverable; pretending the
+comparison is meaningful would not be.
+
+A second, independent silent-wrongness source was live in the same case: the encoder
+**swallowed** nested representability failures, counting `dropped_fields` and continuing.
+A dropped `__links` field reads back as `unit` in Core — which is exactly how an apparatus
+artifact becomes a confident divergence. Representability is now recursive and fatal: an
+unrepresentable value at any depth aborts the case, which is counted by reason rather than
+compared.
+
+Three further apparatus defects surfaced once refusal stopped hiding them:
+
+* The return value was encoded with a **fresh** encoder, so a returned object got a
+  colliding `ref`. One memo now spans the whole case, so a given Python object gets the
+  same `Val` as receiver, nested field, argument and result.
+* `Val.fn` spellings disagreed — CPython says `TTLCache._Link`, Joern says
+  `cachetools/__init__.py:<module>.TTLCache._Link`. Now matched by dotted suffix and
+  nothing looser, mirroring `Ctx.resolve`. Six more apparatus divergences.
+* Callable *instances* were being encoded as `Val.fn`. Only routines, classes, `partial`
+  and descriptors are functions; an instance with `__call__` has fields and is an object.
+  Recovered 274 previously-refused cases.
+
+### Result
+
+| | before | after |
+|---|--:|--:|
+| compared cases | 67 | **99** |
+| functions exercised | 61 | **79** |
+| divergences | 1 | **0** |
+| "no instance" skips | 57 | **40** |
+
+Independently re-verified: **99/99 agree (100%), 0 divergences**, and passing the bare
+repo root now works — `resolve_src_root` corrects to `<repo>/src` and finds
+`<repo>/tests`. Regressions green: stress 30/30, sample 10/10, ctest 25/25 vs `cc`.
+
+### The pattern, stated once more
+
+Every divergence in this episode was the measurement, not the artifact — and each was
+found only because refusing to compare exposed what dropping had hidden. **Strictness in
+an oracle buys accuracy, not just safety**: the stricter the refusal, the more of the
+remaining agreements mean something. `MAX_DEPTH` and `MAX_ELEMS` were raised to pay back
+the coverage that stricter refusal cost, which is the right trade — reach bought by
+honesty, not by leniency.
+
+### Ceilings, current
+
+`skip_unencodable_args` — dominated by caches wider than 256 entries (15,487) and floats
+(6,995, which Core has no type for); `skip_varargs` 13,188; `skip_self_not_object` 1,361.
+Top inconclusive labels: `setField:cache_clear:non-object` 49, `mcall:__init__:non-object`
+36, `call:super` 30, `call:set` 22.
