@@ -12,7 +12,11 @@ import Autoform.Lang.Core.Semantics
 -- which elaborates as nested cons cells -- one frame or more per function, and
 -- Ansible has 5,546. So the limit has to scale with the module's function count,
 -- not with how deep its code happens to be.
+<<<<<<< HEAD
 set_option maxRecDepth 9664
+=======
+set_option maxRecDepth 9672
+>>>>>>> worktree-agent-aaa117a74274c3524
 
 /-!
 # Cachetools — machine-generated
@@ -5136,6 +5140,284 @@ def f_cachetools_keys_py__module__typedmethodkey : Func :=
                   "cachetools/keys.py:<module>.typedkey"
                   [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))) }
 
+/-- `<module-objects>:<module>`  (from ``) -/
+def f__module_objects___module_ : Func :=
+  { name := "<module-objects>:<module>"
+  , params := []
+  , body := (.seq
+            (.setGlobal
+              "<module>cachetools/__init__.py"
+              (.alloc "<module>cachetools/__init__.py" []))
+            (.seq
+              (.setGlobal
+                "<module>cachetools/_cached.py"
+                (.alloc "<module>cachetools/_cached.py" []))
+              (.seq
+                (.setGlobal
+                  "<module>cachetools/_cachedmethod.py"
+                  (.alloc "<module>cachetools/_cachedmethod.py" []))
+                (.seq
+                  (.setGlobal "<module>cachetools/func.py" (.alloc "<module>cachetools/func.py" []))
+                  (.seq
+                    (.setGlobal
+                      "<module>cachetools/keys.py"
+                      (.alloc "<module>cachetools/keys.py" []))
+                    (.seq
+                      (.setField
+                        (.name "<module>cachetools/__init__.py")
+                        "cached"
+                        (.fnref "cachetools/__init__.py:<module>.cached"))
+                      (.seq
+                        (.setField
+                          (.name "<module>cachetools/__init__.py")
+                          "cachedmethod"
+                          (.fnref "cachetools/__init__.py:<module>.cachedmethod"))
+                        (.seq
+                          (.setField
+                            (.name "<module>cachetools/__init__.py")
+                            "Cache"
+                            (.fnref "cachetools/__init__.py:<module>.Cache<meta>"))
+                          (.seq
+                            (.setField
+                              (.name "<module>cachetools/__init__.py")
+                              "FIFOCache"
+                              (.fnref "cachetools/__init__.py:<module>.FIFOCache<meta>"))
+                            (.seq
+                              (.setField
+                                (.name "<module>cachetools/__init__.py")
+                                "LFUCache"
+                                (.fnref "cachetools/__init__.py:<module>.LFUCache<meta>"))
+                              (.seq
+                                (.setField
+                                  (.name "<module>cachetools/__init__.py")
+                                  "LRUCache"
+                                  (.fnref "cachetools/__init__.py:<module>.LRUCache<meta>"))
+                                (.seq
+                                  (.setField
+                                    (.name "<module>cachetools/__init__.py")
+                                    "RRCache"
+                                    (.fnref "cachetools/__init__.py:<module>.RRCache<meta>"))
+                                  (.seq
+                                    (.setField
+                                      (.name "<module>cachetools/__init__.py")
+                                      "TLRUCache"
+                                      (.fnref "cachetools/__init__.py:<module>.TLRUCache<meta>"))
+                                    (.seq
+                                      (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "TTLCache"
+                                        (.fnref "cachetools/__init__.py:<module>.TTLCache<meta>"))
+                                      (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "_DefaultSize"
+                                        (.fnref
+                                        "cachetools/__init__.py:<module>._DefaultSize<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "_TimedCache"
+                                        (.fnref "cachetools/__init__.py:<module>._TimedCache<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "_cached"
+                                        (.name "<module>cachetools/_cached.py"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "_cachedmethod"
+                                        (.name "<module>cachetools/_cachedmethod.py"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "func"
+                                        (.name "<module>cachetools/func.py"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/__init__.py")
+                                        "keys"
+                                        (.name "<module>cachetools/keys.py"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_condition"
+                                        (.fnref "cachetools/_cached.py:<module>._condition"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_condition_info"
+                                        (.fnref "cachetools/_cached.py:<module>._condition_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_locked"
+                                        (.fnref "cachetools/_cached.py:<module>._locked"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_locked_info"
+                                        (.fnref "cachetools/_cached.py:<module>._locked_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_uncached"
+                                        (.fnref "cachetools/_cached.py:<module>._uncached"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_uncached_info"
+                                        (.fnref "cachetools/_cached.py:<module>._uncached_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_unlocked"
+                                        (.fnref "cachetools/_cached.py:<module>._unlocked"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_unlocked_info"
+                                        (.fnref "cachetools/_cached.py:<module>._unlocked_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cached.py")
+                                        "_wrapper"
+                                        (.fnref "cachetools/_cached.py:<module>._wrapper"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_condition"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._condition"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_condition_info"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._condition_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_locked"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._locked"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_locked_info"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._locked_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_none"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._none"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_unlocked"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._unlocked"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_unlocked_info"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._unlocked_info"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_warn_classmethod"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._warn_classmethod"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_warn_instance_dict"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._warn_instance_dict"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_wrapper"
+                                        (.fnref "cachetools/_cachedmethod.py:<module>._wrapper"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_DeprecatedDescriptorBase"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_DescriptorBase"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._DescriptorBase<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/_cachedmethod.py")
+                                        "_WrapperBase"
+                                        (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._WrapperBase<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "_cache"
+                                        (.fnref "cachetools/func.py:<module>._cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "fifo_cache"
+                                        (.fnref "cachetools/func.py:<module>.fifo_cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "lfu_cache"
+                                        (.fnref "cachetools/func.py:<module>.lfu_cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "lru_cache"
+                                        (.fnref "cachetools/func.py:<module>.lru_cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "rr_cache"
+                                        (.fnref "cachetools/func.py:<module>.rr_cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "ttl_cache"
+                                        (.fnref "cachetools/func.py:<module>.ttl_cache"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/func.py")
+                                        "_UnboundTTLCache"
+                                        (.fnref
+                                        "cachetools/func.py:<module>._UnboundTTLCache<meta>"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/keys.py")
+                                        "hashkey"
+                                        (.fnref "cachetools/keys.py:<module>.hashkey"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/keys.py")
+                                        "methodkey"
+                                        (.fnref "cachetools/keys.py:<module>.methodkey"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/keys.py")
+                                        "typedkey"
+                                        (.fnref "cachetools/keys.py:<module>.typedkey"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/keys.py")
+                                        "typedmethodkey"
+                                        (.fnref "cachetools/keys.py:<module>.typedmethodkey"))
+                                        (.seq
+                                        (.setField
+                                        (.name "<module>cachetools/keys.py")
+                                        "_HashedTuple"
+                                        (.fnref "cachetools/keys.py:<module>._HashedTuple<meta>"))
+                                        .skip)))))))))))))))))))))))))))))))))))))))))))))))))))))) }
+
 /-- `cachetools/__init__.py:<module>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module_ : Func :=
   { name := "cachetools/__init__.py:<module>"
@@ -5186,6 +5468,7 @@ def f_cachetools___init___py__module_ : Func :=
                                         (.seq
                                         (.setGlobal "__version__" (.lit (.str "7.1.7")))
                                         (.seq
+<<<<<<< HEAD
                                         (.setGlobal "collections" (.hole "import:module-value"))
                                         (.seq
                                         (.setGlobal "collections" (.hole "import:module-value"))
@@ -5199,6 +5482,21 @@ def f_cachetools___init___py__module_ : Func :=
                                         (.setGlobal "time" (.hole "import:module-value"))
                                         (.seq
                                         (.setGlobal "keys" (.hole "import:module-value"))
+=======
+                                        (.setGlobal "collections" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "collections" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "functools" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "heapq" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "random" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "time" (.hole "import:absent:external"))
+                                        (.seq
+                                        (.setGlobal "keys" (.name "<module>cachetools/keys.py"))
+>>>>>>> worktree-agent-aaa117a74274c3524
                                         (.seq
                                         .skip
                                         (.seq
@@ -5369,7 +5667,7 @@ def f_cachetools__cached_py__module_ : Func :=
               (.seq
                 (.setGlobal "__all__" (.tupleE []))
                 (.seq
-                  (.setGlobal "functools" (.hole "import:module-value"))
+                  (.setGlobal "functools" (.hole "import:absent:external"))
                   (.seq
                     (.setGlobal
                       "_condition_info"
@@ -5445,11 +5743,11 @@ def f_cachetools__cachedmethod_py__module_ : Func :=
                       (.seq
                         (.setGlobal "__all__" (.tupleE []))
                         (.seq
-                          (.setGlobal "functools" (.hole "import:module-value"))
+                          (.setGlobal "functools" (.hole "import:absent:external"))
                           (.seq
-                            (.setGlobal "warnings" (.hole "import:module-value"))
+                            (.setGlobal "warnings" (.hole "import:absent:external"))
                             (.seq
-                              (.setGlobal "weakref" (.hole "import:module-value"))
+                              (.setGlobal "weakref" (.hole "import:absent:external"))
                               (.seq
                                 (.setGlobal
                                   "_warn_classmethod"
@@ -5588,13 +5886,13 @@ def f_cachetools_func_py__module_ : Func :=
                       , (.lit (.str "rr_cache"))
                       , (.lit (.str "ttl_cache")) ]))
                   (.seq
-                    (.setGlobal "math" (.hole "import:module-value"))
+                    (.setGlobal "math" (.hole "import:absent:external"))
                     (.seq
-                      (.setGlobal "random" (.hole "import:module-value"))
+                      (.setGlobal "random" (.hole "import:absent:external"))
                       (.seq
-                        (.setGlobal "time" (.hole "import:module-value"))
+                        (.setGlobal "time" (.hole "import:absent:external"))
                         (.seq
-                          (.setGlobal "Condition" (.hole "import:unresolved"))
+                          (.setGlobal "Condition" (.hole "import:absent:external"))
                           (.seq
                             (.seq
                               (.setGlobal
@@ -5620,7 +5918,11 @@ def f_cachetools_func_py__module_ : Func :=
                                         (.setGlobal
                                         "cached"
                                         (.fnref "cachetools/__init__.py:<module>.cached"))
+<<<<<<< HEAD
                                         (.setGlobal "keys" (.hole "import:module-value"))))))))
+=======
+                                        (.setGlobal "keys" (.name "<module>cachetools/keys.py"))))))))
+>>>>>>> worktree-agent-aaa117a74274c3524
                             (.seq
                               (.seq
                                 (.setGlobal
@@ -5746,10 +6048,13 @@ def f_cachetools_keys_py__module_ : Func :=
 
 /-- Module-level initializers: run these to populate the globals frame
 before calling any entry point. -/
-def moduleInits : List Func := [f_cachetools___init___py__module_, f_cachetools__cached_py__module_, f_cachetools__cachedmethod_py__module_, f_cachetools_func_py__module_, f_cachetools_keys_py__module_]
+def moduleInits : List Func := [f__module_objects___module_, f_cachetools___init___py__module_, f_cachetools__cached_py__module_, f_cachetools__cachedmethod_py__module_, f_cachetools_func_py__module_, f_cachetools_keys_py__module_]
 
-/-- Source dialect: `.python` (integer division/modulo convention). -/
-def program : Program := { dialect := .python, funcs := [
+/-- Source dialect: `.python` (integer division/modulo convention).
+
+`builtinBases` lists the classes whose base is a builtin type, so that
+`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/
+def program : Program := { dialect := .python, builtinBases := [("_HashedTuple", .tuple)], funcs := [
   f_cachetools___init___py__module___DefaultSize___getitem__,
   f_cachetools___init___py__module___DefaultSize___setitem__,
   f_cachetools___init___py__module___DefaultSize_pop,
@@ -5953,6 +6258,7 @@ def program : Program := { dialect := .python, funcs := [
   f_cachetools_keys_py__module__methodkey,
   f_cachetools_keys_py__module__typedkey,
   f_cachetools_keys_py__module__typedmethodkey,
+  f__module_objects___module_,
   f_cachetools___init___py__module_,
   f_cachetools__cached_py__module_,
   f_cachetools__cachedmethod_py__module_,

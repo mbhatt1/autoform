@@ -774,7 +774,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | some (_, v) => (h₁, .val v)
           | none        => match o.captured.find? (·.1 == f) with
                            | some (_, v) => (h₁, .val v)
-                           | none        => (h₁, .val .unit)
+                           -- A **module object** — the exporter's representation of an
+                           -- imported module, marked by a class name beginning `<module>`
+                           -- that no `class` statement in any language can spell — carries
+                           -- exactly its top-level functions, classes and submodules. Its
+                           -- module-level *data* is not a field, because Core's single
+                           -- globals frame is not per-module and the value would have to
+                           -- be captured before the module body computed it. Answering
+                           -- `unit` for such an attribute is the silent wrong answer;
+                           -- naming the miss is the honest one. Ordinary objects keep the
+                           -- documented `unit` behaviour, so no existing corpus changes.
+                           | none        =>
+                             if o.cls.startsWith "<module>" then
+                               (h₁, .hole s!"module-attr:{f}")
+                             else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
       -- `Dialect.fieldsOnDicts`), so `alg.cra_priority` is a lookup in it. A *missing*
@@ -843,7 +856,32 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | none   => (h₂, .hole "mcall:dangling-ref")
           | some o =>
             match ctx.resolveMethod o.cls m with
-            | none    => (h₂, .hole s!"mcall:{o.cls}.{m}")
+            | none    =>
+              -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
+              -- `resolveMethod` finds nothing; what it has is a *field* holding a
+              -- function value, and a module-level function takes no receiver. Calling
+              -- it with `self` bound would shift every argument by one, so the receiver
+              -- is dropped — which is exactly what CPython does for an attribute that is
+              -- a plain function rather than a class attribute.
+              --
+              -- Restricted to module objects on purpose. The same rule is *also* correct
+              -- for an ordinary instance attribute holding a function (`self.cb(x)` does
+              -- not pass `self` in CPython), and today that is the hole `mcall:C.cb`. But
+              -- that is a claim about every class in every corpus, and it is not what
+              -- this change is about; it stays a hole until it is measured on its own.
+              if o.cls.startsWith "<module>" then
+                match o.fields.find? (·.1 == m) with
+                | some (_, .fn g)      =>
+                    match ctx.resolve g with
+                    | some fn => applyFunc ctx n h₂ fn none vs kws
+                    | none    => (h₂, .hole s!"call:{g}")
+                | some (_, .clos g cap) =>
+                    match ctx.resolve g with
+                    | some fn => applyClosure ctx n h₂ fn cap vs kws
+                    | none    => (h₂, .hole s!"call:{g}")
+                | some _  => (h₂, .hole s!"module-call:{m}:not-a-function")
+                | none    => (h₂, .hole s!"module-attr:{m}")
+              else (h₂, .hole s!"mcall:{o.cls}.{m}")
             | some fn =>
               if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
               else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
@@ -1547,5 +1585,116 @@ private def pyDesig : Program := { cBits with dialect := .python }
 #guard_msgs in #eval runFunc cBits 400 "ns.gotoRet" []
 
 end CEvidence
+
+/-! ## Modules as objects, end to end
+
+The exporter represents an imported module as a **heap object** whose class name begins
+`<module>` and whose fields are the module's top-level functions, classes and submodules,
+allocated once by a synthetic initializer that `render_lean.py` places first in
+`moduleInits`. Nothing was added to `Core` for it: `Expr.alloc`, `Stmt.setField` and
+`Expr.field` already do the work.
+
+The program below is the translation of a two-file package, in the exact shape
+`cartographer/export_ast.sc` emits:
+
+```python
+# pkg/util.py
+def double(n):
+    return n * 2
+
+# main
+import pkg.util
+pkg.util.double(21)      # 42
+pkg.util.double          # <function double at ...>
+pkg.util.VERSION         # AttributeError
+```
+
+Measured with CPython 3.9.6:
+
+```
+42
+<function double at 0x109796af0>
+AttributeError: module 'pkg.util' has no attribute 'VERSION'
+```
+
+The three checks below are the non-vacuity evidence. A module object with no fields, or
+one whose fields never resolved, would answer `unit` to all three while every downstream
+theorem still passed. -/
+def modProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "pkg/util.py:<module>.double", params := ["n"]
+      , body := .ret (.binop "*" (.name "n") (.lit (.int 2))) }
+      -- `pkg.util.double(21)`: a field read through the package object into the submodule
+      -- object, then a call of the function that submodule's field holds.
+    , { name := "main.run", params := []
+      , body := .ret (.mcall (.field (.name "<module>pkg/__init__.py") "util")
+                             "double" [.lit (.int 21)]) }
+      -- `pkg.util.double` as a *value*: nesting resolves without calling anything.
+    , { name := "main.ref", params := []
+      , body := .ret (.field (.field (.name "<module>pkg/__init__.py") "util") "double") }
+      -- `pkg.util.VERSION`: a module-level name the module object deliberately does not
+      -- carry. CPython raises `AttributeError`; Core refuses. Refusing is not the same
+      -- claim as raising, so it is a hole and not an `exn`.
+    , { name := "main.attr", params := []
+      , body := .ret (.field (.field (.name "<module>pkg/__init__.py") "util") "VERSION") } ] }
+
+/-- The synthetic `<module-objects>` initializer: **all** allocations first, then the
+field writes, so a package and a module that import each other both exist before either
+is populated. -/
+def modInit : Func :=
+  { name := "<module-objects>:<module>", params := []
+  , body :=
+      .seq (.setGlobal "<module>pkg/__init__.py" (.alloc "<module>pkg/__init__.py" []))
+      (.seq (.setGlobal "<module>pkg/util.py" (.alloc "<module>pkg/util.py" []))
+      (.seq (.setField (.name "<module>pkg/__init__.py") "util"
+                       (.name "<module>pkg/util.py"))
+            (.setField (.name "<module>pkg/util.py") "double"
+                       (.fnref "pkg/util.py:<module>.double")))) }
+
+/-! `pkg.util.double(21)` is `42`, as CPython prints. `unit` would mean a field read
+missed; a hole would mean the module object never reached the call. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 42) -/
+#guard_msgs in #eval runMain modProg 200 [modInit] "main.run" []
+
+/-! Nesting: the package's `util` field holds the submodule object, whose `double` field
+holds the function value. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.fn "pkg/util.py:<module>.double") -/
+#guard_msgs in #eval runMain modProg 200 [modInit] "main.ref" []
+
+/-! The honesty check, and the reason a module object carries a marker class at all. An
+ordinary object answers `unit` for a field it does not have (`ns.unset`, above); a module
+object names the miss. Module-level *data* is absent from a module object on purpose —
+Core has one globals frame for the whole program, so a module-level constant is not
+module-scoped and its value would have to be captured before the module body computed it
+— and this is what stops that decision from becoming a silent `unit`. -/
+/-- info: Autoform.Core.EResult.hole "module-attr:VERSION" -/
+#guard_msgs in #eval runMain modProg 200 [modInit] "main.attr" []
+
+/-! ## f-strings
+
+`f'v{n}!'` is `"v" + str(n) + "!"` — that is the language definition for a field with no
+conversion and no format spec, so the exporter emits exactly that. What it meets is a
+Core limitation that predates it: `Stdlib.builtin`'s `str` answers on `.int` and `.bool`
+and **declines on `.str`**, because Core represents an exception as a bare `Val.str` and
+cannot tell one from an ordinary string.
+
+So the f-string hole *moves* rather than vanishing, and both halves are pinned here.
+Measured with CPython 3.9.6: `greet(3)` is `'v3!'` and `greet('x')` is `'vx!'`. -/
+def fstrProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "greet", params := ["n"]
+      , body := .ret (.binop "+" (.binop "+" (.lit (.str "v")) (.call "str" [.name "n"]))
+                                 (.lit (.str "!"))) } ] }
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "v3!") -/
+#guard_msgs in #eval runFunc fstrProg 200 "greet" [.int 3]
+
+/-! The residue, named for what actually blocks it. CPython answers `'vx!'`; Core answers
+a hole at `str` rather than a wrong string, and the label points at `Stdlib`'s `str`, not
+at the f-string. -/
+/-- info: Autoform.Core.EResult.hole "call:str" -/
+#guard_msgs in #eval runFunc fstrProg 200 "greet" [.str "x"]
 
 end Autoform.Core

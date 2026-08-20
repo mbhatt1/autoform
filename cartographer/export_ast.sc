@@ -469,11 +469,21 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   /** The file-level pseudo-method for a slash-separated module path, if the analysed
     * program contains it — either `p.py` or the package `p/__init__.py`. */
   def moduleAt(path: String): Option[String] = {
-    val a = path + ".py:<module>"
-    val b = path + "/__init__.py:<module>"
-    if (moduleFullNames.contains(a)) Some(a)
-    else if (moduleFullNames.contains(b)) Some(b)
-    else None
+    // The empty path is the parse root itself. `moduleAtTolerant` never asks for it (see
+    // the note there: the root would answer `import os` as readily as `import ansible`),
+    // so no caller reaches this today. It is written out rather than left to
+    // `"" + ".py:<module>"` accidentally matching a file literally named `.py`, because
+    // `modulePath` does fold the root package to `""` and a future caller will pass it.
+    if (path.isEmpty) {
+      if (moduleFullNames.contains("__init__.py:<module>")) Some("__init__.py:<module>")
+      else None
+    } else {
+      val a = path + ".py:<module>"
+      val b = path + "/__init__.py:<module>"
+      if (moduleFullNames.contains(a)) Some(a)
+      else if (moduleFullNames.contains(b)) Some(b)
+      else None
+    }
   }
 
   /** `moduleAt`, tolerating the package prefix the parse root already stands for.
@@ -494,6 +504,13 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * rather than assumed. */
   def moduleAtTolerant(path: String): Option[String] = {
     val segs = path.split('/').filter(_.nonEmpty).toList
+    // `until`, not `to`, and deliberately. Dropping *every* segment would ask for the
+    // parse root, which is what a bare `import ansible` names when the CPG was built from
+    // the `ansible` package itself -- but the CPG does not record the name of the
+    // directory it was built from, so `import ansible` and `import os` are the same shape
+    // and the root would answer both. Resolving `os` to the analysed package is a silent
+    // mistranslation of every stdlib import; leaving the root package unnameable is a
+    // hole. The hole wins.
     (0 until segs.length).view
       .map(i => moduleAt(segs.drop(i).mkString("/")))
       .collectFirst { case Some(m) => m }
@@ -538,6 +555,158 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     if (captures) ujson.Obj("k" -> "classClosure", "c" -> target)
     else ujson.Obj("k" -> "fnref", "v" -> target)
   }
+
+  // ---- module objects ---------------------------------------------------------
+  //
+  // ## What a module is, in Core
+  //
+  // `import functools` used to be a hole because Core has no module value, and pointing
+  // the name at `fnref "functools"` would claim `functools.reduce` is an attribute of a
+  // *function*. But a module does not need a new `Val` constructor: it is an **object**.
+  // `Obj` has a class and a field table, `Expr.field` on a `Val.ref` already reads a
+  // field from the heap, and `Stmt.setField` already writes one — so a module is an
+  // object whose fields are its top-level names, and `os.path.join` is an ordinary field
+  // access with no new semantics at all.
+  //
+  // ## Where they come from
+  //
+  // One synthetic zero-argument initializer, `<module-objects>:<module>`, emitted **first**
+  // in `moduleInits`. Its body allocates one object per Python module of this CPG and
+  // binds it into the globals frame under a reserved key, then writes the members. All
+  // allocations precede all field writes, so a package that contains a module which
+  // imports the package back (`ansible` / `ansible.errors`) is fine, and nesting is
+  // unbounded: `a.b.c.d` is three field reads.
+  //
+  // ## What a module object contains, and what it deliberately does not
+  //
+  // Members are the module's top-level **functions**, **classes** and **submodules** —
+  // exactly the names whose value is fixed by the CPG and does not depend on when the
+  // module body ran. Module-level *data* (`__version__ = "7.1.7"`) is **not** a member,
+  // and that is not an oversight: Core has a single globals frame shared by every module,
+  // so a module-level constant is not module-scoped in the first place, and copying its
+  // value into the module object at init time would capture it *before* the module body
+  // that computes it has run. Binding `mod.__version__` to `unit` is precisely the silent
+  // wrong answer this project keeps finding.
+  //
+  // So a miss has to be loud. `Semantics.evalExpr`'s `.field` case answers `unit` for a
+  // field an object does not have — a documented hazard — and for a module object it
+  // instead answers the hole `module-attr:<name>`. That is why the class name carries the
+  // `<module>` prefix: it is the marker the interpreter tests, and no `class` statement
+  // in any language can produce a class of that name.
+  //
+  // ## Cost
+  //
+  // One heap object per module (Ansible: 584) allocated once by `initGlobals`, plus one
+  // `setField` per exported member. Linear in the program, paid once, and nothing in the
+  // per-call path changes.
+
+  /** Python modules of this CPG. `<global>` — the C frontend's file scope — is excluded:
+    * this is Python's `import`, and a C translation unit is not a value. */
+  val pyModuleFullNames: List[String] =
+    moduleFullNames.filter(_.endsWith(".py:<module>")).toList.sorted
+
+  /** The globals key, and the class name, of a module object. The `<module>` prefix is
+    * the marker `Semantics` tests to turn a missing attribute into a hole. */
+  def moduleKey(mod: String): String = "<module>" + mod.stripSuffix(":<module>")
+
+  /** A module's dotted path in slash form, with `/__init__` folded away, so that a
+    * package and the modules inside it stand in a parent/child relation:
+    * `cachetools/__init__.py:<module>` is `cachetools`, and the parse root is `""`. */
+  def modulePath(mod: String): String = {
+    val f = mod.stripSuffix(".py:<module>")
+    if (f == "__init__") "" else if (f.endsWith("/__init__")) f.dropRight("/__init__".length) else f
+  }
+
+  /** A module used as a value: a read of the reserved global the initializer bound. */
+  def moduleRef(mod: String): ujson.Obj = ujson.Obj("k" -> "name", "v" -> moduleKey(mod))
+
+  /** Module-level **aliases**: `to_native = to_text` at file scope, where the right-hand
+    * side names a top-level function or class of the same module.
+    *
+    * This is the one kind of module-level assignment whose value is fixed by the CPG
+    * rather than by when the module body ran, so it is the one kind that can be a member
+    * without the ordering problem that keeps module-level data out. It is not a
+    * curiosity: `to_native = to_text` in `module_utils/common/text/converters.py` is
+    * imported 87 times in Ansible, and every one of them was a hole.
+    *
+    * An alias to anything else — another module-level variable, a call, a conditional
+    * rebinding — is *not* collected: its value depends on execution and a fixed field
+    * would be a guess. Nor is a name assigned more than once, since which assignment a
+    * later import sees is a flow-sensitive question and this is not a flow analysis. */
+  val moduleAliasesOf: String => List[(String, String)] = {
+    val cache = collection.mutable.HashMap.empty[String, List[(String, String)]]
+    mod => cache.getOrElseUpdate(mod, methodByName.get(mod) match {
+      case None => Nil
+      case Some(m) =>
+        val pairs = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+          .flatMap(a => kidsOf(a) match {
+            case (t: Identifier) :: (r: Identifier) :: Nil => Some(t.name -> r.name)
+            case _                                         => None
+          })
+        pairs.groupBy(_._1).collect { case (k, List(one)) => k -> one._2 }.toList
+          .filter { case (k, v) =>
+            k != v &&
+            (methodByName.contains(mod + "." + v) || classByFullName.contains(mod + "." + v)) &&
+            !methodByName.contains(mod + "." + k) && !classByFullName.contains(mod + "." + k)
+          }.sortBy(_._1)
+    })
+  }
+
+  /** The value a module-level alias stands for. */
+  def aliasValue(mod: String, target: String): ujson.Obj =
+    if (methodByName.contains(mod + "." + target)) fnValue(mod + "." + target)
+    else typeValue(mod + "." + target + "<meta>")
+
+  /** The exported members of a module: top-level functions, top-level classes, aliases of
+    * either, and immediate submodules. See the note above for why module-level *data* is
+    * absent. */
+  def moduleMembers(mod: String): List[(String, ujson.Value)] = {
+    def simple(k: String): Option[String] = {
+      val n = k.drop(mod.length + 1)
+      if (k.startsWith(mod + ".") && !n.contains('.') && !n.contains('<') && n.nonEmpty)
+        Some(n) else None
+    }
+    val fns = methodByName.keys.toList.flatMap(k => simple(k).map(n => n -> (fnValue(k): ujson.Value)))
+    val cls = classByFullName.keys.toList.flatMap(k =>
+      simple(k).map(n => n -> (typeValue(k + "<meta>"): ujson.Value)))
+    val als = moduleAliasesOf(mod).map { case (n, t) => n -> (aliasValue(mod, t): ujson.Value) }
+    val here   = modulePath(mod)
+    val prefix = if (here.isEmpty) "" else here + "/"
+    val subs = pyModuleFullNames.filter { m2 =>
+      val p = modulePath(m2)
+      m2 != mod && p.startsWith(prefix) && p.length > prefix.length &&
+        !p.drop(prefix.length).contains('/')
+    }.map(m2 => modulePath(m2).drop(prefix.length) -> (moduleRef(m2): ujson.Value))
+    // A name defined twice (a `def` shadowed by a submodule of the same name) keeps the
+    // first in this fixed order rather than being decided by map iteration order, so the
+    // export stays deterministic.
+    (fns.sortBy(_._1) ++ cls.sortBy(_._1) ++ als.sortBy(_._1) ++ subs.sortBy(_._1))
+      .foldLeft((Set.empty[String], List.empty[(String, ujson.Value)])) {
+        case ((seen, acc), (n, v)) => if (seen(n)) (seen, acc) else (seen + n, (n, v) :: acc)
+      }._2.reverse
+  }
+
+  /** The synthetic initializer that builds every module object, or `None` when this CPG
+    * has no Python modules — which is what keeps C/C++/Java/Go/JS corpora byte-identical. */
+  def moduleObjectsInit: Option[ujson.Obj] =
+    if (pyModuleFullNames.isEmpty) None
+    else {
+      val allocs: List[ujson.Value] = pyModuleFullNames.map(m =>
+        ujson.Obj("k" -> "setGlobal", "x" -> moduleKey(m),
+                  "e" -> ujson.Obj("k" -> "alloc", "cls" -> moduleKey(m),
+                                   "args" -> ujson.Arr())))
+      val sets: List[ujson.Value] = pyModuleFullNames.flatMap(m =>
+        moduleMembers(m).map { case (f, v) =>
+          ujson.Obj("k" -> "setField", "r" -> moduleRef(m), "f" -> f, "v" -> v)
+        })
+      val body = (allocs ++ sets).foldRight(ujson.Obj("k" -> "skip"): ujson.Value)((s, acc) =>
+        ujson.Obj("k" -> "seq", "a" -> s, "b" -> acc))
+      // The `:<module>` suffix is what `render_lean.py` recognises as an initializer;
+      // emitting this entry before the real ones puts it first in `moduleInits`, so every
+      // module object exists before any module body runs.
+      Some(ujson.Obj("name" -> "<module-objects>:<module>", "file" -> "",
+                     "params" -> ujson.Arr(), "body" -> body))
+    }
 
   // ---- per-method translation state ------------------------------------------
   // `moduleScope` is set while translating a `<module>`/`<global>` pseudo-method: every
@@ -935,26 +1104,141 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * Resolution is lexical and purely syntactic: leading dots count package levels up from
     * the importing file's directory, and the remainder is a path. No sys.path search, no
     * guessing — if the target is not a method or class of the analysed program, we say so. */
-  def importValue(prefix: String, name: String): ujson.Obj = {
+  /** Does a proper, non-empty prefix of `path` name a module of this program?
+    *
+    * This is the evidence that separates the two things `import:unresolved` used to
+    * conflate. `os`, `yaml`, `jinja2.nativetypes` have no such prefix: they are simply
+    * not in this CPG, and no amount of resolver work will find them. `from
+    * ansible.module_utils.common.foo import bar`, where `module_utils/common` *is* in the
+    * CPG and `foo.py` is not, is a different situation with a different remedy.
+    *
+    * The label says only what was measured — a prefix is in the CPG — and not "this is
+    * first-party", because it demonstrably is not always: 82 of Ansible's 116 are `from
+    * collections.abc import ...`, and they land here because Ansible ships its own
+    * `collections/` package. That is the same-name ambiguity `moduleAtTolerant` warns
+    * about, surfacing as a measurement instead of as a wrong translation. */
+  def prefixInCpg(path: String): Boolean = {
+    val segs = path.split('/').filter(_.nonEmpty).toList
+    (1 until segs.length).exists(i => moduleAtTolerant(segs.take(i).mkString("/")).isDefined)
+  }
+
+  /** A module this CPG does not contain, named by *why* we do not have it. */
+  def absentModule(path: String, relative: Boolean): ujson.Obj =
+    if (relative)                  hole("import:absent:relative")
+    else if (prefixInCpg(path))    hole("import:absent:prefix-in-cpg")
+    else                           hole("import:absent:external")
+
+  /** A resolved module, as a value — but only if it is a Python module with an object.
+    * A `<global>` C file scope is not a value and must not be handed out as one. */
+  def resolvedModule(mod: String): Option[ujson.Obj] =
+    if (pyModuleFullNames.contains(mod)) Some(moduleRef(mod)) else None
+
+  /** `import p.q` / `from <prefix> import <name>`, translated to the value it binds.
+    *
+    * `aliased` is `import x.y as z` / `from p import x as z`. It matters for exactly one
+    * case: plain `import a.b.c` binds the **top** package `a`, whereas `import a.b.c as z`
+    * binds `a.b.c` itself. Getting that backwards would bind the wrong module. */
+  def importValue(prefix: String, name: String, aliased: Boolean): ujson.Obj = {
     val dots = prefix.takeWhile(_ == '.').length
     val rest = prefix.drop(dots)
-    // `import x` / `import x.y` binds the *module* `x`, never a member.
-    if (dots == 0 && rest.isEmpty) hole("import:module-value")
-    else {
+    if (dots == 0 && rest.isEmpty) {
+      val segs = name.split('.').filter(_.nonEmpty).toList
+      val path = (if (aliased) segs else segs.take(1)).mkString("/")
+      moduleAtTolerant(path).flatMap(resolvedModule)
+        .getOrElse(absentModule(path, relative = false))
+    } else {
       val dir  = currentFile.split('/').dropRight(1).dropRight(math.max(dots - 1, 0)).toList
       val base = if (dots == 0) Nil else dir
       val segs = base ++ rest.split('.').filter(_.nonEmpty).toList
       val path = segs.mkString("/")
       moduleAtTolerant(path) match {
-        case None => hole("import:unresolved")
+        case None => absentModule(path, relative = dots > 0)
         case Some(mod) =>
           val target = mod + "." + name
           if (methodByName.contains(target))        fnValue(target)
           else if (classByFullName.contains(target)) typeValue(target + "<meta>")
-          // `from . import keys` where `keys` is a sibling *module*, not a member.
-          else if (moduleAtTolerant(path + "/" + name).isDefined) hole("import:module-value")
-          else hole("import:unresolved")
+          // `from ...converters import to_native`, where `to_native = to_text` at file
+          // scope. See `moduleAliasesOf`.
+          else if (moduleAliasesOf(mod).exists(_._1 == name))
+            aliasValue(mod, moduleAliasesOf(mod).find(_._1 == name).get._2)
+          // `from . import keys` where `keys` is a sibling *module*, not a member. The
+          // child is looked for under the module we actually resolved, not under the
+          // written path, because the tolerant resolver may have dropped a prefix.
+          else moduleAt(if (modulePath(mod).isEmpty) name else modulePath(mod) + "/" + name)
+                 .flatMap(resolvedModule)
+                 // The module is here and the name is not a function, a class or a
+                 // submodule of it. In practice that is a module-level *variable* or a
+                 // re-export, which a module object deliberately does not carry (see the
+                 // module-object note above) — a different problem from not having the
+                 // module at all, so a different label.
+                 .getOrElse(hole("import:member-not-found"))
       }
+    }
+  }
+
+  /** Is the method currently being translated Python source? f-strings are a Python
+    * construct and everything below is gated on this: `<operator>.formatString` is also
+    * emitted by other frontends, with other part shapes, and the varargs regression is
+    * the standing reminder of what an ungated language-specific helper costs. */
+  def pyFile: Boolean = currentFile.toLowerCase.endsWith(".py")
+
+  /** One `{...}` field of an f-string.
+    *
+    * `Left` carries the reason it is not expressible, so the hole says which of the two
+    * different problems it is rather than lumping them together.
+    *
+    * A field with no conversion and no format spec means exactly `str(value)` — that is
+    * the language definition, not an approximation — so it becomes `Expr.call "str"`.
+    * `{x!r}` is `repr(x)` and `{x:>10.2f}` is `format(x, '>10.2f')`; Core models neither,
+    * and a formatting model invented here would be worse than a hole.
+    *
+    * The frontend records neither the conversion nor the spec anywhere but the source
+    * text — `{command!r}` has a single child whose code is `command` — so the only sound
+    * test is whether the field's text *is* the expression's text. `{x}` passes; `{x!r}`,
+    * `{x:>10}`, `{x=}` and anything the frontend rewrote into a prelude (`{tmp1 = ...}`)
+    * do not, and are refused rather than silently stripped. */
+  def fstringField(c: Call): Either[String, ujson.Obj] = {
+    val ks = kidsOf(c)
+    val inner = c.code.trim.stripPrefix("{").stripSuffix("}")
+    if (ks.size != 1) Left("shape")
+    else if (inner != ks.head.code.trim) Left("conversion-or-spec")
+    else Right(ujson.Obj("k" -> "call", "f" -> "str", "args" -> ujson.Arr(expr(ks.head))))
+  }
+
+  /** An f-string: the concatenation of its literal segments and its fields.
+    *
+    * ## What this does and does not close
+    *
+    * The *structure* is now translated: `f'version {v}'` is `"version " + str(v)`, which
+    * is what CPython does. What it runs into is a Core limitation that already existed
+    * and is now visible in more places: `Stdlib.builtin`'s `str` answers on `.int` and
+    * `.bool` and **declines on `.str`**, because Core represents an exception as a bare
+    * `Val.str` and cannot tell one from an ordinary string. So `f'{n}'` with an integer
+    * evaluates; `f'{s}'` with a string is the runtime hole `call:str`.
+    *
+    * That is a moved hole, not a closed one, and it is recorded as such: the AST-level
+    * `op:formatString` count goes to zero while the residue reappears at run time under a
+    * label that names the actual blocker — Core's `str`, not the f-string. Inventing a
+    * string conversion here to make the number look better is the thing not done. */
+  def fstring(kids: List[AstNode]): ujson.Obj = {
+    val parts: List[Either[String, ujson.Obj]] = kids.sortBy(_.order).map {
+      case l: Literal =>
+        // The segment's `code` is the raw source between the braces, so a backslash in it
+        // is an escape CPython has already interpreted and we have not. Emitting the text
+        // verbatim would put a literal `\` and `n` into the string.
+        if (l.code.contains('\\')) Left("escape")
+        else Right(ujson.Obj("k" -> "str", "v" -> l.code))
+      case c: Call if c.methodFullName == "<operator>.formattedValue" => fstringField(c)
+      case _ => Left("shape")
+    }
+    parts.collectFirst { case Left(r) => r } match {
+      case Some(r) => hole("op:formatString:" + r)
+      case None =>
+        parts.collect { case Right(o) => o } match {
+          case Nil       => ujson.Obj("k" -> "str", "v" -> "")
+          case p :: rest => rest.foldLeft(p)((a, b) =>
+                              ujson.Obj("k" -> "binop", "op" -> "+", "a" -> a, "b" -> b))
+        }
     }
   }
 
@@ -1015,9 +1299,19 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       // String-literal prefixes: L"x" (wide), u8"x", u"x", U"x". The prefix selects an
       // encoding Core does not model; the *content* is what the program uses, and
       // dropping the prefix is exactly what `unquoted` already does for the quotes.
+      //
+      // Python's `u'x'` is the same object as `'x'` — the prefix has been a no-op since
+      // 3.0 and exists only for 2/3 compatibility — but only the double-quoted spelling
+      // was stripped, so every `u'...'` in the corpus was reported as an unparsed
+      // literal. `b'x'` is *not* covered: bytes are a distinct type Core does not have,
+      // and calling one a `str` would be a wrong value rather than a missing one.
+      // The single-quoted forms are **Python only**, deliberately: `L'a'` and `u'a'` in
+      // C++ are wide/char16_t *character* constants, which are integers, and stripping
+      // the prefix there would turn a number into a string.
       val c =
         if (c0.length >= 3 && (c0.startsWith("L\"") || c0.startsWith("u\"") || c0.startsWith("U\""))) c0.drop(1)
         else if (c0.length >= 4 && c0.startsWith("u8\"")) c0.drop(2)
+        else if (pyFile && c0.length >= 3 && (c0.startsWith("u'") || c0.startsWith("U'"))) c0.drop(1)
         else c0
       val unquoted =
         if (c.length >= 2 && (c.head == '"' || c.head == '\'')) c.drop(1).dropRight(1) else c
@@ -1059,6 +1353,14 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           else if (c.matches("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*""") ||
                    c == ".")
             hole("import:operand")
+          // `b'...'` / `rb"..."`: a **bytes** literal. Core has `str` and no `bytes`, and
+          // the two are not interchangeable in Python 3 (`b'a' == 'a'` is `False`), so
+          // this is a missing *type*, not a parsing failure, and the label says which.
+          else if (pyFile && c.matches("""(?i)(b|rb|br)['"].*"""))
+            hole("lit:bytes")
+          // `...` — the `Ellipsis` singleton, which Python uses as a stub body and as a
+          // typing placeholder. A value Core does not have, again not a parse failure.
+          else if (pyFile && c == "...") hole("lit:ellipsis")
           // Unquoted, non-numeric, non-identifier literal code. Calling it a string would
           // be inventing a value.
           else hole("lit:unquoted")
@@ -1586,16 +1888,25 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // differently.
     else if (mfn == "<operator>.staticAssert")
       ujson.Obj("k" -> "unit")
+    // f-strings. Python only — see `pyFile`.
+    else if (mfn == "<operator>.formatString" && pyFile) fstring(kids)
     else if (mfn.startsWith("<operator>"))
       hole("op:" + mfn.stripPrefix("<operator>."))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
+    // A *fourth* literal is the `as` alias: `import typing as t`, `from p import x as y`.
+    // That shape was not matched at all, so all 492 aliased imports in Ansible fell
+    // through to the generic call branch and emitted their two source fragments as
+    // `import:operand` holes — 984 of the 1,199 in that label, for a construct that
+    // differs from a plain import in one bit.
     else if (c.name == "import" && mfn == "<unknownFullName>" &&
              (kids match {
-               case (_: Identifier) :: (_: Literal) :: (_: Literal) :: Nil => true
-               case _                                                     => false
+               case (_: Identifier) :: (_: Literal) :: (_: Literal) :: rest =>
+                 rest.length <= 1 && rest.forall(_.isInstanceOf[Literal])
+               case _ => false
              }))
       importValue(kids(1).asInstanceOf[Literal].code.trim,
-                  kids(2).asInstanceOf[Literal].code.trim)
+                  kids(2).asInstanceOf[Literal].code.trim,
+                  aliased = kids.length == 4)
     else {
       // A real call. Arguments are the children with argumentIndex >= 1; the callee sits
       // at -1 and the Python frontend repeats the receiver at 0.
@@ -2326,7 +2637,11 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 
   val funcs = methods.map(emit(_, false))
   val inits = moduleMethods.map(emit(_, true))
-  val all   = funcs ++ inits
+  // The module objects are built **before** any module body runs, so an `import` at the
+  // top of a module reads a module object that already exists. `render_lean.py` keeps AST
+  // order when it collects `moduleInits`, so placing this entry first here is what puts
+  // it first there.
+  val all   = funcs ++ moduleObjectsInit.toList ++ inits
 
   os.write.over(os.Path(out, os.pwd), ujson.write(ujson.Arr.from(all), indent = 1))
 

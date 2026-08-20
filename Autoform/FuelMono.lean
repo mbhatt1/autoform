@@ -309,7 +309,51 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             rw [hget] at hy
                             dsimp only at hy ⊢
                             cases hrm : Ctx.resolveMethod ctx o.cls m with
-                            | none => rw [hrm] at hy; exact hy
+                            -- No method of that name. For a **module object** this is not
+                            -- the end: the name may be a *field* holding a function value,
+                            -- which is then applied with no receiver (`Semantics`, `.mcall`).
+                            -- That is a recursive call, so this branch — which used to be a
+                            -- bare hole — now needs the same induction hypotheses the
+                            -- resolved case does. Softening the statement instead was the
+                            -- alternative and is not one.
+                            | none =>
+                                rw [hrm] at hy
+                                dsimp only at hy ⊢
+                                by_cases hmod : String.startsWith o.cls "<module>" = true
+                                · rw [if_pos hmod] at hy ⊢
+                                  cases hf : List.find? (fun x => x.1 == m) o.fields with
+                                  | none => rw [hf] at hy; exact hy
+                                  | some p =>
+                                      obtain ⟨_, mv⟩ := p
+                                      rw [hf] at hy
+                                      cases mv with
+                                      | fn g =>
+                                          dsimp only at hy ⊢
+                                          cases hres2 : Ctx.resolve ctx g with
+                                          | some fn2 =>
+                                              rw [hres2] at hy
+                                              exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                                          | none => rw [hres2] at hy; exact hy
+                                      | clos g cap =>
+                                          dsimp only at hy ⊢
+                                          cases hres2 : Ctx.resolve ctx g with
+                                          | some fn2 =>
+                                              rw [hres2] at hy
+                                              exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                                          | none => rw [hres2] at hy; exact hy
+                                      | int _ => exact hy
+                                      | str _ => exact hy
+                                      | bool _ => exact hy
+                                      | float _ => exact hy
+                                      | unit => exact hy
+                                      | list _ => exact hy
+                                      | tuple _ => exact hy
+                                      | dict _ => exact hy
+                                      | ref _ => exact hy
+                                      | clsClos _ _ => exact hy
+                                      | bobj _ _ => exact hy
+                                · rw [if_neg hmod] at hy ⊢
+                                  exact hy
                             | some fn =>
                                 rw [hrm] at hy
                                 dsimp only at hy ⊢
