@@ -300,7 +300,7 @@ def f_cachetools___init___py__module__Cache_getsizeof : Func :=
   , params := ["value"]
   , body := (.seq
             (.expr (.lit (.str "\"\"Return the size of a cache element's value.\"\"")))
-            (.ret (.lit (.int 1)))) }
+            (.ret (.lit (.int 0)))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.<metaClassCallHandler>`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache__metaClassCallHandler_ : Func :=
@@ -1211,7 +1211,7 @@ def f_cachetools___init___py__module__TTLCache__Link___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache._Link.__init__"
   , params := ["key", "expires"]
   , body := (.seq
-            .skip
+            (.setField (.name "self") "key" (.name "key"))
             (.setField (.name "self") "expires" (.name "expires"))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache._Link.__reduce__`  (from `cachetools/__init__.py`) -/

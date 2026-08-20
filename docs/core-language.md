@@ -254,7 +254,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | Label family | Meaning | Status |
 |---|---|---|
 | `op:starredUnpack` | `*args` / `**kwargs` splicing. Has no Core representation — splicing changes arity, which cannot be expressed by a fixed parameter list. | **Permanent** without variadic functions in Core. |
-| `op:floorDiv`, `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. | Not yet implemented (per operator). |
+| `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
 | `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]`, slice deletion, attribute deletion. | Blocked on boxed containers (index/slice); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
 | `op:raise-bare` | A bare `raise` re-raising the in-flight exception; Core has no ambient current-exception. | Not yet implemented. |
