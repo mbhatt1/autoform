@@ -86,30 +86,49 @@ def f_v8_internal_Convert8Digits_void_uint32_t_char__ : Func :=
                           (.expr
                             (.call
                               "Convert2Digits"
-                              [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                              [ (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32))))
                               , (.name "buffer") ]))
                           (.seq
-                            (.assign "prod" (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                            (.assign
+                              "prod"
+                              (.binop
+                                "*"
+                                (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                (.lit (.int 100))))
                             (.seq
                               (.expr
                                 (.call
                                   "Convert2Digits"
-                                  [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                  [ (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                   , (.hole "cstr:pointer-arith") ]))
                               (.seq
-                                (.assign "prod" (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                (.assign
+                                  "prod"
+                                  (.binop
+                                    "*"
+                                    (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                    (.lit (.int 100))))
                                 (.seq
                                   (.expr
                                     (.call
                                       "Convert2Digits"
-                                      [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                      [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                       , (.hole "cstr:pointer-arith") ]))
                                   (.seq
-                                    (.assign "prod" (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                    (.assign
+                                      "prod"
+                                      (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                     (.expr
                                       (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))))))))))))))) }
 
 /-- `v8.internal.ConvertUpTo9Digits:uint8_t(uint32_t,char*)`  (from `conversions.cc`) -/
@@ -139,48 +158,70 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                             (.seq
                               (.assign
                                 "head_digit"
-                                (.unop "cast:u8" (.hole "op:arithmeticShiftRight")))
+                                (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32)))))
                               (.seq
                                 (.expr (.call "DCHECK_LT" [(.name "head_digit"), (.lit (.int 10))]))
                                 (.seq
                                   (.hole "assign:lhs:indirection")
                                   (.seq
-                                    (.assign "prod" (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                    (.assign
+                                      "prod"
+                                      (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                     (.seq
                                       (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                       (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.ret (.lit (.int 9))))))))))))))))))
                     .skip)
@@ -201,7 +242,7 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                               (.seq
                                 (.assign
                                   "head_digits"
-                                  (.unop "cast:u8" (.hole "op:arithmeticShiftRight")))
+                                  (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32)))))
                                 (.seq
                                   .skip
                                   (.seq
@@ -215,32 +256,47 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                                       (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.name "buffer") ]))
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.ret
                                         (.binop "+" (.lit (.int 6)) (.name "head_digit_count")))))))))))))))))
@@ -257,7 +313,7 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                               (.seq
                                 (.assign
                                   "head_digits"
-                                  (.unop "cast:u8" (.hole "op:arithmeticShiftRight")))
+                                  (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32)))))
                                 (.seq
                                   .skip
                                   (.seq
@@ -271,22 +327,32 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                                       (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.name "buffer") ]))
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.hole "cstr:pointer-arith") ]))
                                         (.ret
                                         (.binop "+" (.lit (.int 4)) (.name "head_digit_count"))))))))))))))
@@ -303,7 +369,7 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                                 (.seq
                                   (.assign
                                     "head_digits"
-                                    (.unop "cast:u8" (.hole "op:arithmeticShiftRight")))
+                                    (.unop "cast:u8" (.binop ">>>" (.name "prod") (.lit (.int 32)))))
                                   (.seq
                                     .skip
                                     (.seq
@@ -317,12 +383,17 @@ def f_v8_internal_ConvertUpTo9Digits_uint8_t_uint32_t_char__ : Func :=
                                         (.seq
                                         (.assign
                                         "prod"
-                                        (.binop "*" (.hole "op:and") (.lit (.int 100))))
+                                        (.binop
+                                        "*"
+                                        (.binop "&" (.name "prod") (.name "kUint32Mask"))
+                                        (.lit (.int 100))))
                                         (.seq
                                         (.expr
                                         (.call
                                         "Convert2Digits"
-                                        [ (.unop "cast:u8" (.hole "op:arithmeticShiftRight"))
+                                        [ (.unop
+                                        "cast:u8"
+                                        (.binop ">>>" (.name "prod") (.lit (.int 32))))
                                         , (.name "buffer") ]))
                                         (.ret
                                         (.binop "+" (.lit (.int 2)) (.name "head_digit_count"))))))))))))
@@ -493,7 +564,7 @@ def f_v8_internal_SimpleStringBuilder_AddExponent_void_int_ : Func :=
                   (.seq
                     .skip
                     (.seq
-                      (.assign "d1" (.hole "op:arithmeticShiftRight"))
+                      (.assign "d1" (.hole "op:shiftRight:unknown-signedness"))
                       (.seq
                         .skip
                         (.seq
@@ -640,7 +711,24 @@ def f_v8_internal_SubStringEquals_bool_Char___Char__char__ : Func :=
                 "DCHECK"
                 [(.binop "==" (.hole "op:indirection:pointer") (.hole "op:indirection:pointer"))]))
             (.seq
-              (.hole "control:FOR")
+              (.seq
+                (.hole "op:postIncrement:pointer")
+                (.loop
+                  (.binop "!=" (.hole "op:indirection:pointer") (.lit (.str "\\0")))
+                  (.seq
+                    (.seq
+                      (.hole "op:preIncrement:pointer")
+                      (.ifte
+                        (.binop
+                          "||"
+                          (.binop "==" (.hole "op:indirection:pointer") (.name "end"))
+                          (.binop
+                            "!="
+                            (.hole "op:indirection:pointer")
+                            (.hole "op:indirection:pointer")))
+                        (.ret (.lit (.bool false)))
+                        .skip))
+                    (.hole "op:postIncrement:pointer"))))
               (.seq (.hole "op:preIncrement:pointer") (.ret (.lit (.bool true)))))) }
 
 /-- `v8.internal.AdvanceToNonspace:bool(Char**,Char*)`  (from `conversions.cc`) -/
@@ -695,7 +783,9 @@ def f_v8_internal_InternalStringToIntDouble_double_Char__Char__bool_bool_ : Func
                               (.seq
                                 .skip
                                 (.seq
-                                  (.assign "radix" (.hole "op:shiftLeft"))
+                                  (.assign
+                                    "radix"
+                                    (.binop "<<" (.lit (.int 1)) (.name "radix_log_2")))
                                   (.seq
                                     .skip
                                     (.seq
@@ -734,7 +824,10 @@ def f_v8_internal_InternalStringToIntDouble_double_Char__Char__bool_bool_ : Func
                                         (.expr
                                         (.call
                                         "DCHECK"
-                                        [(.binop "<" (.name "number") (.hole "op:shiftLeft"))]))
+                                        [ (.binop
+                                        "<"
+                                        (.name "number")
+                                        (.binop "<<" (.hole "expr:BLOCK-impure") (.lit (.int 53)))) ]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -2995,7 +3088,9 @@ def f_v8_internal_DoubleToRadixStringView_string_view_double_int_base_Vector_ : 
                                         (.loop
                                         (.binop ">" (.call "Exponent" []) (.lit (.int 0)))
                                         (.seq
-                                        (.expr (.hole "op:assignmentDivision"))
+                                        (.assign
+                                        "integer"
+                                        (.binop "/" (.name "integer") (.name "radix")))
                                         (.setIndex
                                         (.name "buffer")
                                         (.hole "op:preDecrement:value")
@@ -3016,7 +3111,8 @@ def f_v8_internal_DoubleToRadixStringView_string_view_double_int_base_Vector_ : 
                                         (.expr
                                         (.call
                                         "DCHECK_LE"
-                                        [(.name "integer_cursor"), (.hole "op:shiftLeft")]))
+                                        [ (.name "integer_cursor")
+                                        , (.binop "<<" (.lit (.int 1)) (.lit (.int 31))) ]))
                                         (.seq
                                         (.expr
                                         (.call
@@ -3365,7 +3461,21 @@ def f_v8_internal_IsSpecialIndex_bool_Tagged_v8_internal_SharedStringAccessGuard
                                         (.seq
                                         (.assign "matches" (.lit (.bool true)))
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        .skip
+                                        (.loop
+                                        (.binop "<" (.name "offset") (.name "length"))
+                                        (.seq
+                                        (.expr
+                                        (.call
+                                        "<operators>.assignmentAnd"
+                                        [ (.name "matches")
+                                        , (.call
+                                        "IsDecimalDigit"
+                                        [(.index (.name "buffer") (.name "offset"))]) ]))
+                                        (.assign
+                                        "offset"
+                                        (.binop "+" (.name "offset") (.lit (.int 1)))))))
                                         (.ifte
                                         (.binop "!=" (.name "matches") (.lit (.int 0)))
                                         (.seq
@@ -3428,7 +3538,23 @@ def f_v8_internal_IsSpecialIndex_bool_Tagged_v8_internal_SharedStringAccessGuard
                                         (.binop "!=" (.call "length" []) (.name "length"))
                                         (.ret (.lit (.bool false)))
                                         .skip)
-                                        (.seq (.hole "control:FOR") (.ret (.lit (.bool true))))))))))))))))))))))))))))))))) }
+                                        (.seq
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "length"))
+                                        (.seq
+                                        (.ifte
+                                        (.binop
+                                        "!="
+                                        (.unop
+                                        "cast:u16"
+                                        (.index (.name "reverse_string") (.name "i")))
+                                        (.index (.name "buffer") (.name "i")))
+                                        (.ret (.lit (.bool false)))
+                                        .skip)
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
+                                        (.ret (.lit (.bool true))))))))))))))))))))))))))))))))) }
 
 /-- `v8.internal.DoubleToFloat32_NoInline:float(double)`  (from `conversions.cc`) -/
 def f_v8_internal_DoubleToFloat32_NoInline_float_double_ : Func :=
@@ -3555,7 +3681,13 @@ def f_v8_internal_MathRandom_InitializeContext_void_Isolate__DirectHandle_ : Fun
                                         (.binop "<" (.name "Cast") (.name "FixedDoubleArray"))
                                         (.call "NewFixedDoubleArray" [(.name "kCacheSize")])))
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign "i" (.lit (.int 0)))
+                                        (.loop
+                                        (.binop "<" (.name "i") (.name "kCacheSize"))
+                                        (.seq
+                                        (.expr (.call "set" [(.name "i"), (.lit (.int 0))]))
+                                        (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))))
                                         (.expr
                                         (.call
                                         "set_math_random_cache"
@@ -3578,12 +3710,12 @@ def f_v8_internal_MathRandom_ResetContext_void_Tagged_ : Func :=
                   (.seq
                     .skip
                     (.seq
-                      (.assign "state" (.hole "op:arrayInitializer"))
+                      (.assign "state" (.hole "op:arrayDecl:size"))
                       (.expr
                         (.binop
                           "<"
                           (.binop "<" (.name "Cast") (.name "PodArray"))
-                          (.hole "op:arithmeticShiftRight"))))))))) }
+                          (.hole "op:shiftRight:unknown-signedness"))))))))) }
 
 /-- `v8.internal.MathRandom.InitializeAndMaybeRefillCache:Address(Isolate*,Address)`  (from `math-random.cc`) -/
 def f_v8_internal_MathRandom_InitializeAndMaybeRefillCache_Address_Isolate__Address_ : Func :=
@@ -3657,7 +3789,7 @@ def f_v8_internal_MathRandom_InitializeAndMaybeRefillCache_Address_Isolate__Addr
                                         (.setField
                                         (.name "state")
                                         "s1"
-                                        (.call "MurmurHash3" [(.unop "!" (.name "seed"))]))
+                                        (.call "MurmurHash3" [(.unop "~" (.name "seed"))]))
                                         (.expr
                                         (.call
                                         "CHECK"
@@ -3676,7 +3808,27 @@ def f_v8_internal_MathRandom_InitializeAndMaybeRefillCache_Address_Isolate__Addr
                                         (.seq
                                         (.hole "assign:lhs:greaterThan")
                                         (.seq
-                                        (.hole "control:FOR")
+                                        (.seq
+                                        (.assign
+                                        "i"
+                                        (.binop "-" (.name "kCacheSize") (.lit (.int 1))))
+                                        (.loop
+                                        (.binop ">=" (.name "i") (.lit (.int 0)))
+                                        (.seq
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        (.assign
+                                        "random"
+                                        (.call
+                                        "XorShift128"
+                                        [ (.hole "op:addressOf:field:scalar")
+                                        , (.hole "op:addressOf:field:scalar") ]))
+                                        (.expr
+                                        (.call
+                                        "set"
+                                        [(.name "i"), (.call "ToDouble" [(.name "random")])]))))
+                                        (.assign "i" (.binop "-" (.name "i") (.lit (.int 1)))))))
                                         (.seq
                                         (.expr (.call "set" [(.lit (.int 0)), (.name "state")]))
                                         (.seq

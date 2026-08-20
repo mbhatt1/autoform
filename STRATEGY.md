@@ -831,6 +831,19 @@ assumptions were wrong:
   no bitwise operators — so that mapping was silently computing the wrong answer. They are
   now holes. Same for float literals, which were becoming strings. This is the §12 lesson
   recurring: *constructs that look alike across languages are the dangerous ones.*
+
+  **Update — they are no longer holes; they are bitwise operators.** `Core` now has `"&"`,
+  `"|"`, `"^"`, `"<<"`, `">>"` and `">>>"` as operator strings of their own, implemented
+  by `NumConfig.band`/`bor`/`bxor`/`shl`/`shr` at the dialect's width. They are *not*
+  aliases of `"&&"`/`"||"` and must never become so; the two are separate `applyBinop`
+  cases for exactly that reason. `<operator>.not` was mapped to `"!"` by the same mistake
+  in unary form — it is `~`, in C, C++, Java **and** Python — and now maps to `"~"`.
+
+  The one place the operand's *type* is still needed is `>>`: it is arithmetic on a signed
+  operand and logical on an unsigned one, Joern spells both `arithmeticShiftRight`, and a
+  `Val.int` carries no signedness. The exporter chooses from the static type and emits
+  `op:shiftRight:unknown-signedness` when it cannot — a hole that names the missing *type*,
+  which is a different remedy from a missing semantics.
 * **Resolved attribute access is not attribute access.** When Joern resolves `o.m`, it
   prepends the target, so the node has three children rather than two; those are `fnref`,
   not `field`.
@@ -1999,3 +2012,66 @@ is no conformance evidence either way from that oracle for this change, and none
 claimed. The evidence for the semantics is the CPython-paired `#eval`s above; the evidence
 for the exporter is that a re-export reproduces the committed AST byte-for-byte and
 `scripts/check_render.py` passes on all 10 modules.
+
+
+## §36 — C: `for`, aggregate initializers, bitwise arithmetic, tail `goto`, and a data model
+
+Five C-shaped gaps closed against the Linux kernel 7.1-rc3 (`lib/`, `crypto/`), V8
+`src/base`, and — for the two that are not C-specific — Ansible.
+
+* **`for (init; cond; step) body`** becomes `init; while (cond) { body; step }`. The
+  subtlety is `continue`, which in C jumps to the **step**, not to the test: the textbook
+  desugaring turns `for (i=0;i<n;i++) { if (p) continue; ... }` into an infinite loop that
+  type-checks. Each `continue` belonging to *this* loop is therefore emitted as
+  `step; continue` — an exact rewrite, not an approximation, so no hole is needed. The
+  negative control is in `Semantics.lean`: the naive desugaring of the same loop is
+  pinned as `outOfFuel` while the real one is pinned as the value `cc` prints. A `for`
+  with a clause elided is `control:FOR:elided-clause`, because Joern omits absent clauses
+  and nothing in the graph says which of the three the survivor was.
+
+* **Brace initializers.** `{1,2,3}` is `Expr.listE`; `{ .a = 1, .b = 2 }` is `Expr.dictE`
+  keyed by the field names, with `Dialect.fieldsOnDicts` making `s.a` read it back under a
+  C-family dialect only (in Python `{'a':1}.a` is an `AttributeError` and stays a hole).
+  A struct literal really is a finite map from field names to values and C copies structs
+  by value, so value semantics is the right semantics. `{ [IDX] = v }` — an *index*
+  designator — is refused (`op:arrayInitializer:index-designator`): reading it
+  positionally would put the right value in the wrong place. `T x[N]` in declaration
+  position wears the same CPG operator and is not an initializer at all; it is now
+  `op:arrayDecl:size`, still a hole, because modelling it needs the size model this
+  project does not have.
+
+* **Bitwise operators.** `&`, `|`, `^`, `<<`, `>>`, `>>>` and `~` are now real
+  operations on `NumConfig`, not holes and emphatically not the logical operators. See the
+  §-note above on `<operator>.and`. `>>` is the one that needs the operand's *type*: it is
+  arithmetic on a signed operand and logical on an unsigned one, Joern spells both
+  `arithmeticShiftRight`, and a `Val.int` has no signedness — so the exporter chooses from
+  the static type and emits `op:shiftRight:unknown-signedness` when it cannot.
+
+* **`goto`, partially.** A *forward* jump to a *single* label that is a *direct child of
+  the function body*, with no jump inside a loop or switch, is `while (true) { prefix;
+  break } suffix` — structured control flow wearing an unstructured spelling. Everything
+  else keeps `control:GOTO`. On `crypto/` that is 114 of 434; on `lib/`, 83 of 402. Each
+  condition is load-bearing and each one, dropped, gives a wrong answer rather than a
+  hole: a `break` inside a real loop leaves *that* loop.
+
+* **`long` is not 32 bits.** `intTypeNames` mapped `long -> i32`, so `(long)x` truncated
+  to 32 bits on LP64 — Linux and macOS on x86-64 and arm64, which is what both C corpora
+  are built for. That is the worst category the project has, because a hole-free function
+  is what the ledger counts as good. The fix is not to write `i64`: `long` is 64 bits under
+  LP64 and 32 under LLP64, so its width is a property of the **target data model**, not of
+  the language. `dataModelTable` tabulates `lp64` / `llp64` / `ilp32` for the whole
+  family — `long`, `size_t`, `ssize_t`, `ptrdiff_t`, `intptr_t`, `uintptr_t` — the model
+  is an explicit `--param dataModel` (default `lp64`, printed by the exporter on every
+  run), and an unknown model makes every one of them the hole
+  `op:cast:model-dependent` rather than a silent guess. The choice is legible in the
+  output as well as in this file: the emitted operator names the width it picked, so
+  `(long)x` is `unop "cast:i64"` under LP64 and `"cast:i32"` under LLP64.
+
+  The exactly-sized kernel spellings `s8`..`u64` and `__s8`..`__u64` were added to the
+  model-*independent* table, since those names exist precisely to be target-invariant.
+  `__le32`/`__be32` were **not**: their value is byte-swapped as well as narrowed, and
+  modelling only the narrowing would be half a translation.
+
+**What this does not fix.** `Dialect.cLike` is still 32-bit signed for *arithmetic*, so a
+`cast:i64` value that then takes part in `+` is wrapped back to 32 bits. The cast is now
+right; the arithmetic around it is still under the two-constructor `Dialect` §29 records.

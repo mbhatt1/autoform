@@ -56,6 +56,25 @@ def stringsAreValues : Dialect → Bool
   | .python => true
   | .cLike  => false
 
+/-- Is `e.f` on a **dict** value a member selection?
+
+A C aggregate initializer — `static struct crypto_alg alg = { .cra_name = "842", .
+cra_priority = 100 }` — is a finite map from field names to values, which is exactly
+`Val.dict` with string keys, and C struct assignment copies, so value semantics is the
+right semantics for it. Under a C-family dialect `alg.cra_priority` therefore reads the
+key `"cra_priority"` out of that map.
+
+Under Python it must **not**: `{'a': 1}.a` is an `AttributeError`, not `1`, and answering
+`1` would be a silent wrong answer of the §12 kind. So `.python` says `false` and the
+access stays the `field:a:non-object` hole it has always been.
+
+Note what this does *not* buy: a `dict` is not on the heap, so `e.f = v` on one is still
+`setField:non-object`. A struct whose fields are written after initialization is a hole,
+not a wrong answer. -/
+def fieldsOnDicts : Dialect → Bool
+  | .python => false
+  | .cLike  => true
+
 /-- Does comparing an integer against a float compare **exactly** (Python: `10**23 ==
 1e23` is `False`), or promote the integer to a double first (C)? -/
 def comparesIntFloatExactly : Dialect → Bool

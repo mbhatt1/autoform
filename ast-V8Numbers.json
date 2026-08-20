@@ -287,8 +287,16 @@
               "k": "unop",
               "op": "cast:u8",
               "a": {
-               "k": "hole",
-               "label": "op:arithmeticShiftRight"
+               "k": "binop",
+               "op": ">>>",
+               "a": {
+                "k": "name",
+                "v": "prod"
+               },
+               "b": {
+                "k": "int",
+                "v": "32"
+               }
               }
              },
              {
@@ -307,8 +315,16 @@
              "k": "binop",
              "op": "*",
              "a": {
-              "k": "hole",
-              "label": "op:and"
+              "k": "binop",
+              "op": "&",
+              "a": {
+               "k": "name",
+               "v": "prod"
+              },
+              "b": {
+               "k": "name",
+               "v": "kUint32Mask"
+              }
              },
              "b": {
               "k": "int",
@@ -328,8 +344,16 @@
                 "k": "unop",
                 "op": "cast:u8",
                 "a": {
-                 "k": "hole",
-                 "label": "op:arithmeticShiftRight"
+                 "k": "binop",
+                 "op": ">>>",
+                 "a": {
+                  "k": "name",
+                  "v": "prod"
+                 },
+                 "b": {
+                  "k": "int",
+                  "v": "32"
+                 }
                 }
                },
                {
@@ -348,8 +372,16 @@
                "k": "binop",
                "op": "*",
                "a": {
-                "k": "hole",
-                "label": "op:and"
+                "k": "binop",
+                "op": "&",
+                "a": {
+                 "k": "name",
+                 "v": "prod"
+                },
+                "b": {
+                 "k": "name",
+                 "v": "kUint32Mask"
+                }
                },
                "b": {
                 "k": "int",
@@ -369,8 +401,16 @@
                   "k": "unop",
                   "op": "cast:u8",
                   "a": {
-                   "k": "hole",
-                   "label": "op:arithmeticShiftRight"
+                   "k": "binop",
+                   "op": ">>>",
+                   "a": {
+                    "k": "name",
+                    "v": "prod"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": "32"
+                   }
                   }
                  },
                  {
@@ -389,8 +429,16 @@
                  "k": "binop",
                  "op": "*",
                  "a": {
-                  "k": "hole",
-                  "label": "op:and"
+                  "k": "binop",
+                  "op": "&",
+                  "a": {
+                   "k": "name",
+                   "v": "prod"
+                  },
+                  "b": {
+                   "k": "name",
+                   "v": "kUint32Mask"
+                  }
                  },
                  "b": {
                   "k": "int",
@@ -408,8 +456,16 @@
                    "k": "unop",
                    "op": "cast:u8",
                    "a": {
-                    "k": "hole",
-                    "label": "op:arithmeticShiftRight"
+                    "k": "binop",
+                    "op": ">>>",
+                    "a": {
+                     "k": "name",
+                     "v": "prod"
+                    },
+                    "b": {
+                     "k": "int",
+                     "v": "32"
+                    }
                    }
                   },
                   {
@@ -532,8 +588,16 @@
               "k": "unop",
               "op": "cast:u8",
               "a": {
-               "k": "hole",
-               "label": "op:arithmeticShiftRight"
+               "k": "binop",
+               "op": ">>>",
+               "a": {
+                "k": "name",
+                "v": "prod"
+               },
+               "b": {
+                "k": "int",
+                "v": "32"
+               }
               }
              }
             },
@@ -571,8 +635,16 @@
                  "k": "binop",
                  "op": "*",
                  "a": {
-                  "k": "hole",
-                  "label": "op:and"
+                  "k": "binop",
+                  "op": "&",
+                  "a": {
+                   "k": "name",
+                   "v": "prod"
+                  },
+                  "b": {
+                   "k": "name",
+                   "v": "kUint32Mask"
+                  }
                  },
                  "b": {
                   "k": "int",
@@ -592,8 +664,16 @@
                     "k": "unop",
                     "op": "cast:u8",
                     "a": {
-                     "k": "hole",
-                     "label": "op:arithmeticShiftRight"
+                     "k": "binop",
+                     "op": ">>>",
+                     "a": {
+                      "k": "name",
+                      "v": "prod"
+                     },
+                     "b": {
+                      "k": "int",
+                      "v": "32"
+                     }
                     }
                    },
                    {
@@ -612,8 +692,16 @@
                    "k": "binop",
                    "op": "*",
                    "a": {
-                    "k": "hole",
-                    "label": "op:and"
+                    "k": "binop",
+                    "op": "&",
+                    "a": {
+                     "k": "name",
+                     "v": "prod"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "kUint32Mask"
+                    }
                    },
                    "b": {
                     "k": "int",
@@ -633,8 +721,16 @@
                       "k": "unop",
                       "op": "cast:u8",
                       "a": {
-                       "k": "hole",
-                       "label": "op:arithmeticShiftRight"
+                       "k": "binop",
+                       "op": ">>>",
+                       "a": {
+                        "k": "name",
+                        "v": "prod"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "32"
+                       }
                       }
                      },
                      {
@@ -653,8 +749,16 @@
                      "k": "binop",
                      "op": "*",
                      "a": {
-                      "k": "hole",
-                      "label": "op:and"
+                      "k": "binop",
+                      "op": "&",
+                      "a": {
+                       "k": "name",
+                       "v": "prod"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "kUint32Mask"
+                      }
                      },
                      "b": {
                       "k": "int",
@@ -674,8 +778,16 @@
                         "k": "unop",
                         "op": "cast:u8",
                         "a": {
-                         "k": "hole",
-                         "label": "op:arithmeticShiftRight"
+                         "k": "binop",
+                         "op": ">>>",
+                         "a": {
+                          "k": "name",
+                          "v": "prod"
+                         },
+                         "b": {
+                          "k": "int",
+                          "v": "32"
+                         }
                         }
                        },
                        {
@@ -694,8 +806,16 @@
                        "k": "binop",
                        "op": "*",
                        "a": {
-                        "k": "hole",
-                        "label": "op:and"
+                        "k": "binop",
+                        "op": "&",
+                        "a": {
+                         "k": "name",
+                         "v": "prod"
+                        },
+                        "b": {
+                         "k": "name",
+                         "v": "kUint32Mask"
+                        }
                        },
                        "b": {
                         "k": "int",
@@ -715,8 +835,16 @@
                           "k": "unop",
                           "op": "cast:u8",
                           "a": {
-                           "k": "hole",
-                           "label": "op:arithmeticShiftRight"
+                           "k": "binop",
+                           "op": ">>>",
+                           "a": {
+                            "k": "name",
+                            "v": "prod"
+                           },
+                           "b": {
+                            "k": "int",
+                            "v": "32"
+                           }
                           }
                          },
                          {
@@ -824,8 +952,16 @@
                "k": "unop",
                "op": "cast:u8",
                "a": {
-                "k": "hole",
-                "label": "op:arithmeticShiftRight"
+                "k": "binop",
+                "op": ">>>",
+                "a": {
+                 "k": "name",
+                 "v": "prod"
+                },
+                "b": {
+                 "k": "int",
+                 "v": "32"
+                }
                }
               }
              },
@@ -869,8 +1005,16 @@
                    "k": "binop",
                    "op": "*",
                    "a": {
-                    "k": "hole",
-                    "label": "op:and"
+                    "k": "binop",
+                    "op": "&",
+                    "a": {
+                     "k": "name",
+                     "v": "prod"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "kUint32Mask"
+                    }
                    },
                    "b": {
                     "k": "int",
@@ -890,8 +1034,16 @@
                       "k": "unop",
                       "op": "cast:u8",
                       "a": {
-                       "k": "hole",
-                       "label": "op:arithmeticShiftRight"
+                       "k": "binop",
+                       "op": ">>>",
+                       "a": {
+                        "k": "name",
+                        "v": "prod"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "32"
+                       }
                       }
                      },
                      {
@@ -910,8 +1062,16 @@
                      "k": "binop",
                      "op": "*",
                      "a": {
-                      "k": "hole",
-                      "label": "op:and"
+                      "k": "binop",
+                      "op": "&",
+                      "a": {
+                       "k": "name",
+                       "v": "prod"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "kUint32Mask"
+                      }
                      },
                      "b": {
                       "k": "int",
@@ -931,8 +1091,16 @@
                         "k": "unop",
                         "op": "cast:u8",
                         "a": {
-                         "k": "hole",
-                         "label": "op:arithmeticShiftRight"
+                         "k": "binop",
+                         "op": ">>>",
+                         "a": {
+                          "k": "name",
+                          "v": "prod"
+                         },
+                         "b": {
+                          "k": "int",
+                          "v": "32"
+                         }
                         }
                        },
                        {
@@ -951,8 +1119,16 @@
                        "k": "binop",
                        "op": "*",
                        "a": {
-                        "k": "hole",
-                        "label": "op:and"
+                        "k": "binop",
+                        "op": "&",
+                        "a": {
+                         "k": "name",
+                         "v": "prod"
+                        },
+                        "b": {
+                         "k": "name",
+                         "v": "kUint32Mask"
+                        }
                        },
                        "b": {
                         "k": "int",
@@ -972,8 +1148,16 @@
                           "k": "unop",
                           "op": "cast:u8",
                           "a": {
-                           "k": "hole",
-                           "label": "op:arithmeticShiftRight"
+                           "k": "binop",
+                           "op": ">>>",
+                           "a": {
+                            "k": "name",
+                            "v": "prod"
+                           },
+                           "b": {
+                            "k": "int",
+                            "v": "32"
+                           }
                           }
                          },
                          {
@@ -1069,8 +1253,16 @@
                "k": "unop",
                "op": "cast:u8",
                "a": {
-                "k": "hole",
-                "label": "op:arithmeticShiftRight"
+                "k": "binop",
+                "op": ">>>",
+                "a": {
+                 "k": "name",
+                 "v": "prod"
+                },
+                "b": {
+                 "k": "int",
+                 "v": "32"
+                }
                }
               }
              },
@@ -1114,8 +1306,16 @@
                    "k": "binop",
                    "op": "*",
                    "a": {
-                    "k": "hole",
-                    "label": "op:and"
+                    "k": "binop",
+                    "op": "&",
+                    "a": {
+                     "k": "name",
+                     "v": "prod"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "kUint32Mask"
+                    }
                    },
                    "b": {
                     "k": "int",
@@ -1135,8 +1335,16 @@
                       "k": "unop",
                       "op": "cast:u8",
                       "a": {
-                       "k": "hole",
-                       "label": "op:arithmeticShiftRight"
+                       "k": "binop",
+                       "op": ">>>",
+                       "a": {
+                        "k": "name",
+                        "v": "prod"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": "32"
+                       }
                       }
                      },
                      {
@@ -1155,8 +1363,16 @@
                      "k": "binop",
                      "op": "*",
                      "a": {
-                      "k": "hole",
-                      "label": "op:and"
+                      "k": "binop",
+                      "op": "&",
+                      "a": {
+                       "k": "name",
+                       "v": "prod"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "kUint32Mask"
+                      }
                      },
                      "b": {
                       "k": "int",
@@ -1176,8 +1392,16 @@
                         "k": "unop",
                         "op": "cast:u8",
                         "a": {
-                         "k": "hole",
-                         "label": "op:arithmeticShiftRight"
+                         "k": "binop",
+                         "op": ">>>",
+                         "a": {
+                          "k": "name",
+                          "v": "prod"
+                         },
+                         "b": {
+                          "k": "int",
+                          "v": "32"
+                         }
                         }
                        },
                        {
@@ -1270,8 +1494,16 @@
                 "k": "unop",
                 "op": "cast:u8",
                 "a": {
-                 "k": "hole",
-                 "label": "op:arithmeticShiftRight"
+                 "k": "binop",
+                 "op": ">>>",
+                 "a": {
+                  "k": "name",
+                  "v": "prod"
+                 },
+                 "b": {
+                  "k": "int",
+                  "v": "32"
+                 }
                 }
                }
               },
@@ -1315,8 +1547,16 @@
                     "k": "binop",
                     "op": "*",
                     "a": {
-                     "k": "hole",
-                     "label": "op:and"
+                     "k": "binop",
+                     "op": "&",
+                     "a": {
+                      "k": "name",
+                      "v": "prod"
+                     },
+                     "b": {
+                      "k": "name",
+                      "v": "kUint32Mask"
+                     }
                     },
                     "b": {
                      "k": "int",
@@ -1336,8 +1576,16 @@
                        "k": "unop",
                        "op": "cast:u8",
                        "a": {
-                        "k": "hole",
-                        "label": "op:arithmeticShiftRight"
+                        "k": "binop",
+                        "op": ">>>",
+                        "a": {
+                         "k": "name",
+                         "v": "prod"
+                        },
+                        "b": {
+                         "k": "int",
+                         "v": "32"
+                        }
                        }
                       },
                       {
@@ -2243,7 +2491,7 @@
          "x": "d1",
          "e": {
           "k": "hole",
-          "label": "op:arithmeticShiftRight"
+          "label": "op:shiftRight:unknown-signedness"
          }
         },
         "b": {
@@ -2957,8 +3205,81 @@
    "b": {
     "k": "seq",
     "a": {
-     "k": "holeS",
-     "label": "control:FOR"
+     "k": "seq",
+     "a": {
+      "k": "holeS",
+      "label": "op:postIncrement:pointer"
+     },
+     "b": {
+      "k": "loop",
+      "c": {
+       "k": "binop",
+       "op": "!=",
+       "a": {
+        "k": "hole",
+        "label": "op:indirection:pointer"
+       },
+       "b": {
+        "k": "str",
+        "v": "\\0"
+       }
+      },
+      "body": {
+       "k": "seq",
+       "a": {
+        "k": "seq",
+        "a": {
+         "k": "holeS",
+         "label": "op:preIncrement:pointer"
+        },
+        "b": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "||",
+          "a": {
+           "k": "binop",
+           "op": "==",
+           "a": {
+            "k": "hole",
+            "label": "op:indirection:pointer"
+           },
+           "b": {
+            "k": "name",
+            "v": "end"
+           }
+          },
+          "b": {
+           "k": "binop",
+           "op": "!=",
+           "a": {
+            "k": "hole",
+            "label": "op:indirection:pointer"
+           },
+           "b": {
+            "k": "hole",
+            "label": "op:indirection:pointer"
+           }
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "bool",
+           "v": false
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        }
+       },
+       "b": {
+        "k": "holeS",
+        "label": "op:postIncrement:pointer"
+       }
+      }
+     }
     },
     "b": {
      "k": "seq",
@@ -3193,8 +3514,16 @@
                "k": "assign",
                "x": "radix",
                "e": {
-                "k": "hole",
-                "label": "op:shiftLeft"
+                "k": "binop",
+                "op": "<<",
+                "a": {
+                 "k": "int",
+                 "v": "1"
+                },
+                "b": {
+                 "k": "name",
+                 "v": "radix_log_2"
+                }
                }
               },
               "b": {
@@ -3341,8 +3670,16 @@
                            "v": "number"
                           },
                           "b": {
-                           "k": "hole",
-                           "label": "op:shiftLeft"
+                           "k": "binop",
+                           "op": "<<",
+                           "a": {
+                            "k": "hole",
+                            "label": "expr:BLOCK-impure"
+                           },
+                           "b": {
+                            "k": "int",
+                            "v": "53"
+                           }
                           }
                          }
                         ]
@@ -12615,10 +12952,19 @@
                           "body": {
                            "k": "seq",
                            "a": {
-                            "k": "exprS",
+                            "k": "assign",
+                            "x": "integer",
                             "e": {
-                             "k": "hole",
-                             "label": "op:assignmentDivision"
+                             "k": "binop",
+                             "op": "/",
+                             "a": {
+                              "k": "name",
+                              "v": "integer"
+                             },
+                             "b": {
+                              "k": "name",
+                              "v": "radix"
+                             }
                             }
                            },
                            "b": {
@@ -12710,8 +13056,16 @@
                                 "v": "integer_cursor"
                                },
                                {
-                                "k": "hole",
-                                "label": "op:shiftLeft"
+                                "k": "binop",
+                                "op": "<<",
+                                "a": {
+                                 "k": "int",
+                                 "v": "1"
+                                },
+                                "b": {
+                                 "k": "int",
+                                 "v": "31"
+                                }
                                }
                               ]
                              }
@@ -14110,8 +14464,74 @@
                         "b": {
                          "k": "seq",
                          "a": {
-                          "k": "holeS",
-                          "label": "control:FOR"
+                          "k": "seq",
+                          "a": {
+                           "k": "skip"
+                          },
+                          "b": {
+                           "k": "loop",
+                           "c": {
+                            "k": "binop",
+                            "op": "<",
+                            "a": {
+                             "k": "name",
+                             "v": "offset"
+                            },
+                            "b": {
+                             "k": "name",
+                             "v": "length"
+                            }
+                           },
+                           "body": {
+                            "k": "seq",
+                            "a": {
+                             "k": "exprS",
+                             "e": {
+                              "k": "call",
+                              "f": "<operators>.assignmentAnd",
+                              "args": [
+                               {
+                                "k": "name",
+                                "v": "matches"
+                               },
+                               {
+                                "k": "call",
+                                "f": "IsDecimalDigit",
+                                "args": [
+                                 {
+                                  "k": "index",
+                                  "a": {
+                                   "k": "name",
+                                   "v": "buffer"
+                                  },
+                                  "b": {
+                                   "k": "name",
+                                   "v": "offset"
+                                  }
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            },
+                            "b": {
+                             "k": "assign",
+                             "x": "offset",
+                             "e": {
+                              "k": "binop",
+                              "op": "+",
+                              "a": {
+                               "k": "name",
+                               "v": "offset"
+                              },
+                              "b": {
+                               "k": "int",
+                               "v": 1
+                              }
+                             }
+                            }
+                           }
+                          }
                          },
                          "b": {
                           "k": "ifte",
@@ -14375,8 +14795,92 @@
                                "b": {
                                 "k": "seq",
                                 "a": {
-                                 "k": "holeS",
-                                 "label": "control:FOR"
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "assign",
+                                  "x": "i",
+                                  "e": {
+                                   "k": "int",
+                                   "v": "0"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "loop",
+                                  "c": {
+                                   "k": "binop",
+                                   "op": "<",
+                                   "a": {
+                                    "k": "name",
+                                    "v": "i"
+                                   },
+                                   "b": {
+                                    "k": "name",
+                                    "v": "length"
+                                   }
+                                  },
+                                  "body": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "ifte",
+                                    "c": {
+                                     "k": "binop",
+                                     "op": "!=",
+                                     "a": {
+                                      "k": "unop",
+                                      "op": "cast:u16",
+                                      "a": {
+                                       "k": "index",
+                                       "a": {
+                                        "k": "name",
+                                        "v": "reverse_string"
+                                       },
+                                       "b": {
+                                        "k": "name",
+                                        "v": "i"
+                                       }
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "index",
+                                      "a": {
+                                       "k": "name",
+                                       "v": "buffer"
+                                      },
+                                      "b": {
+                                       "k": "name",
+                                       "v": "i"
+                                      }
+                                     }
+                                    },
+                                    "t": {
+                                     "k": "ret",
+                                     "e": {
+                                      "k": "bool",
+                                      "v": false
+                                     }
+                                    },
+                                    "e": {
+                                     "k": "skip"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "assign",
+                                    "x": "i",
+                                    "e": {
+                                     "k": "binop",
+                                     "op": "+",
+                                     "a": {
+                                      "k": "name",
+                                      "v": "i"
+                                     },
+                                     "b": {
+                                      "k": "int",
+                                      "v": 1
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
                                 },
                                 "b": {
                                  "k": "ret",
@@ -15041,8 +15545,66 @@
                  "b": {
                   "k": "seq",
                   "a": {
-                   "k": "holeS",
-                   "label": "control:FOR"
+                   "k": "seq",
+                   "a": {
+                    "k": "assign",
+                    "x": "i",
+                    "e": {
+                     "k": "int",
+                     "v": "0"
+                    }
+                   },
+                   "b": {
+                    "k": "loop",
+                    "c": {
+                     "k": "binop",
+                     "op": "<",
+                     "a": {
+                      "k": "name",
+                      "v": "i"
+                     },
+                     "b": {
+                      "k": "name",
+                      "v": "kCacheSize"
+                     }
+                    },
+                    "body": {
+                     "k": "seq",
+                     "a": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "call",
+                       "f": "set",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "i"
+                        },
+                        {
+                         "k": "int",
+                         "v": "0"
+                        }
+                       ]
+                      }
+                     },
+                     "b": {
+                      "k": "assign",
+                      "x": "i",
+                      "e": {
+                       "k": "binop",
+                       "op": "+",
+                       "a": {
+                        "k": "name",
+                        "v": "i"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": 1
+                       }
+                      }
+                     }
+                    }
+                   }
                   },
                   "b": {
                    "k": "exprS",
@@ -15137,7 +15699,7 @@
          "x": "state",
          "e": {
           "k": "hole",
-          "label": "op:arrayInitializer"
+          "label": "op:arrayDecl:size"
          }
         },
         "b": {
@@ -15159,7 +15721,7 @@
           },
           "b": {
            "k": "hole",
-           "label": "op:arithmeticShiftRight"
+           "label": "op:shiftRight:unknown-signedness"
           }
          }
         }
@@ -15420,7 +15982,7 @@
                               "args": [
                                {
                                 "k": "unop",
-                                "op": "!",
+                                "op": "~",
                                 "a": {
                                  "k": "name",
                                  "v": "seed"
@@ -15535,8 +16097,107 @@
                          "b": {
                           "k": "seq",
                           "a": {
-                           "k": "holeS",
-                           "label": "control:FOR"
+                           "k": "seq",
+                           "a": {
+                            "k": "assign",
+                            "x": "i",
+                            "e": {
+                             "k": "binop",
+                             "op": "-",
+                             "a": {
+                              "k": "name",
+                              "v": "kCacheSize"
+                             },
+                             "b": {
+                              "k": "int",
+                              "v": "1"
+                             }
+                            }
+                           },
+                           "b": {
+                            "k": "loop",
+                            "c": {
+                             "k": "binop",
+                             "op": ">=",
+                             "a": {
+                              "k": "name",
+                              "v": "i"
+                             },
+                             "b": {
+                              "k": "int",
+                              "v": "0"
+                             }
+                            },
+                            "body": {
+                             "k": "seq",
+                             "a": {
+                              "k": "seq",
+                              "a": {
+                               "k": "skip"
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "assign",
+                                "x": "random",
+                                "e": {
+                                 "k": "call",
+                                 "f": "XorShift128",
+                                 "args": [
+                                  {
+                                   "k": "hole",
+                                   "label": "op:addressOf:field:scalar"
+                                  },
+                                  {
+                                   "k": "hole",
+                                   "label": "op:addressOf:field:scalar"
+                                  }
+                                 ]
+                                }
+                               },
+                               "b": {
+                                "k": "exprS",
+                                "e": {
+                                 "k": "call",
+                                 "f": "set",
+                                 "args": [
+                                  {
+                                   "k": "name",
+                                   "v": "i"
+                                  },
+                                  {
+                                   "k": "call",
+                                   "f": "ToDouble",
+                                   "args": [
+                                    {
+                                     "k": "name",
+                                     "v": "random"
+                                    }
+                                   ]
+                                  }
+                                 ]
+                                }
+                               }
+                              }
+                             },
+                             "b": {
+                              "k": "assign",
+                              "x": "i",
+                              "e": {
+                               "k": "binop",
+                               "op": "-",
+                               "a": {
+                                "k": "name",
+                                "v": "i"
+                               },
+                               "b": {
+                                "k": "int",
+                                "v": 1
+                               }
+                              }
+                             }
+                            }
+                           }
                           },
                           "b": {
                            "k": "seq",

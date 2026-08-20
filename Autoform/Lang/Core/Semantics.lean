@@ -223,6 +223,32 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "*",  .int x, .int y => numToE (nc.mul x y)
   | "/",  .int x, .int y => numToE (nc.div x y)
   | "%",  .int x, .int y => numToE (nc.mod x y)
+  -- ### Bitwise operators
+  --
+  -- These are `&`, `|`, `^`, `<<`, `>>` and `>>>` — the **bitwise** operations, not the
+  -- logical ones. `<operator>.and` / `<operator>.or` in a CPG are these, and the exporter
+  -- used to map them onto `"&&"` / `"||"`, which returned a boolean where C returns a
+  -- number: `(flags & MASK) == MASK` became `true == MASK`. That silent wrong answer is
+  -- why they were unmapped for so long, and it is why they get their **own** operator
+  -- strings here rather than sharing the logical ones.
+  --
+  -- The arithmetic is `NumConfig`'s, so the width and overflow policy are the dialect's:
+  -- under `.cLike` every integer is 32-bit two's-complement, so `1 << 31` is `INT_MIN`
+  -- (the wrapping config the oracle measures) and `-1 & 255` is `255`.
+  --
+  -- `>>` and `>>>` are **two different operators** and the difference is only visible on
+  -- a negative left operand: C's `>>` on a signed value is arithmetic (sign-extending) and
+  -- on an unsigned value it is logical (zero-filling). Core cannot recover the operand's
+  -- signedness at run time — a `Val.int` carries no type — so the *exporter* decides,
+  -- from the CPG's static type, which of the two it emits, and holes when the type is
+  -- unknown. Collapsing them here would reintroduce exactly the `<operator>.and` mistake
+  -- in a place where it is much harder to see.
+  | "&",  .int x, .int y => numToE (nc.band x y)
+  | "|",  .int x, .int y => numToE (nc.bor x y)
+  | "^",  .int x, .int y => numToE (nc.bxor x y)
+  | "<<", .int x, .int y => numToE (nc.shl x y)
+  | ">>", .int x, .int y => numToE (nc.shr x y)
+  | ">>>", .int x, .int y => numToE ({ nc with negRightShift := .logical }.shr x y)
   | "<",  .int x, .int y => .val (.bool (x < y))
   | "<=", .int x, .int y => .val (.bool (x ≤ y))
   | ">",  .int x, .int y => .val (.bool (x > y))
@@ -349,6 +375,11 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- where "subtract from zero" would not be (`0.0 - 0.0 = 0.0`, but `-(0.0) = -0.0`).
   | "-", .float f => .val (.float f.neg)
   | "!", x      => .val (.bool (!x.truthy))
+  -- `~x` — **bitwise** complement, which is not `!x`. Joern spells the two
+  -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
+  -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
+  -- width, which is two's complement at every width and never overflows.
+  | "~", .int x => numToE ((d.toNumConfig).bnot x)
   -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
   -- meaning is completely determined: since C++20, conversion to any integer type is
   -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
@@ -745,6 +776,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | some (_, v) => (h₁, .val v)
                            | none        => (h₁, .val .unit)
         | none => (h₁, .val .unit)
+      -- A C aggregate initializer is a `Val.dict` keyed by field name (see
+      -- `Dialect.fieldsOnDicts`), so `alg.cra_priority` is a lookup in it. A *missing*
+      -- key is a hole rather than `unit`: in C every field of a struct exists, so a name
+      -- the initializer does not mention means the exporter and the semantics disagree
+      -- about the shape, and inventing `unit` would hide that.
+      | (h₁, .val (.dict kvs)) =>
+          if ctx.dialect.fieldsOnDicts then
+            match kvs.find? (fun kv => Val.beq kv.1 (.str f)) with
+            | some (_, v) => (h₁, .val v)
+            | none        => (h₁, .hole s!"field:{f}:absent-from-aggregate")
+          else (h₁, .hole s!"field:{f}:non-object")
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
@@ -1257,5 +1299,253 @@ model. This check exists so the behaviour is a recorded fact with a test attache
 that changing it is a deliberate act rather than an accident. -/
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.unit) -/
 #guard_msgs in #eval runFunc boxProg 200 "ns.unset" []
+
+
+/-! ## Bitwise operators, `for`, and `goto`, checked against `cc`
+
+Every number below was produced by compiling the same fragment with `cc -O0 -fwrapv` on
+x86-64 and running it. They are pinned with `#guard_msgs`, which fails the build if the
+semantics changes and — unlike `native_decide` — introduces no axiom.
+
+These exist because "the label disappeared from the ledger" is not evidence. An `xor`
+that returned `0`, an array initializer that evaluated to `unit`, or a `for` that ran zero
+times would each remove a hole and prove nothing; only a checked *value* does. Where a
+translation could plausibly have been done a wrong-but-plausible way, the wrong way is
+included as a negative control and shown to disagree.
+-/
+
+section CEvidence
+
+/-- The C constructs the exporter now translates, spelled in Core exactly as it spells
+them.
+
+`ns.forSum` is the interesting one. It is the translation of
+
+    int i, s = 0;
+    for (i = 0; i < 10; i++) { if (i % 3 == 0) continue; s += i; }
+    return s * 100 + i;
+
+under the rule that a `for`'s `continue` must run the **step**: each `continue` in the
+body is emitted as `step; continue`. `cc` prints `s=27 i=10`, so the answer is `2710`.
+
+`ns.forNaive` is the same loop under the *textbook* desugaring — `init; while (c) { body;
+step }` with the `continue` left alone. It is the negative control, and it does not
+terminate: the `continue` jumps back to the test without incrementing `i`. -/
+private def cBits : Program :=
+  { dialect := .cLike
+  , funcs :=
+    [ { name := "ns.xor",   params := [],
+        body := .ret (.binop "^" (.lit (.int 0x5A)) (.lit (.int 0x3C))) }
+    , { name := "ns.and",   params := [],
+        body := .ret (.binop "&" (.lit (.int (-1))) (.lit (.int 255))) }
+    , { name := "ns.or",    params := [],
+        body := .ret (.binop "|" (.lit (.int 0xF0)) (.lit (.int 0x0F))) }
+    , { name := "ns.bnot",  params := [],
+        body := .ret (.unop "~" (.lit (.int 0x5A))) }
+    , { name := "ns.shl",   params := [],
+        body := .ret (.binop "<<" (.lit (.int 1)) (.lit (.int 31))) }
+    , { name := "ns.sar",   params := [],
+        body := .ret (.binop ">>" (.lit (.int (-8))) (.lit (.int 1))) }
+    , { name := "ns.sarNeg", params := [],
+        body := .ret (.binop ">>" (.lit (.int (-1))) (.lit (.int 4))) }
+      -- `unsigned u = 0x80000000u; u >> 31` — the *logical* shift, which the exporter
+      -- emits as `>>>` because the left operand's static type is unsigned.
+    , { name := "ns.shrU",  params := [],
+        body := .ret (.binop ">>>" (.lit (.int 0x80000000)) (.lit (.int 31))) }
+      -- The same bits arrived at by wrapping arithmetic, which is how the value actually
+      -- shows up when it is computed rather than written down.
+    , { name := "ns.shrUw", params := [],
+        body := .ret (.binop ">>>" (.binop "<<" (.lit (.int 1)) (.lit (.int 31)))
+                                   (.lit (.int 31))) }
+    , { name := "ns.shrU4", params := [],
+        body := .ret (.binop ">>>" (.lit (.int 0xF0000000)) (.lit (.int 4))) }
+      -- The negative control for the `>>` / `>>>` split. It has to be written with the
+      -- value in its *wrapped* form: an integer literal is not normalised to the
+      -- dialect's width on the way in, so `0xF0000000` is the positive `4026531840` in
+      -- Core, and on a non-negative value the two shifts agree by definition. `1 << 31`
+      -- is `INT_MIN`, and there the two disagree, which is the point.
+      --   `int x = 1 << 31; x >> 4`       cc: -134217728
+      --   `unsigned u = 1u << 31; u >> 4` cc:  134217728
+    , { name := "ns.sarMin", params := [],
+        body := .ret (.binop ">>" (.binop "<<" (.lit (.int 1)) (.lit (.int 31)))
+                                  (.lit (.int 4))) }
+    , { name := "ns.shrMin", params := [],
+        body := .ret (.binop ">>>" (.binop "<<" (.lit (.int 1)) (.lit (.int 31)))
+                                   (.lit (.int 4))) }
+      -- `int a[] = {7,8,9}; return a[1] ^ a[2];`
+    , { name := "ns.tbl",   params := [],
+        body := .ret (.binop "^" (.index (.listE [.lit (.int 7), .lit (.int 8),
+                                                  .lit (.int 9)]) (.lit (.int 1)))
+                                 (.index (.listE [.lit (.int 7), .lit (.int 8),
+                                                  .lit (.int 9)]) (.lit (.int 2)))) }
+      -- `struct crypto_alg alg = { .cra_priority = 100, .cra_name = "842" };
+      --  return alg.cra_priority;`
+    , { name := "ns.desig", params := [],
+        body := .seq (.assign "alg" (.dictE [(.lit (.str "cra_priority"), .lit (.int 100)),
+                                             (.lit (.str "cra_name"), .lit (.str "842"))]))
+                     (.ret (.field (.name "alg") "cra_priority")) }
+      -- A field the initializer does not mention is a hole, not `unit`.
+    , { name := "ns.desigMissing", params := [],
+        body := .seq (.assign "alg" (.dictE [(.lit (.str "cra_priority"),
+                                              .lit (.int 100))]))
+                     (.ret (.field (.name "alg") "cra_flags")) }
+    , { name := "ns.forSum", params := []
+      , body :=
+          .seq (.assign "s" (.lit (.int 0)))
+          (.seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.binop "<" (.name "i") (.lit (.int 10)))
+                  (.seq
+                    -- the body, with `step; continue` in place of each `continue`
+                    (.seq (.ifte (.binop "=="
+                                    (.binop "%" (.name "i") (.lit (.int 3)))
+                                    (.lit (.int 0)))
+                            (.seq (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))
+                                  .cont)
+                            .skip)
+                          (.assign "s" (.binop "+" (.name "s") (.name "i"))))
+                    -- the step
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))
+                (.ret (.binop "+" (.binop "*" (.name "s") (.lit (.int 100)))
+                                  (.name "i"))))) }
+    , { name := "ns.forNaive", params := []
+      , body :=
+          .seq (.assign "s" (.lit (.int 0)))
+          (.seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.binop "<" (.name "i") (.lit (.int 10)))
+                  (.seq
+                    (.seq (.ifte (.binop "=="
+                                    (.binop "%" (.name "i") (.lit (.int 3)))
+                                    (.lit (.int 0)))
+                            .cont
+                            .skip)
+                          (.assign "s" (.binop "+" (.name "s") (.name "i"))))
+                    (.assign "i" (.binop "+" (.name "i") (.lit (.int 1))))))
+                (.ret (.binop "+" (.binop "*" (.name "s") (.lit (.int 100)))
+                                  (.name "i"))))) }
+      -- `for (j = 0; j < 10; j++) { if (j == 4) break; t += j; }` — `break` must *not*
+      -- run the step, so `j` is left at 4. `cc` prints `t=6 j=4`.
+    , { name := "ns.forBrk", params := []
+      , body :=
+          .seq (.assign "t" (.lit (.int 0)))
+          (.seq (.assign "j" (.lit (.int 0)))
+          (.seq (.loop (.binop "<" (.name "j") (.lit (.int 10)))
+                  (.seq
+                    (.seq (.ifte (.binop "==" (.name "j") (.lit (.int 4))) .brk .skip)
+                          (.assign "t" (.binop "+" (.name "t") (.name "j"))))
+                    (.assign "j" (.binop "+" (.name "j") (.lit (.int 1))))))
+                (.ret (.binop "+" (.binop "*" (.name "t") (.lit (.int 100)))
+                                  (.name "j"))))) }
+      -- The kernel error-handling shape:
+      --
+      --     err = 0; err = 7; if (err) goto out; err = 100; out: err = err + 1;
+      --     return err;
+      --
+      -- as `methodBody` encodes it: `while (true) { prefix; break } suffix`. The jump
+      -- must skip `err = 100` and still run `err = err + 1`, so the answer is 8. `100`
+      -- would mean the jump did not happen and `7` that the tail did not run.
+    , { name := "ns.gotoOut", params := []
+      , body :=
+          .seq (.loop (.lit (.bool true))
+                 (.seq (.seq (.assign "err" (.lit (.int 7)))
+                        (.seq (.ifte (.name "err") .brk .skip)
+                              (.assign "err" (.lit (.int 100)))))
+                       .brk))
+               (.seq (.assign "err" (.binop "+" (.name "err") (.lit (.int 1))))
+                     (.ret (.name "err"))) }
+      -- The same shape with the jump not taken: the wrapper must be transparent.
+    , { name := "ns.gotoFall", params := []
+      , body :=
+          .seq (.loop (.lit (.bool true))
+                 (.seq (.seq (.assign "err" (.lit (.int 0)))
+                        (.seq (.ifte (.name "err") .brk .skip)
+                              (.assign "err" (.lit (.int 100)))))
+                       .brk))
+               (.seq (.assign "err" (.binop "+" (.name "err") (.lit (.int 1))))
+                     (.ret (.name "err"))) }
+      -- And a `return` from inside the wrapper, which must leave the *function*, not the
+      -- synthetic loop: `cc` returns 5, never reaching the tail.
+    , { name := "ns.gotoRet", params := []
+      , body :=
+          .seq (.loop (.lit (.bool true))
+                 (.seq (.seq (.assign "err" (.lit (.int 5)))
+                             (.ret (.name "err")))
+                       .brk))
+               (.seq (.assign "err" (.lit (.int 99))) (.ret (.name "err"))) } ] }
+
+/-- The same designated-initializer program under `.python`, where `d.f` on a dict is an
+`AttributeError` and must stay a hole. `Dialect.fieldsOnDicts` is the switch. -/
+private def pyDesig : Program := { cBits with dialect := .python }
+
+-- `0x5A ^ 0x3C` — cc: 102
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 102) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.xor" []
+-- `-1 & 255` — cc: 255.  Not `-1`, and not a boolean.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 255) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.and" []
+-- `0xF0 | 0x0F` — cc: 255
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 255) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.or" []
+-- `~0x5A` — cc: -91.  Under the old `<operator>.not -> "!"` mapping this was `false`.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-91)) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.bnot" []
+-- `1 << 31` — cc -fwrapv: -2147483648
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-2147483648)) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.shl" []
+-- `-8 >> 1` — cc: -4 (arithmetic, sign-extending)
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-4)) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.sar" []
+-- `-1 >> 4` — cc: -1
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-1)) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.sarNeg" []
+-- `0x80000000u >> 31` — cc: 1 (logical, zero-filling)
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 1) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.shrU" []
+-- ... and the same bits reached by `1 << 31`, which Core stores as a negative number.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 1) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.shrUw" []
+-- `0xF0000000u >> 4` — cc: 251658240
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 251658240) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.shrU4" []
+-- The negative control: on `INT_MIN` the arithmetic shift keeps the sign bits and the
+-- logical one does not. `>>` and `>>>` are two operators, and this is the difference.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int (-134217728)) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.sarMin" []
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 134217728) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.shrMin" []
+-- `int a[] = {7,8,9}; a[1] ^ a[2]` — cc: 1
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 1) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.tbl" []
+-- A designated initializer read back by field name: 100, not `unit` and not a hole.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 100) -/
+#guard_msgs in #eval runFunc cBits 200 "ns.desig" []
+-- A field the aggregate does not carry: a hole naming it, never an invented `unit`.
+/-- info: Autoform.Core.EResult.hole "field:cra_flags:absent-from-aggregate" -/
+#guard_msgs in #eval runFunc cBits 200 "ns.desigMissing" []
+-- The dialect split. `{'cra_priority': 100}.cra_priority` is an `AttributeError` in
+-- Python, so under `.python` the same term is the hole it has always been.
+/-- info: Autoform.Core.EResult.hole "field:cra_priority:non-object" -/
+#guard_msgs in #eval runFunc pyDesig 200 "ns.desig" []
+-- The `for` with `continue`: `s = 27`, `i = 10` — cc: `forcont s=27 i=10`.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2710) -/
+#guard_msgs in #eval runFunc cBits 4000 "ns.forSum" []
+-- The negative control. The textbook desugaring skips the step on `continue` and spins
+-- forever; four thousand steps of fuel are not enough because no number of them is.
+/-- info: Autoform.Core.EResult.outOfFuel -/
+#guard_msgs in #eval runFunc cBits 4000 "ns.forNaive" []
+-- The `for` with `break`: `t = 6`, `j = 4` — cc: `forbrk t=6 j=4`. `break` leaves
+-- without running the step, which is why `j` is 4 and not 5.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 604) -/
+#guard_msgs in #eval runFunc cBits 4000 "ns.forBrk" []
+-- `goto out` taken: skips the middle, runs the tail. cc: 8.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 8) -/
+#guard_msgs in #eval runFunc cBits 400 "ns.gotoOut" []
+-- ... not taken: falls through the whole prefix, then the tail. cc: 101.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 101) -/
+#guard_msgs in #eval runFunc cBits 400 "ns.gotoFall" []
+-- ... and a `return` inside the wrapper leaves the function, not the synthetic loop.
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 5) -/
+#guard_msgs in #eval runFunc cBits 400 "ns.gotoRet" []
+
+end CEvidence
 
 end Autoform.Core
