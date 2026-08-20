@@ -1,0 +1,326 @@
+{
+ "module": "Ansible",
+ "generatedAt": "2026-08-20T09:06:26+00:00",
+ "note": "Summary of three evidence artifacts that are themselves gitignored (ledger-*.json, sacm-*.json) or too large to track (core-oracle-Ansible.json, 2.0 MB). Regenerate with the commands in docs/evidence-ansible.md; the sha256 of each artifact as produced by this run is recorded here so a regeneration can be compared against it.",
+ "artifacts": {
+  "ledger-Ansible.json": {
+   "sha256": "30c26fd9a8149ebce3446370bd9d3a6e5e79141b6f51cd0ab9ed36c57e64991c",
+   "tracked": false
+  },
+  "sacm-Ansible.json": {
+   "sha256": "f10447550b95bd90236ffd66ce8428c8872ce264b2b30ed76bee9fea3978715c",
+   "tracked": false
+  },
+  "core-oracle-Ansible.json": {
+   "sha256": "aa3dde1bdc4fe90933d85bfffefd91591e87bb35674b46621df4bfc4e467605c",
+   "tracked": false,
+   "bytes": 1280412
+  }
+ },
+ "ledger": {
+  "functions": 5546,
+  "nodes": 345010,
+  "holes": 8060,
+  "holeFree": 3304,
+  "verifiableCore": 2096,
+  "dynamicHoleRisk": 59507
+ },
+ "ledgerHolesByLabel": [
+  {
+   "label": "import:module-value",
+   "count": 1416
+  },
+  {
+   "label": "import:unresolved",
+   "count": 1309
+  },
+  {
+   "label": "import:operand",
+   "count": 1199
+  },
+  {
+   "label": "lit:unquoted",
+   "count": 974
+  },
+  {
+   "label": "op:formatString",
+   "count": 781
+  },
+  {
+   "label": "op:slice",
+   "count": 325
+  },
+  {
+   "label": "expr:BLOCK-impure",
+   "count": 293
+  },
+  {
+   "label": "expr:BLOCK-prelude",
+   "count": 243
+  },
+  {
+   "label": "op:stringExpressionList",
+   "count": 215
+  },
+  {
+   "label": "op:assignment",
+   "count": 195
+  },
+  {
+   "label": "expr:genExp",
+   "count": 194
+  },
+  {
+   "label": "op:logicalAnd",
+   "count": 169
+  },
+  {
+   "label": "control:TRY-multiCatch",
+   "count": 97
+  },
+  {
+   "label": "op:and",
+   "count": 81
+  },
+  {
+   "label": "op:delete-index",
+   "count": 75
+  }
+ ],
+ "ledgerWallClockSeconds": 33.7,
+ "coreOracle": {
+  "inputsPerFunction_synthetic": 4,
+  "fuel": 5000,
+  "claim": {
+   "functions": 5546,
+   "hole_free": 3304,
+   "verifiable_core_static": 2096
+  },
+  "executed": {
+   "cases": 8786,
+   "answered": 8786,
+   "core_functions_exercised": 2096,
+   "core_functions_with_real_inputs": 139
+  },
+  "result": {
+   "verifiable_core_executed": 511,
+   "verifiable_core_executed_real_inputs_only": 52,
+   "holed_on_some_input": 1585,
+   "holed_on_a_real_input": 87,
+   "inconclusive_never_exercised": 0
+  },
+  "overstatementFactor_staticVsRuntime": 4.1,
+  "hole_labels_top20": {
+   "call:isinstance": 563,
+   "setIndex:immutable-containers": 310,
+   "binop:%": 192,
+   "index:unsupported": 182,
+   "mcall:get_bin_path:non-object": 154,
+   "forIn:non-iterable": 148,
+   "call:dict:keyword-to-builtin": 126,
+   "mcall:deprecate:non-object": 115,
+   "field:path:non-object": 96,
+   "mcall:display:non-object": 94,
+   "field:subdir:non-object": 92,
+   "mcall:get:non-object": 86,
+   "field:params:non-object": 76,
+   "field:host:non-object": 76,
+   "binop:+": 73,
+   "in:non-container": 72,
+   "call:super": 62,
+   "field:name:non-object": 60,
+   "mcall:append:unboxed-container": 53,
+   "mcall:items:non-object": 48
+  },
+  "testSuiteInputs": {
+   "source": "ansible test/units traced with sys.settrace",
+   "records": 402,
+   "coreFunctionsWithRealInputs": 139,
+   "refutedOnRealInput": 87,
+   "survivedOnRealInputsOnly": 52
+  },
+  "mostRefutedFunctions": [
+   {
+    "name": "_internal/_encryption/_crypt.py:<module>.CryptFacade.__init__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "forIn:non-iterable"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_errors/_error_factory.py:<module>.ControllerEventFactory._follow_cause",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "call:isinstance"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_errors/_error_utils.py:<module>.format_exception_message",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "field:ControllerEventFactory:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_json/__init__.py:<module>.AnsibleVariableVisitor.visit",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:_visit:non-object",
+     "field:subdir:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_task.py:<module>.UnifiedTaskResult.__post_init__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "field:CapturedErrorSummary:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_templating/_lazy_containers.py:<module>.register_known_types",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:update:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "_internal/_yaml/_constructor.py:<module>._BaseConstructor.__init_subclass__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:_register_constructors:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_ambient_context.py:<module>.AmbientContextBase.__init_subclass__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "setField:_contextvar:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_ambient_context.py:<module>.AmbientContextBase.__enter__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "field:_contextvar:non-object",
+     "mcall:set:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_dataclass_validation.py:<module>.inject_post_init_validation.append_line",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "binop:*"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_datatag/__init__.py:<module>.AnsibleTagHelper.tag_copy",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:tags:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_datatag/__init__.py:<module>.AnsibleDatatagBase.is_tagged_on",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "field:_ansible_tags_mapping:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_datatag/__init__.py:<module>.AnsibleDatatagBase.untag",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:untag:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_datatag/__init__.py:<module>.AnsibleDatatagBase.tag",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "mcall:tag:non-object"
+    ],
+    "realInputHoles": 4
+   },
+   {
+    "name": "module_utils/_internal/_datatag/__init__.py:<module>.AnsibleDatatagBase.__repr__",
+    "holingInputs": 8,
+    "answered": 8,
+    "labels": [
+     "field:__name__:non-object",
+     "mcall:_repr:non-object"
+    ],
+    "realInputHoles": 4
+   }
+  ]
+ },
+ "assuranceCase": {
+  "topClaim": "UNDEVELOPED",
+  "goals": {
+   "G1": "UNDEVELOPED",
+   "G2": "UNDEVELOPED",
+   "G3": "UNSUPPORTED",
+   "G3.1": "SUPPORTED",
+   "D3.1": "DEFEATED",
+   "G3.2": "DEFEATED",
+   "D3": "UNSUPPORTED",
+   "G4": "UNDEVELOPED",
+   "G5": "UNDEVELOPED"
+  },
+  "summary": {
+   "module": "Ansible",
+   "artifactsPresent": [
+    "ast",
+    "coreOracle",
+    "ledger"
+   ],
+   "artifactsMissing": [
+    "audit",
+    "axioms",
+    "conformance",
+    "contracts",
+    "graph",
+    "mutation"
+   ],
+   "counts": {
+    "functions": 5546,
+    "holeFree": 3304,
+    "holeOccurrences": 8060,
+    "distinctHoleCauses": 38
+   },
+   "subClaimStatus": {
+    "G2": "UNDEVELOPED",
+    "G3": "UNSUPPORTED",
+    "G4": "UNDEVELOPED",
+    "G5": "UNDEVELOPED"
+   },
+   "topStatus": "UNDEVELOPED"
+  }
+ }
+}
