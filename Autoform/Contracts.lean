@@ -530,13 +530,40 @@ theorem onProgram_keysProgram {σ : Impl} {e : Expr}
     substS, substE, substEL, he, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey]
 
+/-- The function table of the instantiated program. -/
+theorem table_keysProgramWith (e : Expr) : (keysProgramWith e).table =
+    [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+    , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] := by
+  simp [Program.table, keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
+
+private theorem filt_hashkey (e : Expr) :
+    List.filter (fun p : String × Func => p.1.endsWith ("." ++ "hashkey"))
+      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ]
+      = [("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)] := by
+  simp +decide [String.endsWith]
+
+private theorem filt_hashedTupleInit (e : Expr) :
+    List.filter (fun p : String × Func =>
+        p.1.endsWith ("." ++ "_HashedTuple" ++ "." ++ "__init__"))
+      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] = [] := by
+  simp +decide [String.endsWith]
+
+private theorem filt_init (e : Expr) :
+    List.filter (fun p : String × Func => p.1.endsWith ("." ++ "__init__"))
+      [ ("cachetools/keys.py:<module>.hashkey", f_cachetools_keys_py__module__hashkey)
+      , ("cachetools/keys.py:<module>.methodkey", methodkeyWith e) ] = [] := by
+  simp +decide [String.endsWith]
+
 /-- Substitution does not disturb name resolution: the entry point still resolves, by
 exact match on the fully qualified CPG name. -/
 theorem resolve_methodkey (e : Expr) :
     (ctxOf (keysProgramWith e)).resolve "cachetools/keys.py:<module>.methodkey"
       = some (methodkeyWith e) := by
-  simp +decide [ctxOf, Ctx.resolve, Program.table, keysProgramWith, methodkeyWith,
-    f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey]
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
+  simp +decide
 
 /-- …and the call to `hashkey` still resolves, by `Ctx.resolve`'s unique-suffix rule.
 This is the one thing a two-function slice could get wrong; the `#eval`s at the end of the
@@ -544,17 +571,16 @@ section check the same resolution in the full 238-function program. -/
 theorem resolve_hashkey (e : Expr) :
     (ctxOf (keysProgramWith e)).resolve "hashkey"
       = some f_cachetools_keys_py__module__hashkey := by
-  simp +decide [ctxOf, Ctx.resolve, Program.table, keysProgramWith, methodkeyWith,
-    String.endsWith, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey]
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith, filt_hashkey]
+  simp +decide
 
 /-- `_HashedTuple` has no translated `__init__`, so `Expr.alloc` returns the fresh
 reference without running one. -/
 theorem resolveMethod_hashedTuple_init (e : Expr) :
     (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp +decide [ctxOf, Ctx.resolve, Ctx.resolveMethod, Program.table, keysProgramWith,
-    methodkeyWith, String.endsWith, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey]
+  simp only [Ctx.resolveMethod, Ctx.resolve, ctxOf, table_keysProgramWith,
+    filt_hashedTupleInit, filt_init]
+  simp +decide
 
 /-! ### Satisfiability first
 

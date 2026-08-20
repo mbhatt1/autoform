@@ -1211,7 +1211,7 @@ def f_cachetools___init___py__module__TTLCache__Link___init__ : Func :=
   { name := "cachetools/__init__.py:<module>.TTLCache._Link.__init__"
   , params := ["key", "expires"]
   , body := (.seq
-            (.setField (.name "self") "key" (.name "expires"))
+            (.setField (.name "self") "expires" (.name "key"))
             (.setField (.name "self") "expires" (.name "expires"))) }
 
 /-- `cachetools/__init__.py:<module>.TTLCache._Link.__reduce__`  (from `cachetools/__init__.py`) -/

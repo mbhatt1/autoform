@@ -109,6 +109,16 @@ integers are 32-bit and always convertible), and `FConfig.ofInt` reproduces that
 genuinely differ here and `flCmp` splits on the dialect. Promoting under `.python` would
 be a silent wrong answer of the `floorDiv` family.
 
+**`/` on two integers is still floor division, and that is now a known wrong answer for
+Python.** CPython's `/` is *true* division (`7 / 2 == 3.5`) and `//` floors. The
+transpiler currently maps Python's `//` onto the `"/"` operator string (see the note above
+`applyBinop_py_div` and `Refine.lean`'s discussion of `op:floorDiv`), so `"/"` on two
+`.int`s is left exactly as it was — changing it would silently break every `//` in the
+corpora. `"//"` is now a distinct operator with the floor semantics, so the fix is in
+`cartographer/render_lean.py`: emit `"//"` for floor division and `"/"` for true division,
+after which `"/"` on two `.int`s under `.python` must become `flBinop`. Until then this is
+a recorded silent mistranslation, not an accident.
+
 **NaN is unordered.** `flCmp` returns `none`, and `ordToE` turns that into `false` for
 `<`, `<=`, `>`, `>=` and `==`, and `true` for `!=`. That is CPython's behaviour and it is
 not expressible by an `Ordering` alone. -/
@@ -247,8 +257,10 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "//", .int x, .int y => numToE (nc.div x y)
   | "==", x, y           => .val (.bool (Val.beq x y))
   | "!=", x, y           => .val (.bool (!Val.beq x y))
-  | "&&", x, y           => .val (.bool (x.truthy && y.truthy))
-  | "||", x, y           => .val (.bool (x.truthy || y.truthy))
+  -- Reached only when the left operand did not decide the result, so the value
+  -- of the expression is the RIGHT operand under value semantics.
+  | "&&", _, y           => .val (match d with | .python => y | .cLike => .bool y.truthy)
+  | "||", _, y           => .val (match d with | .python => y | .cLike => .bool y.truthy)
   | _, _, _              => .hole s!"binop:{op}"
 
 /-!
@@ -446,8 +458,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- conservative approximation: `scripts/differential.py` caught
         -- `safemod(-11, 0)` returning 0 in CPython while Core raised ZeroDivisionError,
         -- because `b != 0 and a % b == 0` evaluated the division anyway.
-        if op == "&&" && !x.truthy then (h₁, .val (.bool false))
-        else if op == "||" && x.truthy then (h₁, .val (.bool true))
+        -- `and`/`or` are VALUE operators in Python and JavaScript: `a and b` is `a`
+        -- when `a` is falsy and `b` otherwise, so `pick(0, 5)` is `5`, not `True`.
+        -- Returning a bool was wrong for every Python program that uses them in
+        -- value position; it survived because cachetools only uses them in
+        -- conditions, where truthiness makes the two indistinguishable.
+        -- C is the opposite: `&&`/`||` genuinely yield 0/1.
+        if op == "&&" && !x.truthy then
+          (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool false))
+        else if op == "||" && x.truthy then
+          (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
           | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)

@@ -116,21 +116,24 @@ Each of these returns `FResult.unmodelled`, i.e. a *visible* hole, never a value
 
 Total functions only: no `partial`, no `sorry`, no `unsafe`, no `native_decide`.
 
-## Wiring (for `Syntax.lean` / `Semantics.lean`, not done here)
+## Wiring (done — see `Syntax.lean` and `Semantics.lean`)
 
-1. `Val.float : Fl → Val`, and `Lit.float : Fl → Lit`.
-2. `applyBinop` on `.float`/`.float` (and the int/float mixed cases, via
-   `FConfig.ofInt`, which is Python's implicit coercion) dispatches to `FConfig.add`
-   etc., then `fresToE` below maps `ok ↦ .val`, `exn ↦ .exn`, `ub`/`unmodelled ↦ .hole`.
-3. `Val.beq` on floats **must not** be structural bit equality: `nan != nan` and
-   `+0.0 == -0.0`. Use `FConfig.eq`. Bit equality is still the right thing for `is`
-   *only* because CPython does not intern floats — `0.1 is 0.1` is `False` for separately
-   evaluated literals, so `is` on unboxed floats should stay a hole.
-   `float_beq_is_not_bit_equality` below states the discrepancy as an executable fact.
-4. `differential.py`: drop `float` from the `Unencodable` tuple and emit
-   `Val.float (Fl.ofBits <int>)` using `struct.unpack('<Q', struct.pack('<d', v))[0]`,
-   and compare parsed results by bit pattern. That is exact in both directions and needs
-   no decimal formatting anywhere in the harness.
+This module is imported *by* `Syntax.lean`, not the other way round, because `Val` and
+`Lit` now mention `Fl`. It therefore depends on nothing in Core.
+
+* `Val.float : Fl → Val`, `Lit.float : Fl → Lit`, `Dialect.toFConfig` (in `Syntax.lean`).
+* `Val.beq` routes floats through `Fl.eqv` and mixed `int`/`float` through `Fl.cmpIntv`
+  — never through the derived `DecidableEq Fl`. `Semantics.beq_float_nan_self` and
+  `beq_float_negzero` pin both directions, so a structural implementation fails the build.
+* `Val.truthy` uses `Fl.truthy` (`-0.0` is false, `nan` is true).
+* `applyBinop` dispatches `flBinop` whenever either operand is a float; `applyUnop "-"`
+  is `Fl.neg`. `evalExpr` evaluates `Lit.float`.
+
+Still owned elsewhere: `cartographer/export_ast.sc` emits `lit:float` as a hole and must
+emit the bit pattern instead; `scripts/differential.py` lists `float` in its `Unencodable`
+tuple and must emit `Val.float (Fl.ofBits <int>)` from
+`struct.unpack('<Q', struct.pack('<d', v))[0]`, comparing NaN as a class rather than as
+bits.
 -/
 
 namespace Autoform.Core

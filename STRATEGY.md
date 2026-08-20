@@ -1410,3 +1410,60 @@ Mathlib. And representation covers field-mutating objects only; container classe
 boxed containers first.
 
 All headline theorems: `[propext, Classical.choice, Quot.sound]`. No `sorryAx`.
+
+## 29. "Universal" is aspirational: the front end generalizes, the back end does not
+
+Five new languages were run through the unmodified pipeline. The architectural bet is
+half-vindicated and half-refuted, and the split is clean.
+
+| language | corpus | parses | compiles | hole-free | verifiable core | oracle |
+|---|---|:--:|:--:|--:|--:|---|
+| Python | cachetools | ✅ | ✅ | 76% | 19% | **CPython** |
+| Java | gson | ✅ | ✅ | **52%** | 28% | **none** |
+| TypeScript | p-queue | ✅ | ✅ | 51% | 21% | none |
+| JavaScript | p-map | ✅ | ✅ | 35% | 7% | none |
+| C | antirez/sds | ✅ | ✅ | 29% | 13% | crashed |
+| Go | envconfig | ✅ | ✅ | 25% | 7% | none |
+
+**The front end is real.** Five languages parsed, exported and type-checked with *zero*
+exporter or semantics changes, and Java gave the best hole-free rate measured anywhere.
+That is the CPG-as-universal-AST bet paying off.
+
+**The back end is not.** There are two dialects for six languages, `.cLike` means
+"32-bit truncating C", and `differential.py` picks its runtime with one line —
+`runtime = "cc" if is_c else "cpython"` — so Java, Go, JS, TS and Kotlin are all handed
+to CPython, produce zero cases, and print "no comparable cases". **The oracle that found
+every dialect bug in this project's history does not exist for four of six languages**,
+which is why the findings below had to be found by hand.
+
+### Six silent mistranslations, one of which was in the flagship corpus
+
+1. **`and`/`or` return an operand, not a bool — including Python.** `pick(0,5)` is `0` in
+   CPython and was `True` in Core; `both(2,3)` is `3` and was `True`. It survived because
+   cachetools only uses them in *conditions*, where truthiness makes the two
+   indistinguishable — lodash uses 551 of them in *value* position. **Fixed**, and
+   dialect-split: C's `&&`/`||` genuinely do yield 0/1.
+2. **Unknown extensions silently got the Python dialect.** `infer_dialect` returned
+   `.python` when nothing voted, so a `.tsx` file was translated with floored division:
+   `-7 % 3` gave `2` where TypeScript gives `-1`. The §12 modulo bug re-entering through
+   the extension table. **Fixed** — it now refuses.
+3. **JS numbers are doubles; Core gave 32-bit ints.** `2147483647+1` → `-2147483648`
+   (JS: 2147483648); `7/2` → `3` (JS: 3.5); `5/0` → `ZeroDivisionError` (JS: Infinity).
+4. **JS `==` and `===` are the same Core operator** — `jssrc2cpg` emits
+   `<operator>.equals` for both, so the distinction is erased *before* Core sees it.
+   Not fixable in the semantics.
+5. **Java `long` and Go `int` are 64-bit; Core models 32.** `100000L*100000L` → 1410065408.
+   `Numeric.lean` already defines `java32`/`java64`/`go64` — but `Dialect` has only
+   `python | cLike`, so they are unreachable dead code.
+6. **`.cLike` string rules are C's, applied to Java/JS/TS.** `"a"+"b"` becomes a pointer
+   hole instead of `"ab"` — safe, but the exact inverse of the case §22 fixed.
+
+### The lesson
+
+§22 split strings by dialect and called item 6 closed. It was closed *for C versus
+Python* — and then applied C's rules to three languages that are neither. **A two-valued
+parameter cannot express a six-way distinction**, and every time this project has added a
+dialect axis it has under-provisioned it: one for integer division, then unary minus, then
+strings, now widths and boolean-operator semantics. The right shape is a dialect per
+*language*, wired to the `NumConfig`s that already exist, with `infer_dialect` refusing
+rather than guessing — not another boolean.

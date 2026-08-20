@@ -289,17 +289,22 @@ theorem evalExpr_binop_val {a b : Expr} {h₁ h₂ : Heap} {x y : Val} (op : Str
     evalExpr ctx (k+1) h ρ (.binop op a b) = (h₂, applyBinop ctx.dialect op x y) := by
   simp [evalExpr, ha, hb, hand, hor]
 
-/-- `&&` does not evaluate its right operand once the left is falsy. -/
+/-- `&&` does not evaluate its right operand once the left is falsy, and yields the
+**left operand itself** under Python value semantics (`0 and 5` is `0`, not `False`).
+Only C-like dialects collapse it to a boolean. -/
 theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = false) :
-    evalExpr ctx (k+1) h ρ (.binop "&&" a b) = (h₁, .val (.bool false)) := by
-  simp [evalExpr, ha, hx]
+    evalExpr ctx (k+1) h ρ (.binop "&&" a b)
+      = (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool false)) := by
+  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd]
 
-/-- `||` does not evaluate its right operand once the left is truthy. -/
+/-- `||` does not evaluate its right operand once the left is truthy, and yields the
+**left operand itself** under Python value semantics (`5 or 0` is `5`, not `True`). -/
 theorem evalExpr_or_short {a b : Expr} {h₁ : Heap} {x : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = true) :
-    evalExpr ctx (k+1) h ρ (.binop "||" a b) = (h₁, .val (.bool true)) := by
-  simp [evalExpr, ha, hx]
+    evalExpr ctx (k+1) h ρ (.binop "||" a b)
+      = (h₁, .val (match ctx.dialect with | .python => x | .cLike => .bool true)) := by
+  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd]
 
 /-- A non-value in the left operand short-circuits and is propagated unchanged. This is
 what stops a hole in one operand from being silently absorbed. -/

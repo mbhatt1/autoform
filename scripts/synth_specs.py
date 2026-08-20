@@ -479,13 +479,14 @@ def gen_candidates(core, byname, recs, rng):
                               extra={"shape": "const", "lit": lit}))
         if core_body.get("k") == "ret" and core_body["e"].get("k") == "field" \
                 and core_body["e"]["a"].get("k") == "name" \
-                and core_body["e"]["a"].get("v") == "self":
+                and core_body["e"]["a"].get("v") == "self" and not f["params"]:
             cands.append(Cand("uproj_" + sid, "u_projection", "algebraic (§4.3)", name,
                               fdef, "", [], kind="universal",
                               note="accessor: returns receiver field %s on every heap"
                                    % core_body["e"]["f"],
                               extra={"shape": "projection",
-                                     "field": core_body["e"]["f"]}))
+                                     "field": core_body["e"]["f"],
+                                     "documented": doc is not None}))
     # Lean names must be unique; a collision would silently drop a candidate.
     seen = {}
     for c in cands:
@@ -509,6 +510,11 @@ import Autoform.Generated.%s
 namespace Autoform.SpecsGen.%s
 
 open Autoform.Core Autoform.Refine Autoform.SpecsGen
+
+-- The proofs below are by computation on concrete inputs: the kernel walks the
+-- interpreter, and deeply nested calls need more than the default budgets.
+set_option maxRecDepth 20000
+set_option maxHeartbeats 1000000
 
 abbrev P : Program := Autoform.Generated.program
 
@@ -649,6 +655,20 @@ PROOF_PROJ = """theorem %(id)s :
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl r args
 """
 
+PROOF_PROJ_DOC = """theorem %(id)s :
+    MRefines P %(name)s 5
+      (fun _ self _ => ∃ r, self = .ref r)
+      (fun h self _ => (h, match self with
+                           | .ref r => .ret (fieldOf h r %(field)s)
+                           | _      => .ret .unit)) := by
+  rintro h _ args ⟨r, rfl⟩
+  refine forall_ge_of_forall_add (N := 5) ?_
+  intro k
+  rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
+  simpa [Nat.add_comm, Nat.add_left_comm] using
+    applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl r args
+"""
+
 DOC = '''
 /-!
 # Synthesized specifications — `%(module)s`
@@ -712,8 +732,12 @@ def emit(cands, module, obligations_extra):
             d = {"id": c.id, "name": json.dumps(c.subject), "fdef": c.fdef,
                  "lit": c.extra.get("lit", ""),
                  "field": json.dumps(c.extra.get("field", ""))}
-            out.append(PROOF_CONST % d if c.extra["shape"] == "const"
-                       else PROOF_PROJ % d)
+            if c.extra["shape"] == "const":
+                out.append(PROOF_CONST % d)
+            elif c.extra.get("documented"):
+                out.append(PROOF_PROJ_DOC % d)
+            else:
+                out.append(PROOF_PROJ % d)
             thms.append((c.id, c.fdef))
     for name, source, subject, reason in obligations_extra:
         obs.append((name, source, subject, reason))
@@ -788,6 +812,10 @@ def main():
     ap.add_argument("--tests", default=None)
     ap.add_argument("--cases", type=int, default=10,
                     help="traced calls to keep per function")
+    ap.add_argument("--refute-cache", default=None,
+                    help="cache the refutation verdicts here, keyed by candidate id. "
+                         "Refuting 500 candidates means elaborating half a megabyte of "
+                         "Lean; when only the emission changed, replay instead")
     ap.add_argument("--obs-cache", default=None,
                     help="cache the traced calls here; the repository's suite takes "
                          "minutes to run under `sys.settrace` and the recording is "
@@ -804,8 +832,16 @@ def main():
                         "Autoform.SpecsGen.Basis"],
                        capture_output=True, text=True, env=ENV, cwd=REPO)
     if b.returncode != 0:
-        print("WARNING: `lake build Autoform.Generated.%s` failed; a stale .olean makes "
-              "every number below untrustworthy:\n%s" % (args.module, b.stderr[:300]))
+        # README: "a stale `.olean` made the oracle lie ... an oracle reading a stale
+        # cache is worse than no oracle". The same applies here, and worse: a red
+        # baseline makes *every* generated proof fail, and the repair loop would then
+        # demote every real theorem to an open obligation and overwrite a good module
+        # with a wrong one. Refuse instead, and leave the previous output alone.
+        print("REFUSING TO RUN: the baseline does not build, so no proof attempt below "
+              "would mean anything, and the previous output would be overwritten with "
+              "an artefact of the broken build:\n%s"
+              % (b.stderr or b.stdout)[-600:])
+        return 2
     global GLOBALS
     GLOBALS = globals_literal(args.module)
     core = core_names(args.module)
@@ -843,7 +879,24 @@ def main():
     print("   %d candidates" % len(cands))
 
     print("== 4. refutation (fuzz every candidate before emitting anything)")
-    refute(cands, args.module)
+    cache = {}
+    if args.refute_cache and os.path.exists(args.refute_cache):
+        cache = json.load(open(args.refute_cache))
+    hit = [c for c in cands if c.id in cache]
+    for c in hit:
+        v = cache[c.id]
+        c.status, c.reason, c.checked = v["status"], v["reason"], v["checked"]
+    miss = [c for c in cands if c.id not in cache]
+    if hit:
+        print("   (%d verdicts replayed from %s, %d to check)"
+              % (len(hit), args.refute_cache, len(miss)))
+    refute(miss, args.module)
+    if args.refute_cache:
+        for c in cands:
+            if c.kind == "law" and c.checked is not None:
+                cache[c.id] = {"status": c.status, "reason": c.reason,
+                               "checked": c.checked}
+        json.dump(cache, open(args.refute_cache, "w"))
     refuted = [c for c in cands if c.status == "refuted"]
     nochk = [c for c in cands if c.status == "not_checked"]
     print("   %d refuted, %d not checkable, %d survive"

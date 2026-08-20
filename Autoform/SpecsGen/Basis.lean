@@ -296,6 +296,27 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;> simp [hgr, hf, hc]
     · simp [hgr, hf]
 
+/-- The same theorem for the shape a *documented* accessor actually has.
+
+Python puts the docstring in the function body, and the transpiler keeps it: the body of
+`Cache.maxsize` is `seq (expr (lit (str "…"))) (ret (field (name "self") …))`. Discarding
+the docstring statement to make the shapes match would be a lie about what is executed,
+so the extra statement is stepped through instead — it costs one more unit of fuel and
+nothing else. -/
+theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
+    (fld doc : String)
+    (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
+    (hp : fn.params = []) (r : Ref) (args : List Val) :
+    applyFunc ctx (n + 5) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
+  unfold applyFunc
+  rw [hb, hp]
+  simp only [execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  rcases hgr : h.get r with _ | o
+  · simp [hgr]
+  · rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;> simp [hgr, hf, hc]
+    · simp [hgr, hf]
+
 /-! ## 4. Open obligations
 
 What the generator could state but not prove. Recorded as *data* plus a `Prop`-valued

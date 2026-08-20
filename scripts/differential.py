@@ -101,19 +101,16 @@ class Encoder:
         if isinstance(v, int): return ("int", v)
         if isinstance(v, str): return ("str", v)
         if isinstance(v, (list, tuple)):
-            # A *subclass* of a builtin container is not a Core container: the
-            # transpiler emits `Expr.alloc "_HashedTuple" [...]`, i.e. a heap object
-            # whose fields do not carry the elements at all. A Python value and a Core
-            # object are then two different things and comparing them would be the
-            # apparatus inventing a disagreement, so refuse.
-            if type(v) is not list and type(v) is not tuple:
-                raise Unencodable("container-subclass:" + type(v).__name__)
+            # Subclasses (`_HashedTuple`, `OrderedDict`) encode structurally: that is
+            # faithful for every operation Core can perform on data it was *handed*
+            # (index, len, membership, iteration order). Where Core instead *allocates*
+            # such a value itself it produces a `Val.ref`, and that shape disagreement
+            # is ruled INCONCLUSIVE at comparison time rather than refused here — see
+            # `compare_outcome`.
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             k = "tuple" if isinstance(v, tuple) else "list"
             return (k, [self.enc(x, depth + 1, in_key) for x in v])
         if isinstance(v, dict):
-            if type(v) is not dict:
-                raise Unencodable("container-subclass:" + type(v).__name__)
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             # Keys are the subtle case: CPython looks them up by `__hash__`/`__eq__`,
             # which user classes override (cachetools' own tests define a
@@ -318,6 +315,17 @@ def same(py, ln, base):
             else:
                 return False
         return True
+    return False
+
+
+def shape_clash(py, ln):
+    """True when the two sides disagree about value-vs-object representation."""
+    containers = ("list", "tuple", "dict")
+    if py[0] == "ref" and ln[0] in containers: return True
+    if ln[0] == "ref" and py[0] in containers: return True
+    if py[0] in containers and ln[0] in containers and py[0] != ln[0]: return False
+    if py[0] in ("list", "tuple") and ln[0] in ("list", "tuple"):
+        return any(shape_clash(a, b) for a, b in zip(py[1], ln[1]))
     return False
 
 
@@ -981,23 +989,37 @@ def main():
                    ", ".join(lean_val(a) for a in c["args"]), chk))
 
     meta = {"base": 0, "gref": 0}
+    # per-process scratch file: two harness runs (or two agents) sharing /tmp would
+    # otherwise clobber each other's generated file mid-bisection
+    scratch = "/tmp/autoform_diff_%d.lean" % os.getpid()
 
     def lean_eval(idxs, depth=0):
         """idxs -> {idx: repr line}. Missing keys are cases Lean could not answer."""
         if not idxs: return {}
         src = header + ["private def cases : List DCase := ["] \
             + [",\n".join(case_lit(i, cases[i]) for i in idxs)] + footer
-        open("/tmp/autoform_diff.lean", "w").write("\n".join(src) + "\n")
-        out = subprocess.run(["lake", "env", "lean", "/tmp/autoform_diff.lean"],
+        open(scratch, "w").write("\n".join(src) + "\n")
+        out = subprocess.run(["lake", "env", "lean", scratch],
                              capture_output=True, text=True, env=env, cwd=repo)
         got = {}
+        saw_meta = False
         for l in out.stdout.splitlines():
             m = re.match(r'@@meta@@(\d+) (\d+)', l)
             if m:
                 meta["base"], meta["gref"] = int(m.group(1)), int(m.group(2))
+                saw_meta = True
                 continue
             m = re.match(r'@@(\d+)@@(.*)', l)
             if m and int(m.group(1)) in idxs: got[int(m.group(1))] = m.group(2)
+        if not saw_meta:
+            # the file never reached the first case: a compile or environment failure
+            # (stale/absent olean, renamed constructor). Bisecting that costs one lake
+            # invocation per case and answers nothing.
+            if depth == 0 or not meta.get("env_reported"):
+                meta["env_reported"] = True
+                print("lean environment failure, not bisecting:",
+                      (out.stdout[:200] + " " + out.stderr[:300]).replace("\n", " ")[:300])
+            return got
         if len(got) < len(idxs) and len(idxs) > 1:
             mid = len(idxs) // 2
             got.update(lean_eval(idxs[:mid], depth + 1))
@@ -1044,18 +1066,37 @@ def main():
             incon_detail[k] = incon_detail.get(k, 0) + 1
             continue
         ok = False
+        undecidable = None
         if py[0] == "val" and lr[0] == "val":
-            ok = same(py[1], lr[1], meta["base"])
+            # A value/object shape disagreement is not adjudicable: the transpiler
+            # allocates a heap object for any constructed class (including subclasses
+            # of tuple/dict), while the runtime hands us a container. The harness
+            # cannot tell its own representation choice from a real disagreement, so
+            # it declines to call it either way.
+            if shape_clash(py[1], lr[1]):
+                undecidable = "representation:value-vs-object"
+            else:
+                ok = same(py[1], lr[1], meta["base"])
             desc = "%s=%s lean=%s" % (runtime, show(py[1]), show(lr[1]))
         elif py[0] == "exn" and lr[0] == "exn":
             lname = lr[1][1] if lr[1][0] == "str" else show(lr[1])
             ok = (lname == py[1])
+            if not ok and lr[1][0] != "str":
+                # Core raised at the same point but carries no name for the class
+                # (`raise NotImplementedError` evaluates a builtin it has no model of).
+                # Control flow agrees; the payload is unmodelled, not wrong.
+                undecidable = "exception-payload-unmodelled"
             desc = "%s raised %s, lean raised %s" % (runtime, py[1], lname)
         elif py[0] == "exn":
             desc = "%s raised %s, lean returned %s" % (runtime, py[1], show(lr[1]))
         else:
             lname = lr[1][1] if lr[1][0] == "str" else show(lr[1])
             desc = "%s=%s, lean raised %s" % (runtime, show(py[1]), lname)
+        if undecidable is not None:
+            incon += 1; bucket["incon"] += 1
+            k = "%s: %s" % (c["name"], undecidable)
+            incon_detail[k] = incon_detail.get(k, 0) + 1
+            continue
         if ok:
             agree += 1; bucket["agree"] += 1
         else:

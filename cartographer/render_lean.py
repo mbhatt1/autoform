@@ -256,10 +256,26 @@ DIALECT = {".py": ".python", ".c": ".cLike", ".h": ".cLike", ".cpp": ".cLike",
            ".go": ".cLike"}
 
 def infer_dialect(funcs) -> str:
+    """Pick the arithmetic/string dialect from file extensions.
+
+    Refuses rather than defaulting. Defaulting to `.python` when no extension
+    voted meant a `.tsx` file was translated with Python's floored division and
+    modulo: measured, `-7 % 3` gave 2 where TypeScript gives -1, and `-7/2` gave
+    -4 where TypeScript gives -3.5. That is the original modulo bug re-entering
+    through the extension table, which is exactly the class of silent
+    mistranslation the dialect parameter exists to prevent — so an unrecognized
+    extension is an error, not an assumption.
+    """
     exts = [os.path.splitext(f.get("file", ""))[1] for f in funcs]
     votes = [DIALECT[e] for e in exts if e in DIALECT]
     if not votes:
-        return ".python"
+        seen = sorted({e for e in exts if e})
+        raise SystemExit(
+            "render_lean: cannot infer dialect — no known extension among %s.\n"
+            "  Known: %s\n"
+            "  Add the extension to DIALECT (with its real integer-division and\n"
+            "  string semantics) rather than letting it default." % (seen or "[]",
+                                                                    sorted(DIALECT)))
     return max(set(votes), key=votes.count)
 
 def render_func(f, nm) -> list:
