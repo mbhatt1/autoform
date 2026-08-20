@@ -240,14 +240,45 @@ def getAttr (h : Heap) (r : Ref) (f : String) : Option Val :=
   | none   => none
   | some o => (o.fields.find? (·.1 == f)).map (·.2)
 
-/-- The Python builtins, for `Expr.call`.
+/-! ### The name predicate, and why it is a *guard* rather than a list
 
-`none` means "not modelled" — the caller must fall through to its `call:<name>` hole.
-Returns the heap so the caller can thread it uniformly; every entry here leaves it
-unchanged (only `getattr` even reads it).
+The ledger needs to know which callee names this file answers, so that `Ctx.resolvable`
+counts a modelled builtin as resolved. The obvious implementation is a hand-written list
+of names beside the implementation — and a hand-written list beside an implementation is
+exactly how a coverage metric starts lying, which is §17's whole subject.
 
-Under `.cLike` this is `none` for every name (see `builtin_cLike_none`). -/
-def builtin (d : Dialect) (h : Heap) (name : String) (args : List Val) :
+So the list is not *beside* the implementation, it is *in front of* it: `builtin` is
+`builtinCore` guarded by `knowsFree`, and every name `knowsFree` rejects is `none` **by
+construction**, not by a theorem that could rot. Adding a case to `builtinCore` without
+adding its name to `freeNames` makes that case dead code rather than making the ledger
+overstate. `builtin_none_of_not_knowsFree` below is then true by `rfl`.
+
+The other direction — every name in `freeNames` really is answered — *can* rot, so it is
+proved by evaluation against a witness argument list (`knowsFree_complete`). -/
+
+/-- Every free name this file answers under `.python`: the exception constructors plus
+the modelled builtins. -/
+def freeNames : List String :=
+  excNames ++
+  [ "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "int"
+  , "ord", "chr", "callable", "isinstance", "getattr", "hasattr"
+  , "list", "tuple", "dict" ]
+
+/-- Does `builtin` model this free-function name under this dialect?
+
+**Exact**, not an upper bound: `knowsFree d n = true` iff `builtin d _ n _` answers for
+*some* arguments (`knowsFree_complete` / `builtin_none_of_not_knowsFree`). It is still
+only an upper bound on whether a *particular* call is answered, since `str` is modelled
+on `.int` but not on `.str` — that residue is `dynamic-hole risk`, exactly like the
+`field`/`index` cases the ledger already counts there. -/
+def knowsFree (d : Dialect) (name : String) : Bool :=
+  match d with
+  | .cLike  => false
+  | .python => freeNames.contains name
+
+/-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
+guard that keeps the ledger honest. -/
+def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     Option (Heap × EResult) :=
   match d with
   | .cLike => none
@@ -351,6 +382,18 @@ where
     | some (i :: is) =>
         some (h, .val (.int (is.foldl (fun a b => if isMin then min a b else max a b) i)))
 
+/-- The Python builtins, for `Expr.call`.
+
+`none` means "not modelled" — the caller must fall through to its `call:<name>` hole.
+Returns the heap so the caller can thread it uniformly; every entry here leaves it
+unchanged (only `getattr` even reads it), which `builtin_heap_unchanged` proves.
+
+Under `.cLike` this is `none` for every name (`builtin_cLike_none`), and for any name
+`knowsFree` rejects it is `none` by construction. -/
+def builtin (d : Dialect) (h : Heap) (name : String) (args : List Val) :
+    Option (Heap × EResult) :=
+  if knowsFree d name then builtinCore d h name args else none
+
 /-! ## Container methods
 
 `Expr.mcall` currently holes with `mcall:<m>:non-object` whenever the receiver is not a
@@ -389,7 +432,7 @@ a `get` or `pop` method always wins — those names are ambiguous by design.
 
 String methods are not modelled at all: an exception value and a string are the same
 `Val`, so `"KeyError".startswith(...)` and `e.startswith(...)` are indistinguishable. -/
-def method (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
+def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
     Option (Heap × MethodResult) :=
   match d with
   | .cLike => none
@@ -469,6 +512,45 @@ def method (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Va
                     | none   => p (raiseE "IndexError")
     | _, _, _ => none
 
+/-- Every method name this file answers under `.python`. -/
+def methodNames : List String :=
+  [ "get", "keys", "values", "items", "copy", "count", "index"
+  , "append", "insert", "extend", "clear", "remove", "pop", "popitem"
+  , "setdefault", "update" ]
+
+/-- Does `method` model this method name under this dialect?
+
+**This one is an upper bound, and you should treat it as one.** Unlike `knowsFree` it
+cannot be exact, because a method is modelled per *receiver shape*, and the ledger is a
+static analysis that does not know receivers: `pop` is answered on a `.list` and a
+`.dict` and refused on a `.str`, `.tuple` or `.ref`. A bare name predicate necessarily
+says `true` for all three.
+
+That is the same kind of claim `Ctx.resolve` already makes for user functions — a name
+that resolves statically can still hole at runtime — so using this in `Ctx.resolvable`
+does not introduce a *new* category of overstatement. But it does add to it, and the
+residue belongs in `dynamic-hole risk`, which is the number §17 built for exactly this.
+
+If you want a predicate with no slack at all, use `answersMethod` below: it is decided by
+the real function against the real receiver, so it cannot overstate and cannot drift. It
+is only usable where the receiver value is in hand — the interpreter, or the conformance
+harness, not the static ledger. -/
+def knowsMethod (d : Dialect) (name : String) : Bool :=
+  match d with
+  | .cLike  => false
+  | .python => methodNames.contains name
+
+/-- Methods on non-object receivers, for `Expr.mcall`. Guarded by `knowsMethod` for the
+same reason `builtin` is guarded by `knowsFree`. -/
+def method (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
+    Option (Heap × MethodResult) :=
+  if knowsMethod d name then methodCore d h recv name args else none
+
+/-- The exact, receiver-aware version of `knowsMethod`: decided by `method` itself, so it
+is sound and complete by definition and cannot drift. -/
+def answersMethod (d : Dialect) (h : Heap) (recv : Val) (name : String)
+    (args : List Val) : Bool := (method d h recv name args).isSome
+
 /-! ## Properties
 
 Only what closes cheaply and independently. Each is stated in terms other than the
@@ -482,6 +564,114 @@ the vacuity `STRATEGY.md` §14 and the mutation gate exist to catch. -/
 /-- Likewise for methods. -/
 @[simp] theorem method_cLike_none (h : Heap) (r : Val) (n : String) (as : List Val) :
     method .cLike h r n as = none := rfl
+
+
+/-! ### The name predicates the ledger consumes
+
+`Ctx.resolvable` must count a modelled builtin as a resolved callee, or the verifiable
+core is understated. These are the predicates for that. The soundness direction — the one
+that stops the ledger *overstating* — holds by construction, because `builtin` and
+`method` are the guarded wrappers, not the implementations. -/
+
+/-- No C program is answered by a Python builtin, at the predicate level too. -/
+@[simp] theorem knowsFree_cLike (n : String) : knowsFree .cLike n = false := rfl
+
+/-- Likewise for methods. -/
+@[simp] theorem knowsMethod_cLike (n : String) : knowsMethod .cLike n = false := rfl
+
+/-- **The direction that matters.** A name the predicate rejects is never answered, so a
+ledger built on `knowsFree` can only understate, never overstate. True by `rfl` under the
+hypothesis: `builtin` *is* `builtinCore` behind this guard. -/
+theorem builtin_none_of_not_knowsFree {d : Dialect} {h : Heap} {n : String}
+    {as : List Val} (hk : knowsFree d n = false) : builtin d h n as = none := by
+  simp [builtin, hk]
+
+/-- Same for methods. -/
+theorem method_none_of_not_knowsMethod {d : Dialect} {h : Heap} {r : Val} {n : String}
+    {as : List Val} (hk : knowsMethod d n = false) : method d h r n as = none := by
+  simp [method, hk]
+
+/-- Contrapositive, in the form a caller wants: if the call was answered, the predicate
+said so. -/
+theorem knowsFree_of_builtin_isSome {d : Dialect} {h : Heap} {n : String} {as : List Val}
+    (hs : (builtin d h n as).isSome) : knowsFree d n = true := by
+  by_cases hk : knowsFree d n
+  · exact hk
+  · simp [builtin_none_of_not_knowsFree (Bool.not_eq_true _ ▸ hk)] at hs
+
+/-- And for methods — which also bounds the exact receiver-aware predicate: anything
+`answersMethod` accepts, `knowsMethod` accepts. -/
+theorem knowsMethod_of_answersMethod {d : Dialect} {h : Heap} {r : Val} {n : String}
+    {as : List Val} (hs : answersMethod d h r n as = true) : knowsMethod d n = true := by
+  by_cases hk : knowsMethod d n
+  · exact hk
+  · simp [answersMethod, method_none_of_not_knowsMethod (Bool.not_eq_true _ ▸ hk)] at hs
+
+/-! The completeness direction — every listed name really is answered — is the one that
+can rot as the implementation changes, so it is not asserted, it is *evaluated*. Each
+name is applied to a witness argument list and the whole table is checked by the kernel.
+Delete a case from `builtinCore` and leave its name in `freeNames`, and this fails. -/
+
+/-- A heap with one object carrying one field, so `getattr`/`hasattr` have something to
+find. -/
+private def wHeap : Heap := [{ cls := "C", fields := [("f", .unit)] }]
+
+/-- Arguments on which each free name is answered. Exception constructors accept
+anything, so they fall through to `[]`. -/
+private def freeWitness : String → List Val
+  | "len"        => [.list []]
+  | "abs"        => [.int 0]
+  | "sum"        => [.list []]
+  | "min"        => [.list [.int 1]]
+  | "max"        => [.list [.int 1]]
+  | "sorted"     => [.list []]
+  | "bool"       => []
+  | "str"        => [.int 0]
+  | "repr"       => [.int 0]
+  | "int"        => []
+  | "ord"        => [.str "a"]
+  | "chr"        => [.int 65]
+  | "callable"   => [.int 0]
+  | "isinstance" => [.int 0, .fn "int"]
+  | "getattr"    => [.ref 0, .str "f"]
+  | "hasattr"    => [.ref 0, .str "f"]
+  | "list"       => []
+  | "tuple"      => []
+  | "dict"       => []
+  | _            => []
+
+/-- Receiver and arguments on which each method name is answered. -/
+private def methodWitness : String → Val × List Val
+  | "get"        => (.dict [], [.unit])
+  | "keys"       => (.dict [], [])
+  | "values"     => (.dict [], [])
+  | "items"      => (.dict [], [])
+  | "copy"       => (.dict [], [])
+  | "count"      => (.list [], [.unit])
+  | "index"      => (.list [], [.unit])
+  | "append"     => (.list [], [.unit])
+  | "insert"     => (.list [], [.int 0, .unit])
+  | "extend"     => (.list [], [.list []])
+  | "clear"      => (.list [], [])
+  | "remove"     => (.list [], [.unit])
+  | "pop"        => (.list [], [])
+  | "popitem"    => (.dict [], [])
+  | "setdefault" => (.dict [], [.unit])
+  | "update"     => (.dict [], [.dict []])
+  | _            => (.unit, [])
+
+/-- Every name `knowsFree` accepts is genuinely answered by `builtin`. With
+`builtin_none_of_not_knowsFree`, `knowsFree` is exactly the set of answered names. -/
+theorem knowsFree_complete :
+    freeNames.all (fun n => (builtin .python wHeap n (freeWitness n)).isSome) = true := by
+  decide
+
+/-- Every name `knowsMethod` accepts is genuinely answered by `method` on some
+receiver. -/
+theorem knowsMethod_complete :
+    methodNames.all (fun n =>
+      (method .python wHeap (methodWitness n).1 n (methodWitness n).2).isSome) = true := by
+  decide
 
 /-- `len` of a list is its length — stated against `List.length`, not against `builtin`. -/
 @[simp] theorem builtin_len_list (h : Heap) (vs : List Val) :
@@ -499,11 +689,13 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
   | python =>
     -- Every branch either returns `(h, _)` or is `none`; `split` enumerates them and
     -- `simp_all` discharges each by injectivity of `some`/`Prod.mk`.
-    unfold builtin at hb
+    unfold builtin builtinCore at hb
+    split at hb
+    case isFalse => cases hb
     simp only at hb
     split at hb
     · simp_all
-    · split at hb <;> simp_all [Option.map_eq_some_iff, builtin.minMax] <;>
+    · split at hb <;> simp_all [Option.map_eq_some_iff, builtinCore.minMax] <;>
         (try split at hb) <;> (try simp_all) <;>
         (try (obtain ⟨_, h1, _⟩ := hb; exact h1.symm)) <;>
         (try (obtain ⟨_, _, h1, _⟩ := hb; exact h1.symm)) <;>
@@ -539,13 +731,13 @@ theorem dictSet_length (ps : List (Val × Val)) (k v : Val) :
 theorem method_dict_get_present (h : Heap) (kvs : List (Val × Val)) (k v : Val)
     (hk : dictGet kvs k = some v) :
     method .python h (.dict kvs) "get" [k] = some (h, .pure (.val v)) := by
-  simp [method, hk]
+  simp [method, methodCore, knowsMethod, methodNames, hk]
 
 /-- `dict.get` with a default falls back to it when the key is absent. -/
 theorem method_dict_get_absent (h : Heap) (kvs : List (Val × Val)) (k dv : Val)
     (hk : dictGet kvs k = none) :
     method .python h (.dict kvs) "get" [k, dv] = some (h, .pure (.val dv)) := by
-  simp [method, hk]
+  simp [method, methodCore, knowsMethod, methodNames, hk]
 
 /-- `append` extends the receiver by exactly one element. -/
 theorem method_append (h : Heap) (vs : List Val) (x : Val) :
@@ -693,6 +885,21 @@ private def Mth (r : Val) (n : String) (as : List Val) : Option MethodResult :=
 -- not modelled
 #eval Mth (.str "ab") "startswith" [.str "a"]                  -- none
 #eval Mth (.list []) "sort" []                                 -- none
+
+-- the ledger's name predicates
+#eval knowsFree .python "len"          -- true
+#eval knowsFree .python "KeyError"     -- true
+#eval knowsFree .python "super"        -- false
+#eval knowsFree .python "hash"         -- false
+#eval knowsFree .cLike  "len"          -- false
+#eval knowsMethod .python "pop"        -- true
+#eval knowsMethod .python "sort"       -- false
+#eval knowsMethod .cLike  "pop"        -- false
+-- and the slack `knowsMethod` necessarily carries, made visible:
+#eval knowsMethod .python "pop"                              -- true  (name level)
+#eval answersMethod .python H (.dict []) "pop" [.str "k"]    -- true  (dict: modelled)
+#eval answersMethod .python H (.str "s") "pop" [.str "k"]    -- false (str: not modelled)
+#eval answersMethod .python H (.tuple []) "pop" []           -- false (tuple: immutable)
 
 end Examples
 

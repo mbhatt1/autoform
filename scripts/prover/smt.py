@@ -52,7 +52,7 @@ def try_z3_module():
         return None
 
 
-problem = sys.stdin.read()
+problem = open(sys.argv[1]).read() if len(sys.argv) > 1 else sys.stdin.read()
 
 for exe in ("cvc5", "z3"):
     if shutil.which(exe):

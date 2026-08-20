@@ -21,7 +21,7 @@ if os.environ.get("AUTOFORM_NEURAL") != "1":
     print("# disabled: set AUTOFORM_NEURAL=1 to enable the local proposer")
     sys.exit(0)
 
-goal = sys.stdin.read().strip()
+goal = (open(sys.argv[1]).read() if len(sys.argv) > 1 else sys.stdin.read()).strip()
 model = os.environ.get("AUTOFORM_NEURAL_MODEL", "qwen2.5:7b")
 host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not host.startswith("http"):

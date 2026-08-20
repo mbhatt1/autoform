@@ -135,6 +135,18 @@ def readField (h : Heap) (r : Ref) (f : String) : Val :=
                      | none        => .unit
   | none => .unit
 
+/-- `h` stores an object at `r` whose **own** field `f` holds `v`.
+
+Used as the domain of the accessor theorems. Requiring the field to be present is not a
+weakening dodge: Python attribute access on a missing attribute raises, and the semantics
+answers `unit`, so a specification that claimed a value for an absent field would be
+claiming something false. -/
+def HasField (h : Heap) (r : Ref) (f : String) (v : Val) : Prop :=
+  ∃ o, h.get r = some o ∧ o.fields.find? (·.1 == f) = some (f, v)
+
+theorem readField_of_has {h r f v} (hv : HasField h r f v) : readField h r f = v := by
+  obtain ⟨o, hg, hf⟩ := hv; simp [readField, hg, hf]
+
 /-! ### `Cache.getsizeof` — the size model is the constant 1
 
 `cachetools.Cache.getsizeof` is the default cost function: every entry costs 1. This is
@@ -200,29 +212,27 @@ heap explicitly, so the separation is witnessed and not merely implied. -/
 
 theorem Cache_maxsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.maxsize" 10
-      (fun _ self _ => ∃ r, self = .ref r)
+      (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__maxsize" v)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (readField h r "_Cache__maxsize")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+  rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField]
+  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
 
 theorem Cache_currsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.currsize" 10
-      (fun _ self _ => ∃ r, self = .ref r)
+      (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__currsize" v)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (readField h r "_Cache__currsize")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+  rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField]
+  simp [applyFunc, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
 
 /-- A concrete cache object whose capacity and occupancy differ. -/
 def sampleCache : Heap :=
@@ -234,8 +244,8 @@ def sampleCache : Heap :=
 theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
     (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
       ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
-  rw [Cache_maxsize_mrefines sampleCache (.ref 0) [] ⟨0, rfl⟩ fuel hf,
-      Cache_currsize_mrefines sampleCache (.ref 0) [] ⟨0, rfl⟩ fuel hf]
+  rw [Cache_maxsize_mrefines sampleCache (.ref 0) [] ⟨0, .int 128, rfl, _, rfl, rfl⟩ fuel hf,
+      Cache_currsize_mrefines sampleCache (.ref 0) [] ⟨0, .int 3, rfl, _, rfl, rfl⟩ fuel hf]
   simp [sampleCache, readField, Heap.get]
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
@@ -247,19 +257,20 @@ refutes on any dict receiver. -/
 theorem Cache_contains_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.__contains__" 12
       (fun h self args => ∃ r k kvs, self = .ref r ∧ args = [k]
-                            ∧ readField h r "_Cache__data" = .dict kvs)
+                            ∧ HasField h r "_Cache__data" (.dict kvs))
       (fun h self args => (h, match self, args with
                               | .ref r, [k] =>
                                   match readField h r "_Cache__data" with
                                   | .dict kvs => .ret (.bool (kvs.any (fun kv => Val.beq k kv.1)))
                                   | _         => .ret .unit
                               | _, _ => .ret .unit)) := by
-  rintro h _ _ ⟨r, k, kvs, rfl, rfl, hdata⟩
+  rintro h _ _ ⟨r, k, kvs, rfl, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
   simp [applyFunc, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField, hdata]
+        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
+        hg, hfld]
 
 /-- Membership is not constant: it answers `true` for a present key and `false` for an
 absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
@@ -271,9 +282,9 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
   ∧ (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 2]).2 = .val (.bool false) := by
   constructor
-  · rw [Cache_contains_mrefines _ (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, rfl⟩ fuel hf]
+  · rw [Cache_contains_mrefines _ (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, _, rfl, rfl⟩ fuel hf]
     simp [Val.beq, readField, Heap.get]
-  · rw [Cache_contains_mrefines _ (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, rfl⟩ fuel hf]
+  · rw [Cache_contains_mrefines _ (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, _, rfl, rfl⟩ fuel hf]
     simp [Val.beq, readField, Heap.get]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
@@ -285,28 +296,28 @@ false under that mutation at any pair of equal expiry times. -/
 theorem TLRUItem_lt_mrefines :
     MRefines "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" 12
       (fun h self args => ∃ r s a b, self = .ref r ∧ args = [.ref s]
-                            ∧ readField h r "expires" = .int a
-                            ∧ readField h s "expires" = .int b)
+                            ∧ HasField h r "expires" (.int a)
+                            ∧ HasField h s "expires" (.int b))
       (fun h self args => (h, match self, args with
                               | .ref r, [.ref s] =>
                                   match readField h r "expires", readField h s "expires" with
                                   | .int a, .int b => .ret (.bool (decide (a < b)))
                                   | _, _ => .ret .unit
                               | _, _ => .ret .unit)) := by
-  rintro h _ _ ⟨r, s, a, b, rfl, rfl, hr, hs⟩
+  rintro h _ _ ⟨r, s, a, b, rfl, rfl, ⟨o, hg, hfld⟩, ⟨o', hg', hfld'⟩⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
   simp [applyFunc, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TLRUCache__Item___lt__, ctxOf, P,
-        applyBinop_int_lt, readField, hr, hs]
+        applyBinop_int_lt, readField, hg, hfld, hg', hfld']
 
 /-- Irreflexivity: an item does not precede itself. False the moment `<` becomes `<=`. -/
 theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
     (runMethod fuel [{ cls := "_Item", fields := [("expires", .int 7)] }]
         "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" (.ref 0) [.ref 0]).2
       = .val (.bool false) := by
-  rw [TLRUItem_lt_mrefines _ (.ref 0) [.ref 0] ⟨0, 0, 7, 7, rfl, rfl, rfl, rfl⟩ fuel hf]
+  rw [TLRUItem_lt_mrefines _ (.ref 0) [.ref 0] ⟨0, 0, 7, 7, rfl, rfl, ⟨_, rfl, rfl⟩, ⟨_, rfl, rfl⟩⟩ fuel hf]
   simp [readField, Heap.get]
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
@@ -318,28 +329,28 @@ on `Heap.setField`, so `-` → `+` and `1` → `2` are both refuted. -/
 theorem Timer_exit_mrefines :
     MRefines "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" 12
       (fun h self args => ∃ r n e, self = .ref r ∧ args = [e]
-                            ∧ readField h r "_Timer__nesting" = .int n)
+                            ∧ HasField h r "_Timer__nesting" (.int n))
       (fun h self _ => match self with
                        | .ref r =>
                            match readField h r "_Timer__nesting" with
                            | .int n => (h.setField r "_Timer__nesting" (.int (n - 1)), .ret .unit)
                            | _      => (h, .ret .unit)
                        | _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, n, e, rfl, rfl, hn⟩
+  rintro h _ _ ⟨r, n, e, rfl, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
   simp [applyFunc, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___exit__, ctxOf, P,
-        P_dialect, readField, hn]
+        P_dialect, readField, hg, hfld]
 
 /-- The decrement is a decrement: on a concrete timer at nesting 1, exit leaves 0. -/
 theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
-    ((runMethod fuel [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
-        "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1).getField 0
+    readField ((runMethod fuel [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
+        "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1) 0
         "_Timer__nesting" = .int 0 := by
-  rw [Timer_exit_mrefines _ (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, rfl⟩ fuel hf]
-  simp [readField, Heap.get, Heap.setField]
+  rw [Timer_exit_mrefines _ (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, _, rfl, rfl⟩ fuel hf]
+  rfl
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
 
@@ -364,14 +375,14 @@ theorem Timer_init_mrefines :
 
 /-- Both fields are actually written, with the right values in the right places. -/
 theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
-    let h := (runMethod fuel [{ cls := "_Timer", fields := [] }]
-      "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
-    h.getField 0 "_Timer__timer" = .int 99 ∧ h.getField 0 "_Timer__nesting" = .int 0 := by
-  intro h
-  have : h = _ := congrArg Prod.fst
-    (Timer_init_mrefines _ (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl⟩ fuel hf)
-  rw [this]
-  simp [readField, Heap.get, Heap.setField]
+    readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
+        "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
+      0 "_Timer__timer" = .int 99
+  ∧ readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
+        "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
+      0 "_Timer__nesting" = .int 0 := by
+  rw [Timer_init_mrefines _ (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl⟩ fuel hf]
+  exact ⟨rfl, rfl⟩
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
 
@@ -393,16 +404,17 @@ theorem TTLLink_init_mrefines :
 
 theorem TTLSetstate_lambda_mrefines :
     MRefines "cachetools/__init__.py:<module>.TTLCache.__setstate__.<lambda>0" 10
-      (fun _ _ args => ∃ r, args = [.ref r])
+      (fun h _ args => ∃ r v, args = [.ref r] ∧ HasField h r "expires" v)
       (fun h _ args => (h, match args with
                            | [.ref r] => .ret (readField h r "expires")
                            | _        => .ret .unit)) := by
-  rintro h self _ ⟨r, rfl⟩
+  rintro h self _ ⟨r, v, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache___setstate____lambda_0 rfl]
   simp [applyFunc, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P, readField]
+        f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P,
+        readField, hg, hfld]
 
 /-! ### `_TimedCache.expire` — an *exception* is a specification
 

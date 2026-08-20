@@ -34,7 +34,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JOERN = os.path.join(os.environ.get("JOERN_HOME", os.path.expanduser("~/joern")), "joern-cli")
 
 # Generous, and recorded: a timeout is a result, but only if the limit is stated.
-TIMEOUTS = {"parse": 3600, "graph": 3600, "export": 3600, "render": 900,
+TIMEOUTS = {"deps": 5400, "parse": 3600, "graph": 3600, "export": 3600, "render": 900,
             "build": 5400, "ledger": 3600}
 
 
@@ -189,11 +189,29 @@ def parse_ledger(text: str, scratch: str, mod: str) -> dict:
     return out
 
 
+# Runs `render_lean.py` unmodified, on a thread with a large stack and a raised
+# recursion limit. argv[1] is the limit, argv[2:] the renderer's own argv.
+_RENDER_SHIM = """
+import sys, threading, runpy
+lim = int(sys.argv[1]); sys.argv = sys.argv[2:]
+sys.setrecursionlimit(lim)
+threading.stack_size(512 * 1024 * 1024)
+err = []
+def go():
+    try: runpy.run_path(sys.argv[0], run_name="__main__")
+    except BaseException as e:
+        import traceback; traceback.print_exc(); err.append(e)
+t = threading.Thread(target=go); t.start(); t.join()
+sys.exit(1 if err else 0)
+"""
+
+
 # ---------------------------------------------------------------------------
 # one target, end to end
 # ---------------------------------------------------------------------------
 
-def run_target(name: str, src: str, scratch: str, keep: bool) -> dict:
+def run_target(name: str, src: str, scratch: str, keep: bool, rlimit: int = 0,
+               mrd: int = 0) -> dict:
     print(f"\n== {name}  ({src})", flush=True)
     work = os.path.join(scratch, name)
     os.makedirs(work, exist_ok=True)
@@ -236,16 +254,40 @@ def run_target(name: str, src: str, scratch: str, keep: bool) -> dict:
         except (ValueError, RecursionError, MemoryError) as e:
             r["ast_stats_error"] = f"{type(e).__name__}: {e}"
 
-    # 4. Render Lean.
-    if not stage("render", [sys.executable,
-                            os.path.join(ROOT, "cartographer", "render_lean.py"),
-                            ast, gen, name]):
+    # 4. Render Lean. `render_lean.py` is recursive over the AST and Python's default
+    #    limit is 1000 frames, which a deeply `seq`-nested module body exceeds. The
+    #    renderer itself is not modified: `--recursion-limit` runs it through a shim
+    #    that raises the limit and gives it a big thread stack, so the run can go on to
+    #    measure what breaks *after* the renderer.
+    render_cmd = [sys.executable,
+                  os.path.join(ROOT, "cartographer", "render_lean.py"), ast, gen, name]
+    if rlimit:
+        r["render_recursion_limit"] = rlimit
+        render_cmd = [sys.executable, "-c", _RENDER_SHIM, str(rlimit),
+                      os.path.join(ROOT, "cartographer", "render_lean.py"),
+                      ast, gen, name]
+    if not stage("render", render_cmd):
         return r
     r.update(lean_stats(gen))
 
     # 5. Elaborate. This is the stage most likely to break on a deep term.
+    #    `--max-rec-depth` does not edit the generated file or the pipeline: it passes
+    #    `-DmaxRecDepth` to `lean` directly, which is how far past Lean's own default
+    #    recursion limit the module has to be pushed before it elaborates at all.
+    olean = os.path.join(ROOT, ".lake", "build", "lib", "lean", "Autoform",
+                         "Generated", f"{name}.olean")
+    if mrd:
+        r["max_rec_depth"] = mrd
+        os.makedirs(os.path.dirname(olean), exist_ok=True)
+        # Raw `lean` does not build dependencies; the imports must already have oleans.
+        stage("deps", ["lake", "build", "Autoform.Lang.Core.Semantics"], cwd=ROOT,
+              to=TIMEOUTS["build"])
+        build_cmd = ["lake", "env", "lean", f"-DmaxRecDepth={mrd}",
+                     os.path.relpath(gen, ROOT), "-o", olean]
+    else:
+        build_cmd = ["lake", "build", f"Autoform.Generated.{name}"]
     try:
-        ok = stage("build", ["lake", "build", f"Autoform.Generated.{name}"], cwd=ROOT)
+        ok = stage("build", build_cmd, cwd=ROOT)
 
         # 6. Ledger — coverage numbers. Runs in scratch so its JSON lands there.
         if ok:
@@ -254,8 +296,15 @@ def run_target(name: str, src: str, scratch: str, keep: bool) -> dict:
             with open(lpath, "w") as fh:
                 fh.write(tmpl.replace("@MODULE@", name))
             # `lake env lean` prints the ledger report on stdout; run_stage keeps it.
-            rec = run_stage("ledger", ["lake", "env", "lean", lpath], work,
-                            TIMEOUTS["ledger"])
+            # Must run from the project root for `lake env` to find the search path.
+            # The template writes `ledger-<mod>.json` into the CWD, so it is moved to
+            # scratch immediately: a scale run leaves no artifact in the repo.
+            lcmd = ["lake", "env", "lean"] + ([f"-DmaxRecDepth={mrd}"] if mrd else []) \
+                + [lpath]
+            rec = run_stage("ledger", lcmd, ROOT, TIMEOUTS["ledger"])
+            stray_ledger = os.path.join(ROOT, f"ledger-{name}.json")
+            if os.path.exists(stray_ledger):
+                shutil.move(stray_ledger, os.path.join(work, f"ledger-{name}.json"))
             r["stages"].append(rec)
             text = rec.get("stdout_tail", "")
             r["ledger_text"] = text
@@ -263,8 +312,6 @@ def run_target(name: str, src: str, scratch: str, keep: bool) -> dict:
     finally:
         if not keep and os.path.exists(gen):
             os.remove(gen)
-            olean = os.path.join(ROOT, ".lake", "build", "lib", "lean", "Autoform",
-                                 "Generated", f"{name}.olean")
             for ext in (".olean", ".ilean", ".trace", ".c", ".o"):
                 p2 = olean.replace(".olean", ext)
                 if os.path.exists(p2):
@@ -308,6 +355,13 @@ def main() -> int:
     ap.add_argument("--out", default="scale-results.json")
     ap.add_argument("--keep", action="store_true",
                     help="keep Autoform/Generated/<Name>.lean after the run")
+    ap.add_argument("--recursion-limit", type=int, default=0,
+                    help="run the renderer under a raised recursion limit and a large "
+                         "thread stack, WITHOUT modifying it — used to see what breaks "
+                         "downstream of the renderer's own stack overflow")
+    ap.add_argument("--max-rec-depth", type=int, default=0,
+                    help="elaborate with `lean -DmaxRecDepth=N` instead of `lake build`, "
+                         "to measure how deep a term Lean is being handed")
     ap.add_argument("--report", help="print the table for an existing results file")
     args = ap.parse_args()
 
@@ -320,7 +374,8 @@ def main() -> int:
     os.makedirs(args.scratch, exist_ok=True)
     results = []
     for name, src in args.target:
-        results.append(run_target(name, os.path.abspath(src), args.scratch, args.keep))
+        results.append(run_target(name, os.path.abspath(src), args.scratch, args.keep,
+                                  args.recursion_limit, args.max_rec_depth))
         with open(args.out, "w") as fh:
             json.dump({"results": results}, fh, indent=2)
     # Joern drops a workspace/ wherever it is invoked from; the repo must stay clean.
