@@ -227,19 +227,84 @@ def observe(ast_path, src_root, tests_override, per_fn):
 # 3. Fuzzing: candidate domains
 # ---------------------------------------------------------------------------
 
-INT_PERTURB = [0, 1, -1, 2, 7, -7, 1000000]
+# Value generation is Hypothesis's job, not ours. The hand-rolled version drew ints from
+# a seven-element list (`[0, 1, -1, 2, 7, -7, 1000000]`) and strings from three shapes
+# (`""`, `"x"`, `v + "!"`). Hypothesis's `integers()` already knows to probe 0, +/-1, and
+# the machine-word and 64-bit boundaries -- the exact edges `Numeric.lean` models and the
+# exact edges a hand-written list forgets -- and `text()` probes empty, whitespace and
+# non-ASCII. `derandomize=True` keeps a run reproducible, which the refutation record
+# depends on: a counterexample nobody can regenerate is not evidence.
+#
+# Hypothesis's shrinking is deliberately NOT used. Shrinking needs a per-example verdict,
+# and the verdict here comes from a batched Lean elaboration of 120 candidates at a time
+# (`refute`, below); asking Lean once per shrink step would cost hours. So Hypothesis is
+# used as a generator and the batch oracle is kept. Counterexamples are therefore not
+# minimal, and that is a real limitation of this script, not a solved problem.
+
+from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import strategies as st
+
+# Bare `st.integers()` is the wrong strategy here, and measuring said so: drawn 600 times
+# it hit exactly one of the boundaries this project models (0) and wandered out to 10^31.
+# Python ints really are unbounded, so those draws are legitimate and are kept -- but the
+# edges that `Numeric.lean` gives distinct behaviour to (word boundaries, INT_MIN, where
+# `-INT_MIN` is unrepresentable) have to be sampled deliberately or they never appear.
+_EDGES = [0, 1, -1, 2, -2, 7, -7, 10 ** 6,
+          2 ** 31 - 1, -2 ** 31, 2 ** 31, 2 ** 32,
+          2 ** 63 - 1, -2 ** 63, 2 ** 63, 10 ** 18]
+_INTS = st.one_of(
+    st.sampled_from(_EDGES),                                       # the modelled edges
+    st.integers(min_value=-2 ** 63, max_value=2 ** 63),            # machine-word range
+    st.integers())                                                 # genuine bignums
+
+# Codepoints Lean's string literals and the JSON round-trip both survive: no surrogates.
+_TEXT = st.text(
+    alphabet=st.characters(exclude_categories=("Cs",), max_codepoint=0x2FFF),
+    max_size=8)
+
+
+def _pool(strategy, n):
+    """Draw `n` values from a Hypothesis strategy as a plain list.
+
+    Hypothesis's execution model is one adaptive test function; this is the supported way
+    to borrow only its generators. `derandomize` makes the pool a pure function of the
+    strategy, so two runs of this script fuzz identically."""
+    out = []
+
+    @settings(max_examples=n, database=None, derandomize=True, deadline=None,
+              phases=[Phase.generate], suppress_health_check=list(HealthCheck))
+    @given(strategy)
+    def collect(v):
+        out.append(v)
+
+    collect()
+    return out
+
+
+_POOL_N = 200
+_INT_POOL = None
+_STR_POOL = None
+
+
+def _pools():
+    global _INT_POOL, _STR_POOL
+    if _INT_POOL is None:
+        _INT_POOL = _pool(_INTS, _POOL_N)
+        _STR_POOL = _pool(_TEXT, _POOL_N)
+    return _INT_POOL, _STR_POOL
 
 
 def perturb(v, rng):
     """One structural mutation of an encoded value. Used to build the refutation domain:
     a law that only ever saw the test suite's arguments has not been tested."""
+    ints, strs = _pools()
     t = v[0]
     if t == "int":
-        return ("int", rng.choice(INT_PERTURB))
+        return ("int", rng.choice(ints))
     if t == "bool":
         return ("bool", not v[1])
     if t == "str":
-        return ("str", rng.choice(["", "x", v[1] + "!"]))
+        return ("str", rng.choice(strs))
     if t in ("list", "tuple"):
         if v[1] and rng.random() < 0.5:
             i = rng.randrange(len(v[1]))
