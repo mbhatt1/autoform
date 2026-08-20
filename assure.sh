@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# assure.sh — the full assurance pipeline over an arbitrary codebase.
+#
+#   ./assure.sh <source-dir> <ModuleName>
+#
+# autoform.sh gets you Lean. This gets you an *argued, evidenced claim* about that Lean,
+# with the trust boundary stated explicitly. The distinction matters: the deliverable was
+# never "your codebase is verified".
+#
+#   1. translate            source -> CPG -> Core -> Lean            (autoform.sh)
+#   2. conformance          Lean interpreter vs the real runtime     (differential.py)
+#   3. axiom + escape audit every declaration, every escape hatch    (audit_all.py)
+#   4. specification teeth  mutation gate over the Lean theorems     (mutate.py)
+#   5. assurance case       SACM argument + in-toto attestation      (sacm.py)
+#
+# Steps 2-4 may legitimately FAIL — a divergence, a leaked axiom, a surviving mutant are
+# all real findings. The pipeline records them and continues, because a suppressed finding
+# is worse than a red build. Only step 5 decides whether the top claim is assertable.
+set -uo pipefail
+
+SRC="${1:?usage: assure.sh <source-dir> <ModuleName>}"
+MOD="${2:?usage: assure.sh <source-dir> <ModuleName>}"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+export PATH="$HOME/.elan/bin:$PATH"
+cd "$ROOT"
+
+hdr() { printf '\n\033[1m=== %s ===\033[0m\n' "$1"; }
+
+hdr "1/5 translate"
+JOERN_HOME="${JOERN_HOME:-$HOME/joern}" ./autoform.sh "$SRC" "$MOD" || echo "  translate: FAILED"
+
+hdr "2/5 conformance vs real runtime"
+python3 scripts/differential.py "ast-$MOD.json" "$SRC" "$MOD" 5 || echo "  conformance: divergences found (recorded)"
+
+hdr "3/5 axiom + escape-hatch audit"
+python3 scripts/audit_all.py || echo "  audit: findings recorded"
+
+hdr "4/5 specification teeth (mutation gate)"
+python3 scripts/mutate.py Autoform/Lang/Imp/Semantics.lean Autoform.Lang.Imp.Semantics \
+  --max-mutants 8 || echo "  mutation: survivors recorded"
+
+hdr "5/5 assurance case"
+python3 scripts/sacm.py --module "$MOD"
+STATUS=$?
+
+hdr "artifacts"
+ls -1 formalization-graph.json "ast-$MOD.json" "ledger-$MOD.json" conformance.json \
+       audit.json mutation.json "sacm-$MOD.json" 2>/dev/null
+
+exit $STATUS

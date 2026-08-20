@@ -1,0 +1,426 @@
+[
+ {
+  "name": "lib.py:<module>.add",
+  "file": "lib.py",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.clamp",
+  "file": "lib.py",
+  "params": [
+   "x",
+   "lo",
+   "hi"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "x"
+     },
+     "b": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "x"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.encode",
+  "file": "lib.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "out",
+    "e": {
+     "k": "hole",
+     "label": "op:listLiteral"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "tmp0",
+       "e": {
+        "k": "call",
+        "f": "__iter__",
+        "args": [
+         {
+          "k": "hole",
+          "label": "op:fieldAccess"
+         },
+         {
+          "k": "name",
+          "v": "xs"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "loop",
+       "c": {
+        "k": "hole",
+        "label": "expr:UNKNOWN"
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "x",
+         "e": {
+          "k": "call",
+          "f": "__next__",
+          "args": [
+           {
+            "k": "hole",
+            "label": "op:fieldAccess"
+           },
+           {
+            "k": "name",
+            "v": "tmp0"
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "exprS",
+         "e": {
+          "k": "call",
+          "f": "append",
+          "args": [
+           {
+            "k": "hole",
+            "label": "op:fieldAccess"
+           },
+           {
+            "k": "name",
+            "v": "out"
+           },
+           {
+            "k": "call",
+            "f": "add",
+            "args": [
+             {
+              "k": "name",
+              "v": "add"
+             },
+             {
+              "k": "name",
+              "v": "x"
+             },
+             {
+              "k": "int",
+              "v": 1
+             }
+            ]
+           }
+          ]
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "out"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.save",
+  "file": "lib.py",
+  "params": [
+   "path",
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "manager_tmp0",
+     "e": {
+      "k": "call",
+      "f": "open",
+      "args": [
+       {
+        "k": "name",
+        "v": "open"
+       },
+       {
+        "k": "name",
+        "v": "path"
+       },
+       {
+        "k": "str",
+        "v": "w"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "enter_tmp0",
+      "e": {
+       "k": "hole",
+       "label": "op:fieldAccess"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "exit_tmp0",
+       "e": {
+        "k": "hole",
+        "label": "op:fieldAccess"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "value_tmp0",
+        "e": {
+         "k": "call",
+         "f": "",
+         "args": [
+          {
+           "k": "name",
+           "v": "enter_tmp0"
+          },
+          {
+           "k": "name",
+           "v": "manager_tmp0"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "holeS",
+        "label": "control:TRY"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "skip"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.sample_id",
+  "file": "lib.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "random",
+    "e": {
+     "k": "call",
+     "f": "import",
+     "args": [
+      {
+       "k": "name",
+       "v": "import"
+      },
+      {
+       "k": "str",
+       "v": ""
+      },
+      {
+       "k": "str",
+       "v": "random"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "random",
+       "args": [
+        {
+         "k": "hole",
+         "label": "op:fieldAccess"
+        },
+        {
+         "k": "name",
+         "v": "random"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ }
+]

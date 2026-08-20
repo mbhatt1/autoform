@@ -1,0 +1,14 @@
+name = "autoform"
+version = "0.1.0"
+defaultTargets = ["Autoform"]
+
+[leanOptions]
+linter.missingDocs = false
+
+[[lean_lib]]
+name = "Autoform"
+
+[[require]]
+name = "specimen"
+git = "https://github.com/strata-org/specimen.git"
+rev = "main"

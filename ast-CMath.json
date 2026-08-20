@@ -1,0 +1,362 @@
+[
+ {
+  "name": "clamp",
+  "file": "math.c",
+  "params": [
+   "x",
+   "lo",
+   "hi"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "x"
+     },
+     "b": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "x"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "math.c:<global>",
+  "file": "math.c",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "holeS",
+    "label": "stmt:METHOD_REF"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "holeS",
+     "label": "stmt:METHOD_REF"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "holeS",
+      "label": "stmt:METHOD_REF"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "stmt:METHOD_REF"
+      },
+      "b": {
+       "k": "holeS",
+       "label": "stmt:METHOD_REF"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "poly",
+  "file": "math.c",
+  "params": [
+   "a",
+   "b",
+   "c"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "-",
+    "a": {
+     "k": "binop",
+     "op": "+",
+     "a": {
+      "k": "binop",
+      "op": "*",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     },
+     "b": {
+      "k": "name",
+      "v": "c"
+     }
+    },
+    "b": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "sumto",
+  "file": "math.c",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "acc",
+     "e": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": 0
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "<=",
+         "a": {
+          "k": "name",
+          "v": "i"
+         },
+         "b": {
+          "k": "name",
+          "v": "n"
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "acc",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "acc"
+           },
+           "b": {
+            "k": "name",
+            "v": "i"
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "i",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "i"
+           },
+           "b": {
+            "k": "int",
+            "v": 1
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "acc"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cdiv",
+  "file": "math.c",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "name",
+      "v": "b"
+     },
+     "b": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "/",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cmod",
+  "file": "math.c",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "name",
+      "v": "b"
+     },
+     "b": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "%",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "<includes>:<global>",
+  "file": "<includes>",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ }
+]

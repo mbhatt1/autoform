@@ -1,0 +1,230 @@
+import Lean
+import Autoform.Lang.Core.Semantics
+
+/-!
+# Trust ledger
+
+The deliverable is never "your codebase is verified". It is a precise statement of what
+was translated, what was assumed, and what remains — so a reader can locate the trust
+boundary in seconds.
+
+Evidence types here are the domain-specific part (§10 of `STRATEGY.md`); the argument
+structure they feed is SACM's, not ours.
+-/
+
+namespace Autoform.Core
+
+open Std
+
+/-!
+## Static hole-freedom is an upper bound, not a guarantee
+
+`Func.total` (no `Expr.hole`/`Stmt.hole` in the AST) was being reported as "the verifiable
+core". Testing showed that claim is too strong: the *interpreter* can introduce holes at
+runtime that static counting cannot see.
+
+    def sneaky  := .ret (.field (.name "x") "attr")   -- Func.total = true
+    run sneaky 3  ==>  hole "field:attr:non-object"
+    run sneaky2 3 ==>  hole "call:not_translated"     -- unresolved call, statically invisible
+    run sneaky3 3 ==>  hole "index:unsupported"
+
+The worst of the three is `call:` — a call to a function that was never translated looks
+identical, in the AST, to a call to one that was. So the headline coverage number
+overstated the verifiable core, and this refines it.
+
+Three tiers are now reported, weakest claim first:
+
+* **hole-free** — no static holes. An upper bound on what could be verified.
+* **call-closed** — hole-free *and* every call/method target resolves inside the program.
+  Removes the invisible-`call:` failure mode.
+* **dynamic-hole risk** — constructs (`field`, `index`, `mcall`, arithmetic that can hit
+  `ub`) that can still produce a hole on some input. Reported as a count, not subtracted,
+  because whether they *do* is input-dependent and belongs to the conformance oracle.
+-/
+
+namespace Analysis
+
+mutual
+/-- Names called by an expression, via `call` or `mcall`. -/
+def eCalls : Expr → List String
+  | .call f as    => f :: eCallsL as
+  | .mcall r m as => m :: eCalls r ++ eCallsL as
+  | .binop _ a b  => eCalls a ++ eCalls b
+  | .unop _ a     => eCalls a
+  | .index a b    => eCalls a ++ eCalls b
+  | .field a _    => eCalls a
+  | .alloc _ as   => eCallsL as
+  | .listE as     => eCallsL as
+  | .tupleE as    => eCallsL as
+  | .dictE kvs    => eCallsP kvs
+  | .cond c a b   => eCalls c ++ eCalls a ++ eCalls b
+  | .isOp _ a b   => eCalls a ++ eCalls b
+  | .inOp _ a b   => eCalls a ++ eCalls b
+  | _             => []
+/-- Names called across a list of expressions. -/
+def eCallsL : List Expr → List String
+  | []      => []
+  | e :: es => eCalls e ++ eCallsL es
+/-- Names called across key/value pairs. -/
+def eCallsP : List (Expr × Expr) → List String
+  | []           => []
+  | (k, v) :: ps => eCalls k ++ eCalls v ++ eCallsP ps
+end
+
+mutual
+/-- Constructs that can produce a hole at runtime even when the AST has none. -/
+def eRisk : Expr → Nat
+  | .field a _    => 1 + eRisk a
+  | .index a b    => 1 + eRisk a + eRisk b
+  | .mcall r _ as => 1 + eRisk r + eRiskL as
+  | .binop _ a b  => 1 + eRisk a + eRisk b   -- may hit `ub:` under a fixed-width dialect
+  | .call _ as    => 1 + eRiskL as           -- may fail to resolve
+  | .unop _ a     => eRisk a
+  | .alloc _ as   => 1 + eRiskL as
+  | .listE as     => eRiskL as
+  | .tupleE as    => eRiskL as
+  | .dictE kvs    => eRiskP kvs
+  | .cond c a b   => eRisk c + eRisk a + eRisk b
+  | .isOp _ a b   => eRisk a + eRisk b
+  | .inOp _ a b   => 1 + eRisk a + eRisk b
+  | _             => 0
+/-- Risk across a list of expressions. -/
+def eRiskL : List Expr → Nat
+  | []      => 0
+  | e :: es => eRisk e + eRiskL es
+/-- Risk across key/value pairs. -/
+def eRiskP : List (Expr × Expr) → Nat
+  | []           => 0
+  | (k, v) :: ps => eRisk k + eRisk v + eRiskP ps
+end
+
+/-- Names called by a statement. -/
+def sCalls : Stmt → List String
+  | .expr e         => eCalls e
+  | .assign _ e     => eCalls e
+  | .setField r _ v => eCalls r ++ eCalls v
+  | .setIndex r i v => eCalls r ++ eCalls i ++ eCalls v
+  | .seq a b        => sCalls a ++ sCalls b
+  | .ifte c a b     => eCalls c ++ sCalls a ++ sCalls b
+  | .loop c a       => eCalls c ++ sCalls a
+  | .forIn _ e b    => eCalls e ++ sCalls b
+  | .ret e          => eCalls e
+  | .tryCatch b _ h => sCalls b ++ sCalls h
+  | .raise e        => eCalls e
+  | _               => []
+
+/-- Runtime-hole risk of a statement. -/
+def sRisk : Stmt → Nat
+  | .expr e         => eRisk e
+  | .assign _ e     => eRisk e
+  | .setField r _ v => 1 + eRisk r + eRisk v
+  | .setIndex _ _ _ => 1
+  | .seq a b        => sRisk a + sRisk b
+  | .ifte c a b     => eRisk c + sRisk a + sRisk b
+  | .loop c a       => eRisk c + sRisk a
+  | .forIn _ e b    => 1 + eRisk e + sRisk b
+  | .ret e          => eRisk e
+  | .tryCatch b _ h => sRisk b + sRisk h
+  | .raise e        => eRisk e
+  | _               => 0
+
+end Analysis
+
+/-- Every name this function calls. -/
+def Func.calls (f : Func) : List String := Analysis.sCalls f.body
+
+/-- How many constructs in this function could hole at runtime. -/
+def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
+
+/-- Hole-free **and** every call target resolves inside the program. -/
+def Program.callClosed (p : Program) : List Func :=
+  let ctx : Ctx := ⟨p.dialect, p.table⟩
+  p.verifiableCore.filter (fun f => f.calls.all (fun n => (ctx.resolve n).isSome))
+
+/-- Per-program translation evidence. -/
+structure Coverage where
+  funcs      : Nat
+  nodes      : Nat
+  holes      : Nat
+  totalFuncs : Nat
+  /-- Hole-free *and* call-closed: the honest verifiable core. -/
+  closedFuncs : Nat
+  /-- Constructs that can still hole at runtime, across the whole program. -/
+  riskNodes  : Nat
+  byLabel    : List (String × Nat)
+  deriving Repr
+
+/-- Group hole labels by frequency, most common first. -/
+def tally (ls : List String) : List (String × Nat) :=
+  let m := ls.foldl (fun (m : Std.HashMap String Nat) l =>
+    m.insert l ((m.getD l 0) + 1)) ∅
+  (m.toList).mergeSort (fun a b => a.2 ≥ b.2)
+
+/-- Compute coverage for a translated program. -/
+def Program.coverage (p : Program) : Coverage :=
+  let hs    := p.holes
+  let nf    := p.funcs.length
+  let nodes := p.size
+  let core  := p.verifiableCore.length
+  let closed := p.callClosed.length
+  let risk   := (p.funcs.map Func.risk).sum
+  { funcs      := nf
+  , nodes      := nodes
+  , holes      := hs.length
+  , totalFuncs := core
+  , closedFuncs := closed
+  , riskNodes  := risk
+  , byLabel    := tally hs }
+
+/-- Render the ledger. Percentages are of AST nodes, and the verifiable core is the set
+of functions with **no** holes — the only ones that can be verified unconditionally. -/
+def Program.ledger (p : Program) (name : String) : String :=
+  let c := p.coverage
+  let pct (a b : Nat) : String :=
+    if b == 0 then "n/a" else s!"{(a * 100) / b}%"
+  let hdr := s!"
+╭─ autoform trust ledger ─ {name}
+│ functions translated : {c.funcs}
+│ AST nodes            : {c.nodes}
+│ holes                : {c.holes}  ({pct c.holes c.nodes} of nodes)
+│ hole-free (upper bd) : {c.totalFuncs} / {c.funcs} functions  ({pct c.totalFuncs c.funcs})
+│ VERIFIABLE CORE      : {c.closedFuncs} / {c.funcs} functions  ({pct c.closedFuncs c.funcs}) — hole-free AND call-closed
+│ dynamic-hole risk    : {c.riskNodes} constructs may hole at runtime (input-dependent)
+│ semantics            : Autoform.Core (fuel-indexed, total, no sorry)
+│ transpiler           : Joern CPG → Core, deterministic
+│ NOT PROVED           : transpiler faithfulness — see conformance.json
+├─ holes by cause ─────────────────────────────────────────────"
+  let rows := c.byLabel.take 12 |>.map (fun (l, n) => s!"\n│ {n}  {l}")
+  let more := if c.byLabel.length > 12 then s!"\n│         … {c.byLabel.length - 12} more labels" else ""
+  hdr ++ String.join rows ++ more ++ "\n╰───────────────────────────────────────────────────────────────"
+
+/-- Human-readable dialect name, for the ledger and for provenance in the assurance case. -/
+def Dialect.name : Dialect -> String
+  | .python => "python"
+  | .cLike  => "c-like"
+
+/-- Machine-readable ledger, for `scripts/sacm.py` to consume as evidence.
+
+Built with `Lean.Json` rather than string concatenation, and tagged with the module and
+dialect explicitly. The SACM pass caught exactly this class of defect in
+`conformance.json`: evidence that cannot be attributed to a subject cannot support a
+claim about that subject, and was correctly capped at WEAK. -/
+def Program.ledgerJson (p : Program) (name : String) : Lean.Json :=
+  let c := p.coverage
+  Lean.Json.mkObj
+    [ ("module",         .str name)
+    , ("dialect",        .str p.dialect.name)
+    , ("functions",      .num c.funcs)
+    , ("nodes",          .num c.nodes)
+    , ("holes",          .num c.holes)
+    , ("holeFree",       .num c.totalFuncs)
+    , ("verifiableCore", .num c.closedFuncs)
+    , ("dynamicHoleRisk", .num c.riskNodes)
+    , ("holesByLabel",   .arr (c.byLabel.map (fun (l, n) =>
+        Lean.Json.mkObj [("label", .str l), ("count", .num n)])).toArray) ]
+
+/-- The names of functions that can be verified unconditionally. -/
+def Program.coreNames (p : Program) : List String :=
+  p.callClosed.map (·.name)
+
+end Autoform.Core

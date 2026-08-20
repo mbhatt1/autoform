@@ -1,0 +1,14 @@
+import Autoform.Generated.@MODULE@
+import Autoform.Ledger
+open Autoform.Core Autoform.Generated
+
+#eval IO.println (program.ledger "@MODULE@")
+#eval do
+  let core := program.coreNames
+  IO.println s!"\nverifiable core ({core.length}) — first 15:"
+  for n in core.take 15 do IO.println s!"  {n}"
+
+-- Machine-readable evidence for scripts/sacm.py, tagged with module and dialect.
+#eval do
+  IO.FS.writeFile "ledger-@MODULE@.json" (program.ledgerJson "@MODULE@").pretty
+  IO.println "wrote ledger-@MODULE@.json"
