@@ -75,7 +75,16 @@ def check_cross(root):
     out = []
     for art, key, other, _, what in CROSS:
         ap_, op_ = os.path.join(root, art), os.path.join(root, other)
-        if not (os.path.exists(ap_) and os.path.exists(op_)):
+        absent = [n for n, q in ((art, ap_), (other, op_)) if not os.path.exists(q)]
+        if absent:
+            # Silence here would be the worst outcome: the cross-artifact check is the
+            # only one that can catch a stale artifact, and skipping it quietly is the
+            # "checker that stopped looking" failure this file warns about elsewhere.
+            # It went quiet on a fresh clone because ast-*.json was gitignored while the
+            # module rendered from it was tracked.
+            out.append(f"cannot cross-check {what}: {', '.join(absent)} absent. "
+                       f"This check is the only one that detects a stale artifact; "
+                       f"treat its absence as a failure, not a pass.")
             continue
         a = json.load(open(ap_)).get(key)
         b = ast_function_count(op_)

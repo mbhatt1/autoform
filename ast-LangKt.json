@@ -1,0 +1,230 @@
+[
+ {
+  "name": "gcd:int(int,int)",
+  "file": "T.kt",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "name",
+      "v": "a"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "y",
+       "e": {
+        "k": "name",
+        "v": "b"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "!=",
+         "a": {
+          "k": "name",
+          "v": "y"
+         },
+         "b": {
+          "k": "int",
+          "v": 0
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "t",
+           "e": {
+            "k": "binop",
+            "op": "%",
+            "a": {
+             "k": "name",
+             "v": "x"
+            },
+            "b": {
+             "k": "name",
+             "v": "y"
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "x",
+            "e": {
+             "k": "name",
+             "v": "y"
+            }
+           },
+           "b": {
+            "k": "assign",
+            "x": "y",
+            "e": {
+             "k": "name",
+             "v": "t"
+            }
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "addAll:int(int)",
+  "file": "T.kt",
+  "params": [
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": 0
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": 0
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "i"
+         },
+         "b": {
+          "k": "name",
+          "v": "n"
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "s"
+           },
+           "b": {
+            "k": "name",
+            "v": "i"
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "i",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "i"
+           },
+           "b": {
+            "k": "int",
+            "v": 1
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "T.kt:<global>.global",
+  "file": "T.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "holeS",
+    "label": "stmt:METHOD"
+   },
+   "b": {
+    "k": "holeS",
+    "label": "stmt:METHOD"
+   }
+  }
+ }
+]

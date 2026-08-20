@@ -1,0 +1,7628 @@
+[
+ {
+  "name": "sdsHdrSize",
+  "file": "sds.c",
+  "params": [
+   "type"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "holeS",
+         "label": "control:SWITCH"
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "int",
+          "v": 0
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsReqType",
+  "file": "sds.c",
+  "params": [
+   "string_size"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "string_size"
+     },
+     "b": {
+      "k": "hole",
+      "label": "op:shiftLeft"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "call",
+      "f": "SDS_TYPE_5",
+      "args": [
+       {
+        "v": 0,
+        "k": "int"
+       }
+      ]
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "<",
+      "a": {
+       "k": "name",
+       "v": "string_size"
+      },
+      "b": {
+       "k": "hole",
+       "label": "op:shiftLeft"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "SDS_TYPE_8",
+       "args": [
+        {
+         "v": 1,
+         "k": "int"
+        }
+       ]
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "binop",
+       "op": "<",
+       "a": {
+        "k": "name",
+        "v": "string_size"
+       },
+       "b": {
+        "k": "hole",
+        "label": "op:shiftLeft"
+       }
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "call",
+        "f": "SDS_TYPE_16",
+        "args": [
+         {
+          "v": 2,
+          "k": "int"
+         }
+        ]
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "ifte",
+       "c": {
+        "k": "binop",
+        "op": "<",
+        "a": {
+         "k": "name",
+         "v": "string_size"
+        },
+        "b": {
+         "k": "hole",
+         "label": "op:shiftLeft"
+        }
+       },
+       "t": {
+        "k": "ret",
+        "e": {
+         "k": "call",
+         "f": "SDS_TYPE_32",
+         "args": [
+          {
+           "v": 3,
+           "k": "int"
+          }
+         ]
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "call",
+        "f": "SDS_TYPE_64",
+        "args": [
+         {
+          "v": 4,
+          "k": "int"
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsnewlen",
+  "file": "sds.c",
+  "params": [
+   "init",
+   "initlen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "type",
+             "e": {
+              "k": "call",
+              "f": "sdsReqType",
+              "args": [
+               {
+                "k": "name",
+                "v": "initlen"
+               }
+              ]
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "ifte",
+              "c": {
+               "k": "binop",
+               "op": "&&",
+               "a": {
+                "k": "binop",
+                "op": "==",
+                "a": {
+                 "k": "name",
+                 "v": "type"
+                },
+                "b": {
+                 "k": "call",
+                 "f": "SDS_TYPE_5",
+                 "args": [
+                  {
+                   "v": 0,
+                   "k": "int"
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "binop",
+                "op": "==",
+                "a": {
+                 "k": "name",
+                 "v": "initlen"
+                },
+                "b": {
+                 "k": "int",
+                 "v": 0
+                }
+               }
+              },
+              "t": {
+               "k": "assign",
+               "x": "type",
+               "e": {
+                "k": "call",
+                "f": "SDS_TYPE_8",
+                "args": [
+                 {
+                  "v": 1,
+                  "k": "int"
+                 }
+                ]
+               }
+              },
+              "e": {
+               "k": "skip"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "hdrlen",
+                "e": {
+                 "k": "call",
+                 "f": "sdsHdrSize",
+                 "args": [
+                  {
+                   "k": "name",
+                   "v": "type"
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "sh",
+                  "e": {
+                   "k": "call",
+                   "f": "s_malloc",
+                   "args": [
+                    {
+                     "args": [
+                      {
+                       "a": {
+                        "a": {
+                         "v": "hdrlen",
+                         "k": "name"
+                        },
+                        "op": "+",
+                        "b": {
+                         "v": "initlen",
+                         "k": "name"
+                        },
+                        "k": "binop"
+                       },
+                       "op": "+",
+                       "b": {
+                        "v": 1,
+                        "k": "int"
+                       },
+                       "k": "binop"
+                      }
+                     ],
+                     "f": "malloc",
+                     "k": "call"
+                    }
+                   ]
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "ifte",
+                   "c": {
+                    "k": "binop",
+                    "op": "==",
+                    "a": {
+                     "k": "name",
+                     "v": "sh"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "NULL"
+                    }
+                   },
+                   "t": {
+                    "k": "ret",
+                    "e": {
+                     "k": "name",
+                     "v": "NULL"
+                    }
+                   },
+                   "e": {
+                    "k": "skip"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "ifte",
+                    "c": {
+                     "k": "hole",
+                     "label": "cstr:address-equality"
+                    },
+                    "t": {
+                     "k": "assign",
+                     "x": "init",
+                     "e": {
+                      "k": "name",
+                      "v": "NULL"
+                     }
+                    },
+                    "e": {
+                     "k": "ifte",
+                     "c": {
+                      "k": "unop",
+                      "op": "!",
+                      "a": {
+                       "k": "name",
+                       "v": "init"
+                      }
+                     },
+                     "t": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "call",
+                       "f": "memset",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "sh"
+                        },
+                        {
+                         "k": "int",
+                         "v": 0
+                        },
+                        {
+                         "k": "binop",
+                         "op": "+",
+                         "a": {
+                          "k": "binop",
+                          "op": "+",
+                          "a": {
+                           "k": "name",
+                           "v": "hdrlen"
+                          },
+                          "b": {
+                           "k": "name",
+                           "v": "initlen"
+                          }
+                         },
+                         "b": {
+                          "k": "int",
+                          "v": 1
+                         }
+                        }
+                       ]
+                      }
+                     },
+                     "e": {
+                      "k": "skip"
+                     }
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "s",
+                     "e": {
+                      "k": "binop",
+                      "op": "+",
+                      "a": {
+                       "k": "hole",
+                       "label": "op:cast"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "hdrlen"
+                      }
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "assign",
+                      "x": "fp",
+                      "e": {
+                       "k": "binop",
+                       "op": "-",
+                       "a": {
+                        "k": "hole",
+                        "label": "op:cast"
+                       },
+                       "b": {
+                        "k": "int",
+                        "v": 1
+                       }
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "holeS",
+                       "label": "control:SWITCH"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "binop",
+                         "op": "&&",
+                         "a": {
+                          "k": "name",
+                          "v": "initlen"
+                         },
+                         "b": {
+                          "k": "name",
+                          "v": "init"
+                         }
+                        },
+                        "t": {
+                         "k": "exprS",
+                         "e": {
+                          "k": "call",
+                          "f": "memcpy",
+                          "args": [
+                           {
+                            "k": "name",
+                            "v": "s"
+                           },
+                           {
+                            "k": "name",
+                            "v": "init"
+                           },
+                           {
+                            "k": "name",
+                            "v": "initlen"
+                           }
+                          ]
+                         }
+                        },
+                        "e": {
+                         "k": "skip"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "holeS",
+                         "label": "assign:lhs:indirectIndexAccess"
+                        },
+                        "b": {
+                         "k": "ret",
+                         "e": {
+                          "k": "name",
+                          "v": "s"
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsempty",
+  "file": "sds.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "sdsnewlen",
+    "args": [
+     {
+      "k": "str",
+      "v": ""
+     },
+     {
+      "k": "int",
+      "v": 0
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdsnew",
+  "file": "sds.c",
+  "params": [
+   "init"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "initlen",
+      "e": {
+       "k": "cond",
+       "c": {
+        "k": "hole",
+        "label": "cstr:address-equality"
+       },
+       "t": {
+        "k": "int",
+        "v": 0
+       },
+       "e": {
+        "k": "call",
+        "f": "strlen",
+        "args": [
+         {
+          "k": "name",
+          "v": "init"
+         }
+        ]
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "call",
+       "f": "sdsnewlen",
+       "args": [
+        {
+         "k": "name",
+         "v": "init"
+        },
+        {
+         "k": "name",
+         "v": "initlen"
+        }
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsdup",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "sdsnewlen",
+    "args": [
+     {
+      "k": "name",
+      "v": "s"
+     },
+     {
+      "k": "call",
+      "f": "sdslen",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdsfree",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "name",
+       "v": "s"
+      },
+      "b": {
+       "k": "name",
+       "v": "NULL"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "unit"
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "exprS",
+     "e": {
+      "k": "call",
+      "f": "s_free",
+      "args": [
+       {
+        "args": [
+         {
+          "a": {
+           "k": "hole",
+           "label": "op:cast"
+          },
+          "op": "-",
+          "b": {
+           "args": [
+            {
+             "k": "hole",
+             "label": "op:indirectIndexAccess"
+            }
+           ],
+           "f": "sdsHdrSize",
+           "k": "call"
+          },
+          "k": "binop"
+         }
+        ],
+        "f": "free",
+        "k": "call"
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsupdatelen",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "reallen",
+     "e": {
+      "k": "call",
+      "f": "strlen",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "exprS",
+     "e": {
+      "k": "call",
+      "f": "sdssetlen",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       },
+       {
+        "k": "name",
+        "v": "reallen"
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsclear",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "call",
+     "f": "sdssetlen",
+     "args": [
+      {
+       "k": "name",
+       "v": "s"
+      },
+      {
+       "k": "int",
+       "v": 0
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "holeS",
+    "label": "assign:lhs:indirectIndexAccess"
+   }
+  }
+ },
+ {
+  "name": "sdsMakeRoomFor",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "addlen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "avail",
+        "e": {
+         "k": "call",
+         "f": "sdsavail",
+         "args": [
+          {
+           "k": "name",
+           "v": "s"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "oldtype",
+              "e": {
+               "k": "hole",
+               "label": "op:and"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "ifte",
+                "c": {
+                 "k": "binop",
+                 "op": ">=",
+                 "a": {
+                  "k": "name",
+                  "v": "avail"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "addlen"
+                 }
+                },
+                "t": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "s"
+                 }
+                },
+                "e": {
+                 "k": "skip"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "len",
+                 "e": {
+                  "k": "call",
+                  "f": "sdslen",
+                  "args": [
+                   {
+                    "k": "name",
+                    "v": "s"
+                   }
+                  ]
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "sh",
+                  "e": {
+                   "k": "binop",
+                   "op": "-",
+                   "a": {
+                    "k": "hole",
+                    "label": "op:cast"
+                   },
+                   "b": {
+                    "k": "call",
+                    "f": "sdsHdrSize",
+                    "args": [
+                     {
+                      "k": "name",
+                      "v": "oldtype"
+                     }
+                    ]
+                   }
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "assign",
+                   "x": "reqlen",
+                   "e": {
+                    "k": "hole",
+                    "label": "op:assignment"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "ifte",
+                    "c": {
+                     "k": "binop",
+                     "op": "<",
+                     "a": {
+                      "k": "name",
+                      "v": "newlen"
+                     },
+                     "b": {
+                      "k": "call",
+                      "f": "SDS_MAX_PREALLOC",
+                      "args": [
+                       {
+                        "a": {
+                         "v": 1024,
+                         "k": "int"
+                        },
+                        "op": "*",
+                        "b": {
+                         "v": 1024,
+                         "k": "int"
+                        },
+                        "k": "binop"
+                       }
+                      ]
+                     }
+                    },
+                    "t": {
+                     "k": "exprS",
+                     "e": {
+                      "k": "hole",
+                      "label": "op:assignmentMultiplication"
+                     }
+                    },
+                    "e": {
+                     "k": "assign",
+                     "x": "newlen",
+                     "e": {
+                      "k": "binop",
+                      "op": "+",
+                      "a": {
+                       "k": "name",
+                       "v": "newlen"
+                      },
+                      "b": {
+                       "k": "call",
+                       "f": "SDS_MAX_PREALLOC",
+                       "args": [
+                        {
+                         "a": {
+                          "v": 1024,
+                          "k": "int"
+                         },
+                         "op": "*",
+                         "b": {
+                          "v": 1024,
+                          "k": "int"
+                         },
+                         "k": "binop"
+                        }
+                       ]
+                      }
+                     }
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "type",
+                     "e": {
+                      "k": "call",
+                      "f": "sdsReqType",
+                      "args": [
+                       {
+                        "k": "name",
+                        "v": "newlen"
+                       }
+                      ]
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "ifte",
+                      "c": {
+                       "k": "binop",
+                       "op": "==",
+                       "a": {
+                        "k": "name",
+                        "v": "type"
+                       },
+                       "b": {
+                        "k": "call",
+                        "f": "SDS_TYPE_5",
+                        "args": [
+                         {
+                          "v": 0,
+                          "k": "int"
+                         }
+                        ]
+                       }
+                      },
+                      "t": {
+                       "k": "assign",
+                       "x": "type",
+                       "e": {
+                        "k": "call",
+                        "f": "SDS_TYPE_8",
+                        "args": [
+                         {
+                          "v": 1,
+                          "k": "int"
+                         }
+                        ]
+                       }
+                      },
+                      "e": {
+                       "k": "skip"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "assign",
+                       "x": "hdrlen",
+                       "e": {
+                        "k": "call",
+                        "f": "sdsHdrSize",
+                        "args": [
+                         {
+                          "k": "name",
+                          "v": "type"
+                         }
+                        ]
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "exprS",
+                        "e": {
+                         "k": "call",
+                         "f": "assert",
+                         "args": [
+                          {
+                           "k": "binop",
+                           "op": ">",
+                           "a": {
+                            "k": "binop",
+                            "op": "+",
+                            "a": {
+                             "k": "binop",
+                             "op": "+",
+                             "a": {
+                              "k": "name",
+                              "v": "hdrlen"
+                             },
+                             "b": {
+                              "k": "name",
+                              "v": "newlen"
+                             }
+                            },
+                            "b": {
+                             "k": "int",
+                             "v": 1
+                            }
+                           },
+                           "b": {
+                            "k": "name",
+                            "v": "reqlen"
+                           }
+                          }
+                         ]
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "ifte",
+                         "c": {
+                          "k": "binop",
+                          "op": "==",
+                          "a": {
+                           "k": "name",
+                           "v": "oldtype"
+                          },
+                          "b": {
+                           "k": "name",
+                           "v": "type"
+                          }
+                         },
+                         "t": {
+                          "k": "seq",
+                          "a": {
+                           "k": "assign",
+                           "x": "newsh",
+                           "e": {
+                            "k": "call",
+                            "f": "s_realloc",
+                            "args": [
+                             {
+                              "args": [
+                               {
+                                "v": "sh",
+                                "k": "name"
+                               },
+                               {
+                                "a": {
+                                 "a": {
+                                  "v": "hdrlen",
+                                  "k": "name"
+                                 },
+                                 "op": "+",
+                                 "b": {
+                                  "v": "newlen",
+                                  "k": "name"
+                                 },
+                                 "k": "binop"
+                                },
+                                "op": "+",
+                                "b": {
+                                 "v": 1,
+                                 "k": "int"
+                                },
+                                "k": "binop"
+                               }
+                              ],
+                              "f": "realloc",
+                              "k": "call"
+                             }
+                            ]
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "ifte",
+                            "c": {
+                             "k": "binop",
+                             "op": "==",
+                             "a": {
+                              "k": "name",
+                              "v": "newsh"
+                             },
+                             "b": {
+                              "k": "name",
+                              "v": "NULL"
+                             }
+                            },
+                            "t": {
+                             "k": "ret",
+                             "e": {
+                              "k": "name",
+                              "v": "NULL"
+                             }
+                            },
+                            "e": {
+                             "k": "skip"
+                            }
+                           },
+                           "b": {
+                            "k": "assign",
+                            "x": "s",
+                            "e": {
+                             "k": "binop",
+                             "op": "+",
+                             "a": {
+                              "k": "hole",
+                              "label": "op:cast"
+                             },
+                             "b": {
+                              "k": "name",
+                              "v": "hdrlen"
+                             }
+                            }
+                           }
+                          }
+                         },
+                         "e": {
+                          "k": "seq",
+                          "a": {
+                           "k": "assign",
+                           "x": "newsh",
+                           "e": {
+                            "k": "call",
+                            "f": "s_malloc",
+                            "args": [
+                             {
+                              "args": [
+                               {
+                                "a": {
+                                 "a": {
+                                  "v": "hdrlen",
+                                  "k": "name"
+                                 },
+                                 "op": "+",
+                                 "b": {
+                                  "v": "newlen",
+                                  "k": "name"
+                                 },
+                                 "k": "binop"
+                                },
+                                "op": "+",
+                                "b": {
+                                 "v": 1,
+                                 "k": "int"
+                                },
+                                "k": "binop"
+                               }
+                              ],
+                              "f": "malloc",
+                              "k": "call"
+                             }
+                            ]
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "ifte",
+                            "c": {
+                             "k": "binop",
+                             "op": "==",
+                             "a": {
+                              "k": "name",
+                              "v": "newsh"
+                             },
+                             "b": {
+                              "k": "name",
+                              "v": "NULL"
+                             }
+                            },
+                            "t": {
+                             "k": "ret",
+                             "e": {
+                              "k": "name",
+                              "v": "NULL"
+                             }
+                            },
+                            "e": {
+                             "k": "skip"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "exprS",
+                             "e": {
+                              "k": "call",
+                              "f": "memcpy",
+                              "args": [
+                               {
+                                "k": "binop",
+                                "op": "+",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:cast"
+                                },
+                                "b": {
+                                 "k": "name",
+                                 "v": "hdrlen"
+                                }
+                               },
+                               {
+                                "k": "name",
+                                "v": "s"
+                               },
+                               {
+                                "k": "binop",
+                                "op": "+",
+                                "a": {
+                                 "k": "name",
+                                 "v": "len"
+                                },
+                                "b": {
+                                 "k": "int",
+                                 "v": 1
+                                }
+                               }
+                              ]
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "exprS",
+                              "e": {
+                               "k": "call",
+                               "f": "s_free",
+                               "args": [
+                                {
+                                 "args": [
+                                  {
+                                   "v": "sh",
+                                   "k": "name"
+                                  }
+                                 ],
+                                 "f": "free",
+                                 "k": "call"
+                                }
+                               ]
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "assign",
+                               "x": "s",
+                               "e": {
+                                "k": "binop",
+                                "op": "+",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:cast"
+                                },
+                                "b": {
+                                 "k": "name",
+                                 "v": "hdrlen"
+                                }
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "holeS",
+                                "label": "assign:lhs:indirectIndexAccess"
+                               },
+                               "b": {
+                                "k": "exprS",
+                                "e": {
+                                 "k": "call",
+                                 "f": "sdssetlen",
+                                 "args": [
+                                  {
+                                   "k": "name",
+                                   "v": "s"
+                                  },
+                                  {
+                                   "k": "name",
+                                   "v": "len"
+                                  }
+                                 ]
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "exprS",
+                          "e": {
+                           "k": "call",
+                           "f": "sdssetalloc",
+                           "args": [
+                            {
+                             "k": "name",
+                             "v": "s"
+                            },
+                            {
+                             "k": "name",
+                             "v": "newlen"
+                            }
+                           ]
+                          }
+                         },
+                         "b": {
+                          "k": "ret",
+                          "e": {
+                           "k": "name",
+                           "v": "s"
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsRemoveFreeSpace",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "oldtype",
+         "e": {
+          "k": "hole",
+          "label": "op:and"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "oldhdrlen",
+            "e": {
+             "k": "call",
+             "f": "sdsHdrSize",
+             "args": [
+              {
+               "k": "name",
+               "v": "oldtype"
+              }
+             ]
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "len",
+              "e": {
+               "k": "call",
+               "f": "sdslen",
+               "args": [
+                {
+                 "k": "name",
+                 "v": "s"
+                }
+               ]
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "avail",
+                "e": {
+                 "k": "call",
+                 "f": "sdsavail",
+                 "args": [
+                  {
+                   "k": "name",
+                   "v": "s"
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "sh",
+                 "e": {
+                  "k": "binop",
+                  "op": "-",
+                  "a": {
+                   "k": "hole",
+                   "label": "op:cast"
+                  },
+                  "b": {
+                   "k": "name",
+                   "v": "oldhdrlen"
+                  }
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "ifte",
+                  "c": {
+                   "k": "binop",
+                   "op": "==",
+                   "a": {
+                    "k": "name",
+                    "v": "avail"
+                   },
+                   "b": {
+                    "k": "int",
+                    "v": 0
+                   }
+                  },
+                  "t": {
+                   "k": "ret",
+                   "e": {
+                    "k": "name",
+                    "v": "s"
+                   }
+                  },
+                  "e": {
+                   "k": "skip"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "assign",
+                   "x": "type",
+                   "e": {
+                    "k": "call",
+                    "f": "sdsReqType",
+                    "args": [
+                     {
+                      "k": "name",
+                      "v": "len"
+                     }
+                    ]
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "assign",
+                    "x": "hdrlen",
+                    "e": {
+                     "k": "call",
+                     "f": "sdsHdrSize",
+                     "args": [
+                      {
+                       "k": "name",
+                       "v": "type"
+                      }
+                     ]
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "ifte",
+                     "c": {
+                      "k": "binop",
+                      "op": "||",
+                      "a": {
+                       "k": "binop",
+                       "op": "==",
+                       "a": {
+                        "k": "name",
+                        "v": "oldtype"
+                       },
+                       "b": {
+                        "k": "name",
+                        "v": "type"
+                       }
+                      },
+                      "b": {
+                       "k": "binop",
+                       "op": ">",
+                       "a": {
+                        "k": "name",
+                        "v": "type"
+                       },
+                       "b": {
+                        "k": "call",
+                        "f": "SDS_TYPE_8",
+                        "args": [
+                         {
+                          "v": 1,
+                          "k": "int"
+                         }
+                        ]
+                       }
+                      }
+                     },
+                     "t": {
+                      "k": "seq",
+                      "a": {
+                       "k": "assign",
+                       "x": "newsh",
+                       "e": {
+                        "k": "call",
+                        "f": "s_realloc",
+                        "args": [
+                         {
+                          "args": [
+                           {
+                            "v": "sh",
+                            "k": "name"
+                           },
+                           {
+                            "a": {
+                             "a": {
+                              "v": "oldhdrlen",
+                              "k": "name"
+                             },
+                             "op": "+",
+                             "b": {
+                              "v": "len",
+                              "k": "name"
+                             },
+                             "k": "binop"
+                            },
+                            "op": "+",
+                            "b": {
+                             "v": 1,
+                             "k": "int"
+                            },
+                            "k": "binop"
+                           }
+                          ],
+                          "f": "realloc",
+                          "k": "call"
+                         }
+                        ]
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "binop",
+                         "op": "==",
+                         "a": {
+                          "k": "name",
+                          "v": "newsh"
+                         },
+                         "b": {
+                          "k": "name",
+                          "v": "NULL"
+                         }
+                        },
+                        "t": {
+                         "k": "ret",
+                         "e": {
+                          "k": "name",
+                          "v": "NULL"
+                         }
+                        },
+                        "e": {
+                         "k": "skip"
+                        }
+                       },
+                       "b": {
+                        "k": "assign",
+                        "x": "s",
+                        "e": {
+                         "k": "binop",
+                         "op": "+",
+                         "a": {
+                          "k": "hole",
+                          "label": "op:cast"
+                         },
+                         "b": {
+                          "k": "name",
+                          "v": "oldhdrlen"
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "e": {
+                      "k": "seq",
+                      "a": {
+                       "k": "assign",
+                       "x": "newsh",
+                       "e": {
+                        "k": "call",
+                        "f": "s_malloc",
+                        "args": [
+                         {
+                          "args": [
+                           {
+                            "a": {
+                             "a": {
+                              "v": "hdrlen",
+                              "k": "name"
+                             },
+                             "op": "+",
+                             "b": {
+                              "v": "len",
+                              "k": "name"
+                             },
+                             "k": "binop"
+                            },
+                            "op": "+",
+                            "b": {
+                             "v": 1,
+                             "k": "int"
+                            },
+                            "k": "binop"
+                           }
+                          ],
+                          "f": "malloc",
+                          "k": "call"
+                         }
+                        ]
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "binop",
+                         "op": "==",
+                         "a": {
+                          "k": "name",
+                          "v": "newsh"
+                         },
+                         "b": {
+                          "k": "name",
+                          "v": "NULL"
+                         }
+                        },
+                        "t": {
+                         "k": "ret",
+                         "e": {
+                          "k": "name",
+                          "v": "NULL"
+                         }
+                        },
+                        "e": {
+                         "k": "skip"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "exprS",
+                         "e": {
+                          "k": "call",
+                          "f": "memcpy",
+                          "args": [
+                           {
+                            "k": "binop",
+                            "op": "+",
+                            "a": {
+                             "k": "hole",
+                             "label": "op:cast"
+                            },
+                            "b": {
+                             "k": "name",
+                             "v": "hdrlen"
+                            }
+                           },
+                           {
+                            "k": "name",
+                            "v": "s"
+                           },
+                           {
+                            "k": "binop",
+                            "op": "+",
+                            "a": {
+                             "k": "name",
+                             "v": "len"
+                            },
+                            "b": {
+                             "k": "int",
+                             "v": 1
+                            }
+                           }
+                          ]
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "exprS",
+                          "e": {
+                           "k": "call",
+                           "f": "s_free",
+                           "args": [
+                            {
+                             "args": [
+                              {
+                               "v": "sh",
+                               "k": "name"
+                              }
+                             ],
+                             "f": "free",
+                             "k": "call"
+                            }
+                           ]
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "assign",
+                           "x": "s",
+                           "e": {
+                            "k": "binop",
+                            "op": "+",
+                            "a": {
+                             "k": "hole",
+                             "label": "op:cast"
+                            },
+                            "b": {
+                             "k": "name",
+                             "v": "hdrlen"
+                            }
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "holeS",
+                            "label": "assign:lhs:indirectIndexAccess"
+                           },
+                           "b": {
+                            "k": "exprS",
+                            "e": {
+                             "k": "call",
+                             "f": "sdssetlen",
+                             "args": [
+                              {
+                               "k": "name",
+                               "v": "s"
+                              },
+                              {
+                               "k": "name",
+                               "v": "len"
+                              }
+                             ]
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "call",
+                       "f": "sdssetalloc",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "s"
+                        },
+                        {
+                         "k": "name",
+                         "v": "len"
+                        }
+                       ]
+                      }
+                     },
+                     "b": {
+                      "k": "ret",
+                      "e": {
+                       "k": "name",
+                       "v": "s"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsAllocSize",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "alloc",
+     "e": {
+      "k": "call",
+      "f": "sdsalloc",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+",
+      "a": {
+       "k": "binop",
+       "op": "+",
+       "a": {
+        "k": "call",
+        "f": "sdsHdrSize",
+        "args": [
+         {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        ]
+       },
+       "b": {
+        "k": "name",
+        "v": "alloc"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": 1
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsAllocPtr",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "hole",
+    "label": "op:cast"
+   }
+  }
+ },
+ {
+  "name": "sdsIncrLen",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "incr"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "flags",
+          "e": {
+           "k": "hole",
+           "label": "op:indirectIndexAccess"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "holeS",
+            "label": "control:SWITCH"
+           },
+           "b": {
+            "k": "holeS",
+            "label": "assign:lhs:indirectIndexAccess"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsgrowzero",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "len"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "curlen",
+      "e": {
+       "k": "call",
+       "f": "sdslen",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "ifte",
+       "c": {
+        "k": "binop",
+        "op": "<=",
+        "a": {
+         "k": "name",
+         "v": "len"
+        },
+        "b": {
+         "k": "name",
+         "v": "curlen"
+        }
+       },
+       "t": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "s",
+        "e": {
+         "k": "call",
+         "f": "sdsMakeRoomFor",
+         "args": [
+          {
+           "k": "name",
+           "v": "s"
+          },
+          {
+           "k": "binop",
+           "op": "-",
+           "a": {
+            "k": "name",
+            "v": "len"
+           },
+           "b": {
+            "k": "name",
+            "v": "curlen"
+           }
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "s"
+          },
+          "b": {
+           "k": "name",
+           "v": "NULL"
+          }
+         },
+         "t": {
+          "k": "ret",
+          "e": {
+           "k": "name",
+           "v": "NULL"
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "call",
+           "f": "memset",
+           "args": [
+            {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "name",
+              "v": "s"
+             },
+             "b": {
+              "k": "name",
+              "v": "curlen"
+             }
+            },
+            {
+             "k": "int",
+             "v": 0
+            },
+            {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "binop",
+              "op": "-",
+              "a": {
+               "k": "name",
+               "v": "len"
+              },
+              "b": {
+               "k": "name",
+               "v": "curlen"
+              }
+             },
+             "b": {
+              "k": "int",
+              "v": 1
+             }
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "exprS",
+           "e": {
+            "k": "call",
+            "f": "sdssetlen",
+            "args": [
+             {
+              "k": "name",
+              "v": "s"
+             },
+             {
+              "k": "name",
+              "v": "len"
+             }
+            ]
+           }
+          },
+          "b": {
+           "k": "ret",
+           "e": {
+            "k": "name",
+            "v": "s"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscatlen",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "t",
+   "len"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "curlen",
+      "e": {
+       "k": "call",
+       "f": "sdslen",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "s",
+       "e": {
+        "k": "call",
+        "f": "sdsMakeRoomFor",
+        "args": [
+         {
+          "k": "name",
+          "v": "s"
+         },
+         {
+          "k": "name",
+          "v": "len"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ifte",
+        "c": {
+         "k": "binop",
+         "op": "==",
+         "a": {
+          "k": "name",
+          "v": "s"
+         },
+         "b": {
+          "k": "name",
+          "v": "NULL"
+         }
+        },
+        "t": {
+         "k": "ret",
+         "e": {
+          "k": "name",
+          "v": "NULL"
+         }
+        },
+        "e": {
+         "k": "skip"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "exprS",
+         "e": {
+          "k": "call",
+          "f": "memcpy",
+          "args": [
+           {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "name",
+             "v": "s"
+            },
+            "b": {
+             "k": "name",
+             "v": "curlen"
+            }
+           },
+           {
+            "k": "name",
+            "v": "t"
+           },
+           {
+            "k": "name",
+            "v": "len"
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "exprS",
+          "e": {
+           "k": "call",
+           "f": "sdssetlen",
+           "args": [
+            {
+             "k": "name",
+             "v": "s"
+            },
+            {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "name",
+              "v": "curlen"
+             },
+             "b": {
+              "k": "name",
+              "v": "len"
+             }
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "holeS",
+           "label": "assign:lhs:indirectIndexAccess"
+          },
+          "b": {
+           "k": "ret",
+           "e": {
+            "k": "name",
+            "v": "s"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscat",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "t"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "sdscatlen",
+    "args": [
+     {
+      "k": "name",
+      "v": "s"
+     },
+     {
+      "k": "name",
+      "v": "t"
+     },
+     {
+      "k": "call",
+      "f": "strlen",
+      "args": [
+       {
+        "k": "name",
+        "v": "t"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdscatsds",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "t"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "sdscatlen",
+    "args": [
+     {
+      "k": "name",
+      "v": "s"
+     },
+     {
+      "k": "name",
+      "v": "t"
+     },
+     {
+      "k": "call",
+      "f": "sdslen",
+      "args": [
+       {
+        "k": "name",
+        "v": "t"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdscpylen",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "t",
+   "len"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "<",
+      "a": {
+       "k": "call",
+       "f": "sdsalloc",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      },
+      "b": {
+       "k": "name",
+       "v": "len"
+      }
+     },
+     "t": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "s",
+       "e": {
+        "k": "call",
+        "f": "sdsMakeRoomFor",
+        "args": [
+         {
+          "k": "name",
+          "v": "s"
+         },
+         {
+          "k": "binop",
+          "op": "-",
+          "a": {
+           "k": "name",
+           "v": "len"
+          },
+          "b": {
+           "k": "call",
+           "f": "sdslen",
+           "args": [
+            {
+             "k": "name",
+             "v": "s"
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "ifte",
+       "c": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "name",
+         "v": "s"
+        },
+        "b": {
+         "k": "name",
+         "v": "NULL"
+        }
+       },
+       "t": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "NULL"
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "call",
+       "f": "memcpy",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        },
+        {
+         "k": "name",
+         "v": "t"
+        },
+        {
+         "k": "name",
+         "v": "len"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "assign:lhs:indirectIndexAccess"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "call",
+         "f": "sdssetlen",
+         "args": [
+          {
+           "k": "name",
+           "v": "s"
+          },
+          {
+           "k": "name",
+           "v": "len"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscpy",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "t"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "sdscpylen",
+    "args": [
+     {
+      "k": "name",
+      "v": "s"
+     },
+     {
+      "k": "name",
+      "v": "t"
+     },
+     {
+      "k": "call",
+      "f": "strlen",
+      "args": [
+       {
+        "k": "name",
+        "v": "t"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdsll2str",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "value"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ifte",
+          "c": {
+           "k": "binop",
+           "op": "<",
+           "a": {
+            "k": "name",
+            "v": "value"
+           },
+           "b": {
+            "k": "int",
+            "v": 0
+           }
+          },
+          "t": {
+           "k": "ifte",
+           "c": {
+            "k": "binop",
+            "op": "!=",
+            "a": {
+             "k": "name",
+             "v": "value"
+            },
+            "b": {
+             "k": "name",
+             "v": "LLONG_MIN"
+            }
+           },
+           "t": {
+            "k": "assign",
+            "x": "v",
+            "e": {
+             "k": "unop",
+             "op": "-",
+             "a": {
+              "k": "name",
+              "v": "value"
+             }
+            }
+           },
+           "e": {
+            "k": "assign",
+            "x": "v",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "hole",
+              "label": "op:cast"
+             },
+             "b": {
+              "k": "int",
+              "v": 1
+             }
+            }
+           }
+          },
+          "e": {
+           "k": "assign",
+           "x": "v",
+           "e": {
+            "k": "name",
+            "v": "value"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "p",
+           "e": {
+            "k": "name",
+            "v": "s"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "loop",
+            "c": {
+             "k": "hole",
+             "label": "expr:BLOCK-prelude"
+            },
+            "body": {
+             "k": "exprS",
+             "e": {
+              "k": "binop",
+              "op": "!=",
+              "a": {
+               "k": "name",
+               "v": "v"
+              },
+              "b": {
+               "k": "int",
+               "v": 0
+              }
+             }
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "ifte",
+             "c": {
+              "k": "binop",
+              "op": "<",
+              "a": {
+               "k": "name",
+               "v": "value"
+              },
+              "b": {
+               "k": "int",
+               "v": 0
+              }
+             },
+             "t": {
+              "k": "holeS",
+              "label": "assign:lhs:indirection"
+             },
+             "e": {
+              "k": "skip"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "l",
+              "e": {
+               "k": "hole",
+               "label": "cstr:pointer-arith"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "holeS",
+               "label": "assign:lhs:indirection"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "exprS",
+                "e": {
+                 "k": "hole",
+                 "label": "op:postDecrement"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "loop",
+                 "c": {
+                  "k": "hole",
+                  "label": "cstr:address-compare"
+                 },
+                 "body": {
+                  "k": "seq",
+                  "a": {
+                   "k": "assign",
+                   "x": "aux",
+                   "e": {
+                    "k": "hole",
+                    "label": "op:indirection"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "holeS",
+                    "label": "assign:lhs:indirection"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "holeS",
+                     "label": "assign:lhs:indirection"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "hole",
+                       "label": "op:postIncrement"
+                      }
+                     },
+                     "b": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "hole",
+                       "label": "op:postDecrement"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "b": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "l"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsull2str",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "v"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "p",
+       "e": {
+        "k": "name",
+        "v": "s"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "hole",
+         "label": "expr:BLOCK-prelude"
+        },
+        "body": {
+         "k": "exprS",
+         "e": {
+          "k": "binop",
+          "op": "!=",
+          "a": {
+           "k": "name",
+           "v": "v"
+          },
+          "b": {
+           "k": "int",
+           "v": 0
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "l",
+         "e": {
+          "k": "hole",
+          "label": "cstr:pointer-arith"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "holeS",
+          "label": "assign:lhs:indirection"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "exprS",
+           "e": {
+            "k": "hole",
+            "label": "op:postDecrement"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "loop",
+            "c": {
+             "k": "hole",
+             "label": "cstr:address-compare"
+            },
+            "body": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "aux",
+              "e": {
+               "k": "hole",
+               "label": "op:indirection"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "holeS",
+               "label": "assign:lhs:indirection"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "holeS",
+                "label": "assign:lhs:indirection"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "hole",
+                  "label": "op:postIncrement"
+                 }
+                },
+                "b": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "hole",
+                  "label": "op:postDecrement"
+                 }
+                }
+               }
+              }
+             }
+            }
+           },
+           "b": {
+            "k": "ret",
+            "e": {
+             "k": "name",
+             "v": "l"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsfromlonglong",
+  "file": "sds.c",
+  "params": [
+   "value"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "buf",
+     "e": {
+      "k": "hole",
+      "label": "op:alloc"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "len",
+       "e": {
+        "k": "call",
+        "f": "sdsll2str",
+        "args": [
+         {
+          "k": "name",
+          "v": "buf"
+         },
+         {
+          "k": "name",
+          "v": "value"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "call",
+        "f": "sdsnewlen",
+        "args": [
+         {
+          "k": "name",
+          "v": "buf"
+         },
+         {
+          "k": "name",
+          "v": "len"
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscatvprintf",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "fmt",
+   "ap"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "staticbuf",
+         "e": {
+          "k": "hole",
+          "label": "op:alloc"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "buf",
+          "e": {
+           "k": "name",
+           "v": "staticbuf"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "buflen",
+            "e": {
+             "k": "binop",
+             "op": "*",
+             "a": {
+              "k": "call",
+              "f": "strlen",
+              "args": [
+               {
+                "k": "name",
+                "v": "fmt"
+               }
+              ]
+             },
+             "b": {
+              "k": "int",
+              "v": 2
+             }
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "ifte",
+              "c": {
+               "k": "binop",
+               "op": ">",
+               "a": {
+                "k": "name",
+                "v": "buflen"
+               },
+               "b": {
+                "k": "hole",
+                "label": "op:sizeOf"
+               }
+              },
+              "t": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "buf",
+                "e": {
+                 "k": "call",
+                 "f": "s_malloc",
+                 "args": [
+                  {
+                   "args": [
+                    {
+                     "v": "buflen",
+                     "k": "name"
+                    }
+                   ],
+                   "f": "malloc",
+                   "k": "call"
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "ifte",
+                "c": {
+                 "k": "hole",
+                 "label": "cstr:address-equality"
+                },
+                "t": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "NULL"
+                 }
+                },
+                "e": {
+                 "k": "skip"
+                }
+               }
+              },
+              "e": {
+               "k": "assign",
+               "x": "buflen",
+               "e": {
+                "k": "hole",
+                "label": "op:sizeOf"
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "loop",
+               "c": {
+                "k": "int",
+                "v": 1
+               },
+               "body": {
+                "k": "seq",
+                "a": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "call",
+                  "f": "va_copy",
+                  "args": [
+                   {
+                    "k": "name",
+                    "v": "cpy"
+                   },
+                   {
+                    "k": "name",
+                    "v": "ap"
+                   }
+                  ]
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "bufstrlen",
+                  "e": {
+                   "k": "call",
+                   "f": "vsnprintf",
+                   "args": [
+                    {
+                     "k": "name",
+                     "v": "buf"
+                    },
+                    {
+                     "k": "name",
+                     "v": "buflen"
+                    },
+                    {
+                     "k": "name",
+                     "v": "fmt"
+                    },
+                    {
+                     "k": "name",
+                     "v": "cpy"
+                    }
+                   ]
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "exprS",
+                   "e": {
+                    "k": "call",
+                    "f": "va_end",
+                    "args": [
+                     {
+                      "k": "name",
+                      "v": "cpy"
+                     }
+                    ]
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "ifte",
+                    "c": {
+                     "k": "binop",
+                     "op": "<",
+                     "a": {
+                      "k": "name",
+                      "v": "bufstrlen"
+                     },
+                     "b": {
+                      "k": "int",
+                      "v": 0
+                     }
+                    },
+                    "t": {
+                     "k": "seq",
+                     "a": {
+                      "k": "ifte",
+                      "c": {
+                       "k": "hole",
+                       "label": "cstr:address-equality"
+                      },
+                      "t": {
+                       "k": "exprS",
+                       "e": {
+                        "k": "call",
+                        "f": "s_free",
+                        "args": [
+                         {
+                          "args": [
+                           {
+                            "v": "buf",
+                            "k": "name"
+                           }
+                          ],
+                          "f": "free",
+                          "k": "call"
+                         }
+                        ]
+                       }
+                      },
+                      "e": {
+                       "k": "skip"
+                      }
+                     },
+                     "b": {
+                      "k": "ret",
+                      "e": {
+                       "k": "name",
+                       "v": "NULL"
+                      }
+                     }
+                    },
+                    "e": {
+                     "k": "skip"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "ifte",
+                     "c": {
+                      "k": "binop",
+                      "op": ">=",
+                      "a": {
+                       "k": "hole",
+                       "label": "op:cast"
+                      },
+                      "b": {
+                       "k": "name",
+                       "v": "buflen"
+                      }
+                     },
+                     "t": {
+                      "k": "seq",
+                      "a": {
+                       "k": "ifte",
+                       "c": {
+                        "k": "hole",
+                        "label": "cstr:address-equality"
+                       },
+                       "t": {
+                        "k": "exprS",
+                        "e": {
+                         "k": "call",
+                         "f": "s_free",
+                         "args": [
+                          {
+                           "args": [
+                            {
+                             "v": "buf",
+                             "k": "name"
+                            }
+                           ],
+                           "f": "free",
+                           "k": "call"
+                          }
+                         ]
+                        }
+                       },
+                       "e": {
+                        "k": "skip"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "assign",
+                        "x": "buflen",
+                        "e": {
+                         "k": "binop",
+                         "op": "+",
+                         "a": {
+                          "k": "hole",
+                          "label": "op:cast"
+                         },
+                         "b": {
+                          "k": "int",
+                          "v": 1
+                         }
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "assign",
+                         "x": "buf",
+                         "e": {
+                          "k": "call",
+                          "f": "s_malloc",
+                          "args": [
+                           {
+                            "args": [
+                             {
+                              "v": "buflen",
+                              "k": "name"
+                             }
+                            ],
+                            "f": "malloc",
+                            "k": "call"
+                           }
+                          ]
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "ifte",
+                          "c": {
+                           "k": "hole",
+                           "label": "cstr:address-equality"
+                          },
+                          "t": {
+                           "k": "ret",
+                           "e": {
+                            "k": "name",
+                            "v": "NULL"
+                           }
+                          },
+                          "e": {
+                           "k": "skip"
+                          }
+                         },
+                         "b": {
+                          "k": "cont"
+                         }
+                        }
+                       }
+                      }
+                     },
+                     "e": {
+                      "k": "skip"
+                     }
+                    },
+                    "b": {
+                     "k": "brk"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "t",
+                "e": {
+                 "k": "call",
+                 "f": "sdscatlen",
+                 "args": [
+                  {
+                   "k": "name",
+                   "v": "s"
+                  },
+                  {
+                   "k": "name",
+                   "v": "buf"
+                  },
+                  {
+                   "k": "name",
+                   "v": "bufstrlen"
+                  }
+                 ]
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "ifte",
+                 "c": {
+                  "k": "hole",
+                  "label": "cstr:address-equality"
+                 },
+                 "t": {
+                  "k": "exprS",
+                  "e": {
+                   "k": "call",
+                   "f": "s_free",
+                   "args": [
+                    {
+                     "args": [
+                      {
+                       "v": "buf",
+                       "k": "name"
+                      }
+                     ],
+                     "f": "free",
+                     "k": "call"
+                    }
+                   ]
+                  }
+                 },
+                 "e": {
+                  "k": "skip"
+                 }
+                },
+                "b": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "t"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscatprintf",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "fmt",
+   "<param>3"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "exprS",
+      "e": {
+       "k": "call",
+       "f": "va_start",
+       "args": [
+        {
+         "k": "name",
+         "v": "ap"
+        },
+        {
+         "k": "name",
+         "v": "fmt"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "t",
+       "e": {
+        "k": "call",
+        "f": "sdscatvprintf",
+        "args": [
+         {
+          "k": "name",
+          "v": "s"
+         },
+         {
+          "k": "name",
+          "v": "fmt"
+         },
+         {
+          "k": "name",
+          "v": "ap"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "exprS",
+        "e": {
+         "k": "call",
+         "f": "va_end",
+         "args": [
+          {
+           "k": "name",
+           "v": "ap"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "t"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscatfmt",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "fmt",
+   "<param>3"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "initlen",
+     "e": {
+      "k": "call",
+      "f": "sdslen",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "f",
+       "e": {
+        "k": "name",
+        "v": "fmt"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "call",
+           "f": "sdsMakeRoomFor",
+           "args": [
+            {
+             "k": "name",
+             "v": "s"
+            },
+            {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "name",
+              "v": "initlen"
+             },
+             "b": {
+              "k": "binop",
+              "op": "*",
+              "a": {
+               "k": "call",
+               "f": "strlen",
+               "args": [
+                {
+                 "k": "name",
+                 "v": "fmt"
+                }
+               ]
+              },
+              "b": {
+               "k": "int",
+               "v": 2
+              }
+             }
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "exprS",
+           "e": {
+            "k": "call",
+            "f": "va_start",
+            "args": [
+             {
+              "k": "name",
+              "v": "ap"
+             },
+             {
+              "k": "name",
+              "v": "fmt"
+             }
+            ]
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "f",
+            "e": {
+             "k": "name",
+             "v": "fmt"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "i",
+             "e": {
+              "k": "name",
+              "v": "initlen"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "loop",
+              "c": {
+               "k": "hole",
+               "label": "op:indirection"
+              },
+              "body": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "ifte",
+                     "c": {
+                      "k": "binop",
+                      "op": "==",
+                      "a": {
+                       "k": "call",
+                       "f": "sdsavail",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "s"
+                        }
+                       ]
+                      },
+                      "b": {
+                       "k": "int",
+                       "v": 0
+                      }
+                     },
+                     "t": {
+                      "k": "assign",
+                      "x": "s",
+                      "e": {
+                       "k": "call",
+                       "f": "sdsMakeRoomFor",
+                       "args": [
+                        {
+                         "k": "name",
+                         "v": "s"
+                        },
+                        {
+                         "k": "int",
+                         "v": 1
+                        }
+                       ]
+                      }
+                     },
+                     "e": {
+                      "k": "skip"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "holeS",
+                      "label": "control:SWITCH"
+                     },
+                     "b": {
+                      "k": "exprS",
+                      "e": {
+                       "k": "hole",
+                       "label": "op:postIncrement"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "exprS",
+               "e": {
+                "k": "call",
+                "f": "va_end",
+                "args": [
+                 {
+                  "k": "name",
+                  "v": "ap"
+                 }
+                ]
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "holeS",
+                "label": "assign:lhs:indirectIndexAccess"
+               },
+               "b": {
+                "k": "ret",
+                "e": {
+                 "k": "name",
+                 "v": "s"
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdstrim",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "cset"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "sp",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "ep",
+         "e": {
+          "k": "hole",
+          "label": "op:assignment"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "loop",
+          "c": {
+           "k": "binop",
+           "op": "&&",
+           "a": {
+            "k": "hole",
+            "label": "cstr:address-compare"
+           },
+           "b": {
+            "k": "call",
+            "f": "strchr",
+            "args": [
+             {
+              "k": "name",
+              "v": "cset"
+             },
+             {
+              "k": "hole",
+              "label": "op:indirection"
+             }
+            ]
+           }
+          },
+          "body": {
+           "k": "exprS",
+           "e": {
+            "k": "hole",
+            "label": "op:postIncrement"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "loop",
+           "c": {
+            "k": "binop",
+            "op": "&&",
+            "a": {
+             "k": "hole",
+             "label": "cstr:address-compare"
+            },
+            "b": {
+             "k": "call",
+             "f": "strchr",
+             "args": [
+              {
+               "k": "name",
+               "v": "cset"
+              },
+              {
+               "k": "hole",
+               "label": "op:indirection"
+              }
+             ]
+            }
+           },
+           "body": {
+            "k": "exprS",
+            "e": {
+             "k": "hole",
+             "label": "op:postDecrement"
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "len",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "hole",
+              "label": "cstr:pointer-arith"
+             },
+             "b": {
+              "k": "int",
+              "v": 1
+             }
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "ifte",
+             "c": {
+              "k": "hole",
+              "label": "cstr:address-equality"
+             },
+             "t": {
+              "k": "exprS",
+              "e": {
+               "k": "call",
+               "f": "memmove",
+               "args": [
+                {
+                 "k": "name",
+                 "v": "s"
+                },
+                {
+                 "k": "name",
+                 "v": "sp"
+                },
+                {
+                 "k": "name",
+                 "v": "len"
+                }
+               ]
+              }
+             },
+             "e": {
+              "k": "skip"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "holeS",
+              "label": "assign:lhs:indirectIndexAccess"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "exprS",
+               "e": {
+                "k": "call",
+                "f": "sdssetlen",
+                "args": [
+                 {
+                  "k": "name",
+                  "v": "s"
+                 },
+                 {
+                  "k": "name",
+                  "v": "len"
+                 }
+                ]
+               }
+              },
+              "b": {
+               "k": "ret",
+               "e": {
+                "k": "name",
+                "v": "s"
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsrange",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "start",
+   "end"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "len",
+      "e": {
+       "k": "call",
+       "f": "sdslen",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "ifte",
+       "c": {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "name",
+         "v": "len"
+        },
+        "b": {
+         "k": "int",
+         "v": 0
+        }
+       },
+       "t": {
+        "k": "ret",
+        "e": {
+         "k": "unit"
+        }
+       },
+       "e": {
+        "k": "skip"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ifte",
+        "c": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "start"
+         },
+         "b": {
+          "k": "int",
+          "v": 0
+         }
+        },
+        "t": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "start",
+          "e": {
+           "k": "binop",
+           "op": "+",
+           "a": {
+            "k": "name",
+            "v": "len"
+           },
+           "b": {
+            "k": "name",
+            "v": "start"
+           }
+          }
+         },
+         "b": {
+          "k": "ifte",
+          "c": {
+           "k": "binop",
+           "op": "<",
+           "a": {
+            "k": "name",
+            "v": "start"
+           },
+           "b": {
+            "k": "int",
+            "v": 0
+           }
+          },
+          "t": {
+           "k": "assign",
+           "x": "start",
+           "e": {
+            "k": "int",
+            "v": 0
+           }
+          },
+          "e": {
+           "k": "skip"
+          }
+         }
+        },
+        "e": {
+         "k": "skip"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "<",
+          "a": {
+           "k": "name",
+           "v": "end"
+          },
+          "b": {
+           "k": "int",
+           "v": 0
+          }
+         },
+         "t": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "end",
+           "e": {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "name",
+             "v": "len"
+            },
+            "b": {
+             "k": "name",
+             "v": "end"
+            }
+           }
+          },
+          "b": {
+           "k": "ifte",
+           "c": {
+            "k": "binop",
+            "op": "<",
+            "a": {
+             "k": "name",
+             "v": "end"
+            },
+            "b": {
+             "k": "int",
+             "v": 0
+            }
+           },
+           "t": {
+            "k": "assign",
+            "x": "end",
+            "e": {
+             "k": "int",
+             "v": 0
+            }
+           },
+           "e": {
+            "k": "skip"
+           }
+          }
+         },
+         "e": {
+          "k": "skip"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "newlen",
+          "e": {
+           "k": "cond",
+           "c": {
+            "k": "binop",
+            "op": ">",
+            "a": {
+             "k": "name",
+             "v": "start"
+            },
+            "b": {
+             "k": "name",
+             "v": "end"
+            }
+           },
+           "t": {
+            "k": "int",
+            "v": 0
+           },
+           "e": {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "binop",
+             "op": "-",
+             "a": {
+              "k": "name",
+              "v": "end"
+             },
+             "b": {
+              "k": "name",
+              "v": "start"
+             }
+            },
+            "b": {
+             "k": "int",
+             "v": 1
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "ifte",
+           "c": {
+            "k": "binop",
+            "op": "!=",
+            "a": {
+             "k": "name",
+             "v": "newlen"
+            },
+            "b": {
+             "k": "int",
+             "v": 0
+            }
+           },
+           "t": {
+            "k": "ifte",
+            "c": {
+             "k": "binop",
+             "op": ">=",
+             "a": {
+              "k": "name",
+              "v": "start"
+             },
+             "b": {
+              "k": "hole",
+              "label": "op:cast"
+             }
+            },
+            "t": {
+             "k": "assign",
+             "x": "newlen",
+             "e": {
+              "k": "int",
+              "v": 0
+             }
+            },
+            "e": {
+             "k": "ifte",
+             "c": {
+              "k": "binop",
+              "op": ">=",
+              "a": {
+               "k": "name",
+               "v": "end"
+              },
+              "b": {
+               "k": "hole",
+               "label": "op:cast"
+              }
+             },
+             "t": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "end",
+               "e": {
+                "k": "binop",
+                "op": "-",
+                "a": {
+                 "k": "name",
+                 "v": "len"
+                },
+                "b": {
+                 "k": "int",
+                 "v": 1
+                }
+               }
+              },
+              "b": {
+               "k": "assign",
+               "x": "newlen",
+               "e": {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "binop",
+                 "op": "-",
+                 "a": {
+                  "k": "name",
+                  "v": "end"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "start"
+                 }
+                },
+                "b": {
+                 "k": "int",
+                 "v": 1
+                }
+               }
+              }
+             },
+             "e": {
+              "k": "skip"
+             }
+            }
+           },
+           "e": {
+            "k": "skip"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "ifte",
+            "c": {
+             "k": "binop",
+             "op": "&&",
+             "a": {
+              "k": "name",
+              "v": "start"
+             },
+             "b": {
+              "k": "name",
+              "v": "newlen"
+             }
+            },
+            "t": {
+             "k": "exprS",
+             "e": {
+              "k": "call",
+              "f": "memmove",
+              "args": [
+               {
+                "k": "name",
+                "v": "s"
+               },
+               {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "name",
+                 "v": "s"
+                },
+                "b": {
+                 "k": "name",
+                 "v": "start"
+                }
+               },
+               {
+                "k": "name",
+                "v": "newlen"
+               }
+              ]
+             }
+            },
+            "e": {
+             "k": "skip"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "holeS",
+             "label": "assign:lhs:indirectIndexAccess"
+            },
+            "b": {
+             "k": "exprS",
+             "e": {
+              "k": "call",
+              "f": "sdssetlen",
+              "args": [
+               {
+                "k": "name",
+                "v": "s"
+               },
+               {
+                "k": "name",
+                "v": "newlen"
+               }
+              ]
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdstolower",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "len",
+      "e": {
+       "k": "call",
+       "f": "sdslen",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "holeS",
+      "label": "control:FOR"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdstoupper",
+  "file": "sds.c",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "len",
+      "e": {
+       "k": "call",
+       "f": "sdslen",
+       "args": [
+        {
+         "k": "name",
+         "v": "s"
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "holeS",
+      "label": "control:FOR"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscmp",
+  "file": "sds.c",
+  "params": [
+   "s1",
+   "s2"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "l1",
+        "e": {
+         "k": "call",
+         "f": "sdslen",
+         "args": [
+          {
+           "k": "name",
+           "v": "s1"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "l2",
+         "e": {
+          "k": "call",
+          "f": "sdslen",
+          "args": [
+           {
+            "k": "name",
+            "v": "s2"
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "minlen",
+          "e": {
+           "k": "cond",
+           "c": {
+            "k": "binop",
+            "op": "<",
+            "a": {
+             "k": "name",
+             "v": "l1"
+            },
+            "b": {
+             "k": "name",
+             "v": "l2"
+            }
+           },
+           "t": {
+            "k": "name",
+            "v": "l1"
+           },
+           "e": {
+            "k": "name",
+            "v": "l2"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "cmp",
+           "e": {
+            "k": "call",
+            "f": "memcmp",
+            "args": [
+             {
+              "k": "name",
+              "v": "s1"
+             },
+             {
+              "k": "name",
+              "v": "s2"
+             },
+             {
+              "k": "name",
+              "v": "minlen"
+             }
+            ]
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "ifte",
+            "c": {
+             "k": "binop",
+             "op": "==",
+             "a": {
+              "k": "name",
+              "v": "cmp"
+             },
+             "b": {
+              "k": "int",
+              "v": 0
+             }
+            },
+            "t": {
+             "k": "ret",
+             "e": {
+              "k": "cond",
+              "c": {
+               "k": "binop",
+               "op": ">",
+               "a": {
+                "k": "name",
+                "v": "l1"
+               },
+               "b": {
+                "k": "name",
+                "v": "l2"
+               }
+              },
+              "t": {
+               "k": "int",
+               "v": 1
+              },
+              "e": {
+               "k": "cond",
+               "c": {
+                "k": "binop",
+                "op": "<",
+                "a": {
+                 "k": "name",
+                 "v": "l1"
+                },
+                "b": {
+                 "k": "name",
+                 "v": "l2"
+                }
+               },
+               "t": {
+                "k": "unop",
+                "op": "-",
+                "a": {
+                 "k": "int",
+                 "v": 1
+                }
+               },
+               "e": {
+                "k": "int",
+                "v": 0
+               }
+              }
+             }
+            },
+            "e": {
+             "k": "skip"
+            }
+           },
+           "b": {
+            "k": "ret",
+            "e": {
+             "k": "name",
+             "v": "cmp"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdssplitlen",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "len",
+   "sep",
+   "seplen",
+   "count"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "elements",
+        "e": {
+         "k": "int",
+         "v": 0
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "slots",
+         "e": {
+          "k": "int",
+          "v": 5
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "start",
+            "e": {
+             "k": "int",
+             "v": 0
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "ifte",
+              "c": {
+               "k": "binop",
+               "op": "||",
+               "a": {
+                "k": "binop",
+                "op": "<",
+                "a": {
+                 "k": "name",
+                 "v": "seplen"
+                },
+                "b": {
+                 "k": "int",
+                 "v": 1
+                }
+               },
+               "b": {
+                "k": "binop",
+                "op": "<=",
+                "a": {
+                 "k": "name",
+                 "v": "len"
+                },
+                "b": {
+                 "k": "int",
+                 "v": 0
+                }
+               }
+              },
+              "t": {
+               "k": "seq",
+               "a": {
+                "k": "holeS",
+                "label": "assign:lhs:indirection"
+               },
+               "b": {
+                "k": "ret",
+                "e": {
+                 "k": "name",
+                 "v": "NULL"
+                }
+               }
+              },
+              "e": {
+               "k": "skip"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "tokens",
+               "e": {
+                "k": "call",
+                "f": "s_malloc",
+                "args": [
+                 {
+                  "args": [
+                   {
+                    "a": {
+                     "k": "hole",
+                     "label": "op:sizeOf"
+                    },
+                    "op": "*",
+                    "b": {
+                     "v": "slots",
+                     "k": "name"
+                    },
+                    "k": "binop"
+                   }
+                  ],
+                  "f": "malloc",
+                  "k": "call"
+                 }
+                ]
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "ifte",
+                "c": {
+                 "k": "binop",
+                 "op": "==",
+                 "a": {
+                  "k": "name",
+                  "v": "tokens"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "NULL"
+                 }
+                },
+                "t": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "NULL"
+                 }
+                },
+                "e": {
+                 "k": "skip"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "holeS",
+                 "label": "control:FOR"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "holeS",
+                  "label": "assign:lhs:indirectIndexAccess"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "ifte",
+                   "c": {
+                    "k": "binop",
+                    "op": "==",
+                    "a": {
+                     "k": "hole",
+                     "label": "op:indirectIndexAccess"
+                    },
+                    "b": {
+                     "k": "name",
+                     "v": "NULL"
+                    }
+                   },
+                   "t": {
+                    "k": "holeS",
+                    "label": "control:GOTO"
+                   },
+                   "e": {
+                    "k": "skip"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "exprS",
+                    "e": {
+                     "k": "hole",
+                     "label": "op:postIncrement"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "holeS",
+                     "label": "assign:lhs:indirection"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "ret",
+                      "e": {
+                       "k": "name",
+                       "v": "tokens"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "skip"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "holeS",
+                         "label": "control:FOR"
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "exprS",
+                          "e": {
+                           "k": "call",
+                           "f": "s_free",
+                           "args": [
+                            {
+                             "args": [
+                              {
+                               "v": "tokens",
+                               "k": "name"
+                              }
+                             ],
+                             "f": "free",
+                             "k": "call"
+                            }
+                           ]
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "holeS",
+                           "label": "assign:lhs:indirection"
+                          },
+                          "b": {
+                           "k": "ret",
+                           "e": {
+                            "k": "name",
+                            "v": "NULL"
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsfreesplitres",
+  "file": "sds.c",
+  "params": [
+   "tokens",
+   "count"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "unop",
+     "op": "!",
+     "a": {
+      "k": "name",
+      "v": "tokens"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "unit"
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "loop",
+     "c": {
+      "k": "hole",
+      "label": "op:postDecrement"
+     },
+     "body": {
+      "k": "exprS",
+      "e": {
+       "k": "call",
+       "f": "sdsfree",
+       "args": [
+        {
+         "k": "hole",
+         "label": "op:indirectIndexAccess"
+        }
+       ]
+      }
+     }
+    },
+    "b": {
+     "k": "exprS",
+     "e": {
+      "k": "call",
+      "f": "s_free",
+      "args": [
+       {
+        "args": [
+         {
+          "v": "tokens",
+          "k": "name"
+         }
+        ],
+        "f": "free",
+        "k": "call"
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdscatrepr",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "p",
+   "len"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "s",
+    "e": {
+     "k": "call",
+     "f": "sdscatlen",
+     "args": [
+      {
+       "k": "name",
+       "v": "s"
+      },
+      {
+       "k": "str",
+       "v": "\\\""
+      },
+      {
+       "k": "int",
+       "v": 1
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "loop",
+     "c": {
+      "k": "hole",
+      "label": "op:postDecrement"
+     },
+     "body": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "control:SWITCH"
+      },
+      "b": {
+       "k": "exprS",
+       "e": {
+        "k": "hole",
+        "label": "op:postIncrement"
+       }
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "call",
+      "f": "sdscatlen",
+      "args": [
+       {
+        "k": "name",
+        "v": "s"
+       },
+       {
+        "k": "str",
+        "v": "\\\""
+       },
+       {
+        "k": "int",
+        "v": 1
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "is_hex_digit",
+  "file": "sds.c",
+  "params": [
+   "c"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "||",
+    "a": {
+     "k": "binop",
+     "op": "||",
+     "a": {
+      "k": "binop",
+      "op": "&&",
+      "a": {
+       "k": "binop",
+       "op": ">=",
+       "a": {
+        "k": "name",
+        "v": "c"
+       },
+       "b": {
+        "k": "str",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "binop",
+       "op": "<=",
+       "a": {
+        "k": "name",
+        "v": "c"
+       },
+       "b": {
+        "k": "str",
+        "v": "9"
+       }
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": "&&",
+      "a": {
+       "k": "binop",
+       "op": ">=",
+       "a": {
+        "k": "name",
+        "v": "c"
+       },
+       "b": {
+        "k": "str",
+        "v": "a"
+       }
+      },
+      "b": {
+       "k": "binop",
+       "op": "<=",
+       "a": {
+        "k": "name",
+        "v": "c"
+       },
+       "b": {
+        "k": "str",
+        "v": "f"
+       }
+      }
+     }
+    },
+    "b": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "binop",
+      "op": ">=",
+      "a": {
+       "k": "name",
+       "v": "c"
+      },
+      "b": {
+       "k": "str",
+       "v": "A"
+      }
+     },
+     "b": {
+      "k": "binop",
+      "op": "<=",
+      "a": {
+       "k": "name",
+       "v": "c"
+      },
+      "b": {
+       "k": "str",
+       "v": "F"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "hex_digit_to_int",
+  "file": "sds.c",
+  "params": [
+   "c"
+  ],
+  "body": {
+   "k": "holeS",
+   "label": "control:SWITCH"
+  }
+ },
+ {
+  "name": "sdssplitargs",
+  "file": "sds.c",
+  "params": [
+   "line",
+   "argc"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "p",
+        "e": {
+         "k": "name",
+         "v": "line"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "current",
+          "e": {
+           "k": "name",
+           "v": "NULL"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "vector",
+            "e": {
+             "k": "name",
+             "v": "NULL"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "holeS",
+             "label": "assign:lhs:indirection"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "loop",
+              "c": {
+               "k": "int",
+               "v": 1
+              },
+              "body": {
+               "k": "seq",
+               "a": {
+                "k": "loop",
+                "c": {
+                 "k": "binop",
+                 "op": "&&",
+                 "a": {
+                  "k": "hole",
+                  "label": "op:indirection"
+                 },
+                 "b": {
+                  "k": "call",
+                  "f": "isspace",
+                  "args": [
+                   {
+                    "k": "hole",
+                    "label": "op:indirection"
+                   }
+                  ]
+                 }
+                },
+                "body": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "hole",
+                  "label": "op:postIncrement"
+                 }
+                }
+               },
+               "b": {
+                "k": "ifte",
+                "c": {
+                 "k": "hole",
+                 "label": "op:indirection"
+                },
+                "t": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "assign",
+                   "x": "inq",
+                   "e": {
+                    "k": "int",
+                    "v": 0
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "assign",
+                     "x": "insq",
+                     "e": {
+                      "k": "int",
+                      "v": 0
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "assign",
+                       "x": "done",
+                       "e": {
+                        "k": "int",
+                        "v": 0
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "ifte",
+                        "c": {
+                         "k": "hole",
+                         "label": "cstr:address-equality"
+                        },
+                        "t": {
+                         "k": "assign",
+                         "x": "current",
+                         "e": {
+                          "k": "call",
+                          "f": "sdsempty",
+                          "args": []
+                         }
+                        },
+                        "e": {
+                         "k": "skip"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "loop",
+                         "c": {
+                          "k": "unop",
+                          "op": "!",
+                          "a": {
+                           "k": "name",
+                           "v": "done"
+                          }
+                         },
+                         "body": {
+                          "k": "seq",
+                          "a": {
+                           "k": "ifte",
+                           "c": {
+                            "k": "binop",
+                            "op": "!=",
+                            "a": {
+                             "k": "name",
+                             "v": "inq"
+                            },
+                            "b": {
+                             "k": "int",
+                             "v": 0
+                            }
+                           },
+                           "t": {
+                            "k": "ifte",
+                            "c": {
+                             "k": "binop",
+                             "op": "&&",
+                             "a": {
+                              "k": "binop",
+                              "op": "&&",
+                              "a": {
+                               "k": "binop",
+                               "op": "&&",
+                               "a": {
+                                "k": "binop",
+                                "op": "==",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                },
+                                "b": {
+                                 "k": "str",
+                                 "v": "\\\\"
+                                }
+                               },
+                               "b": {
+                                "k": "binop",
+                                "op": "==",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                },
+                                "b": {
+                                 "k": "str",
+                                 "v": "x"
+                                }
+                               }
+                              },
+                              "b": {
+                               "k": "call",
+                               "f": "is_hex_digit",
+                               "args": [
+                                {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                }
+                               ]
+                              }
+                             },
+                             "b": {
+                              "k": "call",
+                              "f": "is_hex_digit",
+                              "args": [
+                               {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               }
+                              ]
+                             }
+                            },
+                            "t": {
+                             "k": "seq",
+                             "a": {
+                              "k": "skip"
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "assign",
+                               "x": "byte",
+                               "e": {
+                                "k": "binop",
+                                "op": "+",
+                                "a": {
+                                 "k": "binop",
+                                 "op": "*",
+                                 "a": {
+                                  "k": "call",
+                                  "f": "hex_digit_to_int",
+                                  "args": [
+                                   {
+                                    "k": "hole",
+                                    "label": "op:indirection"
+                                   }
+                                  ]
+                                 },
+                                 "b": {
+                                  "k": "int",
+                                  "v": 16
+                                 }
+                                },
+                                "b": {
+                                 "k": "call",
+                                 "f": "hex_digit_to_int",
+                                 "args": [
+                                  {
+                                   "k": "hole",
+                                   "label": "op:indirection"
+                                  }
+                                 ]
+                                }
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "assign",
+                                "x": "current",
+                                "e": {
+                                 "k": "call",
+                                 "f": "sdscatlen",
+                                 "args": [
+                                  {
+                                   "k": "name",
+                                   "v": "current"
+                                  },
+                                  {
+                                   "k": "hole",
+                                   "label": "op:cast"
+                                  },
+                                  {
+                                   "k": "int",
+                                   "v": 1
+                                  }
+                                 ]
+                                }
+                               },
+                               "b": {
+                                "k": "holeS",
+                                "label": "cstr:pointer-arith"
+                               }
+                              }
+                             }
+                            },
+                            "e": {
+                             "k": "ifte",
+                             "c": {
+                              "k": "binop",
+                              "op": "&&",
+                              "a": {
+                               "k": "binop",
+                               "op": "==",
+                               "a": {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               },
+                               "b": {
+                                "k": "str",
+                                "v": "\\\\"
+                               }
+                              },
+                              "b": {
+                               "k": "hole",
+                               "label": "op:indirection"
+                              }
+                             },
+                             "t": {
+                              "k": "seq",
+                              "a": {
+                               "k": "skip"
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "exprS",
+                                "e": {
+                                 "k": "hole",
+                                 "label": "op:postIncrement"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "holeS",
+                                 "label": "control:SWITCH"
+                                },
+                                "b": {
+                                 "k": "assign",
+                                 "x": "current",
+                                 "e": {
+                                  "k": "call",
+                                  "f": "sdscatlen",
+                                  "args": [
+                                   {
+                                    "k": "name",
+                                    "v": "current"
+                                   },
+                                   {
+                                    "k": "hole",
+                                    "label": "op:addressOf"
+                                   },
+                                   {
+                                    "k": "int",
+                                    "v": 1
+                                   }
+                                  ]
+                                 }
+                                }
+                               }
+                              }
+                             },
+                             "e": {
+                              "k": "ifte",
+                              "c": {
+                               "k": "binop",
+                               "op": "==",
+                               "a": {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               },
+                               "b": {
+                                "k": "str",
+                                "v": "\""
+                               }
+                              },
+                              "t": {
+                               "k": "seq",
+                               "a": {
+                                "k": "ifte",
+                                "c": {
+                                 "k": "binop",
+                                 "op": "&&",
+                                 "a": {
+                                  "k": "hole",
+                                  "label": "op:indirection"
+                                 },
+                                 "b": {
+                                  "k": "unop",
+                                  "op": "!",
+                                  "a": {
+                                   "k": "call",
+                                   "f": "isspace",
+                                   "args": [
+                                    {
+                                     "k": "hole",
+                                     "label": "op:indirection"
+                                    }
+                                   ]
+                                  }
+                                 }
+                                },
+                                "t": {
+                                 "k": "holeS",
+                                 "label": "control:GOTO"
+                                },
+                                "e": {
+                                 "k": "skip"
+                                }
+                               },
+                               "b": {
+                                "k": "assign",
+                                "x": "done",
+                                "e": {
+                                 "k": "int",
+                                 "v": 1
+                                }
+                               }
+                              },
+                              "e": {
+                               "k": "ifte",
+                               "c": {
+                                "k": "unop",
+                                "op": "!",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                }
+                               },
+                               "t": {
+                                "k": "holeS",
+                                "label": "control:GOTO"
+                               },
+                               "e": {
+                                "k": "assign",
+                                "x": "current",
+                                "e": {
+                                 "k": "call",
+                                 "f": "sdscatlen",
+                                 "args": [
+                                  {
+                                   "k": "name",
+                                   "v": "current"
+                                  },
+                                  {
+                                   "k": "name",
+                                   "v": "p"
+                                  },
+                                  {
+                                   "k": "int",
+                                   "v": 1
+                                  }
+                                 ]
+                                }
+                               }
+                              }
+                             }
+                            }
+                           },
+                           "e": {
+                            "k": "ifte",
+                            "c": {
+                             "k": "binop",
+                             "op": "!=",
+                             "a": {
+                              "k": "name",
+                              "v": "insq"
+                             },
+                             "b": {
+                              "k": "int",
+                              "v": 0
+                             }
+                            },
+                            "t": {
+                             "k": "ifte",
+                             "c": {
+                              "k": "binop",
+                              "op": "&&",
+                              "a": {
+                               "k": "binop",
+                               "op": "==",
+                               "a": {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               },
+                               "b": {
+                                "k": "str",
+                                "v": "\\\\"
+                               }
+                              },
+                              "b": {
+                               "k": "binop",
+                               "op": "==",
+                               "a": {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               },
+                               "b": {
+                                "k": "str",
+                                "v": "\\'"
+                               }
+                              }
+                             },
+                             "t": {
+                              "k": "seq",
+                              "a": {
+                               "k": "exprS",
+                               "e": {
+                                "k": "hole",
+                                "label": "op:postIncrement"
+                               }
+                              },
+                              "b": {
+                               "k": "assign",
+                               "x": "current",
+                               "e": {
+                                "k": "call",
+                                "f": "sdscatlen",
+                                "args": [
+                                 {
+                                  "k": "name",
+                                  "v": "current"
+                                 },
+                                 {
+                                  "k": "str",
+                                  "v": "'"
+                                 },
+                                 {
+                                  "k": "int",
+                                  "v": 1
+                                 }
+                                ]
+                               }
+                              }
+                             },
+                             "e": {
+                              "k": "ifte",
+                              "c": {
+                               "k": "binop",
+                               "op": "==",
+                               "a": {
+                                "k": "hole",
+                                "label": "op:indirection"
+                               },
+                               "b": {
+                                "k": "str",
+                                "v": "\\'"
+                               }
+                              },
+                              "t": {
+                               "k": "seq",
+                               "a": {
+                                "k": "ifte",
+                                "c": {
+                                 "k": "binop",
+                                 "op": "&&",
+                                 "a": {
+                                  "k": "hole",
+                                  "label": "op:indirection"
+                                 },
+                                 "b": {
+                                  "k": "unop",
+                                  "op": "!",
+                                  "a": {
+                                   "k": "call",
+                                   "f": "isspace",
+                                   "args": [
+                                    {
+                                     "k": "hole",
+                                     "label": "op:indirection"
+                                    }
+                                   ]
+                                  }
+                                 }
+                                },
+                                "t": {
+                                 "k": "holeS",
+                                 "label": "control:GOTO"
+                                },
+                                "e": {
+                                 "k": "skip"
+                                }
+                               },
+                               "b": {
+                                "k": "assign",
+                                "x": "done",
+                                "e": {
+                                 "k": "int",
+                                 "v": 1
+                                }
+                               }
+                              },
+                              "e": {
+                               "k": "ifte",
+                               "c": {
+                                "k": "unop",
+                                "op": "!",
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                }
+                               },
+                               "t": {
+                                "k": "holeS",
+                                "label": "control:GOTO"
+                               },
+                               "e": {
+                                "k": "assign",
+                                "x": "current",
+                                "e": {
+                                 "k": "call",
+                                 "f": "sdscatlen",
+                                 "args": [
+                                  {
+                                   "k": "name",
+                                   "v": "current"
+                                  },
+                                  {
+                                   "k": "name",
+                                   "v": "p"
+                                  },
+                                  {
+                                   "k": "int",
+                                   "v": 1
+                                  }
+                                 ]
+                                }
+                               }
+                              }
+                             }
+                            },
+                            "e": {
+                             "k": "holeS",
+                             "label": "control:SWITCH"
+                            }
+                           }
+                          },
+                          "b": {
+                           "k": "ifte",
+                           "c": {
+                            "k": "hole",
+                            "label": "op:indirection"
+                           },
+                           "t": {
+                            "k": "exprS",
+                            "e": {
+                             "k": "hole",
+                             "label": "op:postIncrement"
+                            }
+                           },
+                           "e": {
+                            "k": "skip"
+                           }
+                          }
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "assign",
+                          "x": "vector",
+                          "e": {
+                           "k": "call",
+                           "f": "s_realloc",
+                           "args": [
+                            {
+                             "args": [
+                              {
+                               "v": "vector",
+                               "k": "name"
+                              },
+                              {
+                               "a": {
+                                "a": {
+                                 "k": "hole",
+                                 "label": "op:indirection"
+                                },
+                                "op": "+",
+                                "b": {
+                                 "v": 1,
+                                 "k": "int"
+                                },
+                                "k": "binop"
+                               },
+                               "op": "*",
+                               "b": {
+                                "k": "hole",
+                                "label": "op:sizeOf"
+                               },
+                               "k": "binop"
+                              }
+                             ],
+                             "f": "realloc",
+                             "k": "call"
+                            }
+                           ]
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "holeS",
+                           "label": "assign:lhs:indirectIndexAccess"
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "exprS",
+                            "e": {
+                             "k": "hole",
+                             "label": "op:postIncrement"
+                            }
+                           },
+                           "b": {
+                            "k": "assign",
+                            "x": "current",
+                            "e": {
+                             "k": "name",
+                             "v": "NULL"
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                },
+                "e": {
+                 "k": "seq",
+                 "a": {
+                  "k": "ifte",
+                  "c": {
+                   "k": "hole",
+                   "label": "cstr:address-equality"
+                  },
+                  "t": {
+                   "k": "assign",
+                   "x": "vector",
+                   "e": {
+                    "k": "call",
+                    "f": "s_malloc",
+                    "args": [
+                     {
+                      "args": [
+                       {
+                        "k": "hole",
+                        "label": "op:sizeOf"
+                       }
+                      ],
+                      "f": "malloc",
+                      "k": "call"
+                     }
+                    ]
+                   }
+                  },
+                  "e": {
+                   "k": "skip"
+                  }
+                 },
+                 "b": {
+                  "k": "ret",
+                  "e": {
+                   "k": "name",
+                   "v": "vector"
+                  }
+                 }
+                }
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "loop",
+                "c": {
+                 "k": "hole",
+                 "label": "op:postDecrement"
+                },
+                "body": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "call",
+                  "f": "sdsfree",
+                  "args": [
+                   {
+                    "k": "hole",
+                    "label": "op:indirectIndexAccess"
+                   }
+                  ]
+                 }
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "call",
+                  "f": "s_free",
+                  "args": [
+                   {
+                    "args": [
+                     {
+                      "v": "vector",
+                      "k": "name"
+                     }
+                    ],
+                    "f": "free",
+                    "k": "call"
+                   }
+                  ]
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "ifte",
+                  "c": {
+                   "k": "hole",
+                   "label": "cstr:address-equality"
+                  },
+                  "t": {
+                   "k": "exprS",
+                   "e": {
+                    "k": "call",
+                    "f": "sdsfree",
+                    "args": [
+                     {
+                      "k": "name",
+                      "v": "current"
+                     }
+                    ]
+                   }
+                  },
+                  "e": {
+                   "k": "skip"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "holeS",
+                   "label": "assign:lhs:indirection"
+                  },
+                  "b": {
+                   "k": "ret",
+                   "e": {
+                    "k": "name",
+                    "v": "NULL"
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsmapchars",
+  "file": "sds.c",
+  "params": [
+   "s",
+   "from",
+   "to",
+   "setlen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "l",
+       "e": {
+        "k": "call",
+        "f": "sdslen",
+        "args": [
+         {
+          "k": "name",
+          "v": "s"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "holeS",
+        "label": "control:FOR"
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsjoin",
+  "file": "sds.c",
+  "params": [
+   "argv",
+   "argc",
+   "sep"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "join",
+     "e": {
+      "k": "call",
+      "f": "sdsempty",
+      "args": []
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "control:FOR"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "join"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsjoinsds",
+  "file": "sds.c",
+  "params": [
+   "argv",
+   "argc",
+   "sep",
+   "seplen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "join",
+     "e": {
+      "k": "call",
+      "f": "sdsempty",
+      "args": []
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "control:FOR"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "join"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sds_malloc",
+  "file": "sds.c",
+  "params": [
+   "size"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "s_malloc",
+    "args": [
+     {
+      "args": [
+       {
+        "v": "size",
+        "k": "name"
+       }
+      ],
+      "f": "malloc",
+      "k": "call"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sds_realloc",
+  "file": "sds.c",
+  "params": [
+   "ptr",
+   "size"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "call",
+    "f": "s_realloc",
+    "args": [
+     {
+      "args": [
+       {
+        "v": "ptr",
+        "k": "name"
+       },
+       {
+        "v": "size",
+        "k": "name"
+       }
+      ],
+      "f": "realloc",
+      "k": "call"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sds_free",
+  "file": "sds.c",
+  "params": [
+   "ptr"
+  ],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "call",
+    "f": "s_free",
+    "args": [
+     {
+      "args": [
+       {
+        "v": "ptr",
+        "k": "name"
+       }
+      ],
+      "f": "free",
+      "k": "call"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "sdsTest",
+  "file": "sds.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "skip"
+  }
+ },
+ {
+  "name": "main",
+  "file": "sds.c",
+  "params": [
+   ""
+  ],
+  "body": {
+   "k": "skip"
+  }
+ },
+ {
+  "name": "sdshdr5.<clinit>:sdshdr5()",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "hole",
+    "label": "op:arrayInitializer"
+   }
+  }
+ },
+ {
+  "name": "sdshdr8.<clinit>:sdshdr8()",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "hole",
+    "label": "op:arrayInitializer"
+   }
+  }
+ },
+ {
+  "name": "sdshdr16.<clinit>:sdshdr16()",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "hole",
+    "label": "op:arrayInitializer"
+   }
+  }
+ },
+ {
+  "name": "sdshdr32.<clinit>:sdshdr32()",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "hole",
+    "label": "op:arrayInitializer"
+   }
+  }
+ },
+ {
+  "name": "sdshdr64.<clinit>:sdshdr64()",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "exprS",
+   "e": {
+    "k": "hole",
+    "label": "op:arrayInitializer"
+   }
+  }
+ },
+ {
+  "name": "sdslen",
+  "file": "sds.h",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "holeS",
+          "label": "control:SWITCH"
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "int",
+           "v": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsavail",
+  "file": "sds.h",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "holeS",
+          "label": "control:SWITCH"
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "int",
+           "v": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdssetlen",
+  "file": "sds.h",
+  "params": [
+   "s",
+   "newlen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "holeS",
+         "label": "control:SWITCH"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsinclen",
+  "file": "sds.h",
+  "params": [
+   "s",
+   "inc"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "holeS",
+         "label": "control:SWITCH"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsalloc",
+  "file": "sds.h",
+  "params": [
+   "s"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "holeS",
+          "label": "control:SWITCH"
+         },
+         "b": {
+          "k": "ret",
+          "e": {
+           "k": "int",
+           "v": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdssetalloc",
+  "file": "sds.h",
+  "params": [
+   "s",
+   "newlen"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "flags",
+         "e": {
+          "k": "hole",
+          "label": "op:indirectIndexAccess"
+         }
+        },
+        "b": {
+         "k": "holeS",
+         "label": "control:SWITCH"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sds.c:<global>",
+  "file": "sds.c",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "SDS_NOINIT",
+     "e": {
+      "k": "str",
+      "v": "SDS_NOINIT"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "skip"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "skip"
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "skip"
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "skip"
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "skip"
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "skip"
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "skip"
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "skip"
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "skip"
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "skip"
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "skip"
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "skip"
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "skip"
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "skip"
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "skip"
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "skip"
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "skip"
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "skip"
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "skip"
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "skip"
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "skip"
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "skip"
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "skip"
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "skip"
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "skip"
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "skip"
+                                                },
+                                                "b": {
+                                                 "k": "skip"
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sds.h:<global>",
+  "file": "sds.h",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "holeS",
+     "label": "stmt:TYPE_DECL"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "skip"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "sdsalloc.h:<global>",
+  "file": "sdsalloc.h",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ }
+]

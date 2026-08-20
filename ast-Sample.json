@@ -1,0 +1,431 @@
+[
+ {
+  "name": "lib.py:<module>.add",
+  "file": "lib.py",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.clamp",
+  "file": "lib.py",
+  "params": [
+   "x",
+   "lo",
+   "hi"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "<",
+     "a": {
+      "k": "name",
+      "v": "x"
+     },
+     "b": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "lo"
+     }
+    },
+    "e": {
+     "k": "skip"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": ">",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "hi"
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "name",
+      "v": "x"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.encode",
+  "file": "lib.py",
+  "params": [
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "out",
+    "e": {
+     "k": "listE",
+     "items": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "forIn",
+      "x": "x",
+      "e": {
+       "k": "name",
+       "v": "xs"
+      },
+      "body": {
+       "k": "exprS",
+       "e": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "out"
+        },
+        "m": "append",
+        "args": [
+         {
+          "k": "call",
+          "f": "add",
+          "args": [
+           {
+            "k": "name",
+            "v": "x"
+           },
+           {
+            "k": "int",
+            "v": 1
+           }
+          ]
+         }
+        ]
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "out"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.save",
+  "file": "lib.py",
+  "params": [
+   "path",
+   "xs"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "manager_tmp0",
+     "e": {
+      "k": "call",
+      "f": "open",
+      "args": [
+       {
+        "k": "name",
+        "v": "path"
+       },
+       {
+        "k": "str",
+        "v": "w"
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "enter_tmp0",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "manager_tmp0"
+       },
+       "f": "__enter__"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "exit_tmp0",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "manager_tmp0"
+        },
+        "f": "__exit__"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "value_tmp0",
+        "e": {
+         "k": "call",
+         "f": "",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "tryCatch",
+         "body": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "f",
+           "e": {
+            "k": "name",
+            "v": "value_tmp0"
+           }
+          },
+          "b": {
+           "k": "exprS",
+           "e": {
+            "k": "mcall",
+            "recv": {
+             "k": "name",
+             "v": "f"
+            },
+            "m": "write",
+            "args": [
+             {
+              "k": "call",
+              "f": "str",
+              "args": [
+               {
+                "k": "call",
+                "f": "encode",
+                "args": [
+                 {
+                  "k": "name",
+                  "v": "xs"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          }
+         },
+         "x": "__exc",
+         "handler": {
+          "k": "seq",
+          "a": {
+           "k": "exprS",
+           "e": {
+            "k": "call",
+            "f": "",
+            "args": []
+           }
+          },
+          "b": {
+           "k": "raise",
+           "e": {
+            "k": "name",
+            "v": "__exc"
+           }
+          }
+         }
+        },
+        "b": {
+         "k": "exprS",
+         "e": {
+          "k": "call",
+          "f": "",
+          "args": []
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "skip"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lib.py:<module>.sample_id",
+  "file": "lib.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "random",
+    "e": {
+     "k": "call",
+     "f": "import",
+     "args": [
+      {
+       "k": "unit"
+      },
+      {
+       "k": "hole",
+       "label": "lit:unquoted"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ret",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "random"
+       },
+       "m": "random",
+       "args": []
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  }
+ }
+]

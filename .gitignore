@@ -1,7 +1,6 @@
 .lake/
 workspace/
 formalization-graph.json
-ast-*.json
 conformance.json
 ledger-*.json
 sacm-*.json
@@ -15,5 +14,15 @@ __pycache__/
 .env
 *.key
 Autoform/Generated/Scale*.lean
-Autoform/Generated/Lang*.lean
 contracts-*.json
+
+# The mutation gate writes this beside the module it is rewriting, as the pristine copy
+# to restore from if a run is interrupted. It is scratch state for a run in flight and
+# must never be committed -- a commit taken mid-run would capture a mutant's backup as
+# though it were the module.
+*.mutate-backup
+
+# The neutral AST is NOT ignored. Autoform/Generated/*.lean is tracked, and the AST is
+# the source it is rendered from; ignoring one half of a pair makes them impossible to
+# check against each other from a clean clone, which is exactly the drift
+# scripts/check_docs.py exists to catch. 2.5 MB for all six corpora.
