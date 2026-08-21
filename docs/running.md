@@ -35,11 +35,31 @@ subsequent builds are incremental.
 lake build
 ```
 
-### Joern
+### Joern — pinned, like the Lean toolchain
 
 Joern supplies the code property graph that is this project's universal front end. It is a
 **~1.7 GB download**, which is why CI never installs it on the gating build — the Joern
 end-to-end job is opt-in.
+
+**The version is pinned in `joern-version`, and the pin is load-bearing.** The neutral AST
+is a *function of the front end*: which nodes exist, how `fullName`s resolve, whether
+`IS_VARIADIC` is set, whether an absent clause is elided. Two machines running different
+Joern builds produce different `ast-*.json` from identical source, and until this pin
+existed nothing would have shown it. Treat it exactly as you treat `lean-toolchain`.
+
+```sh
+cat joern-version                                  # 4.0.606
+python3 scripts/provenance.py joern-version --check # compares it to what is installed
+```
+
+The check reads the version out of `$JOERN_HOME/joern-cli/lib/io.joern.joern-cli-*.jar`
+rather than booting `joern --version`: it is a fact about the bytes on disk, it takes
+milliseconds instead of a JVM start, and it catches the "installed nothing, exited 0"
+failure below, which a version banner cannot.
+
+Changing the pin is a deliberate act that invalidates every artifact: bump it, regenerate
+each `ast-*.json`, re-render each `Autoform/Generated/*.lean`, re-record provenance. §5
+describes how that is checked.
 
 **On macOS arm64, do not trust the official installer.** `joern-install.sh` can **exit 0
 while having failed**, leaving no `joern-cli` directory and a shell that reports success.
@@ -66,14 +86,40 @@ chmod +x joern-install.sh && sudo ./joern-install.sh --without-plugins
 Confirm the binary runs before believing the install — "exit 0" is the shape a silent
 failure takes.
 
-### The source tree the CPG was built from
+### The source tree the CPG was built from — a hard precondition
 
-`cartographer/export_ast.sc` reads the original source text (for example to count the `*`s
-before a C parameter name), so the source tree the CPG was built from must still be present
-at the path recorded in `cpg.metaData.root` when the exporter runs. If it cannot read a
-file it needs, it aborts with `export_ast: cannot read source for <file> (root='…')`
-rather than guessing — a missing source tree fails the run loudly instead of producing a
-mistranslation.
+**The exporter needs the source tree, not only the CPG. CPG-only analysis is not
+possible.** This is a new precondition and the most likely reason an otherwise-correct
+invocation fails, so it is stated here rather than in troubleshooting alone.
+
+`cartographer/export_ast.sc` reads the original source text, and the reason is `*args` /
+`**kwargs`. Joern's `pysrc2cpg` sets `IS_VARIADIC` on `*args` and sets **nothing** on
+`**kwargs`: by every graph property, `**kwargs` is indistinguishable from an ordinary
+positional parameter. No CPG property records the stars. What the CPG does carry is
+`OFFSET`, the parameter name's byte offset in its file, so the exporter opens the file at
+that offset and counts the `*`s before the name.
+
+The alternative — treating `**kwargs` as positional — is a silent mistranslation of exactly
+the kind the hole mechanism exists to prevent, so the exporter **aborts** instead:
+
+```
+export_ast: cannot read source for <file> (root='<cpg.metaData.root>') to decide
+whether parameter '<name>' is `*args` or `**kwargs`. Run the exporter against the tree
+the CPG was built from.
+```
+
+What this means in practice:
+
+* The tree must still be at the path recorded in `cpg.metaData.root` when the exporter
+  runs. Moving or deleting a source tree after `joern-parse` breaks a later re-export.
+* A `.cpg` archived on its own is **not** sufficient to regenerate an AST. Archive the
+  source revision with it — which is what `provenance/<artifact>.prov.json` records (§5).
+* The star-count is gated to `.py` files. In C and C++ a `*` before a parameter name is a
+  pointer, not a splat.
+
+A missing source tree fails the run loudly instead of producing a mistranslation. That is
+the intended behaviour; the fix is to re-parse from the tree, or to run the exporter
+somewhere that path resolves.
 
 ### Python
 
@@ -196,7 +242,93 @@ audit, vacuity detection and the ledger. It **deliberately contains an admitted 
 two failing audits**, so `lean` exits non-zero by design; what matters is that
 `TRUSTED-CODE LEAK` and `VACUOUS` appear in the output. CI asserts exactly that.
 
-## 5. Troubleshooting
+## 5. Reproducibility and provenance
+
+`lake-manifest.json` pins every Lean dependency and `lean-toolchain` pins the compiler, so
+the Lean half of the pipeline is reproducible. `joern-version` plus the records under
+`provenance/` do the same for the front-end half.
+
+### The cheap check — run it anywhere
+
+```sh
+python3 scripts/check_provenance.py             # no Joern, no CPG, no source tree needed
+python3 scripts/check_provenance.py --strict    # also refuse the unattributed backlog
+python3 scripts/check_provenance.py --verify-source   # re-derive source_revision if present
+```
+
+It answers six questions from tracked bytes alone:
+
+| Check | Fails when |
+|---|---|
+| coverage | an `ast-*.json` has neither a record nor a named backlog entry |
+| integrity | the record's `artifact_sha256` is not the file's digest |
+| pin | the record's `joern_version` differs from `joern-version` |
+| **exporter** | `cartographer/export_ast.sc` changed since the artifact was exported |
+| fields | a field a regeneration needs is missing or empty |
+| orphans / backlog expiry | a record describes nothing, or a backlogged artifact's digest moved |
+
+The **exporter** row is the one that matters most, because the `.cpg` files are not tracked
+and never will be — they are hundreds of megabytes. A committed AST therefore cannot be
+diffed against a re-export of its own CPG. But it does not need to be: the moment the
+exporter changes, every AST recorded against the old exporter is *mechanically known* to be
+stale, and its record carries the exact command that regenerates it.
+
+Finding nothing to check is a failure, not a pass: with no `ast-*.json` present the script
+exits 2 and says so.
+
+### Producing an attributed artifact
+
+```sh
+scripts/export_with_provenance.sh <source-dir> <ModuleName>
+```
+
+`joern-parse` → `export_ast.sc` → `provenance.py record`, refusing to start unless the
+installed Joern matches the pin. `./autoform.sh` does **not** yet record provenance (see
+docs/architecture.md, "Merge-phase changes this asks for elsewhere"), so an AST it produces
+is unattributed and the checker will name it.
+
+To record provenance for an artifact produced some other way:
+
+```sh
+python3 scripts/provenance.py record \
+  --artifact ast-<M>.json --source <source-dir> \
+  --exporter cartographer/export_ast.sc --command '<the exact command you ran>'
+python3 scripts/provenance.py show ast-<M>.json
+```
+
+`source_revision` is the source tree's git commit when it is a checkout (with `+dirty` when
+it is not clean) and a `tree-sha256:<digest>:<n>files` content digest when it is not — an
+unpacked tarball, for instance. Both are re-derivable from the same bytes later, which is
+the only property required. `record` refuses rather than inventing a value it cannot
+determine.
+
+### The expensive check — independent recomputation
+
+```sh
+python3 scripts/reproduce_ast.py ast-<M>.json [--source <dir>] [--keep <dir>]
+```
+
+Rebuilds the CPG from the recorded source tree with the pinned Joern, re-runs the committed
+exporter, and diffs. It never reads the committed AST to decide what to expect. Exit 0 =
+byte-for-byte reproduction, 1 = differs (with a summary of how), 2 = could not run, with the
+reason. Minutes per corpus, which is why it is a command and not a build step.
+
+### The unattributed backlog
+
+`provenance/unattributed.json` lists the `ast-*.json` files that predate this mechanism.
+It is a **named gap, not an exemption**: every entry is printed by name on every run, and an
+entry stops applying the moment its artifact's digest changes — regenerate one and you must
+record real provenance for it.
+
+Three of them were re-exported to find out rather than assumed, and **all three differ from
+a fresh export** with the pinned Joern and the committed exporter: `ast-Sample.json` and
+`ast-Stress.json` are missing the module-initializer entries the exporter now emits, and in
+`ast-CMath.json` every integer literal is `"v": 0` where a fresh export writes `"v": "0"`.
+That is recorded in the file as the finding it is. The remaining eight were not reproduced
+because the source tree they came from is not identified anywhere in the repository — which
+is the same gap, one step earlier.
+
+## 6. Troubleshooting
 
 **`leanchecker` passes but checked nothing.** Always pass `--fresh`. Without it the checker
 can silently no-op on a module that has only imports and no declarations of its own —
@@ -209,9 +341,26 @@ turns that into a non-zero exit. A gap that is reported is a gap; a gap that is 
 silently is a lie.
 
 **`export_ast: cannot read source for …`.** The exporter needs the source tree the CPG was
-built from, at the path recorded in the CPG metadata. Re-parse from the tree, or run the
-exporter where that path resolves. The failure is deliberate: without the source text the
-exporter would have to guess, and a guess here is a mistranslation rather than a hole.
+built from, at the path recorded in the CPG metadata — see §1, "The source tree the CPG was
+built from". It is deciding whether a parameter is `*args` or `**kwargs`, which no CPG
+property records. Re-parse from the tree, or run the exporter where that path resolves.
+The failure is deliberate: without the source text the exporter would have to guess, and a
+guess here is a mistranslation rather than a hole. If all you have is a `.cpg`, you cannot
+export from it; you need the source revision, which is why `provenance/` records it.
+
+**`joern-version: MISMATCH`.** The installed Joern is not the pinned one. Do not just
+proceed: the neutral AST is a function of the front end, so anything you regenerate will
+differ from its neighbours for reasons that have nothing to do with the source. Install the
+pinned release (§1) or change the pin deliberately and regenerate everything.
+
+**`check_provenance: … changed since this artifact was exported`.** The exporter moved and
+the committed ASTs did not. This is the check working. Regenerate the artifact with the
+command in its record (`scripts/provenance.py show ast-<M>.json`), re-render the Lean module
+from it, and re-record. Do not edit the record to match the new exporter digest — that
+turns a real staleness finding into a green check.
+
+**`check_provenance: found no ast-*.json … Nothing was checked`.** Exit 2, not 0. You are
+running it somewhere without the artifacts; pass `--root`.
 
 **The oracle reports divergences that make no sense.** Suspect a stale `.olean` first. An
 oracle reading a stale cache answers with the *previous* semantics and produces confident,
