@@ -113,7 +113,8 @@ def seq_chain(n, leaf=None):
     return node
 
 
-def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None):
+def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None,
+              record_manifest=True):
     """A minimal repo skeleton: scripts/, cartographer/, an AST, a generated module.
 
     Real copies of the scripts, so the tests exercise the shipped code, not a stub.
@@ -136,4 +137,12 @@ def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None):
     else:
         with open(gen, "w") as fh:
             fh.write(lean_text)
+    # check_render.py became manifest-driven with the 2026-08-19 artifact policy: a
+    # module with an AST but no artifact-manifest.json entry is UNVERIFIABLE (exit 2),
+    # not a pass and not a mismatch. Record the fixture's pair so the tests exercise the
+    # agreement/disagreement paths rather than the no-entry path. Tests that want the
+    # no-entry path build their own repo without calling --record.
+    if record_manifest:
+        subprocess.run([sys.executable, os.path.join(d, "scripts", "check_render.py"),
+                        "--record", module], cwd=d, check=True, capture_output=True)
     return d, ast, gen

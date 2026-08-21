@@ -22,10 +22,42 @@ contracts-*.json
 # though it were the module.
 *.mutate-backup
 
-# The neutral AST is NOT ignored. Autoform/Generated/*.lean is tracked, and the AST is
-# the source it is rendered from; ignoring one half of a pair makes them impossible to
-# check against each other from a clean clone, which is exactly the drift
-# scripts/check_docs.py exists to catch. 2.5 MB for all six corpora.
+# The neutral AST is NOT ignored, and after the 2026-08-19 policy change below it is the
+# *only* tracked half of the AST/module pair -- so ignoring it would leave nothing at all
+# to check a build against from a clean clone. Keep ast-*.json tracked.
+
+# --- Generated Lean modules: build products, not tracked (decided 2026-08-19) ---
+#
+# Autoform/Generated/<M>.lean is a deterministic function of ast-<M>.json --
+# render_lean.py is verified byte-identical across runs -- so tracking it stores no
+# information the AST does not already determine. What it DID buy was a write channel:
+# the mutation-gate mutant that survived four commits reached git precisely because the
+# module was tracked, and a 21 MB machine-generated file has no reviewable diff. Ansible
+# (21 MB) and LinuxLib (6 MB) were swept in by a `git add -A` during a merge today.
+#
+# Policy: the AST is the tracked source of truth. artifact-manifest.json pins the sha256
+# of each AST and of its render; scripts/check_render.py verifies both and can
+# materialise + type-check the render. See docs/integrity.md.
+Autoform/Generated/*.lean
+# Exception: Cachetools is the one module hand-written theorems depend on by name, and at
+# 300 KB its diff is still reviewable -- the two conditions under which tracking a render
+# earns its drift risk. It stays tracked and check_render.py diffs it every run.
+!Autoform/Generated/Cachetools.lean
+# Exception: SC.lean has no ast-SC.json anywhere in the repo, so the AST-only policy has
+# nothing to regenerate it from. Untracking it would delete it outright rather than move
+# it upstream. It stays tracked until it has a source, and check_render.py cannot speak
+# for it (no AST, no verdict) -- which is itself the reason it should acquire one.
+!Autoform/Generated/SC.lean
+
+# ASTs for the large corpora. ast-*.json is otherwise TRACKED and must stay so -- it is
+# now the only tracked half of the pair. These four are 15-55 MB each, i.e. larger than
+# the modules they render to, so they are tracked by sha256 + provenance in
+# artifact-manifest.json instead of by bytes, and check_render.py reports them
+# UNVERIFIABLE (loudly, non-zero) rather than passing when the AST is not on disk.
+ast-Ansible.json
+ast-LinuxLib.json
+ast-LinuxCrypto.json
+ast-V8Base.json
 
 # Hypothesis's example database, written by scripts/synth_specs.py when it borrows
 # Hypothesis as a value generator. Run state, not source.

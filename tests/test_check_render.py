@@ -39,7 +39,7 @@ class TestAgreement:
         repo, _, _ = make_repo(tmp_path, "Cachetools", FUNCS)
         rc, out = check(repo)
         assert rc == 0, out
-        assert "1 module(s) match" in out
+        assert "1 verified" in out and "Cachetools" in out
 
     def test_it_actually_compared_something(self, tmp_path):
         """A pass must name a module. `check_render: 0 module(s) match` is the silence
@@ -47,7 +47,7 @@ class TestAgreement:
         repo, _, _ = make_repo(tmp_path, "Cachetools", FUNCS)
         rc, out = check(repo)
         assert rc == 0
-        assert "0 module(s)" not in out
+        assert "0 verified" not in out
 
 
 class TestDisagreement:
@@ -61,16 +61,32 @@ class TestDisagreement:
         open(gen, "w").write(mutated)
         rc, out = check(repo)
         assert rc == 1, out
-        assert "is NOT a render of" in out
+        assert "is NOT the render of" in out
         assert ".int 0" in out          # the diff must show what changed
 
     def test_a_module_with_extra_functions(self, tmp_path):
-        """238 functions against 208: two pipelines, two ASTs."""
+        """238 functions against 208: two pipelines, two ASTs.
+
+        Under the manifest-driven checker this is caught one step earlier and more
+        sharply: the AST no longer hashes to what was recorded, so the report names the
+        *AST* as the thing that moved rather than only showing a module diff. That is
+        strictly louder -- the old checker could not detect an edited AST at all, because
+        it re-rendered whatever was on disk and compared against the module."""
         repo, ast, gen = make_repo(tmp_path, "M", FUNCS)
         write_ast(ast, FUNCS[:1])       # AST shrinks, module does not
         rc, out = check(repo)
         assert rc == 1, out
-        assert "differing lines" in out
+        assert "the AST has changed since it was recorded" in out
+
+    def test_a_module_that_drifted_from_an_unchanged_ast(self, tmp_path):
+        """The other direction: the AST is exactly as recorded and the module is not its
+        render. This is the case the diff output is for."""
+        repo, ast, gen = make_repo(tmp_path, "M", FUNCS)
+        text = open(gen).read()
+        open(gen, "w").write(text.replace("(.lit (.int 1))", "(.lit (.int 7))", 1))
+        rc, out = check(repo)
+        assert rc == 1, out
+        assert "differing lines" in out or "is NOT the render of" in out
 
     def test_whitespace_only_edits_are_caught(self, tmp_path):
         """The module is generated; a hand edit of any kind means it is not the render."""
@@ -96,8 +112,10 @@ class TestNothingToCheckIsNotAPass:
         os.remove(gen)
         rc, out = check(repo)
         assert rc == 2, out
-        assert "no module has both" in out
-        assert "match" not in out.replace("no module", "")
+        # The AST is gone, so the recorded pair cannot be checked. That is
+        # UNVERIFIABLE (exit 2), not a pass -- the distinction this class exists for.
+        assert "UNVERIFIABLE" in out
+        assert "AST not found" in out
 
     def test_a_module_without_an_ast_is_not_silently_skipped(self, tmp_path):
         """A generated module with no AST is unverifiable. The default sweep can only
@@ -113,7 +131,12 @@ class TestNothingToCheckIsNotAPass:
         write_ast(ast, [fn(body={"k": "teleport"})])
         rc, out = check(repo)
         assert rc == 1, out
-        assert "render failed" in out
+        # Rewriting the AST changes its hash, so the manifest check fires before the
+        # render is ever attempted. Either way the run FAILS with an attributable
+        # reason; what must never happen is a pass.
+        assert ("render failed" in out
+                or "the AST has changed since it was recorded" in out)
+        assert "verified, 0 mismatched" not in out
 
 
 class TestRoundTrip:
