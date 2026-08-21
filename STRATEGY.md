@@ -2237,6 +2237,17 @@ project has been quoting — stopped elaborating at some point after
 This is §17 again in its purest form: every metric in sight was computed from something
 other than the thing it described.
 
+The mutation branch found the same wall independently and, to its credit, recorded it
+correctly: `mutation-SpecsGenCachetools.json` is not a kill rate but
+
+    "status": "BASELINE_FAILED",
+    "reason": "the module under test does not build before any mutation is applied;
+               no mutation verdict is possible"
+
+A mutation gate whose baseline does not build could have reported a 100% kill rate — every
+mutant "dies" because everything dies. It refused to, and that refusal is the only reason
+the breakage was written down anywhere before this merge.
+
 `Autoform/SpecsGen/Basis.lean` is now imported from `Autoform.lean`, so its 21 theorems go
 through the kernel on every build and through `leanchecker` in the audit. The corpus
 modules are too slow for the gating build, so `scripts/check_specs.py` elaborates them and
