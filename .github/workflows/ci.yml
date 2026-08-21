@@ -170,11 +170,15 @@ jobs:
               echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
             fi
           }
-          # A floor here is a floor on TEXT. Two of these modules do not elaborate --
-          # see STRATEGY.md 40 -- so their counts are recorded to stop the text being
-          # deleted while it waits for regeneration, NOT as a claim that they prove
-          # anything. The elaboration verdict is the step below; read them together.
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79   # DOES NOT PROVE
+          # A floor here is a floor on TEXT. SpecsGen/V8Base still does not elaborate --
+          # see STRATEGY.md 40 -- so its count is recorded to stop the text being deleted
+          # while it waits for regeneration, NOT as a claim that it proves anything. The
+          # elaboration verdict is the step below; read them together. SpecsGen/Cachetools
+          # DOES elaborate again and is built by the standalone step above; 72 of its laws
+          # are now Prop-valued open obligations (the fuel transport is refuted, not
+          # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
+          # its text count is higher than the old floor and the floor stays where it was.
+          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
           check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
           check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
           check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
@@ -186,37 +190,45 @@ jobs:
       - name: SpecsGen modules elaborate
         run: python3 scripts/check_specs.py Basis
 
-      # SpecsGen/Cachetools.lean is KNOWN BROKEN and pinned here rather than
-      # deleted. Its `C_tfFree` premise -- every body in the function table is
-      # `tryFinally`-free, which every fuel-transported theorem in the module rests
-      # on -- became false when the exporter learned to translate `try/finally`:
-      # the current render holds 49 `.tryFinally` nodes where the AST it was
-      # generated against had none. It needs regeneration, not repair.
+      # Modules that cannot be imported from Autoform.lean, elaborated explicitly.
       #
-      # Pinning the failure keeps it visible AND catches the day it changes: if it
-      # starts passing, this step fails and tells you to drop the pin. A known
-      # breakage that nothing asserts is a known breakage nobody will notice
-      # healing or worsening.
-      # Same pin for SpecsGen/V8Base.lean, which fails for a DIFFERENT reason:
-      # re-rendering V8Base split an overloaded C++ name, so
-      # `f_v8_base_AddressRegion___init__` is now the empty stub and the real
-      # constructor is `..._init__'`. Every theorem generated against the old
-      # numbering is a theorem about the wrong function. It cannot run in CI anyway
-      # (its Generated module is not tracked), so it is exercised by hand; the floor
-      # step above keeps the text from being deleted meanwhile.
-      - name: SpecsGen/Cachetools is still broken for the recorded reason
+      # Every Autoform/Generated/<M>.lean defines `Autoform.Generated.program`, so at
+      # most ONE generated corpus fits in a single import graph; Autoform.Overflow
+      # already takes the slot with Generated.CMath. The five modules below need a
+      # different corpus, so `lake build` on the root target never touches them -- and
+      # that is exactly how all four Cachetools modules (161 theorems) came to stop
+      # elaborating while CI stayed green: nothing built them, and the inventory step
+      # above counts TEXT. Naming them here makes every theorem in them elaborate on
+      # every run. A module no build touches will rot; do not delete a line from this
+      # list without moving the module into Autoform.lean.
+      - name: Standalone modules elaborate (not reachable from Autoform.lean)
         run: |
           set -euo pipefail
-          if python3 scripts/check_specs.py Cachetools > ct.out 2>&1; then
-            echo "SpecsGen/Cachetools.lean now elaborates. That is good news, and it"
-            echo "means this pin is stale: delete this step and add Cachetools to the"
-            echo "'SpecsGen modules elaborate' step above."
-            cat ct.out; exit 1
-          fi
-          cat ct.out
-          grep -q 'FAIL     Cachetools' ct.out || {
-            echo "Cachetools failed for a DIFFERENT reason than the recorded one."
-            echo "Read the output above before touching this pin."; exit 1; }
+          for m in Autoform.BuiltinBase \
+                   Autoform.Contracts \
+                   Autoform.Specs.CachetoolsSpec \
+                   Autoform.SpecsGen.Cachetools \
+                   Autoform.Specs.V8Spec; do
+            echo "=== lake build $m"
+            lake build "$m"
+          done
+
+      # SpecsGen/Cachetools.lean used to be pinned here as KNOWN BROKEN. It elaborates
+      # again as of this change, and is built by the step above. Its `C_tfFree` premise
+      # -- every body in the function table is `tryFinally`-free -- is now FALSE (the
+      # exporter learned to translate try/finally; 8 rendered bodies carry it), so the
+      # module states `C_not_tfFree`, a refutation, and the 72 laws that rested on the
+      # transport are `Prop`-valued open obligations whose FUEL-instantiated content is
+      # kept as `*_at_FUEL` theorems. This step guards that framing: if the refutation
+      # ever stops holding, the module stops elaborating above and this comment is the
+      # place to start.
+      - name: SpecsGen/Cachetools records the refutation, not the premise
+        run: |
+          set -euo pipefail
+          grep -q 'theorem C_not_tfFree : ¬ TFFreeCtx C' Autoform/SpecsGen/Cachetools.lean || {
+            echo "SpecsGen/Cachetools.lean no longer refutes TFFreeCtx C."
+            echo "If the corpus lost its tryFinally bodies, restore C_tfFree and the"
+            echo "transported theorems -- do not just drop this check."; exit 1; }
 
       # The artifact policy makes the AST the tracked source of truth and the
       # render a build product. check_render verifies both halves against

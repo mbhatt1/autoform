@@ -60,11 +60,11 @@ def runMethod (fuel : Nat) (h : Heap) (name : String) (self : Val)
     (args : List Val) : Heap × EResult :=
   match (ctxOf P).resolve name with
   | none    => (h, .hole s!"entry:{name}")
-  | some fn => applyFunc (ctxOf P) fuel h fn (some self) args
+  | some fn => applyFunc (ctxOf P) fuel h fn (some self) args []
 
 theorem runMethod_of_resolve (fuel : Nat) (name : String) (h : Heap) (self : Val)
     (args : List Val) (fn : Func) (hres : (ctxOf P).resolve name = some fn) :
-    runMethod fuel h name self args = applyFunc (ctxOf P) fuel h fn (some self) args := by
+    runMethod fuel h name self args = applyFunc (ctxOf P) fuel h fn (some self) args [] := by
   unfold runMethod; rw [hres]
 
 /-- **Method refinement.** For every receiver/argument tuple in `dom` and every fuel
@@ -160,7 +160,7 @@ theorem Cache_getsizeof_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, Marshal.toVal]
 
 /-! ### `_DefaultSize.__getitem__` / `.pop` — the degenerate size table
@@ -176,7 +176,7 @@ theorem DefaultSize_getitem_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, Marshal.toVal]
 
 theorem DefaultSize_pop_refines :
@@ -187,7 +187,7 @@ theorem DefaultSize_pop_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, Marshal.toVal]
 
 /-- `_DefaultSize.__setitem__` is a no-op **on the heap as well as on the result**: this
@@ -200,7 +200,7 @@ theorem DefaultSize_setitem_mrefines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___DefaultSize___setitem__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___DefaultSize___setitem__, ctxOf, P]
 
 /-! ### `Cache.maxsize` / `Cache.currsize` — the two accessors must read *different* fields
@@ -210,29 +210,57 @@ not free to move: swapping `_Cache__maxsize` for `_Cache__currsize` makes the st
 false at any heap where the two differ. `Cache_size_fields_distinct` exhibits such a
 heap explicitly, so the separation is witnessed and not merely implied. -/
 
+/-- **The surplus-argument branch is part of the specification, not excluded from it.**
+The rendered accessor has `params := []` — the receiver arrives as the base environment,
+not as a positional parameter — so *any* positional argument is a surplus, and since
+`posRejected` was made real the call raises `TypeError`, exactly as CPython does
+(`maxsize() takes 1 positional argument but 2 were given`). The specification therefore
+covers every argument list; before the calling convention was modelled the surplus was
+silently truncated and this theorem's `.ret` branch was claimed for calls CPython
+rejects. -/
 theorem Cache_maxsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.maxsize" 10
       (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__maxsize" v)
-      (fun h self _ => (h, match self with
-                           | .ref r => .ret (readField h r "_Cache__maxsize")
-                           | _      => .ret .unit)) := by
+      (fun h self args => (h, match args with
+                           | [] => match self with
+                                   | .ref r => .ret (readField h r "_Cache__maxsize")
+                                   | _      => .ret .unit
+                           | _  => .raise (.str "TypeError"))) := by
   rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
+  cases args with
+  | nil =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_maxsize, ctxOf, P, readField, hg, hfld]
+  | cons a as =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
 
+/-- **The surplus-argument branch is part of the specification, not excluded from it.**
+The rendered accessor has `params := []` — the receiver arrives as the base environment,
+not as a positional parameter — so *any* positional argument is a surplus, and since
+`posRejected` was made real the call raises `TypeError`, exactly as CPython does
+(`maxsize() takes 1 positional argument but 2 were given`). The specification therefore
+covers every argument list; before the calling convention was modelled the surplus was
+silently truncated and this theorem's `.ret` branch was claimed for calls CPython
+rejects. -/
 theorem Cache_currsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.currsize" 10
       (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__currsize" v)
-      (fun h self _ => (h, match self with
-                           | .ref r => .ret (readField h r "_Cache__currsize")
-                           | _      => .ret .unit)) := by
+      (fun h self args => (h, match args with
+                           | [] => match self with
+                                   | .ref r => .ret (readField h r "_Cache__currsize")
+                                   | _      => .ret .unit
+                           | _  => .raise (.str "TypeError"))) := by
   rintro h _ args ⟨r, v, rfl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 10) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
+  cases args with
+  | nil =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_currsize, ctxOf, P, readField, hg, hfld]
+  | cons a as =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
 
 /-- A concrete cache object whose capacity and occupancy differ. -/
 def sampleCache : Heap :=
@@ -259,7 +287,7 @@ theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
       runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
   refine ⟨?_, ?_, ?_⟩ <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
           f_cachetools___init___py__module__Cache_maxsize,
           f_cachetools___init___py__module__Cache_currsize]
 
@@ -283,7 +311,7 @@ theorem Cache_contains_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
         hg, hfld]
 
@@ -299,7 +327,7 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
           f_cachetools___init___py__module__Cache___contains__]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
@@ -323,7 +351,7 @@ theorem TLRUItem_lt_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TLRUCache__Item___lt__, ctxOf, P,
         applyBinop_int_lt, readField, hg, hfld, hg', hfld']
 
@@ -334,7 +362,7 @@ theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
       = .val (.bool false) := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
         f_cachetools___init___py__module__TLRUCache__Item___lt__]
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
@@ -357,7 +385,7 @@ theorem Timer_exit_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___exit__, ctxOf, P,
         P_dialect, readField, hg, hfld]
 
@@ -368,7 +396,7 @@ theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
         "_Timer__nesting" = .int 0 := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
         f_cachetools___init___py__module___TimedCache__Timer___exit__]
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
@@ -389,7 +417,7 @@ theorem Timer_init_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P]
 
 /-- Both fields are actually written, with the right values in the right places. -/
@@ -403,7 +431,7 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
           f_cachetools___init___py__module___TimedCache__Timer___init__]
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
@@ -419,7 +447,7 @@ theorem TTLLink_init_mrefines :
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link___init__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
@@ -434,7 +462,7 @@ theorem TTLSetstate_lambda_mrefines :
   refine forall_ge_of_forall_add (N := 10) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache___setstate____lambda_0 rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__TTLCache___setstate____lambda_0, ctxOf, P,
         readField, hg, hfld]
 
@@ -466,9 +494,13 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
   obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
   refine ⟨v, ?_⟩
-  simp only [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, f_cachetools___init___py__module___TimedCache_expire,
-        Env.set]
+  have hne : ((none : Option String) != some "time") = true := rfl
+  simp +decide only [hne, applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+        Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
+        Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
+        reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
   rw [hv]
+  simp +decide
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 
@@ -479,7 +511,7 @@ theorem cachedmethod_none_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro m
   rw [runFunc_of_resolve _ _ _ _ f_cachetools__cachedmethod_py__module___none rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools__cachedmethod_py__module___none, ctxOf, P]
 
 /-! ## 3. A negative result on the translated module
@@ -498,7 +530,7 @@ theorem cache_clear_reaches_hole (k : Nat) (h : Heap) (self : Val) :
     (runMethod (k + 4) h "cachetools/_cached.py:<module>._uncached_info.cache_clear"
       self []).2 = .hole "scope:nonlocal-write" := by
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools__cached_py__module___uncached_info_cache_clear rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, Env.set,
+  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, Env.set,
         f_cachetools__cached_py__module___uncached_info_cache_clear]
 
 theorem cache_clear_not_refinable (N : Nat)

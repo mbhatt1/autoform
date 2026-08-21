@@ -556,6 +556,12 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
+/-- `keys.py` records no class with a builtin base, so `Expr.alloc "_HashedTuple"` takes
+the ordinary heap-allocation branch. Stated as a lemma so the evaluation `simp`s below can
+step past `Ctx.builtinBase` without unfolding the program. -/
+@[simp] theorem builtinBase_keysProgram (cls : String) :
+    (ctxOf keysProgram).builtinBase cls = none := rfl
+
 /-! ### The instantiated program, and its name resolution
 
 `Ctx.resolve` falls back to a *unique suffix* match over the function table, and
@@ -575,6 +581,13 @@ def methodkeyWith (e : Expr) : Func :=
 /-- The instantiated program. -/
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
+
+/-- The `keys.py` fragment records no class with a builtin base, so `Expr.alloc
+"_HashedTuple"` takes the ordinary heap-allocation branch. Stated as a lemma so the
+evaluation `simp`s below can step past `Ctx.builtinBase` without unfolding the whole
+program. -/
+@[simp] theorem builtinBase_keysProgramWith (e : Expr) (cls : String) :
+    (ctxOf (keysProgramWith e)).builtinBase cls = none := rfl
 
 /-- `methodkey` **as the transpiler used to emit it**: the starred call replaced by the
 hole it produced before `Expr.starred`/`Expr.dstarred` existed. This is the subject of the
@@ -641,7 +654,7 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
 /-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
-    ({ dialect := p.dialect, table := p.table } : Ctx) = ctxOf p := rfl
+    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases } : Ctx) = ctxOf p := rfl
 
 /-! ### Satisfiability first
 
@@ -760,7 +773,7 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
@@ -796,8 +809,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   intro k
   -- As in the value theorem: the plainness clause of `Consistent` is what lets a fact
   -- about `evalExpr e` become a fact about the argument list `[e]`.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected,
-    evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
@@ -880,7 +892,7 @@ theorem methodkey_refines :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, ctx_fold,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
@@ -909,7 +921,8 @@ set_option maxHeartbeats 1000000 in
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, keysProgramHoled, keysProgramWith, methodkeyWith, f_cachetools_keys_py__module__hashkey,
+  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,

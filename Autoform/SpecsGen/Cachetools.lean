@@ -26,16 +26,25 @@ def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
 def FUEL : Nat := 400
 open Autoform.Generated
 
-/-- Every function body reachable in this program is `tryFinally`-free, so
-`Autoform/FuelMono.lean`'s monotonicity theorems apply to this context. Checked by
-computation over the whole function table, not assumed. `Stmt.tryFinally` is the single
-construct that breaks fuel monotonicity (`FuelMono.tryFinally_breaks_fuel_mono` exhibits a
-program answering 1 at fuel 4 and 2 at fuel 5), so this is the hypothesis that decides
-whether a law checked at one budget holds at every larger one. -/
-theorem C_tfFree : TFFreeCtx C := by
-  refine tfFree_of_table ?_
-  have h : (C.table.all fun p => tfFreeS p.2.body) = true := by rfl
-  exact fun p hp => (List.all_eq_true.mp h) p hp
+/-- **The fuel-transport hypothesis is false for this corpus, and here is the refutation.**
+
+This module was generated when every rendered body was `tryFinally`-free, and every law
+below was transported from `FUEL` to every larger budget by `Autoform/FuelMono.lean` under
+`TFFreeCtx C`. The exporter has since learned to translate `try/finally`, and 8 of the
+rendered bodies (the `_cachedmethod`/`_cached` lock wrappers) now contain `Stmt.tryFinally`
+— the single construct `FuelMono` excludes, by the counterexample in
+`FuelMono.tryFinally_breaks_fuel_mono`.
+
+So `C_tfFree` is not merely unproved, it is refutable, and every `∀ fuel ≥ FUEL` law that
+rested on it has been converted to an open obligation with its `FUEL`-instantiated content
+kept as a theorem. Stating the refutation rather than deleting the premise is what makes
+the change visible: the day a reachability-restricted transport lemma exists, or the
+corpus loses its `tryFinally` bodies, this theorem is what fails. -/
+theorem C_not_tfFree : ¬ TFFreeCtx C := by
+  intro hc
+  have h := hc.1 "cachetools/_cachedmethod.py:<module>._locked.cache_clear"
+    f_cachetools__cachedmethod_py__module___locked_cache_clear (by rfl)
+  exact absurd h (by decide +kernel)
 
 
 /-!
@@ -72,11 +81,13 @@ whose subject a mutation gate can attack.
 **Fuel.** A law checked at one budget is a weaker claim than it looks, so each law here is
 stated as `∀ fuel, FUEL ≤ fuel → …` wherever that could be *proved*: checked at `FUEL` by
 computation and transported by `Autoform/FuelMono.lean`'s `applyFunc_fuel_mono`. That
-transport needs two side conditions, both discharged rather than assumed — the context is
-`tryFinally`-free (`C_tfFree`, by computation over the function table) and the run did not
-end in `outOfFuel` (the `g…` guard, evaluated over the same domain as the law). Where
-either fails, the theorem stays at `FUEL` and its generalization is recorded in
-`obligations` below as a `Prop`-valued `def` — a statement, not an admission.
+transport needs two side conditions, and one of them **no longer holds**: the context is
+no longer `tryFinally`-free — `C_not_tfFree` refutes it, because the exporter learned to
+translate `try/finally` after this file was generated. So every law that was transported
+is now a `Prop`-valued `def` in `obligations` below (a statement, not an admission), and
+what remains proved for it is the pair `…_at_FUEL` / `…_guard_at_FUEL`: the law at `FUEL`
+by kernel computation, and the `≠ outOfFuel` guard over the same domain, so the law does
+not hold there for the reason that nothing ran.
 
 There is no `sorry` in this file.
 
@@ -87,19 +98,25 @@ def dom_conform_cachetools___init___py__module___DefaultSize___getitem : List Ob
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (1)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___DefaultSize___getitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConform C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___DefaultSize___getitem` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___DefaultSize___getitem_at_FUEL : ((dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize___getitem_guard_at_FUEL : (dom_conform_cachetools___init___py__module___DefaultSize___getitem).all (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) = true := by rfl
 
 def dom_nonneg_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -111,19 +128,25 @@ def dom_nonneg_cachetools___init___py__module___DefaultSize___getitem : List Cas
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def nonneg_cachetools___init___py__module___DefaultSize___getitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem nonneg_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
-    (fun c hgc hlc =>
-      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`nonneg_cachetools___init___py__module___DefaultSize___getitem` that is proved; the quantifier over larger budgets is not. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize___getitem_at_FUEL : ((dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize___getitem_guard_at_FUEL : (dom_nonneg_cachetools___init___py__module___DefaultSize___getitem).all (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -135,19 +158,25 @@ def dom_idempotent_cachetools___init___py__module___DefaultSize___getitem : List
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module___DefaultSize___getitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___getitem__)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module___DefaultSize___getitem` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___getitem_at_FUEL : ((dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___getitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___getitem_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module___DefaultSize___getitem).all (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) = true := by rfl
 
 def dom_const_cachetools___init___py__module___DefaultSize___getitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -159,19 +188,25 @@ def dom_const_cachetools___init___py__module___DefaultSize___getitem : List Case
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-1712093602)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module___DefaultSize___getitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___getitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module___DefaultSize___getitem` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module___DefaultSize___getitem_at_FUEL : ((dom_const_cachetools___init___py__module___DefaultSize___getitem).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___getitem__ (Val.int (1)))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module___DefaultSize___getitem_guard_at_FUEL : (dom_const_cachetools___init___py__module___DefaultSize___getitem).all (gRun C FUEL f_cachetools___init___py__module___DefaultSize___getitem__) = true := by rfl
 
 theorem uconst_cachetools___init___py__module___DefaultSize___getitem :
     Refines P "cachetools/__init__.py:<module>._DefaultSize.__getitem__" 8
@@ -193,19 +228,25 @@ def dom_conform_cachetools___init___py__module___DefaultSize___setitem : List Ob
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4), Val.int (1)] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (5), Val.int (1)] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___DefaultSize___setitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConform C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___DefaultSize___setitem` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___DefaultSize___setitem_at_FUEL : ((dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize___setitem_guard_at_FUEL : (dom_conform_cachetools___init___py__module___DefaultSize___setitem).all (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
@@ -217,19 +258,25 @@ def dom_idempotent_cachetools___init___py__module___DefaultSize___setitem : List
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module___DefaultSize___setitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module___DefaultSize___setitem` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___setitem_at_FUEL : ((dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize___setitem_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module___DefaultSize___setitem).all (gIdem C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) = true := by rfl
 
 def dom_commutes_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
@@ -241,19 +288,25 @@ def dom_commutes_cachetools___init___py__module___DefaultSize___setitem : List C
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module___DefaultSize___setitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawCommutes C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawCommutes C fuel f_cachetools___init___py__module___DefaultSize___setitem__)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module___DefaultSize___setitem` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module___DefaultSize___setitem_at_FUEL : ((dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (lawCommutes C FUEL f_cachetools___init___py__module___DefaultSize___setitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module___DefaultSize___setitem_guard_at_FUEL : (dom_commutes_cachetools___init___py__module___DefaultSize___setitem).all (gComm C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) = true := by rfl
 
 def dom_const_cachetools___init___py__module___DefaultSize___setitem : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] },
@@ -265,19 +318,25 @@ def dom_const_cachetools___init___py__module___DefaultSize___setitem : List Case
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-87), Val.int (3909866)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (10934770)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module___DefaultSize___setitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module___DefaultSize___setitem : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize___setitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module___DefaultSize___setitem` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module___DefaultSize___setitem_at_FUEL : ((dom_const_cachetools___init___py__module___DefaultSize___setitem).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize___setitem__ (Val.unit))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module___DefaultSize___setitem_guard_at_FUEL : (dom_const_cachetools___init___py__module___DefaultSize___setitem).all (gRun C FUEL f_cachetools___init___py__module___DefaultSize___setitem__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module___DefaultSize_pop : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.int (1)) },
@@ -285,19 +344,25 @@ def dom_conform_cachetools___init___py__module___DefaultSize_pop : List Obs :=
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (4)] }, expected := EResult.val (Val.int (1)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___DefaultSize_pop : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConform C fuel f_cachetools___init___py__module___DefaultSize_pop)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___DefaultSize_pop` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___DefaultSize_pop_at_FUEL : ((dom_conform_cachetools___init___py__module___DefaultSize_pop).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize_pop_guard_at_FUEL : (dom_conform_cachetools___init___py__module___DefaultSize_pop).all (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_pop) = true := by rfl
 
 def dom_nonneg_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
@@ -309,19 +374,25 @@ def dom_nonneg_cachetools___init___py__module___DefaultSize_pop : List Case :=
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def nonneg_cachetools___init___py__module___DefaultSize_pop : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem nonneg_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawNonneg C fuel f_cachetools___init___py__module___DefaultSize_pop)
-    (fun c hgc hlc =>
-      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`nonneg_cachetools___init___py__module___DefaultSize_pop` that is proved; the quantifier over larger budgets is not. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize_pop_at_FUEL : ((dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (lawNonneg C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem nonneg_cachetools___init___py__module___DefaultSize_pop_guard_at_FUEL : (dom_nonneg_cachetools___init___py__module___DefaultSize_pop).all (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
@@ -333,19 +404,25 @@ def dom_idempotent_cachetools___init___py__module___DefaultSize_pop : List Case 
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module___DefaultSize_pop : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawIdempotent C fuel f_cachetools___init___py__module___DefaultSize_pop)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module___DefaultSize_pop` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize_pop_at_FUEL : ((dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (lawIdempotent C FUEL f_cachetools___init___py__module___DefaultSize_pop)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module___DefaultSize_pop_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module___DefaultSize_pop).all (gIdem C FUEL f_cachetools___init___py__module___DefaultSize_pop) = true := by rfl
 
 def dom_const_cachetools___init___py__module___DefaultSize_pop : List Case :=
   [{ heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] },
@@ -357,19 +434,25 @@ def dom_const_cachetools___init___py__module___DefaultSize_pop : List Case :=
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-9223372036854775808)] },
    { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module___DefaultSize_pop : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) (lawConst C FUEL f_cachetools___init___py__module___DefaultSize_pop (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_pop.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module___DefaultSize_pop` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module___DefaultSize_pop_at_FUEL : ((dom_const_cachetools___init___py__module___DefaultSize_pop).all (lawConst C FUEL f_cachetools___init___py__module___DefaultSize_pop (Val.int (1)))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module___DefaultSize_pop_guard_at_FUEL : (dom_const_cachetools___init___py__module___DefaultSize_pop).all (gRun C FUEL f_cachetools___init___py__module___DefaultSize_pop) = true := by rfl
 
 theorem uconst_cachetools___init___py__module___DefaultSize_pop :
     Refines P "cachetools/__init__.py:<module>._DefaultSize.pop" 8
@@ -387,19 +470,25 @@ theorem uconst_cachetools___init___py__module___DefaultSize_pop :
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___DefaultSize_clear : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___DefaultSize_clear : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_clear) (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_clear) (lawConform C fuel f_cachetools___init___py__module___DefaultSize_clear)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___DefaultSize_clear.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___DefaultSize_clear` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___DefaultSize_clear_at_FUEL : ((dom_conform_cachetools___init___py__module___DefaultSize_clear).all (lawConform C FUEL f_cachetools___init___py__module___DefaultSize_clear)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___DefaultSize_clear_guard_at_FUEL : (dom_conform_cachetools___init___py__module___DefaultSize_clear).all (gRunObs C FUEL f_cachetools___init___py__module___DefaultSize_clear) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__Cache___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] }, expected := EResult.val (Val.unit) },
@@ -409,19 +498,25 @@ def dom_conform_cachetools___init___py__module__Cache___init : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.unit] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (3), Val.fn "CacheTestMixin.test_getsizeof_negative.<locals>.<lambda>"] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C fuel f_cachetools___init___py__module__Cache___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___init__) (lawConform C FUEL f_cachetools___init___py__module__Cache___init__) (lawConform C fuel f_cachetools___init___py__module__Cache___init__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache___init` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache___init_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache___init).all (lawConform C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by decide +kernel
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache___init_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache___init).all (gRunObs C FUEL f_cachetools___init___py__module__Cache___init__) = true := by decide +kernel
 
 def dom_runs_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
@@ -433,19 +528,25 @@ def dom_runs_cachetools___init___py__module__Cache___init : List Case :=
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__Cache___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawRuns C FUEL f_cachetools___init___py__module__Cache___init__) (lawRuns C fuel f_cachetools___init___py__module__Cache___init__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__Cache___init` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__Cache___init_at_FUEL : ((dom_runs_cachetools___init___py__module__Cache___init).all (lawRuns C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by decide +kernel
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__Cache___init_guard_at_FUEL : (dom_runs_cachetools___init___py__module__Cache___init).all (gRun C FUEL f_cachetools___init___py__module__Cache___init__) = true := by decide +kernel
 
 def dom_returns_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
@@ -457,19 +558,25 @@ def dom_returns_cachetools___init___py__module__Cache___init : List Case :=
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__Cache___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawReturns C FUEL f_cachetools___init___py__module__Cache___init__) (lawReturns C fuel f_cachetools___init___py__module__Cache___init__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__Cache___init` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__Cache___init_at_FUEL : ((dom_returns_cachetools___init___py__module__Cache___init).all (lawReturns C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by decide +kernel
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__Cache___init_guard_at_FUEL : (dom_returns_cachetools___init___py__module__Cache___init).all (gRun C FUEL f_cachetools___init___py__module__Cache___init__) = true := by decide +kernel
 
 def dom_commutes_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
@@ -481,19 +588,25 @@ def dom_commutes_cachetools___init___py__module__Cache___init : List Case :=
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module__Cache___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__Cache___init__) (lawCommutes C FUEL f_cachetools___init___py__module__Cache___init__) (lawCommutes C fuel f_cachetools___init___py__module__Cache___init__)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module__Cache___init` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module__Cache___init_at_FUEL : ((dom_commutes_cachetools___init___py__module__Cache___init).all (lawCommutes C FUEL f_cachetools___init___py__module__Cache___init__)) = true := by decide +kernel
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module__Cache___init_guard_at_FUEL : (dom_commutes_cachetools___init___py__module__Cache___init).all (gComm C FUEL f_cachetools___init___py__module__Cache___init__) = true := by decide +kernel
 
 def dom_const_cachetools___init___py__module__Cache___init : List Case :=
   [{ heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.unit] },
@@ -505,19 +618,25 @@ def dom_const_cachetools___init___py__module__Cache___init : List Case :=
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (41562618), Val.int (0)] },
    { heap := h0 ++ [{ cls := "LRUCache", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (-8983422), Val.int (0)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__Cache___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__Cache___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___init__) (lawConst C FUEL f_cachetools___init___py__module__Cache___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__Cache___init__ (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__Cache___init` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__Cache___init_at_FUEL : ((dom_const_cachetools___init___py__module__Cache___init).all (lawConst C FUEL f_cachetools___init___py__module__Cache___init__ (Val.unit))) = true := by decide +kernel
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__Cache___init_guard_at_FUEL : (dom_const_cachetools___init___py__module__Cache___init).all (gRun C FUEL f_cachetools___init___py__module__Cache___init__) = true := by decide +kernel
 
 def dom_conform_cachetools___init___py__module__Cache___getitem : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (3), Val.int (3)), (Val.int (4), Val.int (4))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (3)] }, expected := EResult.val (Val.int (3)) },
@@ -529,19 +648,25 @@ def dom_conform_cachetools___init___py__module__Cache___getitem : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (3)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (2)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (2), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.int (2)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache___getitem : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache___getitem : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___getitem__) (lawConform C FUEL f_cachetools___init___py__module__Cache___getitem__) (lawConform C fuel f_cachetools___init___py__module__Cache___getitem__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___getitem__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache___getitem` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache___getitem_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache___getitem).all (lawConform C FUEL f_cachetools___init___py__module__Cache___getitem__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache___getitem_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache___getitem).all (gRunObs C FUEL f_cachetools___init___py__module__Cache___getitem__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__Cache___contains : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
@@ -551,19 +676,25 @@ def dom_conform_cachetools___init___py__module__Cache___contains : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (1), Val.int (2))]), ("_Cache__data", Val.dict [(Val.int (1), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] }, expected := EResult.val (Val.bool false) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict [(Val.int (3), Val.int (3))]), ("_Cache__data", Val.dict [(Val.int (3), Val.int (3))]), ("_Cache__currsize", Val.int (3)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___contains).all (lawConform C fuel f_cachetools___init___py__module__Cache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache___contains).all (lawConform C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache___contains__) (lawConform C FUEL f_cachetools___init___py__module__Cache___contains__) (lawConform C fuel f_cachetools___init___py__module__Cache___contains__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache___contains_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache___contains).all (lawConform C FUEL f_cachetools___init___py__module__Cache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache___contains_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache___contains).all (gRunObs C FUEL f_cachetools___init___py__module__Cache___contains__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__Cache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -575,19 +706,25 @@ def dom_runs_cachetools___init___py__module__Cache___contains : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (699))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__Cache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) (lawRuns C FUEL f_cachetools___init___py__module__Cache___contains__) (lawRuns C fuel f_cachetools___init___py__module__Cache___contains__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__Cache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__Cache___contains_at_FUEL : ((dom_runs_cachetools___init___py__module__Cache___contains).all (lawRuns C FUEL f_cachetools___init___py__module__Cache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__Cache___contains_guard_at_FUEL : (dom_runs_cachetools___init___py__module__Cache___contains).all (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__Cache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -599,19 +736,25 @@ def dom_returns_cachetools___init___py__module__Cache___contains : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (699))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (4), Val.int (4)), (Val.int (5), Val.int (5))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [Val.int (5)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__Cache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__Cache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) (lawReturns C FUEL f_cachetools___init___py__module__Cache___contains__) (lawReturns C fuel f_cachetools___init___py__module__Cache___contains__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__Cache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__Cache___contains_at_FUEL : ((dom_returns_cachetools___init___py__module__Cache___contains).all (lawReturns C FUEL f_cachetools___init___py__module__Cache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__Cache___contains_guard_at_FUEL : (dom_returns_cachetools___init___py__module__Cache___contains).all (gRun C FUEL f_cachetools___init___py__module__Cache___contains__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__Cache_maxsize : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (1)) },
@@ -623,19 +766,25 @@ def dom_conform_cachetools___init___py__module__Cache_maxsize : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.tuple [Val.int (0)], Val.int (0))]), ("_Cache__currsize", Val.int (1)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.tuple [Val.int (0)], Val.int (0)), (Val.tuple [Val.int (1)], Val.int (1))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache_maxsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawConform C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawConform C fuel f_cachetools___init___py__module__Cache_maxsize)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache_maxsize` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache_maxsize_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache_maxsize).all (lawConform C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache_maxsize_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache_maxsize).all (gRunObs C FUEL f_cachetools___init___py__module__Cache_maxsize) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -647,19 +796,25 @@ def dom_runs_cachetools___init___py__module__Cache_maxsize : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__Cache_maxsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawRuns C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawRuns C fuel f_cachetools___init___py__module__Cache_maxsize)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__Cache_maxsize` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__Cache_maxsize_at_FUEL : ((dom_runs_cachetools___init___py__module__Cache_maxsize).all (lawRuns C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__Cache_maxsize_guard_at_FUEL : (dom_runs_cachetools___init___py__module__Cache_maxsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -671,19 +826,25 @@ def dom_returns_cachetools___init___py__module__Cache_maxsize : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__Cache_maxsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawReturns C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawReturns C fuel f_cachetools___init___py__module__Cache_maxsize)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__Cache_maxsize` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__Cache_maxsize_at_FUEL : ((dom_returns_cachetools___init___py__module__Cache_maxsize).all (lawReturns C FUEL f_cachetools___init___py__module__Cache_maxsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__Cache_maxsize_guard_at_FUEL : (dom_returns_cachetools___init___py__module__Cache_maxsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) = true := by rfl
 
 def dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -695,32 +856,58 @@ def dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize :
    { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-207063756041))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize : ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) (lawProjects C FUEL f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize") (lawProjects C fuel f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")
-    (fun c hgc hlc =>
-      lawProjects_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_maxsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize` that is proved; the quantifier over larger budgets is not. -/
+theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize_at_FUEL : ((dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (lawProjects C FUEL f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize")) = true := by rfl
 
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize_guard_at_FUEL : (dom_projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_maxsize) = true := by rfl
+
+/-- **Restated against the current semantics** (the generated text predated both
+changes, and each half of the change is real).
+
+* `args` now matters. The accessor renders with `params := []` — the receiver arrives as
+  the base environment, not as a positional parameter — so any positional argument is a
+  surplus and `posRejected` raises `TypeError`, exactly as CPython does. The old statement
+  claimed the field read for *every* argument list, which was true only while a surplus
+  was silently truncated. It is here stated for every argument list, with the `TypeError`
+  branch spelled out, so nothing is dropped from the domain.
+* A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
+  the globals frame rather than through `fieldOf`, so the two agree only off that class;
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
 theorem uproj_cachetools___init___py__module__Cache_maxsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.maxsize" 5
-      (fun _ self _ => ∃ r, self = .ref r)
-      (fun h self _ => (h, match self with
-                           | .ref r => .ret (fieldOf h r "_Cache__maxsize")
-                           | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+      (fun h self _ => ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self args => (h, match args with
+                           | [] => match self with
+                                   | .ref r => .ret (fieldOf h r "_Cache__maxsize")
+                                   | _      => .ret .unit
+                           | _  => .raise (.str "TypeError"))) := by
+  rintro h _ args ⟨r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
-  simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl r args
+  cases args with
+  | nil =>
+    simpa [Nat.add_comm, Nat.add_left_comm] using
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod
+  | cons a as =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+      Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
 
 def dom_conform_cachetools___init___py__module__Cache_currsize : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (2)) },
@@ -732,19 +919,25 @@ def dom_conform_cachetools___init___py__module__Cache_currsize : List Obs :=
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_negative.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) },
    { case := { heap := h0 ++ [{ cls := "Cache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.int (0)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache_currsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_currsize) (lawConform C FUEL f_cachetools___init___py__module__Cache_currsize) (lawConform C fuel f_cachetools___init___py__module__Cache_currsize)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache_currsize` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache_currsize_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache_currsize).all (lawConform C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache_currsize_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache_currsize).all (gRunObs C FUEL f_cachetools___init___py__module__Cache_currsize) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -756,19 +949,25 @@ def dom_runs_cachetools___init___py__module__Cache_currsize : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__Cache_currsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawRuns C FUEL f_cachetools___init___py__module__Cache_currsize) (lawRuns C fuel f_cachetools___init___py__module__Cache_currsize)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__Cache_currsize` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__Cache_currsize_at_FUEL : ((dom_runs_cachetools___init___py__module__Cache_currsize).all (lawRuns C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__Cache_currsize_guard_at_FUEL : (dom_runs_cachetools___init___py__module__Cache_currsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -780,19 +979,25 @@ def dom_returns_cachetools___init___py__module__Cache_currsize : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__Cache_currsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawReturns C FUEL f_cachetools___init___py__module__Cache_currsize) (lawReturns C fuel f_cachetools___init___py__module__Cache_currsize)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__Cache_currsize` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__Cache_currsize_at_FUEL : ((dom_returns_cachetools___init___py__module__Cache_currsize).all (lawReturns C FUEL f_cachetools___init___py__module__Cache_currsize)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__Cache_currsize_guard_at_FUEL : (dom_returns_cachetools___init___py__module__Cache_currsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) = true := by rfl
 
 def dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict [(Val.int (1), Val.int (1)), (Val.int (2), Val.int (2))]), ("_Cache__currsize", Val.int (2)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -804,32 +1009,58 @@ def dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (92)), ("_Cache__maxsize", Val.int (2))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (1828))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize : ∀ fuel, FUEL ≤ fuel → ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) (lawProjects C FUEL f_cachetools___init___py__module__Cache_currsize "_Cache__currsize") (lawProjects C fuel f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")
-    (fun c hgc hlc =>
-      lawProjects_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_currsize.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`projects__Cache__currsize_cachetools___init___py__module__Cache_currsize` that is proved; the quantifier over larger budgets is not. -/
+theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize_at_FUEL : ((dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (lawProjects C FUEL f_cachetools___init___py__module__Cache_currsize "_Cache__currsize")) = true := by rfl
 
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem projects__Cache__currsize_cachetools___init___py__module__Cache_currsize_guard_at_FUEL : (dom_projects__Cache__currsize_cachetools___init___py__module__Cache_currsize).all (gRun C FUEL f_cachetools___init___py__module__Cache_currsize) = true := by rfl
+
+/-- **Restated against the current semantics** (the generated text predated both
+changes, and each half of the change is real).
+
+* `args` now matters. The accessor renders with `params := []` — the receiver arrives as
+  the base environment, not as a positional parameter — so any positional argument is a
+  surplus and `posRejected` raises `TypeError`, exactly as CPython does. The old statement
+  claimed the field read for *every* argument list, which was true only while a surplus
+  was silently truncated. It is here stated for every argument list, with the `TypeError`
+  branch spelled out, so nothing is dropped from the domain.
+* A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
+  the globals frame rather than through `fieldOf`, so the two agree only off that class;
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
 theorem uproj_cachetools___init___py__module__Cache_currsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.currsize" 5
-      (fun _ self _ => ∃ r, self = .ref r)
-      (fun h self _ => (h, match self with
-                           | .ref r => .ret (fieldOf h r "_Cache__currsize")
-                           | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+      (fun h self _ => ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self args => (h, match args with
+                           | [] => match self with
+                                   | .ref r => .ret (fieldOf h r "_Cache__currsize")
+                                   | _      => .ret .unit
+                           | _  => .raise (.str "TypeError"))) := by
+  rintro h _ args ⟨r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl r args
+  cases args with
+  | nil =>
+    simpa [Nat.add_comm, Nat.add_left_comm] using
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod
+  | cons a as =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+      Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
 
 def dom_conform_cachetools___init___py__module__Cache_getsizeof : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (1)] }, expected := EResult.val (Val.int (1)) },
@@ -841,19 +1072,25 @@ def dom_conform_cachetools___init___py__module__Cache_getsizeof : List Obs :=
    { case := { heap := h0 ++ [], self := none, args := [Val.str ""] }, expected := EResult.val (Val.int (1)) },
    { case := { heap := h0 ++ [], self := none, args := [Val.int (0)] }, expected := EResult.val (Val.int (1)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__Cache_getsizeof : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConform C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConform C fuel f_cachetools___init___py__module__Cache_getsizeof)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__Cache_getsizeof` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__Cache_getsizeof_at_FUEL : ((dom_conform_cachetools___init___py__module__Cache_getsizeof).all (lawConform C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__Cache_getsizeof_guard_at_FUEL : (dom_conform_cachetools___init___py__module__Cache_getsizeof).all (gRunObs C FUEL f_cachetools___init___py__module__Cache_getsizeof) = true := by rfl
 
 def dom_nonneg_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
@@ -865,19 +1102,25 @@ def dom_nonneg_cachetools___init___py__module__Cache_getsizeof : List Case :=
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
    { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def nonneg_cachetools___init___py__module__Cache_getsizeof : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem nonneg_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawNonneg C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawNonneg C fuel f_cachetools___init___py__module__Cache_getsizeof)
-    (fun c hgc hlc =>
-      lawNonneg_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`nonneg_cachetools___init___py__module__Cache_getsizeof` that is proved; the quantifier over larger budgets is not. -/
+theorem nonneg_cachetools___init___py__module__Cache_getsizeof_at_FUEL : ((dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (lawNonneg C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem nonneg_cachetools___init___py__module__Cache_getsizeof_guard_at_FUEL : (dom_nonneg_cachetools___init___py__module__Cache_getsizeof).all (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
@@ -889,19 +1132,25 @@ def dom_idempotent_cachetools___init___py__module__Cache_getsizeof : List Case :
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
    { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module__Cache_getsizeof : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawIdempotent C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawIdempotent C fuel f_cachetools___init___py__module__Cache_getsizeof)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module__Cache_getsizeof` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module__Cache_getsizeof_at_FUEL : ((dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (lawIdempotent C FUEL f_cachetools___init___py__module__Cache_getsizeof)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module__Cache_getsizeof_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module__Cache_getsizeof).all (gIdem C FUEL f_cachetools___init___py__module__Cache_getsizeof) = true := by rfl
 
 def dom_const_cachetools___init___py__module__Cache_getsizeof : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (1)] },
@@ -913,19 +1162,25 @@ def dom_const_cachetools___init___py__module__Cache_getsizeof : List Case :=
    { heap := h0 ++ [], self := none, args := [Val.int (3)] },
    { heap := h0 ++ [], self := none, args := [Val.int (-4473606)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__Cache_getsizeof : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) (lawConst C FUEL f_cachetools___init___py__module__Cache_getsizeof (Val.int (1))) (lawConst C fuel f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__Cache_getsizeof.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__Cache_getsizeof` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__Cache_getsizeof_at_FUEL : ((dom_const_cachetools___init___py__module__Cache_getsizeof).all (lawConst C FUEL f_cachetools___init___py__module__Cache_getsizeof (Val.int (1)))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__Cache_getsizeof_guard_at_FUEL : (dom_const_cachetools___init___py__module__Cache_getsizeof).all (gRun C FUEL f_cachetools___init___py__module__Cache_getsizeof) = true := by rfl
 
 theorem uconst_cachetools___init___py__module__Cache_getsizeof :
     Refines P "cachetools/__init__.py:<module>.Cache.getsizeof" 8
@@ -945,37 +1200,49 @@ def dom_conform_cachetools___init___py__module___TimedCache__Timer___init : List
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.fn "datetime.now"] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___TimedCache__Timer___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___TimedCache__Timer___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__) (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__) (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___init__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___TimedCache__Timer___init` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___init_at_FUEL : ((dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___init_guard_at_FUEL : (dom_conform_cachetools___init___py__module___TimedCache__Timer___init).all (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___init__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module___TimedCache__Timer___exit : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (4)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___TimedCache__Timer___exit : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConform C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___TimedCache__Timer___exit` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL : ((dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___TimedCache__Timer___exit_guard_at_FUEL : (dom_conform_cachetools___init___py__module___TimedCache__Timer___exit).all (gRunObs C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
@@ -987,19 +1254,25 @@ def dom_runs_cachetools___init___py__module___TimedCache__Timer___exit : List Ca
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module___TimedCache__Timer___exit : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module___TimedCache__Timer___exit` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL : ((dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___exit_guard_at_FUEL : (dom_runs_cachetools___init___py__module___TimedCache__Timer___exit).all (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
@@ -1011,19 +1284,25 @@ def dom_returns_cachetools___init___py__module___TimedCache__Timer___exit : List
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module___TimedCache__Timer___exit : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module___TimedCache__Timer___exit` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL : ((dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___exit_guard_at_FUEL : (dom_returns_cachetools___init___py__module___TimedCache__Timer___exit).all (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
@@ -1035,19 +1314,25 @@ def dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit : L
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module___TimedCache__Timer___exit : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawIdempotent C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawIdempotent C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module___TimedCache__Timer___exit` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL : ((dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (lawIdempotent C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module___TimedCache__Timer___exit_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module___TimedCache__Timer___exit).all (gIdem C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) = true := by rfl
 
 def dom_const_cachetools___init___py__module___TimedCache__Timer___exit : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] },
@@ -1059,19 +1344,25 @@ def dom_const_cachetools___init___py__module___TimedCache__Timer___exit : List C
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (-2000))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-93))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple []] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (-94203)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.unit, Val.unit, Val.unit]] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module___TimedCache__Timer___exit : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module___TimedCache__Timer___exit : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) (lawConst C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___exit__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module___TimedCache__Timer___exit` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL : ((dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (lawConst C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__ (Val.unit))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module___TimedCache__Timer___exit_guard_at_FUEL : (dom_const_cachetools___init___py__module___TimedCache__Timer___exit).all (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___exit__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1083,19 +1374,25 @@ def dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce : List 
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (99089))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (2196))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-713))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module___TimedCache__Timer___reduce : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module___TimedCache__Timer___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawRuns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___reduce__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module___TimedCache__Timer___reduce` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL : ((dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module___TimedCache__Timer___reduce_guard_at_FUEL : (dom_runs_cachetools___init___py__module___TimedCache__Timer___reduce).all (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1107,19 +1404,25 @@ def dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce : Li
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (99089))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (2196))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 1)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (-713))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module___TimedCache__Timer___reduce : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module___TimedCache__Timer___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) (lawReturns C fuel f_cachetools___init___py__module___TimedCache__Timer___reduce__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache__Timer___reduce__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module___TimedCache__Timer___reduce` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL : ((dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module___TimedCache__Timer___reduce_guard_at_FUEL : (dom_returns_cachetools___init___py__module___TimedCache__Timer___reduce).all (gRun C FUEL f_cachetools___init___py__module___TimedCache__Timer___reduce__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module___TimedCache_timer : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) },
@@ -1131,19 +1434,25 @@ def dom_conform_cachetools___init___py__module___TimedCache_timer : List Obs :=
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_param.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (3)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) },
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("getsizeof", Val.fn "CacheTestMixin.test_getsizeof_replace_grow.<locals>.<lambda>"), ("_Cache__size", Val.dict []), ("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (10)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.ref (base + 1)) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module___TimedCache_timer : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConform C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConform C fuel f_cachetools___init___py__module___TimedCache_timer)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module___TimedCache_timer` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module___TimedCache_timer_at_FUEL : ((dom_conform_cachetools___init___py__module___TimedCache_timer).all (lawConform C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module___TimedCache_timer_guard_at_FUEL : (dom_conform_cachetools___init___py__module___TimedCache_timer).all (gRunObs C FUEL f_cachetools___init___py__module___TimedCache_timer) = true := by rfl
 
 def dom_runs_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1155,19 +1464,25 @@ def dom_runs_cachetools___init___py__module___TimedCache_timer : List Case :=
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module___TimedCache_timer : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawRuns C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawRuns C fuel f_cachetools___init___py__module___TimedCache_timer)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module___TimedCache_timer` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module___TimedCache_timer_at_FUEL : ((dom_runs_cachetools___init___py__module___TimedCache_timer).all (lawRuns C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module___TimedCache_timer_guard_at_FUEL : (dom_runs_cachetools___init___py__module___TimedCache_timer).all (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) = true := by rfl
 
 def dom_returns_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1179,19 +1494,25 @@ def dom_returns_cachetools___init___py__module___TimedCache_timer : List Case :=
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module___TimedCache_timer : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawReturns C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawReturns C fuel f_cachetools___init___py__module___TimedCache_timer)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module___TimedCache_timer` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module___TimedCache_timer_at_FUEL : ((dom_returns_cachetools___init___py__module___TimedCache_timer).all (lawReturns C FUEL f_cachetools___init___py__module___TimedCache_timer)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module___TimedCache_timer_guard_at_FUEL : (dom_returns_cachetools___init___py__module___TimedCache_timer).all (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) = true := by rfl
 
 def dom_const_cachetools___init___py__module___TimedCache_timer : List Case :=
   [{ heap := h0 ++ [{ cls := "TTLCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TTLCache__root", Val.ref (base + 2)), ("_TTLCache__links", Val.dict []), ("_TTLCache__ttl", Val.int (600))] }, { cls := "_Timer", fields := [("_Timer__timer", Val.fn "monotonic"), ("_Timer__nesting", Val.int (0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 2))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1203,32 +1524,58 @@ def dom_const_cachetools___init___py__module___TimedCache_timer : List Case :=
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (1804883))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (893185))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module___TimedCache_timer : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module___TimedCache_timer : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) (lawConst C FUEL f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1))) (lawConst C fuel f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module___TimedCache_timer.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module___TimedCache_timer` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module___TimedCache_timer_at_FUEL : ((dom_const_cachetools___init___py__module___TimedCache_timer).all (lawConst C FUEL f_cachetools___init___py__module___TimedCache_timer (Val.ref (base + 1)))) = true := by rfl
 
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module___TimedCache_timer_guard_at_FUEL : (dom_const_cachetools___init___py__module___TimedCache_timer).all (gRun C FUEL f_cachetools___init___py__module___TimedCache_timer) = true := by rfl
+
+/-- **Restated against the current semantics** (the generated text predated both
+changes, and each half of the change is real).
+
+* `args` now matters. The accessor renders with `params := []` — the receiver arrives as
+  the base environment, not as a positional parameter — so any positional argument is a
+  surplus and `posRejected` raises `TypeError`, exactly as CPython does. The old statement
+  claimed the field read for *every* argument list, which was true only while a surplus
+  was silently truncated. It is here stated for every argument list, with the `TypeError`
+  branch spelled out, so nothing is dropped from the domain.
+* A `<module>` receiver is excluded. `applyFunc` reads a module object's attribute through
+  the globals frame rather than through `fieldOf`, so the two agree only off that class;
+  this is the same side condition `applyFunc_doc_ret_field_self` now carries. -/
 theorem uproj_cachetools___init___py__module___TimedCache_timer :
     MRefines P "cachetools/__init__.py:<module>._TimedCache.timer" 5
-      (fun _ self _ => ∃ r, self = .ref r)
-      (fun h self _ => (h, match self with
-                           | .ref r => .ret (fieldOf h r "_TimedCache__timer")
-                           | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+      (fun h self _ => ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self args => (h, match args with
+                           | [] => match self with
+                                   | .ref r => .ret (fieldOf h r "_TimedCache__timer")
+                                   | _      => .ret .unit
+                           | _  => .raise (.str "TypeError"))) := by
+  rintro h _ args ⟨r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module___TimedCache_timer rfl]
-  simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl r args
+  cases args with
+  | nil =>
+    simpa [Nat.add_comm, Nat.add_left_comm] using
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod
+  | cons a as =>
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+      Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module___TimedCache_timer]
 
 def dom_conform_cachetools___init___py__module__TTLCache__Link___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit] }, expected := EResult.val (Val.unit) },
@@ -1236,19 +1583,25 @@ def dom_conform_cachetools___init___py__module__TTLCache__Link___init : List Obs
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [] }, { cls := "RecursiveEquals", fields := [("_use_cache", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.ref (base + 1)], Val.unit] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [] }, { cls := "RecursiveEquals", fields := [("_use_cache", Val.bool true)] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.ref (base + 1)], Val.unit] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__TTLCache__Link___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link___init__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__TTLCache__Link___init` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link___init_at_FUEL : ((dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link___init_guard_at_FUEL : (dom_conform_cachetools___init___py__module__TTLCache__Link___init).all (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) = true := by rfl
 
 def dom_commutes_cachetools___init___py__module__TTLCache__Link___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit] },
@@ -1260,19 +1613,25 @@ def dom_commutes_cachetools___init___py__module__TTLCache__Link___init : List Ca
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [], Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (384)], Val.unit] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module__TTLCache__Link___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawCommutes C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawCommutes C fuel f_cachetools___init___py__module__TTLCache__Link___init__)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module__TTLCache__Link___init` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module__TTLCache__Link___init_at_FUEL : ((dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (lawCommutes C FUEL f_cachetools___init___py__module__TTLCache__Link___init__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module__TTLCache__Link___init_guard_at_FUEL : (dom_commutes_cachetools___init___py__module__TTLCache__Link___init).all (gComm C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) = true := by rfl
 
 def dom_const_cachetools___init___py__module__TTLCache__Link___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.unit, Val.unit] },
@@ -1284,57 +1643,75 @@ def dom_const_cachetools___init___py__module__TTLCache__Link___init : List Case 
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [], Val.int (0)] },
    { heap := h0 ++ [{ cls := "_Link", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.tuple [Val.int (384)], Val.unit] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__TTLCache__Link___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__TTLCache__Link___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__TTLCache__Link___init` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__TTLCache__Link___init_at_FUEL : ((dom_const_cachetools___init___py__module__TTLCache__Link___init).all (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link___init__ (Val.unit))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__TTLCache__Link___init_guard_at_FUEL : (dom_const_cachetools___init___py__module__TTLCache__Link___init).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___init__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__TTLCache__Link___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__TTLCache__Link___reduce : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__TTLCache__Link___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___reduce__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__TTLCache__Link___reduce` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL : ((dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link___reduce_guard_at_FUEL : (dom_runs_cachetools___init___py__module__TTLCache__Link___reduce).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__TTLCache__Link___reduce : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.unit), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__TTLCache__Link___reduce : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__TTLCache__Link___reduce : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link___reduce__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link___reduce__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__TTLCache__Link___reduce` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL : ((dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link___reduce_guard_at_FUEL : (dom_returns_cachetools___init___py__module__TTLCache__Link___reduce).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link___reduce__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__TTLCache__Link_unlink : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) },
@@ -1346,19 +1723,25 @@ def dom_conform_cachetools___init___py__module__TTLCache__Link_unlink : List Obs
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (9)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 1))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 0))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (3)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__TTLCache__Link_unlink : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConform C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__TTLCache__Link_unlink` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL : ((dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConform C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__TTLCache__Link_unlink_guard_at_FUEL : (dom_conform_cachetools___init___py__module__TTLCache__Link_unlink).all (gRunObs C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1370,19 +1753,25 @@ def dom_runs_cachetools___init___py__module__TTLCache__Link_unlink : List Case :
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__TTLCache__Link_unlink : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawRuns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__TTLCache__Link_unlink` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL : ((dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (lawRuns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__TTLCache__Link_unlink_guard_at_FUEL : (dom_runs_cachetools___init___py__module__TTLCache__Link_unlink).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1394,19 +1783,25 @@ def dom_returns_cachetools___init___py__module__TTLCache__Link_unlink : List Cas
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__TTLCache__Link_unlink : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawReturns C fuel f_cachetools___init___py__module__TTLCache__Link_unlink)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__TTLCache__Link_unlink` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL : ((dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (lawReturns C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__TTLCache__Link_unlink_guard_at_FUEL : (dom_returns_cachetools___init___py__module__TTLCache__Link_unlink).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) = true := by rfl
 
 def dom_const_cachetools___init___py__module__TTLCache__Link_unlink : List Case :=
   [{ heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.unit), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
@@ -1418,19 +1813,25 @@ def dom_const_cachetools___init___py__module__TTLCache__Link_unlink : List Case 
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (-1970)), ("key", Val.int (128434258256119365632)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.int (0)), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] },
    { heap := h0 ++ [{ cls := "_Link", fields := [("expires", Val.int (3)), ("key", Val.int (2)), ("next", Val.ref (base + 1)), ("prev", Val.ref (base + 2))] }, { cls := "_Link", fields := [("expires", Val.int (4)), ("key", Val.int (3)), ("next", Val.ref (base + 2)), ("prev", Val.ref (base + 0))] }, { cls := "_Link", fields := [("expires", Val.int (0)), ("key", Val.unit), ("next", Val.ref (base + 0)), ("prev", Val.ref (base + 1))] }], self := (some (Val.ref (base + 0))), args := [] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__TTLCache__Link_unlink : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__TTLCache__Link_unlink : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TTLCache__Link_unlink.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__TTLCache__Link_unlink` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL : ((dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (lawConst C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink (Val.unit))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__TTLCache__Link_unlink_guard_at_FUEL : (dom_const_cachetools___init___py__module__TTLCache__Link_unlink).all (gRun C FUEL f_cachetools___init___py__module__TTLCache__Link_unlink) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__TLRUCache__Item___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] }, expected := EResult.val (Val.unit) },
@@ -1442,19 +1843,25 @@ def dom_conform_cachetools___init___py__module__TLRUCache__Item___init : List Ob
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (42), Val.int (2)] }, expected := EResult.val (Val.unit) },
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (4)] }, expected := EResult.val (Val.unit) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__TLRUCache__Item___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__TLRUCache__Item___init` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL : ((dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___init_guard_at_FUEL : (dom_conform_cachetools___init___py__module__TLRUCache__Item___init).all (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) = true := by rfl
 
 def dom_commutes_cachetools___init___py__module__TLRUCache__Item___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] },
@@ -1466,19 +1873,25 @@ def dom_commutes_cachetools___init___py__module__TLRUCache__Item___init : List C
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (180645), Val.int (239)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (2)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module__TLRUCache__Item___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawCommutes C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawCommutes C fuel f_cachetools___init___py__module__TLRUCache__Item___init__)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module__TLRUCache__Item___init` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL : ((dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (lawCommutes C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module__TLRUCache__Item___init_guard_at_FUEL : (dom_commutes_cachetools___init___py__module__TLRUCache__Item___init).all (gComm C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) = true := by rfl
 
 def dom_const_cachetools___init___py__module__TLRUCache__Item___init : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (5)] },
@@ -1490,19 +1903,25 @@ def dom_const_cachetools___init___py__module__TLRUCache__Item___init : List Case
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (180645), Val.int (239)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (2), Val.int (2)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__TLRUCache__Item___init : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__TLRUCache__Item___init : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) (lawConst C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit)) (lawConst C fuel f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___init__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__TLRUCache__Item___init` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL : ((dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (lawConst C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__ (Val.unit))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__TLRUCache__Item___init_guard_at_FUEL : (dom_const_cachetools___init___py__module__TLRUCache__Item___init).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___init__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__TLRUCache__Item___lt : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool false) },
@@ -1514,19 +1933,25 @@ def dom_conform_cachetools___init___py__module__TLRUCache__Item___lt : List Obs 
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (5)), ("key", Val.int (1)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (4)), ("key", Val.int (2)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool false) },
    { case := { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (5)), ("key", Val.int (1)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (6)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }, expected := EResult.val (Val.bool true) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__TLRUCache__Item___lt : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__TLRUCache__Item___lt` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL : ((dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache__Item___lt_guard_at_FUEL : (dom_conform_cachetools___init___py__module__TLRUCache__Item___lt).all (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__TLRUCache__Item___lt : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
@@ -1538,19 +1963,25 @@ def dom_runs_cachetools___init___py__module__TLRUCache__Item___lt : List Case :=
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-16678)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (6788849)), ("key", Val.int (-40216)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__TLRUCache__Item___lt : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawRuns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__TLRUCache__Item___lt` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL : ((dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__TLRUCache__Item___lt_guard_at_FUEL : (dom_runs_cachetools___init___py__module__TLRUCache__Item___lt).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__TLRUCache__Item___lt : List Case :=
   [{ heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (2)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (1)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
@@ -1562,19 +1993,25 @@ def dom_returns_cachetools___init___py__module__TLRUCache__Item___lt : List Case
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool false)] }, { cls := "_Item", fields := [("expires", Val.int (-16678)), ("key", Val.int (3)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] },
    { heap := h0 ++ [{ cls := "_Item", fields := [("expires", Val.int (2)), ("key", Val.int (4)), ("removed", Val.bool true)] }, { cls := "_Item", fields := [("expires", Val.int (6788849)), ("key", Val.int (-40216)), ("removed", Val.bool false)] }], self := (some (Val.ref (base + 0))), args := [Val.ref (base + 1)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__TLRUCache__Item___lt : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__TLRUCache__Item___lt : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) (lawReturns C fuel f_cachetools___init___py__module__TLRUCache__Item___lt__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache__Item___lt__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__TLRUCache__Item___lt` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL : ((dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__TLRUCache__Item___lt_guard_at_FUEL : (dom_returns_cachetools___init___py__module__TLRUCache__Item___lt).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache__Item___lt__) = true := by rfl
 
 def dom_conform_cachetools___init___py__module__TLRUCache___contains : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
@@ -1583,19 +2020,25 @@ def dom_conform_cachetools___init___py__module__TLRUCache___contains : List Obs 
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] }, expected := EResult.val (Val.bool false) },
    { case := { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (1)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (0)] }, expected := EResult.val (Val.bool false) }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def conform_cachetools___init___py__module__TLRUCache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRunObs` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem conform_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConform C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConform C fuel f_cachetools___init___py__module__TLRUCache___contains__)
-    (fun c hgc hlc =>
-      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`conform_cachetools___init___py__module__TLRUCache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem conform_cachetools___init___py__module__TLRUCache___contains_at_FUEL : ((dom_conform_cachetools___init___py__module__TLRUCache___contains).all (lawConform C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem conform_cachetools___init___py__module__TLRUCache___contains_guard_at_FUEL : (dom_conform_cachetools___init___py__module__TLRUCache___contains).all (gRunObs C FUEL f_cachetools___init___py__module__TLRUCache___contains__) = true := by rfl
 
 def dom_runs_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -1607,19 +2050,25 @@ def dom_runs_cachetools___init___py__module__TLRUCache___contains : List Case :=
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def runs_cachetools___init___py__module__TLRUCache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem runs_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawRuns C fuel f_cachetools___init___py__module__TLRUCache___contains__)
-    (fun c hgc hlc =>
-      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`runs_cachetools___init___py__module__TLRUCache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem runs_cachetools___init___py__module__TLRUCache___contains_at_FUEL : ((dom_runs_cachetools___init___py__module__TLRUCache___contains).all (lawRuns C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem runs_cachetools___init___py__module__TLRUCache___contains_guard_at_FUEL : (dom_runs_cachetools___init___py__module__TLRUCache___contains).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) = true := by rfl
 
 def dom_returns_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -1631,19 +2080,25 @@ def dom_returns_cachetools___init___py__module__TLRUCache___contains : List Case
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def returns_cachetools___init___py__module__TLRUCache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem returns_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawReturns C fuel f_cachetools___init___py__module__TLRUCache___contains__)
-    (fun c hgc hlc =>
-      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`returns_cachetools___init___py__module__TLRUCache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem returns_cachetools___init___py__module__TLRUCache___contains_at_FUEL : ((dom_returns_cachetools___init___py__module__TLRUCache___contains).all (lawReturns C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem returns_cachetools___init___py__module__TLRUCache___contains_guard_at_FUEL : (dom_returns_cachetools___init___py__module__TLRUCache___contains).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -1655,19 +2110,25 @@ def dom_idempotent_cachetools___init___py__module__TLRUCache___contains : List C
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module__TLRUCache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawIdempotent C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawIdempotent C fuel f_cachetools___init___py__module__TLRUCache___contains__)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module__TLRUCache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module__TLRUCache___contains_at_FUEL : ((dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (lawIdempotent C FUEL f_cachetools___init___py__module__TLRUCache___contains__)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module__TLRUCache___contains_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module__TLRUCache___contains).all (gIdem C FUEL f_cachetools___init___py__module__TLRUCache___contains__) = true := by rfl
 
 def dom_const_cachetools___init___py__module__TLRUCache___contains : List Case :=
   [{ heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (1)] },
@@ -1679,19 +2140,25 @@ def dom_const_cachetools___init___py__module__TLRUCache___contains : List Case :
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (-1970)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (0)), ("_Timer__time", Val.int (-246))] }, { cls := "Timer", fields := [("auto", Val.bool false), ("time", Val.int (8604147705))] }], self := (some (Val.ref (base + 0))), args := [Val.int (2)] },
    { heap := h0 ++ [{ cls := "TLRUTestCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_TimedCache__timer", Val.ref (base + 1)), ("_TLRUCache__items", Val.dict []), ("_TLRUCache__order", Val.list []), ("_TLRUCache__ttu", Val.fn "default_ttu")] }, { cls := "_Timer", fields := [("_Timer__timer", Val.ref (base + 2)), ("_Timer__nesting", Val.int (115817512)), ("_Timer__time", Val.int (0))] }, { cls := "Timer", fields := [("auto", Val.bool true), ("time", Val.int (0))] }], self := (some (Val.ref (base + 0))), args := [Val.int (7575705755762)] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def const_cachetools___init___py__module__TLRUCache___contains : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gRun` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem const_cachetools___init___py__module__TLRUCache___contains : ∀ fuel, FUEL ≤ fuel → ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true := by
-  intro fuel hf
-  exact all_transfer _ (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) (lawConst C FUEL f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false)) (lawConst C fuel f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))
-    (fun c hgc hlc =>
-      lawConst_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__TLRUCache___contains__.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`const_cachetools___init___py__module__TLRUCache___contains` that is proved; the quantifier over larger budgets is not. -/
+theorem const_cachetools___init___py__module__TLRUCache___contains_at_FUEL : ((dom_const_cachetools___init___py__module__TLRUCache___contains).all (lawConst C FUEL f_cachetools___init___py__module__TLRUCache___contains__ (Val.bool false))) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem const_cachetools___init___py__module__TLRUCache___contains_guard_at_FUEL : (dom_const_cachetools___init___py__module__TLRUCache___contains).all (gRun C FUEL f_cachetools___init___py__module__TLRUCache___contains__) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module__cached : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
@@ -1703,19 +2170,25 @@ def dom_idempotent_cachetools___init___py__module__cached : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1436)), ("_Cache__maxsize", Val.int (-4272))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }, { cls := "CountedCondition", fields := [("count", Val.int (0)), ("wait_count", Val.int (0)), ("notify_count", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.ref (base + 1), Val.bool false] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module__cached : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C fuel f_cachetools___init___py__module__cached)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module__cached : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C fuel f_cachetools___init___py__module__cached)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__cached) (lawIdempotent C FUEL f_cachetools___init___py__module__cached) (lawIdempotent C fuel f_cachetools___init___py__module__cached)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cached.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module__cached` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module__cached_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C FUEL f_cachetools___init___py__module__cached)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module__cached_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module__cached).all (gIdem C FUEL f_cachetools___init___py__module__cached) = true := by rfl
 
 def dom_commutes_cachetools___init___py__module__cached : List Case :=
   [{ heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
@@ -1727,19 +2200,25 @@ def dom_commutes_cachetools___init___py__module__cached : List Case :=
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-1436)), ("_Cache__maxsize", Val.int (-4272))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.unit, Val.bool false] },
    { heap := h0 ++ [{ cls := "Cache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2))] }, { cls := "CountedCondition", fields := [("count", Val.int (0)), ("wait_count", Val.int (0)), ("notify_count", Val.int (0))] }], self := none, args := [Val.ref (base + 0), Val.fn "hashkey", Val.unit, Val.ref (base + 1), Val.bool false] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module__cached : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C fuel f_cachetools___init___py__module__cached)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module__cached : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C fuel f_cachetools___init___py__module__cached)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__cached) (lawCommutes C FUEL f_cachetools___init___py__module__cached) (lawCommutes C fuel f_cachetools___init___py__module__cached)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cached.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module__cached` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module__cached_at_FUEL : ((dom_commutes_cachetools___init___py__module__cached).all (lawCommutes C FUEL f_cachetools___init___py__module__cached)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module__cached_guard_at_FUEL : (dom_commutes_cachetools___init___py__module__cached).all (gComm C FUEL f_cachetools___init___py__module__cached) = true := by rfl
 
 def dom_idempotent_cachetools___init___py__module__cachedmethod : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool false] },
@@ -1751,19 +2230,25 @@ def dom_idempotent_cachetools___init___py__module__cachedmethod : List Case :=
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.int (0), Val.bool true] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools___init___py__module__cachedmethod : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools___init___py__module__cachedmethod : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools___init___py__module__cachedmethod) (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod) (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cachedmethod.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools___init___py__module__cachedmethod` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools___init___py__module__cachedmethod_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools___init___py__module__cachedmethod_guard_at_FUEL : (dom_idempotent_cachetools___init___py__module__cachedmethod).all (gIdem C FUEL f_cachetools___init___py__module__cachedmethod) = true := by rfl
 
 def dom_commutes_cachetools___init___py__module__cachedmethod : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.unit, Val.unit, Val.bool false] },
@@ -1775,19 +2260,25 @@ def dom_commutes_cachetools___init___py__module__cachedmethod : List Case :=
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.unit, Val.bool false] },
    { heap := h0 ++ [], self := none, args := [Val.fn "Cached.<lambda>", Val.fn "methodkey", Val.fn "Cached.<lambda>", Val.int (0), Val.bool true] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools___init___py__module__cachedmethod : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools___init___py__module__cachedmethod : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools___init___py__module__cachedmethod) (lawCommutes C FUEL f_cachetools___init___py__module__cachedmethod) (lawCommutes C fuel f_cachetools___init___py__module__cachedmethod)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools___init___py__module__cachedmethod.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools___init___py__module__cachedmethod` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools___init___py__module__cachedmethod_at_FUEL : ((dom_commutes_cachetools___init___py__module__cachedmethod).all (lawCommutes C FUEL f_cachetools___init___py__module__cachedmethod)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools___init___py__module__cachedmethod_guard_at_FUEL : (dom_commutes_cachetools___init___py__module__cachedmethod).all (gComm C FUEL f_cachetools___init___py__module__cachedmethod) = true := by rfl
 
 def dom_idempotent_cachetools_func_py__module___cache : List Case :=
   [{ heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool false] },
@@ -1799,19 +2290,25 @@ def dom_idempotent_cachetools_func_py__module___cache : List Case :=
    { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-562949953421311)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (122769988322284790909354065310777344), Val.bool true] },
    { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def idempotent_cachetools_func_py__module___cache : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C fuel f_cachetools_func_py__module___cache)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gIdem` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem idempotent_cachetools_func_py__module___cache : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C fuel f_cachetools_func_py__module___cache)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gIdem C FUEL f_cachetools_func_py__module___cache) (lawIdempotent C FUEL f_cachetools_func_py__module___cache) (lawIdempotent C fuel f_cachetools_func_py__module___cache)
-    (fun c hgc hlc =>
-      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools_func_py__module___cache.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`idempotent_cachetools_func_py__module___cache` that is proved; the quantifier over larger budgets is not. -/
+theorem idempotent_cachetools_func_py__module___cache_at_FUEL : ((dom_idempotent_cachetools_func_py__module___cache).all (lawIdempotent C FUEL f_cachetools_func_py__module___cache)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem idempotent_cachetools_func_py__module___cache_guard_at_FUEL : (dom_idempotent_cachetools_func_py__module___cache).all (gIdem C FUEL f_cachetools_func_py__module___cache) = true := by rfl
 
 def dom_commutes_cachetools_func_py__module___cache : List Case :=
   [{ heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (2), Val.bool false] },
@@ -1823,19 +2320,25 @@ def dom_commutes_cachetools_func_py__module___cache : List Case :=
    { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (-562949953421311)), ("_Cache__maxsize", Val.int (2)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (122769988322284790909354065310777344), Val.bool true] },
    { heap := h0 ++ [{ cls := "FIFOCache", fields := [("_Cache__data", Val.dict []), ("_Cache__currsize", Val.int (0)), ("_Cache__maxsize", Val.int (128)), ("_FIFOCache__order", Val.dict [])] }], self := none, args := [Val.ref (base + 0), Val.int (128), Val.bool false] }]
 
-/-- Holds at **every** fuel budget at or above `FUEL`.
+/-- **OPEN OBLIGATION — not a theorem.** The fuel transport this statement needs
+rests on `TFFreeCtx C`, and that is now *false*: `C_not_tfFree` below refutes it by
+exhibiting a resolvable body containing `Stmt.tryFinally`, the one construct
+`FuelMono` excludes by counterexample. The exporter learned to translate
+`try/finally` after this file was generated, so 8 of the 233 rendered bodies now
+carry it and `FuelMono` has no transport lemma that avoids them. Recorded as an
+open obligation rather than deleted, weakened to a fixed budget, or `sorry`d; the
+computational content that *is* checked is the pair of theorems immediately below.
+Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
+whose reachable bodies are `tryFinally`-free), not a change to this file. -/
+def commutes_cachetools_func_py__module___cache : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C fuel f_cachetools_func_py__module___cache)) = true
 
-Checked at `FUEL` by computation, then transported by `FuelMono.applyFunc_fuel_mono`.
-The `gComm` conjunct is the `≠ outOfFuel` side condition, evaluated over the same
-domain rather than assumed: without it a law could hold at `FUEL` for the reason that
-nothing ran. -/
-theorem commutes_cachetools_func_py__module___cache : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C fuel f_cachetools_func_py__module___cache)) = true := by
-  intro fuel hf
-  exact all_transfer _ (gComm C FUEL f_cachetools_func_py__module___cache) (lawCommutes C FUEL f_cachetools_func_py__module___cache) (lawCommutes C fuel f_cachetools_func_py__module___cache)
-    (fun c hgc hlc =>
-      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_cachetools_func_py__module___cache.body = true))
-        (hk := hf) (hg := hgc) (h := hlc))
-    (by rfl) (by rfl)
+/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
+`commutes_cachetools_func_py__module___cache` that is proved; the quantifier over larger budgets is not. -/
+theorem commutes_cachetools_func_py__module___cache_at_FUEL : ((dom_commutes_cachetools_func_py__module___cache).all (lawCommutes C FUEL f_cachetools_func_py__module___cache)) = true := by rfl
+
+/-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
+domain, so every case actually ran. -/
+theorem commutes_cachetools_func_py__module___cache_guard_at_FUEL : (dom_commutes_cachetools_func_py__module___cache).all (gComm C FUEL f_cachetools_func_py__module___cache) = true := by rfl
 
 /-- Everything this module states but does not prove. A `Prop`-valued `def` asserts nothing, so nothing here is admitted. -/
 def obligations : List OpenObligation :=
@@ -1849,7 +2352,79 @@ def obligations : List OpenObligation :=
    { name := "stmt_returns_cachetools___init___py__module__Cache___len", source := "structural (\u00a74.2)", subject := "cachetools/__init__.py:<module>.Cache.__len__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_nonneg_cachetools___init___py__module__Cache___len", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.Cache.__len__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
    { name := "stmt_idempotent_cachetools___init___py__module__TTLCache__Link___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TTLCache._Link.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
-   { name := "stmt_idempotent_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" }]
+   { name := "stmt_idempotent_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (\u00a74.3)", subject := "cachetools/__init__.py:<module>.TLRUCache._Item.__init__", reason := "statement survived refutation; the generated proof portfolio could not close it" },
+   { name := "commutes_cachetools___init___py__module__Cache___init", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module__Cache___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools___init___py__module__TLRUCache__Item___init", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module__TLRUCache__Item___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools___init___py__module__TTLCache__Link___init", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module__TTLCache__Link___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module___DefaultSize___setitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools___init___py__module__cached", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module__cached", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools___init___py__module__cachedmethod", source := "algebraic (§4.3)", subject := "commutes_cachetools___init___py__module__cachedmethod", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "commutes_cachetools_func_py__module___cache", source := "algebraic (§4.3)", subject := "commutes_cachetools_func_py__module___cache", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache___contains", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache___getitem", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache___getitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache___init", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache_currsize", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache_currsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache_getsizeof", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache_getsizeof", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__Cache_maxsize", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__Cache_maxsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__TLRUCache__Item___init", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__TLRUCache__Item___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__TLRUCache__Item___lt", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__TLRUCache__Item___lt", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__TLRUCache___contains", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__TLRUCache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__TTLCache__Link___init", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__TTLCache__Link___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module__TTLCache__Link_unlink", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module__TTLCache__Link_unlink", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___DefaultSize___getitem", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___DefaultSize___getitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___DefaultSize___setitem", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___DefaultSize___setitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___DefaultSize_clear", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___DefaultSize_clear", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___DefaultSize_pop", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___DefaultSize_pop", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___TimedCache__Timer___exit", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___TimedCache__Timer___exit", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___TimedCache__Timer___init", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___TimedCache__Timer___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "conform_cachetools___init___py__module___TimedCache_timer", source := "cross-runtime (§4.4)", subject := "conform_cachetools___init___py__module___TimedCache_timer", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__Cache___init", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__Cache___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__Cache_getsizeof", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__Cache_getsizeof", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__TLRUCache__Item___init", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__TLRUCache__Item___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__TLRUCache___contains", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__TLRUCache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__TTLCache__Link___init", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__TTLCache__Link___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module__TTLCache__Link_unlink", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module__TTLCache__Link_unlink", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module___DefaultSize___getitem", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module___DefaultSize___getitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module___DefaultSize___setitem", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module___DefaultSize___setitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module___DefaultSize_pop", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module___DefaultSize_pop", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module___TimedCache__Timer___exit", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module___TimedCache__Timer___exit", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "const_cachetools___init___py__module___TimedCache_timer", source := "artifact (§4.1)", subject := "const_cachetools___init___py__module___TimedCache_timer", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module__Cache_getsizeof", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module__TLRUCache___contains", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module__TLRUCache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module___DefaultSize___getitem", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module___DefaultSize___getitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module___DefaultSize___setitem", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module___DefaultSize___setitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module___DefaultSize_pop", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module___TimedCache__Timer___exit", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module___TimedCache__Timer___exit", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module__cached", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module__cached", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools___init___py__module__cachedmethod", source := "algebraic (§4.3)", subject := "idempotent_cachetools___init___py__module__cachedmethod", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "idempotent_cachetools_func_py__module___cache", source := "algebraic (§4.3)", subject := "idempotent_cachetools_func_py__module___cache", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "nonneg_cachetools___init___py__module__Cache_getsizeof", source := "algebraic (§4.3)", subject := "nonneg_cachetools___init___py__module__Cache_getsizeof", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "nonneg_cachetools___init___py__module___DefaultSize___getitem", source := "algebraic (§4.3)", subject := "nonneg_cachetools___init___py__module___DefaultSize___getitem", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "nonneg_cachetools___init___py__module___DefaultSize_pop", source := "algebraic (§4.3)", subject := "nonneg_cachetools___init___py__module___DefaultSize_pop", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "projects__Cache__currsize_cachetools___init___py__module__Cache_currsize", source := "artifact (§4.1)", subject := "projects__Cache__currsize_cachetools___init___py__module__Cache_currsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize", source := "artifact (§4.1)", subject := "projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__Cache___contains", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__Cache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__Cache___init", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__Cache___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__Cache_currsize", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__Cache_currsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__Cache_maxsize", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__Cache_maxsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__TLRUCache__Item___lt", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__TLRUCache__Item___lt", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__TLRUCache___contains", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__TLRUCache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__TTLCache__Link___reduce", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__TTLCache__Link___reduce", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module__TTLCache__Link_unlink", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module__TTLCache__Link_unlink", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module___TimedCache__Timer___exit", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module___TimedCache__Timer___exit", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module___TimedCache__Timer___reduce", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module___TimedCache__Timer___reduce", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "returns_cachetools___init___py__module___TimedCache_timer", source := "structural (§4.2)", subject := "returns_cachetools___init___py__module___TimedCache_timer", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__Cache___contains", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__Cache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__Cache___init", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__Cache___init", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__Cache_currsize", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__Cache_currsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__Cache_maxsize", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__Cache_maxsize", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__TLRUCache__Item___lt", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__TLRUCache__Item___lt", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__TLRUCache___contains", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__TLRUCache___contains", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__TTLCache__Link___reduce", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__TTLCache__Link___reduce", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module__TTLCache__Link_unlink", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module__TTLCache__Link_unlink", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module___TimedCache__Timer___exit", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module___TimedCache__Timer___exit", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module___TimedCache__Timer___reduce", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module___TimedCache__Timer___reduce", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" },
+   { name := "runs_cachetools___init___py__module___TimedCache_timer", source := "structural (§4.2)", subject := "runs_cachetools___init___py__module___TimedCache_timer", reason := "fuel transport blocked: `TFFreeCtx C` is refuted by `C_not_tfFree` since the exporter learned to translate `try/finally`; the `FUEL`-instantiated law and its guard are proved as `..._at_FUEL`" }]
 
 #eval IO.println (renderObligations "Cachetools" obligations)
 
@@ -1857,166 +2432,166 @@ def obligations : List OpenObligation :=
 
 `#audit_depends` fails the build if a theorem's proof term never mentions the generated definition it claims to be about — the necessary half of the gate. The sufficient half is `scripts/mutate.py`, run against this file. -/
 
-#audit_depends conform_cachetools___init___py__module___DefaultSize___getitem on f_cachetools___init___py__module___DefaultSize___getitem__
-#audit_depends nonneg_cachetools___init___py__module___DefaultSize___getitem on f_cachetools___init___py__module___DefaultSize___getitem__
-#audit_depends idempotent_cachetools___init___py__module___DefaultSize___getitem on f_cachetools___init___py__module___DefaultSize___getitem__
-#audit_depends const_cachetools___init___py__module___DefaultSize___getitem on f_cachetools___init___py__module___DefaultSize___getitem__
+#audit_depends conform_cachetools___init___py__module___DefaultSize___getitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___getitem__
+#audit_depends nonneg_cachetools___init___py__module___DefaultSize___getitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___getitem__
+#audit_depends idempotent_cachetools___init___py__module___DefaultSize___getitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___getitem__
+#audit_depends const_cachetools___init___py__module___DefaultSize___getitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___getitem__
 #audit_depends uconst_cachetools___init___py__module___DefaultSize___getitem on f_cachetools___init___py__module___DefaultSize___getitem__
-#audit_depends conform_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
-#audit_depends idempotent_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
-#audit_depends commutes_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
-#audit_depends const_cachetools___init___py__module___DefaultSize___setitem on f_cachetools___init___py__module___DefaultSize___setitem__
-#audit_depends conform_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
-#audit_depends nonneg_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
-#audit_depends idempotent_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
-#audit_depends const_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends conform_cachetools___init___py__module___DefaultSize___setitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___setitem__
+#audit_depends idempotent_cachetools___init___py__module___DefaultSize___setitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___setitem__
+#audit_depends commutes_cachetools___init___py__module___DefaultSize___setitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___setitem__
+#audit_depends const_cachetools___init___py__module___DefaultSize___setitem_at_FUEL on f_cachetools___init___py__module___DefaultSize___setitem__
+#audit_depends conform_cachetools___init___py__module___DefaultSize_pop_at_FUEL on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends nonneg_cachetools___init___py__module___DefaultSize_pop_at_FUEL on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends idempotent_cachetools___init___py__module___DefaultSize_pop_at_FUEL on f_cachetools___init___py__module___DefaultSize_pop
+#audit_depends const_cachetools___init___py__module___DefaultSize_pop_at_FUEL on f_cachetools___init___py__module___DefaultSize_pop
 #audit_depends uconst_cachetools___init___py__module___DefaultSize_pop on f_cachetools___init___py__module___DefaultSize_pop
-#audit_depends conform_cachetools___init___py__module___DefaultSize_clear on f_cachetools___init___py__module___DefaultSize_clear
-#audit_depends conform_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
-#audit_depends runs_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
-#audit_depends returns_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
-#audit_depends commutes_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
-#audit_depends const_cachetools___init___py__module__Cache___init on f_cachetools___init___py__module__Cache___init__
-#audit_depends conform_cachetools___init___py__module__Cache___getitem on f_cachetools___init___py__module__Cache___getitem__
-#audit_depends conform_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
-#audit_depends runs_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
-#audit_depends returns_cachetools___init___py__module__Cache___contains on f_cachetools___init___py__module__Cache___contains__
-#audit_depends conform_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
-#audit_depends runs_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
-#audit_depends returns_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
-#audit_depends projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
+#audit_depends conform_cachetools___init___py__module___DefaultSize_clear_at_FUEL on f_cachetools___init___py__module___DefaultSize_clear
+#audit_depends conform_cachetools___init___py__module__Cache___init_at_FUEL on f_cachetools___init___py__module__Cache___init__
+#audit_depends runs_cachetools___init___py__module__Cache___init_at_FUEL on f_cachetools___init___py__module__Cache___init__
+#audit_depends returns_cachetools___init___py__module__Cache___init_at_FUEL on f_cachetools___init___py__module__Cache___init__
+#audit_depends commutes_cachetools___init___py__module__Cache___init_at_FUEL on f_cachetools___init___py__module__Cache___init__
+#audit_depends const_cachetools___init___py__module__Cache___init_at_FUEL on f_cachetools___init___py__module__Cache___init__
+#audit_depends conform_cachetools___init___py__module__Cache___getitem_at_FUEL on f_cachetools___init___py__module__Cache___getitem__
+#audit_depends conform_cachetools___init___py__module__Cache___contains_at_FUEL on f_cachetools___init___py__module__Cache___contains__
+#audit_depends runs_cachetools___init___py__module__Cache___contains_at_FUEL on f_cachetools___init___py__module__Cache___contains__
+#audit_depends returns_cachetools___init___py__module__Cache___contains_at_FUEL on f_cachetools___init___py__module__Cache___contains__
+#audit_depends conform_cachetools___init___py__module__Cache_maxsize_at_FUEL on f_cachetools___init___py__module__Cache_maxsize
+#audit_depends runs_cachetools___init___py__module__Cache_maxsize_at_FUEL on f_cachetools___init___py__module__Cache_maxsize
+#audit_depends returns_cachetools___init___py__module__Cache_maxsize_at_FUEL on f_cachetools___init___py__module__Cache_maxsize
+#audit_depends projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize_at_FUEL on f_cachetools___init___py__module__Cache_maxsize
 #audit_depends uproj_cachetools___init___py__module__Cache_maxsize on f_cachetools___init___py__module__Cache_maxsize
-#audit_depends conform_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
-#audit_depends runs_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
-#audit_depends returns_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
-#audit_depends projects__Cache__currsize_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
+#audit_depends conform_cachetools___init___py__module__Cache_currsize_at_FUEL on f_cachetools___init___py__module__Cache_currsize
+#audit_depends runs_cachetools___init___py__module__Cache_currsize_at_FUEL on f_cachetools___init___py__module__Cache_currsize
+#audit_depends returns_cachetools___init___py__module__Cache_currsize_at_FUEL on f_cachetools___init___py__module__Cache_currsize
+#audit_depends projects__Cache__currsize_cachetools___init___py__module__Cache_currsize_at_FUEL on f_cachetools___init___py__module__Cache_currsize
 #audit_depends uproj_cachetools___init___py__module__Cache_currsize on f_cachetools___init___py__module__Cache_currsize
-#audit_depends conform_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
-#audit_depends nonneg_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
-#audit_depends idempotent_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
-#audit_depends const_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
+#audit_depends conform_cachetools___init___py__module__Cache_getsizeof_at_FUEL on f_cachetools___init___py__module__Cache_getsizeof
+#audit_depends nonneg_cachetools___init___py__module__Cache_getsizeof_at_FUEL on f_cachetools___init___py__module__Cache_getsizeof
+#audit_depends idempotent_cachetools___init___py__module__Cache_getsizeof_at_FUEL on f_cachetools___init___py__module__Cache_getsizeof
+#audit_depends const_cachetools___init___py__module__Cache_getsizeof_at_FUEL on f_cachetools___init___py__module__Cache_getsizeof
 #audit_depends uconst_cachetools___init___py__module__Cache_getsizeof on f_cachetools___init___py__module__Cache_getsizeof
-#audit_depends conform_cachetools___init___py__module___TimedCache__Timer___init on f_cachetools___init___py__module___TimedCache__Timer___init__
-#audit_depends conform_cachetools___init___py__module___TimedCache__Timer___exit on f_cachetools___init___py__module___TimedCache__Timer___exit__
-#audit_depends runs_cachetools___init___py__module___TimedCache__Timer___exit on f_cachetools___init___py__module___TimedCache__Timer___exit__
-#audit_depends returns_cachetools___init___py__module___TimedCache__Timer___exit on f_cachetools___init___py__module___TimedCache__Timer___exit__
-#audit_depends idempotent_cachetools___init___py__module___TimedCache__Timer___exit on f_cachetools___init___py__module___TimedCache__Timer___exit__
-#audit_depends const_cachetools___init___py__module___TimedCache__Timer___exit on f_cachetools___init___py__module___TimedCache__Timer___exit__
-#audit_depends runs_cachetools___init___py__module___TimedCache__Timer___reduce on f_cachetools___init___py__module___TimedCache__Timer___reduce__
-#audit_depends returns_cachetools___init___py__module___TimedCache__Timer___reduce on f_cachetools___init___py__module___TimedCache__Timer___reduce__
-#audit_depends conform_cachetools___init___py__module___TimedCache_timer on f_cachetools___init___py__module___TimedCache_timer
-#audit_depends runs_cachetools___init___py__module___TimedCache_timer on f_cachetools___init___py__module___TimedCache_timer
-#audit_depends returns_cachetools___init___py__module___TimedCache_timer on f_cachetools___init___py__module___TimedCache_timer
-#audit_depends const_cachetools___init___py__module___TimedCache_timer on f_cachetools___init___py__module___TimedCache_timer
+#audit_depends conform_cachetools___init___py__module___TimedCache__Timer___init_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___init__
+#audit_depends conform_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___exit__
+#audit_depends runs_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___exit__
+#audit_depends returns_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___exit__
+#audit_depends idempotent_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___exit__
+#audit_depends const_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___exit__
+#audit_depends runs_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___reduce__
+#audit_depends returns_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL on f_cachetools___init___py__module___TimedCache__Timer___reduce__
+#audit_depends conform_cachetools___init___py__module___TimedCache_timer_at_FUEL on f_cachetools___init___py__module___TimedCache_timer
+#audit_depends runs_cachetools___init___py__module___TimedCache_timer_at_FUEL on f_cachetools___init___py__module___TimedCache_timer
+#audit_depends returns_cachetools___init___py__module___TimedCache_timer_at_FUEL on f_cachetools___init___py__module___TimedCache_timer
+#audit_depends const_cachetools___init___py__module___TimedCache_timer_at_FUEL on f_cachetools___init___py__module___TimedCache_timer
 #audit_depends uproj_cachetools___init___py__module___TimedCache_timer on f_cachetools___init___py__module___TimedCache_timer
-#audit_depends conform_cachetools___init___py__module__TTLCache__Link___init on f_cachetools___init___py__module__TTLCache__Link___init__
-#audit_depends commutes_cachetools___init___py__module__TTLCache__Link___init on f_cachetools___init___py__module__TTLCache__Link___init__
-#audit_depends const_cachetools___init___py__module__TTLCache__Link___init on f_cachetools___init___py__module__TTLCache__Link___init__
-#audit_depends runs_cachetools___init___py__module__TTLCache__Link___reduce on f_cachetools___init___py__module__TTLCache__Link___reduce__
-#audit_depends returns_cachetools___init___py__module__TTLCache__Link___reduce on f_cachetools___init___py__module__TTLCache__Link___reduce__
-#audit_depends conform_cachetools___init___py__module__TTLCache__Link_unlink on f_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_depends runs_cachetools___init___py__module__TTLCache__Link_unlink on f_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_depends returns_cachetools___init___py__module__TTLCache__Link_unlink on f_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_depends const_cachetools___init___py__module__TTLCache__Link_unlink on f_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_depends conform_cachetools___init___py__module__TLRUCache__Item___init on f_cachetools___init___py__module__TLRUCache__Item___init__
-#audit_depends commutes_cachetools___init___py__module__TLRUCache__Item___init on f_cachetools___init___py__module__TLRUCache__Item___init__
-#audit_depends const_cachetools___init___py__module__TLRUCache__Item___init on f_cachetools___init___py__module__TLRUCache__Item___init__
-#audit_depends conform_cachetools___init___py__module__TLRUCache__Item___lt on f_cachetools___init___py__module__TLRUCache__Item___lt__
-#audit_depends runs_cachetools___init___py__module__TLRUCache__Item___lt on f_cachetools___init___py__module__TLRUCache__Item___lt__
-#audit_depends returns_cachetools___init___py__module__TLRUCache__Item___lt on f_cachetools___init___py__module__TLRUCache__Item___lt__
-#audit_depends conform_cachetools___init___py__module__TLRUCache___contains on f_cachetools___init___py__module__TLRUCache___contains__
-#audit_depends runs_cachetools___init___py__module__TLRUCache___contains on f_cachetools___init___py__module__TLRUCache___contains__
-#audit_depends returns_cachetools___init___py__module__TLRUCache___contains on f_cachetools___init___py__module__TLRUCache___contains__
-#audit_depends idempotent_cachetools___init___py__module__TLRUCache___contains on f_cachetools___init___py__module__TLRUCache___contains__
-#audit_depends const_cachetools___init___py__module__TLRUCache___contains on f_cachetools___init___py__module__TLRUCache___contains__
-#audit_depends idempotent_cachetools___init___py__module__cached on f_cachetools___init___py__module__cached
-#audit_depends commutes_cachetools___init___py__module__cached on f_cachetools___init___py__module__cached
-#audit_depends idempotent_cachetools___init___py__module__cachedmethod on f_cachetools___init___py__module__cachedmethod
-#audit_depends commutes_cachetools___init___py__module__cachedmethod on f_cachetools___init___py__module__cachedmethod
-#audit_depends idempotent_cachetools_func_py__module___cache on f_cachetools_func_py__module___cache
-#audit_depends commutes_cachetools_func_py__module___cache on f_cachetools_func_py__module___cache
+#audit_depends conform_cachetools___init___py__module__TTLCache__Link___init_at_FUEL on f_cachetools___init___py__module__TTLCache__Link___init__
+#audit_depends commutes_cachetools___init___py__module__TTLCache__Link___init_at_FUEL on f_cachetools___init___py__module__TTLCache__Link___init__
+#audit_depends const_cachetools___init___py__module__TTLCache__Link___init_at_FUEL on f_cachetools___init___py__module__TTLCache__Link___init__
+#audit_depends runs_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL on f_cachetools___init___py__module__TTLCache__Link___reduce__
+#audit_depends returns_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL on f_cachetools___init___py__module__TTLCache__Link___reduce__
+#audit_depends conform_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL on f_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_depends runs_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL on f_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_depends returns_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL on f_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_depends const_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL on f_cachetools___init___py__module__TTLCache__Link_unlink
+#audit_depends conform_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___init__
+#audit_depends commutes_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___init__
+#audit_depends const_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___init__
+#audit_depends conform_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___lt__
+#audit_depends runs_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___lt__
+#audit_depends returns_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL on f_cachetools___init___py__module__TLRUCache__Item___lt__
+#audit_depends conform_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
+#audit_depends runs_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
+#audit_depends returns_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
+#audit_depends idempotent_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
+#audit_depends const_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
+#audit_depends idempotent_cachetools___init___py__module__cached_at_FUEL on f_cachetools___init___py__module__cached
+#audit_depends commutes_cachetools___init___py__module__cached_at_FUEL on f_cachetools___init___py__module__cached
+#audit_depends idempotent_cachetools___init___py__module__cachedmethod_at_FUEL on f_cachetools___init___py__module__cachedmethod
+#audit_depends commutes_cachetools___init___py__module__cachedmethod_at_FUEL on f_cachetools___init___py__module__cachedmethod
+#audit_depends idempotent_cachetools_func_py__module___cache_at_FUEL on f_cachetools_func_py__module___cache
+#audit_depends commutes_cachetools_func_py__module___cache_at_FUEL on f_cachetools_func_py__module___cache
 
 /-! ## Axiom basis
 
 `#audit_axioms` fails the build on `sorryAx`, `ofReduceBool` or `ofReduceNat`, so "no admitted step, no `native_decide`" is checked here rather than asserted in prose. -/
 
-#audit_axioms conform_cachetools___init___py__module___DefaultSize___getitem
-#audit_axioms nonneg_cachetools___init___py__module___DefaultSize___getitem
-#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___getitem
-#audit_axioms const_cachetools___init___py__module___DefaultSize___getitem
+#audit_axioms conform_cachetools___init___py__module___DefaultSize___getitem_at_FUEL
+#audit_axioms nonneg_cachetools___init___py__module___DefaultSize___getitem_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___getitem_at_FUEL
+#audit_axioms const_cachetools___init___py__module___DefaultSize___getitem_at_FUEL
 #audit_axioms uconst_cachetools___init___py__module___DefaultSize___getitem
-#audit_axioms conform_cachetools___init___py__module___DefaultSize___setitem
-#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___setitem
-#audit_axioms commutes_cachetools___init___py__module___DefaultSize___setitem
-#audit_axioms const_cachetools___init___py__module___DefaultSize___setitem
-#audit_axioms conform_cachetools___init___py__module___DefaultSize_pop
-#audit_axioms nonneg_cachetools___init___py__module___DefaultSize_pop
-#audit_axioms idempotent_cachetools___init___py__module___DefaultSize_pop
-#audit_axioms const_cachetools___init___py__module___DefaultSize_pop
+#audit_axioms conform_cachetools___init___py__module___DefaultSize___setitem_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize___setitem_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module___DefaultSize___setitem_at_FUEL
+#audit_axioms const_cachetools___init___py__module___DefaultSize___setitem_at_FUEL
+#audit_axioms conform_cachetools___init___py__module___DefaultSize_pop_at_FUEL
+#audit_axioms nonneg_cachetools___init___py__module___DefaultSize_pop_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module___DefaultSize_pop_at_FUEL
+#audit_axioms const_cachetools___init___py__module___DefaultSize_pop_at_FUEL
 #audit_axioms uconst_cachetools___init___py__module___DefaultSize_pop
-#audit_axioms conform_cachetools___init___py__module___DefaultSize_clear
-#audit_axioms conform_cachetools___init___py__module__Cache___init
-#audit_axioms runs_cachetools___init___py__module__Cache___init
-#audit_axioms returns_cachetools___init___py__module__Cache___init
-#audit_axioms commutes_cachetools___init___py__module__Cache___init
-#audit_axioms const_cachetools___init___py__module__Cache___init
-#audit_axioms conform_cachetools___init___py__module__Cache___getitem
-#audit_axioms conform_cachetools___init___py__module__Cache___contains
-#audit_axioms runs_cachetools___init___py__module__Cache___contains
-#audit_axioms returns_cachetools___init___py__module__Cache___contains
-#audit_axioms conform_cachetools___init___py__module__Cache_maxsize
-#audit_axioms runs_cachetools___init___py__module__Cache_maxsize
-#audit_axioms returns_cachetools___init___py__module__Cache_maxsize
-#audit_axioms projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize
+#audit_axioms conform_cachetools___init___py__module___DefaultSize_clear_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__Cache___init_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__Cache___init_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__Cache___init_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module__Cache___init_at_FUEL
+#audit_axioms const_cachetools___init___py__module__Cache___init_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__Cache___getitem_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__Cache___contains_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__Cache___contains_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__Cache___contains_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__Cache_maxsize_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__Cache_maxsize_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__Cache_maxsize_at_FUEL
+#audit_axioms projects__Cache__maxsize_cachetools___init___py__module__Cache_maxsize_at_FUEL
 #audit_axioms uproj_cachetools___init___py__module__Cache_maxsize
-#audit_axioms conform_cachetools___init___py__module__Cache_currsize
-#audit_axioms runs_cachetools___init___py__module__Cache_currsize
-#audit_axioms returns_cachetools___init___py__module__Cache_currsize
-#audit_axioms projects__Cache__currsize_cachetools___init___py__module__Cache_currsize
+#audit_axioms conform_cachetools___init___py__module__Cache_currsize_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__Cache_currsize_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__Cache_currsize_at_FUEL
+#audit_axioms projects__Cache__currsize_cachetools___init___py__module__Cache_currsize_at_FUEL
 #audit_axioms uproj_cachetools___init___py__module__Cache_currsize
-#audit_axioms conform_cachetools___init___py__module__Cache_getsizeof
-#audit_axioms nonneg_cachetools___init___py__module__Cache_getsizeof
-#audit_axioms idempotent_cachetools___init___py__module__Cache_getsizeof
-#audit_axioms const_cachetools___init___py__module__Cache_getsizeof
+#audit_axioms conform_cachetools___init___py__module__Cache_getsizeof_at_FUEL
+#audit_axioms nonneg_cachetools___init___py__module__Cache_getsizeof_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module__Cache_getsizeof_at_FUEL
+#audit_axioms const_cachetools___init___py__module__Cache_getsizeof_at_FUEL
 #audit_axioms uconst_cachetools___init___py__module__Cache_getsizeof
-#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___init
-#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___exit
-#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___exit
-#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___exit
-#audit_axioms idempotent_cachetools___init___py__module___TimedCache__Timer___exit
-#audit_axioms const_cachetools___init___py__module___TimedCache__Timer___exit
-#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___reduce
-#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___reduce
-#audit_axioms conform_cachetools___init___py__module___TimedCache_timer
-#audit_axioms runs_cachetools___init___py__module___TimedCache_timer
-#audit_axioms returns_cachetools___init___py__module___TimedCache_timer
-#audit_axioms const_cachetools___init___py__module___TimedCache_timer
+#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___init_at_FUEL
+#audit_axioms conform_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL
+#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL
+#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL
+#audit_axioms const_cachetools___init___py__module___TimedCache__Timer___exit_at_FUEL
+#audit_axioms runs_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL
+#audit_axioms returns_cachetools___init___py__module___TimedCache__Timer___reduce_at_FUEL
+#audit_axioms conform_cachetools___init___py__module___TimedCache_timer_at_FUEL
+#audit_axioms runs_cachetools___init___py__module___TimedCache_timer_at_FUEL
+#audit_axioms returns_cachetools___init___py__module___TimedCache_timer_at_FUEL
+#audit_axioms const_cachetools___init___py__module___TimedCache_timer_at_FUEL
 #audit_axioms uproj_cachetools___init___py__module___TimedCache_timer
-#audit_axioms conform_cachetools___init___py__module__TTLCache__Link___init
-#audit_axioms commutes_cachetools___init___py__module__TTLCache__Link___init
-#audit_axioms const_cachetools___init___py__module__TTLCache__Link___init
-#audit_axioms runs_cachetools___init___py__module__TTLCache__Link___reduce
-#audit_axioms returns_cachetools___init___py__module__TTLCache__Link___reduce
-#audit_axioms conform_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_axioms runs_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_axioms returns_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_axioms const_cachetools___init___py__module__TTLCache__Link_unlink
-#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___init
-#audit_axioms commutes_cachetools___init___py__module__TLRUCache__Item___init
-#audit_axioms const_cachetools___init___py__module__TLRUCache__Item___init
-#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___lt
-#audit_axioms runs_cachetools___init___py__module__TLRUCache__Item___lt
-#audit_axioms returns_cachetools___init___py__module__TLRUCache__Item___lt
-#audit_axioms conform_cachetools___init___py__module__TLRUCache___contains
-#audit_axioms runs_cachetools___init___py__module__TLRUCache___contains
-#audit_axioms returns_cachetools___init___py__module__TLRUCache___contains
-#audit_axioms idempotent_cachetools___init___py__module__TLRUCache___contains
-#audit_axioms const_cachetools___init___py__module__TLRUCache___contains
-#audit_axioms idempotent_cachetools___init___py__module__cached
-#audit_axioms commutes_cachetools___init___py__module__cached
-#audit_axioms idempotent_cachetools___init___py__module__cachedmethod
-#audit_axioms commutes_cachetools___init___py__module__cachedmethod
-#audit_axioms idempotent_cachetools_func_py__module___cache
-#audit_axioms commutes_cachetools_func_py__module___cache
+#audit_axioms conform_cachetools___init___py__module__TTLCache__Link___init_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module__TTLCache__Link___init_at_FUEL
+#audit_axioms const_cachetools___init___py__module__TTLCache__Link___init_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__TTLCache__Link___reduce_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL
+#audit_axioms const_cachetools___init___py__module__TTLCache__Link_unlink_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL
+#audit_axioms const_cachetools___init___py__module__TLRUCache__Item___init_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__TLRUCache__Item___lt_at_FUEL
+#audit_axioms conform_cachetools___init___py__module__TLRUCache___contains_at_FUEL
+#audit_axioms runs_cachetools___init___py__module__TLRUCache___contains_at_FUEL
+#audit_axioms returns_cachetools___init___py__module__TLRUCache___contains_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module__TLRUCache___contains_at_FUEL
+#audit_axioms const_cachetools___init___py__module__TLRUCache___contains_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module__cached_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module__cached_at_FUEL
+#audit_axioms idempotent_cachetools___init___py__module__cachedmethod_at_FUEL
+#audit_axioms commutes_cachetools___init___py__module__cachedmethod_at_FUEL
+#audit_axioms idempotent_cachetools_func_py__module___cache_at_FUEL
+#audit_axioms commutes_cachetools_func_py__module___cache_at_FUEL
 
 end Autoform.SpecsGen.Cachetools

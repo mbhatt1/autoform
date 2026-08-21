@@ -22,9 +22,12 @@ Measured against **CPython 3.9.6**, running the upstream `_HashedTuple`/`hashkey
 >>> {(0,): 'x'}[hashkey(0)]        'x'
 ```
 
-Core's `hashkey` takes the packed varargs tuple `args` as its first parameter, so the Lean
-call `hashkey (tuple [int 0])` is CPython's `hashkey(0)`, and
-`hashkey (tuple [tuple [int 0]])` is CPython's `hashkey((0,))`.
+`hashkey` is `def hashkey(*args)`, and Core now implements varargs packing itself
+(`applyFunc`/`applyClosure` take the caller's positional list and pack the starred tail),
+so the Lean call `hashkey [int 0]` is CPython's `hashkey(0)` and `hashkey [tuple [int 0]]`
+is CPython's `hashkey((0,))`. Before varargs were modelled these tests handed the *already
+packed* tuple across as a single ordinary argument; that workaround is now a double-pack
+(`hashkey((0,))` where `hashkey(0)` was meant) and has been removed.
 
 ## What is a proof here, and what is a test
 
@@ -66,72 +69,77 @@ staleness today and still does; this file touches neither artifact. -/
 def cachetoolsWithBases : Program :=
   { Autoform.Generated.program with builtinBases := [("_HashedTuple", .tuple)] }
 
-/-- The same program with `builtinBases` empty — exactly what STRATEGY.md §34 measured. -/
-def cachetoolsBefore : Program := Autoform.Generated.program
+/-- The same program with `builtinBases` empty — exactly what STRATEGY.md §34 measured.
+
+`Autoform/Generated/Cachetools.lean` has since been re-rendered *with* the `_HashedTuple`
+base in it, so `Generated.program` is no longer the "before" picture and this fixture has
+to clear the field explicitly. Reading it as the before-state again would make every
+divergence guard below vacuous. -/
+def cachetoolsBefore : Program := { Autoform.Generated.program with builtinBases := [] }
 
 /-- `hashkey` applied to a varargs tuple, then compared with a plain `Val`. -/
-private def hashkeyEq (p : Program) (args res : Val) : Bool :=
-  match runFunc p 200 "hashkey" [args] with
+private def hashkeyEq (p : Program) (args : List Val) (res : Val) : Bool :=
+  match runFunc p 200 "hashkey" args with
   | .val v => Val.beq v res
   | _      => false
 
 /-- Is the result of `hashkey` an opaque heap reference — the pre-change behaviour? -/
-private def hashkeyIsRef (p : Program) (args : Val) : Bool :=
-  match runFunc p 200 "hashkey" [args] with
+private def hashkeyIsRef (p : Program) (args : List Val) : Bool :=
+  match runFunc p 200 "hashkey" args with
   | .val (.ref _) => true
   | _             => false
 
 /-- Does `hashkey`'s result find `expect` stored under a plain-tuple key? -/
-private def hashkeyFinds (p : Program) (args : Val) (d : List (Val × Val))
+private def hashkeyFinds (p : Program) (args : List Val) (d : List (Val × Val))
     (expect : Val) : Bool :=
-  match runFunc p 200 "hashkey" [args] with
+  match runFunc p 200 "hashkey" args with
   | .val v => match Stdlib.dictGet d v with
               | some w => Val.beq w expect
               | none   => false
   | _      => false
 
 -- BEFORE: `EResult.val (Val.ref 0)`, an opaque reference, where CPython says `(0,)`.
-#eval runFunc cachetoolsBefore 200 "hashkey" [.tuple [.int 0]]
+#eval runFunc cachetoolsBefore 200 "hashkey" [.int 0]
 
 -- AFTER: `EResult.val (Val.bobj "_HashedTuple" (Val.tuple [Val.int 0]))` — CPython's
 -- `hashkey(0)`, which is `(0,)` of type `_HashedTuple`.
-#eval runFunc cachetoolsWithBases 200 "hashkey" [.tuple [.int 0]]
+#eval runFunc cachetoolsWithBases 200 "hashkey" [.int 0]
 
 -- The divergence, pinned: before the change the answer really was an opaque reference,
 -- so nothing below is measuring something that already worked.
-#guard hashkeyIsRef cachetoolsBefore (.tuple [.int 0]) = true
-#guard hashkeyIsRef cachetoolsWithBases (.tuple [.int 0]) = false
+#guard hashkeyIsRef cachetoolsBefore [.int 0] = true
+#guard hashkeyIsRef cachetoolsWithBases [.int 0] = false
 
 -- **THE PASS/FAIL CRITERION.** CPython: `hashkey(0) == (0,)` is `True`.
-#guard hashkeyEq cachetoolsWithBases (.tuple [.int 0]) (.tuple [.int 0]) = true
+#guard hashkeyEq cachetoolsWithBases [.int 0] (.tuple [.int 0]) = true
 
 -- ...and it was `false` before the change. This is the defect, and its repair.
-#guard hashkeyEq cachetoolsBefore (.tuple [.int 0]) (.tuple [.int 0]) = false
+#guard hashkeyEq cachetoolsBefore [.int 0] (.tuple [.int 0]) = false
 
 -- CPython: `hashkey((0,))` is `((0,),)`.
-#guard hashkeyEq cachetoolsWithBases (.tuple [.tuple [.int 0]]) (.tuple [.tuple [.int 0]])
+#guard hashkeyEq cachetoolsWithBases [.tuple [.int 0]] (.tuple [.tuple [.int 0]])
          = true
 
 -- NON-VACUITY. CPython: `hashkey(0) == ((0,),)` is `False` — two keys that must not
 -- collide do not.
-#guard hashkeyEq cachetoolsWithBases (.tuple [.int 0]) (.tuple [.tuple [.int 0]]) = false
+#guard hashkeyEq cachetoolsWithBases [.int 0] (.tuple [.tuple [.int 0]]) = false
 
 -- CPython: `hashkey(0) == (1,)` is `False`.
-#guard hashkeyEq cachetoolsWithBases (.tuple [.int 0]) (.tuple [.int 1]) = false
+#guard hashkeyEq cachetoolsWithBases [.int 0] (.tuple [.int 1]) = false
 
 -- CPython: `hashkey(0) == [0]` is `False` — not merely "contents equal".
-#guard hashkeyEq cachetoolsWithBases (.tuple [.int 0]) (.list [.int 0]) = false
+#guard hashkeyEq cachetoolsWithBases [.int 0] (.list [.int 0]) = false
 
 -- The cache-key round trip that motivated all of this: a key **stored** as a plain tuple
 -- is **found** by a key computed through `hashkey`. CPython: `{(0,): 'x'}[hashkey(0)]`
 -- is `'x'`. Before the change the lookup missed.
-#guard hashkeyFinds cachetoolsWithBases (.tuple [.int 0])
+#guard hashkeyFinds cachetoolsWithBases [.int 0]
          [(.tuple [.int 0], .str "x")] (.str "x") = true
-#guard hashkeyFinds cachetoolsBefore (.tuple [.int 0])
+#guard hashkeyFinds cachetoolsBefore [.int 0]
          [(.tuple [.int 0], .str "x")] (.str "x") = false
 
 -- ...and a *different* key is still not found, so the lookup is not matching everything.
-#guard hashkeyFinds cachetoolsWithBases (.tuple [.int 0])
+#guard hashkeyFinds cachetoolsWithBases [.int 0]
          [(.tuple [.int 1], .str "x")] (.str "x") = false
 
 /-! ## 2. Non-vacuity, end to end
