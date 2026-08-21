@@ -326,7 +326,15 @@ private def orun (c : OCase) : EResult :=
   else
     match octx.resolve c.fn with
     | none    => .hole s!"entry:{{c.fn}}"
-    | some fn => (applyFunc octx {fuel} h fn c.slf c.args).2
+    -- `applyFunc` takes keyword arguments as a sixth explicit argument since Python
+    -- kwargs landed in the Core semantics. This harness used to call it with five, which
+    -- elaborated to a partially applied function; `.2` on it was an invalid projection,
+    -- the `#eval` was aborted for depending on `sorry`, and EVERY batch came back with
+    -- no answer. Bisection then split each batch to singletons, all of which also
+    -- failed, and the run finished reporting every claimed-core function INCONCLUSIVE —
+    -- silence reading as "nothing to report" rather than as breakage. We pass `[]`:
+    -- the synthetic and traced cases are positional-only.
+    | some fn => (applyFunc octx {fuel} h fn c.slf c.args []).2
 """
 
 FOOTER = """
