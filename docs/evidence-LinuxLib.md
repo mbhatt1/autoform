@@ -1,5 +1,15 @@
 # Evidence for `LinuxLib` (Linux `lib/`, C, 3368 functions)
 
+> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
+> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
+> the time. That module has since been re-rendered: every large corpus's committed render
+> was behind its neutral AST, and all five were regenerated and re-pinned in
+> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
+> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
+> silent; re-running it against the current module is the way to refresh these numbers,
+> and until that is done they should be read as a dated measurement, not as today's.
+
+
 First coverage/hole accounting for one of the five large corpora. Produced 2026-08-20
 from `ast-LinuxLib.json` (= `/tmp/final-LinuxLib.json`, 3368 functions) and
 `Autoform/Generated/LinuxLib.lean`, both current at the time of the run (the oracle's

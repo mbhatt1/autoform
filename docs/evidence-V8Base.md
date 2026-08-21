@@ -1,5 +1,15 @@
 # Evidence — V8Base (C++, `v8/src/base`)
 
+> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
+> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
+> the time. That module has since been re-rendered: every large corpus's committed render
+> was behind its neutral AST, and all five were regenerated and re-pinned in
+> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
+> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
+> silent; re-running it against the current module is the way to refresh these numbers,
+> and until that is done they should be read as a dated measurement, not as today's.
+
+
 First ledger + assurance case + execution oracle for one of the five large corpora.
 Before this, all three existed only for `cachetools` (238 Python functions) and the toy
 modules, so 12,700 of the 12,946 translated functions had no coverage claim at all.

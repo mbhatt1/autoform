@@ -1,5 +1,15 @@
 # Evidence for LinuxCrypto (linux/crypto, C, 1,955 functions)
 
+> **Staleness notice added during the merge (STRATEGY.md §40).** The figures in this
+> document were produced against the `Autoform/Generated/<M>.lean` that was committed at
+> the time. That module has since been re-rendered: every large corpus's committed render
+> was behind its neutral AST, and all five were regenerated and re-pinned in
+> `artifact-manifest.json`. The counts below therefore describe the *previous* render.
+> `core_oracle.py`'s own body-staleness gate is what makes this visible rather than
+> silent; re-running it against the current module is the way to refresh these numbers,
+> and until that is done they should be read as a dated measurement, not as today's.
+
+
 First ledger, assurance case and execution-oracle run for one of the five large corpora.
 Before this, all 108 theorems and every conformance number in the repo were about one
 238-function Python library. `ledger-*.json` and `sacm-*.json` are gitignored, so the
