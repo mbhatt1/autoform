@@ -1,0 +1,655 @@
+{
+  "file": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-8/Autoform/Generated/LinuxLib.lean",
+  "module": "Autoform.Generated.LinuxLib",
+  "seed": 20260819,
+  "operators": "generated-ast",
+  "spec_file": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-8/Autoform/SpecsGen/LinuxLibSample.lean",
+  "spec_module": "Autoform.SpecsGen.LinuxLibSample",
+  "decls": [
+    "f_alloc_mod_tags_mem",
+    "f_bad_io_access",
+    "f_debugfs_errno_set",
+    "f_span_iteration_check_duplicate_0"
+  ],
+  "mutants_generated": 23,
+  "mutants_run": 12,
+  "invalid": 3,
+  "inconclusive": 0,
+  "theorems": {
+    "C_tfFree": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              .skip"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"port\" (.lit (.int 10)))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "uconst_alloc_mod_tags_mem": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              .skip"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"port\" (.lit (.int 10)))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "uconst_span_iteration_check_duplicate_0": {
+      "killed": 1,
+      "survived": 8,
+      "score": 0.1111111111111111,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              .skip"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"port\" (.lit (.int 10)))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "runs_bad_io_access": {
+      "killed": 2,
+      "survived": 7,
+      "score": 0.2222222222222222,
+      "scope": "all-mutants",
+      "coverage_score": 0.2222222222222222,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "returns_bad_io_access": {
+      "killed": 2,
+      "survived": 7,
+      "score": 0.2222222222222222,
+      "scope": "all-mutants",
+      "coverage_score": 0.2222222222222222,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "uconst_debugfs_errno_set": {
+      "killed": 1,
+      "survived": 8,
+      "score": 0.1111111111111111,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-seq-delete",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              .skip"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"port\" (.lit (.int 10)))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    },
+    "charact_bad_io_access": {
+      "killed": 2,
+      "survived": 7,
+      "score": 0.2222222222222222,
+      "scope": "all-mutants",
+      "coverage_score": 0.2222222222222222,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:10->9",
+          "line": 30145,
+          "decl": "f_bad_io_access",
+          "before": "              (.assign \"count\" (.lit (.int 10)))",
+          "after": "              (.assign \"count\" (.lit (.int 9)))"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 30073,
+          "decl": "f_span_iteration_check_duplicate_0",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-ret->expr",
+          "line": 72697,
+          "decl": "f_debugfs_errno_set",
+          "before": "  , body := (.ret (.lit (.int 0))) }",
+          "after": "  , body := (.expr (.lit (.int 0))) }"
+        },
+        {
+          "op": "ast-int:0->1",
+          "line": 30147,
+          "decl": "f_bad_io_access",
+          "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+          "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))"
+        },
+        {
+          "op": "ast-binop:-->+",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-assign:count->port",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 30148,
+          "decl": "f_bad_io_access",
+          "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+          "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))"
+        }
+      ]
+    }
+  },
+  "mutants": [
+    {
+      "op": "ast-int:10->9",
+      "line": 30145,
+      "decl": "f_bad_io_access",
+      "before": "              (.assign \"count\" (.lit (.int 10)))",
+      "after": "              (.assign \"count\" (.lit (.int 9)))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 30073,
+      "decl": "f_span_iteration_check_duplicate_0",
+      "before": "  , body := (.ret (.lit (.int 0))) }",
+      "after": "  , body := (.expr (.lit (.int 0))) }",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "killed",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-ret->expr",
+      "line": 72697,
+      "decl": "f_debugfs_errno_set",
+      "before": "  , body := (.ret (.lit (.int 0))) }",
+      "after": "  , body := (.expr (.lit (.int 0))) }",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "killed",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->1",
+      "line": 30147,
+      "decl": "f_bad_io_access",
+      "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+      "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int 1)))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 72697,
+      "decl": "f_debugfs_errno_set",
+      "before": "  , body := (.ret (.lit (.int 0))) }",
+      "after": "  , body := (.ret (.lit (.int -1))) }",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 30147,
+      "decl": "f_bad_io_access",
+      "before": "                (.binop \"!=\" (.name \"count\") (.lit (.int 0)))",
+      "after": "                (.binop \"!=\" (.name \"count\") (.lit (.int -1)))",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-binop:-->+",
+      "line": 30148,
+      "decl": "f_bad_io_access",
+      "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+      "after": "                (.assign \"count\" (.binop \"+\" (.name \"count\") (.lit (.int 1))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-seq-delete",
+      "line": 30145,
+      "decl": "f_bad_io_access",
+      "before": "              (.assign \"count\" (.lit (.int 10)))",
+      "after": "              .skip",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "killed",
+        "returns_bad_io_access": "killed",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-assign:count->port",
+      "line": 30148,
+      "decl": "f_bad_io_access",
+      "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+      "after": "                (.assign \"port\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-assign:count->port",
+      "line": 30145,
+      "decl": "f_bad_io_access",
+      "before": "              (.assign \"count\" (.lit (.int 10)))",
+      "after": "              (.assign \"port\" (.lit (.int 10)))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "killed",
+        "returns_bad_io_access": "killed",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 475,
+      "decl": "f_alloc_mod_tags_mem",
+      "before": "  , body := (.ret (.lit (.int 0))) }",
+      "after": "  , body := (.ret (.lit (.int -1))) }",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 30148,
+      "decl": "f_bad_io_access",
+      "before": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 1))))",
+      "after": "                (.assign \"count\" (.binop \"-\" (.name \"count\") (.lit (.int 0))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "uconst_alloc_mod_tags_mem": "survived",
+        "uconst_span_iteration_check_duplicate_0": "survived",
+        "runs_bad_io_access": "survived",
+        "returns_bad_io_access": "survived",
+        "uconst_debugfs_errno_set": "survived",
+        "charact_bad_io_access": "survived"
+      },
+      "timeout": false
+    }
+  ],
+  "coarse_attributions": 0
+}
