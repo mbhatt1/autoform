@@ -2331,10 +2331,27 @@ agree exactly with the figures this workflow started from.
 
 ### What it did not
 
-* The 108-theorem figure. It should be read as 21 (Basis, kernel-checked in the build) plus
-  28 (LinuxLib, LinuxLibSample, V8BaseSample, checked by `check_specs`) plus whatever
-  `SpecsGen/V8Base.lean` proves, minus the 79 Cachetools theorems, which currently prove
-  nothing at all.
+* The 108-theorem figure. Measured by elaboration rather than by `grep`, the inventory is:
+
+  | module | theorems | verdict |
+  |---|---|---|
+  | `SpecsGen/Basis.lean` | 21 | **proved** — imported from `Autoform.lean`, kernel-checked every build |
+  | `SpecsGen/LinuxLib.lean` | 12 | **proved** (`check_specs`, 30 s) |
+  | `SpecsGen/V8BaseSample.lean` | 9 | **proved** (`check_specs`, 5 s) |
+  | `SpecsGen/LinuxLibSample.lean` | 7 | **proved** (`check_specs`, 11 s) |
+  | `SpecsGen/V8Base.lean` | 229 | **does not elaborate** (21 errors, 2420 s) |
+  | `SpecsGen/Cachetools.lean` | 79 | **does not elaborate** (14 errors) |
+
+  So **49 theorems prove and 308 do not**, against a `grep` count of 357. The gap is the
+  whole point of this section.
+
+  `SpecsGen/V8Base.lean` fails for a *different* reason from Cachetools, and the reason is
+  instructive. Re-rendering V8Base from its AST split an overloaded C++ name differently:
+  `f_v8_base_AddressRegion___init__` is now the empty stub (`params := []`, `body := .skip`)
+  and the real two-argument constructor is `f_v8_base_AddressRegion___init__'`. Every
+  theorem generated against the old numbering is now a theorem about the wrong function.
+  Nothing here is repairable by editing a proof; both modules need `synth_specs.py` run
+  again against the current render, and the domains it mines have to come with them.
 * Provenance. `scripts/check_provenance.py` reports 0 of 12 artifacts attributed to a
   pinned Joern. That is the honest baseline it was built to establish, not a pass.
 * `scripts/differential.py`'s trace step on cachetools, which is what blocks the

@@ -170,9 +170,13 @@ jobs:
               echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
             fi
           }
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
+          # A floor here is a floor on TEXT. Two of these modules do not elaborate --
+          # see STRATEGY.md 40 -- so their counts are recorded to stop the text being
+          # deleted while it waits for regeneration, NOT as a claim that they prove
+          # anything. The elaboration verdict is the step below; read them together.
+          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79   # DOES NOT PROVE
+          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
           check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
-          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229
           check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
           check Refine              Autoform/Refine.lean             113
           exit $fail
@@ -193,6 +197,13 @@ jobs:
       # starts passing, this step fails and tells you to drop the pin. A known
       # breakage that nothing asserts is a known breakage nobody will notice
       # healing or worsening.
+      # Same pin for SpecsGen/V8Base.lean, which fails for a DIFFERENT reason:
+      # re-rendering V8Base split an overloaded C++ name, so
+      # `f_v8_base_AddressRegion___init__` is now the empty stub and the real
+      # constructor is `..._init__'`. Every theorem generated against the old
+      # numbering is a theorem about the wrong function. It cannot run in CI anyway
+      # (its Generated module is not tracked), so it is exercised by hand; the floor
+      # step above keeps the text from being deleted meanwhile.
       - name: SpecsGen/Cachetools is still broken for the recorded reason
         run: |
           set -euo pipefail
