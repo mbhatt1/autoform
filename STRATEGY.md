@@ -2011,6 +2011,33 @@ Every rejected site falls into one of two classes, and neither was correct befor
 Both are pre-existing and neither is fixed here (`cartographer/export_ast.sc` and the
 resolution rule are separate changes); what changed is that they are now loud.
 
+### The same two fixes, run rather than argued
+
+`scripts/core_oracle.py` executes the ledger's claimed core against synthetic inputs. It
+was run twice on `Cachetools` — once with `Val.iterable`'s `str` case and `posRejected`
+reverted, once with them — 2,424 cases each, same inputs, same fuel:
+
+| | claimed core | exercised | never holed | holes at runtime |
+|---|---|---|---|---|
+| before | 101 | 101 | 39 | 62 |
+| after | 101 | 101 | **41** | 60 |
+
+No function that executed hole-free before stops doing so; two start
+(`_condition_info.Descriptor.Wrapper.__call__`, `_unlocked.cache_clear`), and three hole
+labels fall (`field:_obj:non-object` 24 → 0, `field:__enter__:non-object` 370 → 351,
+`binop:+` 66 → 61). No new label appears.
+
+Read that gain narrowly. Both functions are in `_cachedmethod.py`, which is where all six
+of the corpus' newly-rejected call sites are, so the likeliest cause is that `posRejected`
+raises `TypeError` *before* the body reaches the construct that used to hole — an
+exception is not a hole, and the oracle counts holes. That is a real improvement in
+faithfulness (CPython raises there too, on a call Core was mis-resolving) but it is not
+two more functions' worth of coverage, and it is not claimed as such.
+
+This run also required fixing `scripts/core_oracle.py`, which had been emitting a harness
+that did not elaborate — see the commit; it reported "0 executed" where it should have
+reported a type error.
+
 ### What is *not* established
 
 `scripts/differential.py` on this corpus produced **0 COMPARED cases** — the recorded
