@@ -1947,10 +1947,11 @@ been unsound, not merely imprecise.
 
 * **Default parameter values.** `def k(a=None, **kw)` binds `a` to `None`; Core leaves it
   unbound and reads `unit`. Not modelled, and `unit` is not `None`.
-* **Surplus positional arguments.** `f(1,2,3)` into `def f(a,b)` is a `TypeError` in
-  CPython; `applyFunc` truncates, as it always has.
-  `CallingConvention.surplusPositional_is_a_known_divergence` states the disagreement as a
-  theorem rather than omitting the case.
+* **Under-supplied calls.** `f(1)` into `def f(a,b)` is a `TypeError` in CPython; Core
+  leaves `b` unbound and reads `unit`. It stays accepted because Core has no default
+  values and so cannot tell a missing argument from a defaulted one — rejecting it would
+  reject calls CPython accepts. (The *surplus* direction, `f(1,2,3)`, used to truncate and
+  now raises: `posRejected`, `surplusPositional_now_agrees_with_cpython`.)
 * **Keyword-only parameters** (`def f(*, a)`) are not distinguished from positional ones.
 * **A starred form outside an argument list** (`a, *b = xs`) is the narrower hole
   `op:starred-outside-call`. It does not occur in `cachetools`; the label exists so that
@@ -1958,17 +1959,19 @@ been unsound, not merely imprecise.
 * **Keyword arguments to modelled builtins** — `Stdlib.builtin`/`Stdlib.method` take
   positional arguments only, so these are the named holes `call:<f>:keyword-to-builtin`
   and `mcall:<m>:keyword-to-builtin`.
-* **Two measured divergences, both recorded as theorems rather than omitted.**
-  `g(*"ab")` is `('a','b')` in CPython and `TypeError` in Core, because `Val.iterable` has
-  no `str` case — a gap that already affected `for c in "ab"` and predates this work
-  (`str_is_not_iterable_in_core`). And `h(1, a=2)` where `a` is also positional is
+* **One measured divergence left, recorded as a theorem rather than omitted.**
+  `h(1, a=2)` where `a` is also positional is
   `TypeError: got multiple values for argument 'a'` in CPython, while Core lets the
-  keyword shadow the positional (`duplicate_argument_is_not_detected`).
+  keyword shadow the positional (`duplicate_argument_is_not_detected`). The other one
+  recorded here is closed: `Val.iterable` now has a `str` case, so `g(*"ab")` is
+  `('a','b')` and `for c in "ab"` iterates one-character strings, as in CPython
+  (`str_is_iterable`, `str_iteration_is_not_empty`, both pinned with `#guard_msgs`).
 
 ### The anti-vacuity evidence
 
-`Autoform/CallingConvention.lean` is 20 `#eval`s against CPython 3.9.6, each carrying the
-value CPython printed, plus ten kernel-checked theorems. It covers `f(*[1,2])`,
+`Autoform/CallingConvention.lean` is 31 `#eval`s against CPython 3.9.6, each carrying the
+value CPython printed — seven of them pinned with `#guard_msgs` so a regression fails the
+build — plus 15 kernel-checked theorems. It covers `f(*[1,2])`,
 `f(1,*[2])`, `def g(*a)` at 0/1/3 arguments, `def h(a,*rest)` (the interaction with a
 positional parameter, including the empty remainder), `k(**{'a':1})` vs `k(**{'z':9})`,
 all four forms in one call, `*` on a tuple and on a dict (which iterates keys), and the

@@ -178,10 +178,93 @@ def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
     -- function, so excluding them costs almost nothing and buys an honest number.
     || Stdlib.knowsFree ctx.dialect n
 
-/-- Hole-free **and** every call target resolves inside the program. -/
-def Program.callClosed (p : Program) : List Func :=
+/-! ## Making call closure linear instead of quadratic
+
+`Ctx.resolvable` calls `Ctx.resolve`, which scans the whole function table on every miss.
+The ledger asks it once per call site, so computing call closure is O(callsites × table)
+— 363 s on a 10k-function corpus.
+
+The obvious fix, a `HashMap` field on `Ctx`, is **not available**: the proofs in
+`Autoform/Contracts.lean`, `Autoform/Refine.lean` and `Autoform/CallingConvention.lean`
+`simp` through `Ctx.resolve.go` on the association list, so the list shape is load-bearing
+for the kernel. So the index lives *here*, is built once per program, and `Ctx.resolve`
+itself is untouched — a `git diff` of `Semantics.lean` shows no change to it.
+
+An index is only a speedup if it computes the same answer. It would be very easy for this
+one to quietly disagree with `Ctx.resolvable` and inflate the verifiable core, which is
+the exact §17/§30 failure this project keeps catching, so:
+
+* the equivalence argument is written out below, in terms of `String.endsWith`;
+* `Program.callClosureAgrees` re-derives the answer *both* ways and compares, and
+  `#guard`s at the bottom of this file run it on real corpora at elaboration time. A
+  disagreement is a build failure, not a silent number.
+
+**The equivalence.** `Ctx.resolve n` looks for an exact key, then for a *unique* key with
+`k.endsWith ("." ++ n)`. For a key `k` split on `"."` into `p₀ … pₘ`, the strings `k` ends
+with after a dot are exactly the rejoined tails `p₁…pₘ`, `p₂…pₘ`, …, `pₘ` — one per dot,
+all of different lengths, so a single key contributes each candidate `n` at most once.
+Therefore `suffixCount[n]` counts *keys*, and:
+
+* `(ctx.resolve n).isSome  ↔  exact.contains n ∨ suffixCount[n] = 1`
+* `ctx.table.any (·.1.endsWith ("." ++ n))  ↔  suffixCount[n] ≥ 1`
+
+which is what `ResolveIndex.resolvable` evaluates. -/
+structure ResolveIndex where
+  /-- Keys present verbatim in the table — the exact-match arm of `Ctx.resolve`. -/
+  exact : Std.HashSet String
+  /-- For each name that some key ends with after a dot, how many keys do. `1` means
+  `Ctx.resolve`'s uniqueness condition holds; `≥ 2` means it resolves to `none`. -/
+  suffixCount : Std.HashMap String Nat
+  deriving Inhabited
+
+/-- Every string `k` ends with immediately after a `'.'`, longest first. `"a.b.c"` gives
+`["b.c", "c"]` — and notably *not* `"a.b.c"` itself, matching `endsWith ("." ++ n)`, which
+requires a dot to be present. -/
+private def nonEmptySuffixes : List String → List (List String)
+  | []      => []
+  | p :: ps => (p :: ps) :: nonEmptySuffixes ps
+
+def dottedTails (k : String) : List String :=
+  match k.splitOn "." with
+  | []      => []
+  | _ :: ps => (nonEmptySuffixes ps).map (fun t => ".".intercalate t)
+
+def ResolveIndex.build (t : FuncTable) : ResolveIndex :=
+  t.foldl (fun idx (k, _) =>
+    { exact := idx.exact.insert k
+    , suffixCount := (dottedTails k).foldl
+        (fun m n => m.insert n ((m.getD n 0) + 1)) idx.suffixCount })
+    { exact := ∅, suffixCount := ∅ }
+
+/-- The index's answer to `Ctx.resolvable`. Mirrors it arm for arm, including the
+`Stdlib.knowsFree` fallback and the deliberate omission of `knowsMethod`. -/
+def ResolveIndex.resolvable (idx : ResolveIndex) (dialect : Dialect)
+    (isMethod : Bool) (n : String) : Bool :=
+  if isMethod then idx.suffixCount.getD n 0 ≥ 1
+  else idx.exact.contains n || idx.suffixCount.getD n 0 == 1
+       || Stdlib.knowsFree dialect n
+
+/-- Hole-free **and** every call target resolves inside the program.
+
+The reference definition: `Ctx.resolvable` per call site, quadratic. Kept because it is
+the one that obviously mirrors the interpreter, and because it is the thing
+`Program.callClosureAgrees` checks the index against. -/
+def Program.callClosedRef (p : Program) : List Func :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table }
   p.verifiableCore.filter (fun f => f.calls.all (fun c => ctx.resolvable c.1 c.2))
+
+/-- Hole-free **and** every call target resolves inside the program, via the index. This
+is what the ledger reports. -/
+def Program.callClosed (p : Program) : List Func :=
+  let idx := ResolveIndex.build p.table
+  p.verifiableCore.filter (fun f =>
+    f.calls.all (fun c => idx.resolvable p.dialect c.1 c.2))
+
+/-- Do the two agree, function for function? Compares the *names*, not just the counts:
+two lists of equal length can still be different lists, and it is the membership that the
+ledger's claim rests on. -/
+def Program.callClosureAgrees (p : Program) : Bool :=
+  p.callClosed.map (·.name) == p.callClosedRef.map (·.name)
 
 /-- Per-program translation evidence. -/
 structure Coverage where
@@ -264,6 +347,51 @@ def Program.ledgerJson (p : Program) (name : String) : Lean.Json :=
     , ("dynamicHoleRisk", .num c.riskNodes)
     , ("holesByLabel",   .arr (c.byLabel.map (fun (l, n) =>
         Lean.Json.mkObj [("label", .str l), ("count", .num n)])).toArray) ]
+
+/-! ## The index, checked against the definition it replaces
+
+A synthetic table covering every arm, including the two that a wrong index would get
+wrong in the *flattering* direction: an ambiguous suffix must be unresolvable on the free
+path, and a name that is only a *substring* of a key must not match at all. Real corpora
+are checked too — `scripts/ledger.lean.tmpl` fails loudly if `callClosureAgrees` is false
+for the module being reported. -/
+section IndexCheck
+
+private def tbl : FuncTable :=
+  [ ("m.py:<module>.helper",      { name := "m.py:<module>.helper",   params := [], body := .skip })
+  , ("m.py:<module>.A.clear",     { name := "m.py:<module>.A.clear",  params := [], body := .skip })
+  , ("m.py:<module>.B.clear",     { name := "m.py:<module>.B.clear",  params := [], body := .skip })
+  , ("plain",                     { name := "plain",                  params := [], body := .skip }) ]
+
+private def ix : ResolveIndex := ResolveIndex.build tbl
+private def cx : Ctx := { dialect := .python, table := tbl }
+
+-- Unique suffix: resolvable as a free call, and agrees with `Ctx.resolvable`.
+#guard ix.resolvable .python false "helper" == cx.resolvable false "helper"
+#guard ix.resolvable .python false "helper" == true
+-- Ambiguous suffix (`A.clear` and `B.clear`): `Ctx.resolve` returns `none`, so the free
+-- path must say `false`. An index that counted "at least one" would say `true` here and
+-- inflate the verifiable core — this is the case that makes the check non-vacuous.
+#guard ix.resolvable .python false "clear" == cx.resolvable false "clear"
+#guard ix.resolvable .python false "clear" == false
+-- The same name on the *method* path is resolvable, because `resolveMethod` takes the
+-- first match. The two paths must disagree here; an index collapsing them fails.
+#guard ix.resolvable .python true "clear" == cx.resolvable true "clear"
+#guard ix.resolvable .python true "clear" == true
+-- Exact key with no dot at all.
+#guard ix.resolvable .python false "plain" == cx.resolvable false "plain"
+#guard ix.resolvable .python false "plain" == true
+-- A substring that is not a dotted tail: `"lper"` must not match `".helper"`.
+#guard ix.resolvable .python false "lper" == cx.resolvable false "lper"
+#guard ix.resolvable .python false "lper" == false
+#guard ix.resolvable .python true "lper" == cx.resolvable true "lper"
+-- A modelled builtin is resolvable on the free path even though it is not in the table.
+#guard ix.resolvable .python false "len" == cx.resolvable false "len"
+-- The tail decomposition itself.
+#guard dottedTails "m.py:<module>.A.clear" == ["py:<module>.A.clear", "A.clear", "clear"]
+#guard dottedTails "plain" == []
+
+end IndexCheck
 
 /-- The names of functions that can be verified unconditionally. -/
 def Program.coreNames (p : Program) : List String :=

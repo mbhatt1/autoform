@@ -567,6 +567,43 @@ def bindParams (fn : Func) (base : Env) (vs : List Val)
   | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
   | none   => ρ₂
 
+/-- Does this call pass **more positional arguments than the callee can accept**?
+
+CPython: `def f(a, b)` called as `f(1, 2, 3)` is
+`TypeError: f() takes 2 positional arguments but 3 were given` (3.9.6). Core used to
+truncate — `params.zip vs` drops the surplus — and the disagreement was recorded as the
+theorem `surplusPositional_is_a_known_divergence`, now
+`CallingConvention.surplusPositional_now_agrees_with_cpython`. Truncation is the dangerous
+direction: a call the real program rejects loudly runs to completion in Core and every
+theorem about it is a theorem about a program CPython never executes.
+
+Only a *surplus* is rejected. Too few arguments is still not an error here, because Core
+does not model default values: `def k(a=None)` renders as `params := ["a"]`, so raising
+on an under-supplied call would reject calls CPython accepts. That asymmetry is
+deliberate and is the reason this is not simply an arity equality test.
+
+A `*args` parameter absorbs any surplus, so a callee with `vararg` is never rejected. -/
+def posRejected (fn : Func) (vs : List Val) : Bool :=
+  fn.vararg.isNone && fn.posParams.length < vs.length
+
+/-- A call passing no more arguments than the callee has positional parameters is never
+rejected — in particular the zero-argument call, which is what most callers in a rendered
+corpus are. -/
+@[simp] theorem posRejected_nil (fn : Func) : posRejected fn [] = false := by
+  simp [posRejected]
+
+/-- `posRejected` on the shape a rendered corpus actually presents: a `Func` literal with
+both variadic fields at their `none` defaults. The companion of `bindParams_mk`, and
+needed for the same reason — a proof about a literal `Func` cannot fire a hypothesis-form
+lemma without first deciding which `fn` it is about. -/
+@[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
+    (vs : List Val) :
+    posRejected ⟨name, params, body, none, none⟩ vs
+      = decide (params.length < vs.length) := by
+  have : (List.filter (fun p => none != some p) params) = params := by
+    simp [List.filter_eq_self]
+  simp [posRejected, Func.posParams, this]
+
 /-- Does this call pass a keyword argument the callee cannot accept? CPython raises
 `TypeError: f() got an unexpected keyword argument 'k'`; `bindParams` alone would silently
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
@@ -954,7 +991,7 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
                         | some s => [("self", s)]
                         | none   => []
       let ρ := bindParams fn base vs kws
-      if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v)    => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
@@ -975,7 +1012,7 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
   | n+1, h, fn, cap, vs, kws =>
       let base : Env := cap
       let ρ : Env := bindParams fn base vs kws
-      if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v)     => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)

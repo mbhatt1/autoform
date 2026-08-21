@@ -29,11 +29,11 @@ Two modelling notes, stated rather than glossed:
   no argument supplies it; Core leaves `a` unbound, and an unbound read is `Val.unit`.
   `unit` is the closest thing Core has to `None`, so `k(**{'z': 9})` is compared against
   `(None, {'z': 9})` with `None` read as `unit`. Defaults remain unmodelled.
-* **Surplus positional arguments are dropped, where CPython raises.** `f(1, 2, 3)` is a
-  `TypeError` in CPython; `applyFunc` truncates. That predates this change (`params.zip`
-  did the same) and is deliberately left alone here, so it is *not* claimed as agreement —
-  see `surplusPositional_is_a_known_divergence` at the end, which states the disagreement
-  as a theorem rather than omitting the case.
+* **Surplus positional arguments now raise, as CPython does.** `f(1, 2, 3)` on
+  `def f(a, b)` used to truncate to `(1, 2)`; `posRejected` makes it a `TypeError`. What
+  is still accepted where CPython raises is an *under*-supplied call, because Core does
+  not model default values and cannot tell a missing argument from a defaulted one. See
+  `surplusPositional_now_agrees_with_cpython`.
 -/
 
 namespace Autoform.Core
@@ -93,11 +93,31 @@ def prog : Program := { dialect := .python, funcs :=
   , caller "e3"  (.call "f" [.dstarred (.listE [.lit (.int 1)])])
   , caller "e4"  (.call "f" [.lit (.int 1), .lit (.int 2), .kwargE "q" (.lit (.int 3))])
   , caller "s1"  (.starred (.listE [.lit (.int 1)]))
-  , caller "d1"  (.call "g" [.starred (.lit (.str "ab"))])
   , caller "d2"  (.call "h" [.lit (.int 1), .kwargE "a" (.lit (.int 2))])
+  -- str iteration, now that `Val.iterable` has a `str` case.
+  , caller "t1"  (.call "g" [.starred (.lit (.str "ab"))])
+  , caller "t2"  (.call "g" [.starred (.lit (.str ""))])
+  , { name := "t3", params := []
+    , body := .seq (.forIn "c" (.lit (.str "abc")) (.assign "acc" (.name "c")))
+                   (.ret (.name "acc")) }
+  -- exact-arity and under-supplied calls, which must keep succeeding now that surplus
+  -- ones raise.
+  , caller "p1"  (.call "f" [.lit (.int 1), .lit (.int 2)])
+  , caller "p2"  (.call "f" [.lit (.int 1)])
   ] }
 
-def run (nm : String) : String := reprStr (runFunc prog 60 nm [])
+/-- `prog` plus the surplus-positional caller, which is kept in its own program only
+because it was added later. -/
+def prog' : Program := { prog with funcs := prog.funcs ++
+  [ caller "x1" (.call "f" [.lit (.int 1), .lit (.int 2), .lit (.int 3)]) ] }
+
+def run (nm : String) : String :=
+  reprStr (runFunc (if nm == "x1" then prog' else prog) 60 nm [])
+
+/-- `run` with the namespace prefix stripped, so a pinned expectation reads the way the
+comments beside the `#eval`s do. Purely cosmetic: it is `String.replace`, not a
+reinterpretation of the result. -/
+def pin (nm : String) : String := (run nm).replace "Autoform.Core." ""
 
 /-! ## Splicing into a fixed parameter list -/
 
@@ -213,35 +233,83 @@ theorem unexpected_keyword_raises :
 theorem starred_outside_a_call_is_a_hole :
     runFunc prog 60 "s1" [] = .hole "op:starred-outside-call" := by rfl
 
-/-! ## The divergence this change does *not* fix
+/-! ## Two divergences closed, and one still open
 
-`applyFunc` truncates surplus positional arguments; CPython raises `TypeError`. Stated as
-a theorem so the disagreement is on the record rather than absent from the test list. -/
+Both fixes are paired with the value CPython 3.9.6 actually printed, pinned with
+`#guard_msgs` so the build fails if either regresses. `#guard_msgs` adds no axiom.
 
--- CPython: g(*"ab") == ('a', 'b') -- a `str` is iterable.
--- Core: `Val.iterable` has no `str` case, so this raises `TypeError`. The same gap
--- already affected `for c in "ab"`; it predates the calling convention and is not fixed
--- by it, so it is recorded rather than claimed.
-#eval run "d1"   -- exn (str "TypeError")   [DIVERGES from CPython]
+### `str` is iterable
+
+`Val.iterable` had no `str` case, so `g(*"ab")` raised `TypeError` and `for c in "ab"`
+holed. It now yields one-character strings, as CPython does. -/
+
+-- CPython: g(*"ab") == ('a', 'b')
+/-- info: "EResult.val (Val.tuple [Val.str \"a\", Val.str \"b\"])" -/
+#guard_msgs in #eval pin "t1"
+
+-- The boundary in the other direction. `t1` already rules out a `str` case that returns
+-- `some []` for everything; this rules out one that returns `none` on the empty string,
+-- which would raise where CPython yields the empty tuple.
+-- CPython: g(*"") == ()
+/-- info: "EResult.val (Val.tuple [])" -/
+#guard_msgs in #eval pin "t2"
+
+-- And the construct the gap actually broke in real code: `for c in "abc"`.
+-- CPython: acc = None; for c in "abc": acc = c  ==> acc == 'c'
+/-- info: "EResult.val (Val.str \"c\")" -/
+#guard_msgs in #eval pin "t3"
+
+theorem str_is_iterable :
+    runFunc prog 60 "t1" [] = .val (.tuple [.str "a", .str "b"]) := by rfl
+
+theorem str_iteration_is_not_empty :
+    runFunc prog 60 "t3" [] = .val (.str "c") := by rfl
+
+/-! ### Surplus positional arguments raise
+
+`applyFunc` used to truncate: `f(1, 2, 3)` on `def f(a, b)` returned `(1, 2)`. CPython
+raises. `posRejected` now makes Core raise too. Only a *surplus* is rejected — Core has no
+default values, so an under-supplied call must still be accepted (`p2` below), and a
+callee with `*args` absorbs any number of arguments (`c5`). Those two cases are the
+anti-vacuity evidence: a check that fired on every call would make `p1`, `p2` and `c5`
+raise as well, and all three are pinned to values, not exceptions. -/
+
+-- CPython: f(1,2,3)    ==  TypeError: f() takes 2 positional arguments but 3 were given
+/-- info: "EResult.exn (Val.str \"TypeError\")" -/
+#guard_msgs in #eval pin "x1"
+-- CPython: f(1,2)      ==  (1, 2)          — the exact-arity call still succeeds
+/-- info: "EResult.val (Val.tuple [Val.int 1, Val.int 2])" -/
+#guard_msgs in #eval pin "p1"
+-- No exact CPython counterpart: `f(1)` is a TypeError there too, but for a *missing*
+-- argument, which Core cannot distinguish from an unmodelled default. Left accepted,
+-- deliberately; `unit` is the unbound read.
+/-- info: "EResult.val (Val.tuple [Val.int 1, Val.unit])" -/
+#guard_msgs in #eval pin "p2"
+-- CPython: g(1,2,3)    ==  (1, 2, 3)       — `*args` absorbs the surplus, no raise
+/-- info: "EResult.val\n  (Val.tuple [Val.int 1, Val.int 2, Val.int 3])" -/
+#guard_msgs in #eval pin "c5"
+
+/-- What used to be `surplusPositional_is_a_known_divergence`, now recording agreement. -/
+theorem surplusPositional_now_agrees_with_cpython :
+    runFunc prog' 60 "x1" [] = .exn (.str "TypeError") := by rfl
+
+/-- The raise is not vacuous in the direction that matters: the exact-arity call it sits
+next to still returns a value. -/
+theorem exactArity_still_succeeds :
+    runFunc prog 60 "p1" [] = .val (.tuple [.int 1, .int 2]) := by rfl
+
+/-- Nor does it fire on a `*args` callee. -/
+theorem vararg_absorbs_surplus :
+    runFunc prog 60 "c5" [] = .val (.tuple [.int 1, .int 2, .int 3]) := by rfl
+
+/-! ### Still open: duplicate arguments -/
 
 -- CPython: h(1, a=2) == TypeError: h() got multiple values for argument 'a'
 -- Core: the keyword binding shadows the positional one and the call succeeds.
 #eval run "d2"   -- val (tuple [int 2, tuple []])   [DIVERGES from CPython]
 
-theorem str_is_not_iterable_in_core :
-    runFunc prog 60 "d1" [] = .exn (.str "TypeError") := by rfl
-
 theorem duplicate_argument_is_not_detected :
     runFunc prog 60 "d2" [] = .val (.tuple [.int 2, .tuple []]) := by rfl
-
-def prog' : Program := { prog with funcs := prog.funcs ++
-  [ caller "x1" (.call "f" [.lit (.int 1), .lit (.int 2), .lit (.int 3)]) ] }
-
-/-- CPython: `f(1, 2, 3)` is `TypeError: f() takes 2 positional arguments but 3 were
-given`. Core returns `(1, 2)`. This is pre-existing behaviour of `applyFunc`, unchanged
-by the calling convention, and it is a real divergence. -/
-theorem surplusPositional_is_a_known_divergence :
-    runFunc prog' 60 "x1" [] = .val (.tuple [.int 1, .int 2]) := by rfl
 
 end CallingConvention
 end Autoform.Core
