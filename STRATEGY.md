@@ -2210,4 +2210,121 @@ verifies the module those figures describe is a render of the checked-in AST.
 Two smaller discrepancies remain unreconciled and are recorded rather than fixed:
 `skip_unencodable_args` is 534 in §25 and 521 in §26 with no stated cause, and §27 reports
 that category on a different basis again. Whether §34's 238-vs-208 hazard is still live is
-answered by running `scripts/check_render.py`, which currently passes 11/11.
+answered by running `scripts/check_render.py`, which now verifies 15/15 against
+`artifact-manifest.json` (§40).
+
+
+## §40 — The merge that found the theorems had not been checked
+
+Eleven branches merged into one state. The build is clean, `scripts/audit_all.py` prints
+PASS, `scripts/check_render.py` verifies 15 of 15, `scripts/check_docs.py` matches 8 of 8,
+`fuelMonoExclusions` is still exactly `["Stmt.tryFinally"]`, and `tests/` is 130 green.
+None of that is the finding.
+
+### The finding
+
+**No `Autoform/SpecsGen/*.lean` module was in the build, and the headline theorem count
+was a `grep`.**
+
+`lake build` roots the `Autoform` library at `Autoform.lean`, which imported no SpecsGen
+module. `audit_all.py`'s `leanchecker` replay walks that same import closure, so it never
+saw one either. CI's proof-inventory step counted `^ *theorem ` with `grep -c`. Three
+independent green signals, none of them looking at the artifact they were about.
+
+Under that cover, `Autoform/SpecsGen/Cachetools.lean` — the home of the 79 theorems this
+project has been quoting — stopped elaborating at some point after
+`Autoform/SpecsGen/Basis.lean` changed shape underneath it, and nothing anywhere said so.
+This is §17 again in its purest form: every metric in sight was computed from something
+other than the thing it described.
+
+`Autoform/SpecsGen/Basis.lean` is now imported from `Autoform.lean`, so its 21 theorems go
+through the kernel on every build and through `leanchecker` in the audit. The corpus
+modules are too slow for the gating build, so `scripts/check_specs.py` elaborates them and
+reports per module; a missing module, an unbuilt dependency, a timeout and a `--quick`
+skip are each a FAILURE with a reason, and an empty run exits 2.
+
+### What the semantics fix cost, and why the cost is the point
+
+The surplus-positional change (`applyFunc` now raises `TypeError` instead of truncating)
+made 47 generated theorems **false**, not merely unprovable. They were stated as
+
+    Refines P "f" N (fun _ => True) (fun _ => .ret v)
+
+— for *every* argument list — and were true only because surplus arguments were silently
+dropped. The repair is the exact domain, `fun args => posRejected f args = false`, in
+`scripts/synth_specs.py` and in the modules it had already emitted; the same hypothesis
+went onto Basis's two accessor lemmas, where it is discharged by `rfl` at every call site.
+For a callee with `*args` the hypothesis is identically true, so nothing variadic lost
+anything. `LinuxLib`, `LinuxLibSample` and `V8BaseSample` elaborate again.
+
+That a semantics fix falsified 47 theorems and no build noticed is the strongest available
+argument for putting the proofs in the build.
+
+### What is still broken, precisely
+
+`Autoform/SpecsGen/Cachetools.lean` does not elaborate. Its `C_tfFree` premise — *every
+body in the function table is `tryFinally`-free* — is what every fuel-transported theorem
+in the module rests on, and it is now false: `Autoform/Generated/Cachetools.lean` contains
+49 `.tryFinally` nodes, because the exporter learned to translate `try/finally` after the
+module was generated. This is not repairable by hand; it needs regeneration, and
+`synth_specs.py`'s trace step currently records zero calls on cachetools — inside
+`scripts/differential.py`, owned by another branch. The failure is pinned in CI, which
+also fails if it starts passing, so the pin cannot go stale in silence.
+
+`fuelMonoExclusions` was not touched. The right response to a table that is no longer
+`tryFinally`-free is a narrower context, not a wider exclusion list.
+
+### The renders were all behind their ASTs
+
+`check_render` went red the moment the V8Base evidence branch landed its `ast-V8Base.json`,
+and pulling that thread showed every large corpus in the same state: the committed
+`Autoform/Generated/*.lean` were older than the neutral ASTs — Ansible by 42,094 lines,
+LinuxCrypto by 26,714, V8Base by 2,105. Anything measured from them described a program
+nobody wrote. All five were re-rendered, type-checked and re-pinned in
+`artifact-manifest.json`.
+
+### Coverage: unchanged, and independently reconfirmed
+
+| corpus | functions | hole-free | holes |
+|---|---|---|---|
+| v8 `src/numbers` | 157 | 109 (69%) | 210 |
+| v8 `src/base` | 1920 | 1189 (62%) | 2055 |
+| linux `lib/` | 3368 | 1168 (35%) | 10106 |
+| linux `crypto/` | 1955 | 692 (35%) | 5884 |
+| ansible | 5546 | 3304 (60%) | 8060 |
+
+No corpus regressed and none improved. That is the correct result and not a null one: no
+branch in this workflow touched `cartographer/export_ast.sc` or
+`cartographer/render_lean.py`, so re-exporting could only reproduce the same ASTs. The
+numbers above were recomputed from `/tmp/final-*.json` by a walk that counts `hole` and
+`holeS` nodes, independent of the ledger and of the documents that quote it, and they
+agree exactly with the figures this workflow started from.
+
+### What this workflow closed
+
+* CI runs `check_render`, `check_docs`, `pytest` and `check_specs`, and the previously-red
+  Cachetools render is green.
+* The artifact policy: the AST is tracked, the render is a build product, both pinned by
+  sha256 in `artifact-manifest.json`. 33 MB left the index.
+* Evidence artifacts — trust ledger, SACM assurance case, execution oracle — for V8Base,
+  LinuxLib, LinuxCrypto and Ansible. Four of the five large corpora now have some.
+* ~8,000 lines of Python tooling have a test suite, with a regression test per silent
+  failure. It is 130 green and it caught two of its own fixtures going stale during this
+  merge.
+* Four branches independently discovered that `core_oracle.py` called `applyFunc` without
+  its keyword-argument list, so every case failed to elaborate and every run reported
+  INCONCLUSIVE. The merged file keeps the smoke gate that fails before spending hours, the
+  all-cases-unanswered backstop, and the per-depth error print.
+* Theorems about V8 `base/` and Linux `lib/` — the first about anything other than
+  cachetools — and they elaborate.
+
+### What it did not
+
+* The 108-theorem figure. It should be read as 21 (Basis, kernel-checked in the build) plus
+  28 (LinuxLib, LinuxLibSample, V8BaseSample, checked by `check_specs`) plus whatever
+  `SpecsGen/V8Base.lean` proves, minus the 79 Cachetools theorems, which currently prove
+  nothing at all.
+* Provenance. `scripts/check_provenance.py` reports 0 of 12 artifacts attributed to a
+  pinned Joern. That is the honest baseline it was built to establish, not a pass.
+* `scripts/differential.py`'s trace step on cachetools, which is what blocks the
+  regeneration above.

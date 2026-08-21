@@ -146,11 +146,20 @@ jobs:
             echo 'It must be exactly ["Stmt.tryFinally"]. A genuine break needs a proved counterexample, not a wider exclusion list.'
             exit 1; }
 
-      # Proof-inventory floor. Deleting or commenting out a theorem is a
-      # perfectly green way to make a build pass; nothing else in CI notices.
-      # These floors are the counts that exist today; raise them when you add
-      # proofs, and never lower one without saying why in the commit message.
-      - name: Proof inventory does not shrink
+      # Proof inventory. The floor used to be `grep -c '^ *theorem '`, and that is
+      # exactly how the repository came to believe it had 108 theorems about
+      # cachetools while `Autoform/SpecsGen/Cachetools.lean` had not type-checked
+      # for weeks: no SpecsGen module was imported from Autoform.lean, so neither
+      # `lake build` nor the audit's kernel replay ever looked at one, and grep
+      # counts text. `Autoform/SpecsGen/Basis.lean` is now in the build, so its 21
+      # theorems are kernel-checked above. The rest are gated here by ELABORATION.
+      #
+      # Only modules whose inputs are tracked can run in CI. Under the artifact
+      # policy (docs/integrity.md) the large corpora's ASTs and renders are not in
+      # git, so SpecsGen/V8Base, V8BaseSample, LinuxLib and LinuxLibSample cannot be
+      # checked from a clean clone -- and check_specs.py says so, loudly, instead of
+      # skipping them into a pass. They are checked by hand after a re-export.
+      - name: Proof inventory does not shrink (by count)
         run: |
           set -euo pipefail
           fail=0
@@ -163,8 +172,49 @@ jobs:
           }
           check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
           check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
+          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229
+          check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
           check Refine              Autoform/Refine.lean             113
           exit $fail
+
+      # ...and the count is only meaningful for a module that proves. This is the
+      # check the count was standing in for.
+      - name: SpecsGen modules elaborate
+        run: python3 scripts/check_specs.py Basis
+
+      # SpecsGen/Cachetools.lean is KNOWN BROKEN and pinned here rather than
+      # deleted. Its `C_tfFree` premise -- every body in the function table is
+      # `tryFinally`-free, which every fuel-transported theorem in the module rests
+      # on -- became false when the exporter learned to translate `try/finally`:
+      # the current render holds 49 `.tryFinally` nodes where the AST it was
+      # generated against had none. It needs regeneration, not repair.
+      #
+      # Pinning the failure keeps it visible AND catches the day it changes: if it
+      # starts passing, this step fails and tells you to drop the pin. A known
+      # breakage that nothing asserts is a known breakage nobody will notice
+      # healing or worsening.
+      - name: SpecsGen/Cachetools is still broken for the recorded reason
+        run: |
+          set -euo pipefail
+          if python3 scripts/check_specs.py Cachetools > ct.out 2>&1; then
+            echo "SpecsGen/Cachetools.lean now elaborates. That is good news, and it"
+            echo "means this pin is stale: delete this step and add Cachetools to the"
+            echo "'SpecsGen modules elaborate' step above."
+            cat ct.out; exit 1
+          fi
+          cat ct.out
+          grep -q 'FAIL     Cachetools' ct.out || {
+            echo "Cachetools failed for a DIFFERENT reason than the recorded one."
+            echo "Read the output above before touching this pin."; exit 1; }
+
+      # The artifact policy makes the AST the tracked source of truth and the
+      # render a build product. check_render verifies both halves against
+      # artifact-manifest.json and reports UNVERIFIABLE (non-zero) when an AST is
+      # absent rather than passing on an empty comparison.
+      - name: check_specs / check_render report, for the log
+        if: always()
+        run: |
+          python3 scripts/check_render.py || true
 
       # Demo.lean deliberately contains a `sorry`-admitted theorem and two
       # deliberately-failing audits, to demonstrate that the audit catches them.

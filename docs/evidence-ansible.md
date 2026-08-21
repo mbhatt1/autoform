@@ -6,6 +6,9 @@ run, all 108 theorems and every coverage claim in the repository were about `cac
 (238 functions); 12,700 of the 12,946 translated functions had no coverage claim and no
 hole accounting at all.
 
+> **Correction (see STRATEGY.md §40).** The "108 theorems" figure above was a `grep` count. No `Autoform/SpecsGen/*.lean` module was in the build, and `SpecsGen/Cachetools.lean` -- the 79 of those 108 that were about `cachetools` -- does not elaborate: its whole-table `tryFinally`-free premise became false when the exporter learned to translate `try/finally`. Run `scripts/check_specs.py` for the current, elaboration-based count.
+
+
 Everything below is a measured number from this run. Where a number could not be measured,
 that is said rather than estimated.
 

@@ -119,7 +119,7 @@ having stopped looking.
 `Cachetools` came back MISMATCH: the tracked module was rendered by an older
 `render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and is ~1148 lines
 different from a fresh render, though whitespace-insensitively the terms agree. It was not
-re-rendered here, because the 108 theorems that depend on it were being edited
+re-rendered here, because the theorems that depend on it were being edited
 concurrently. `check_render.py` therefore exits 1 today, on purpose. The fix is to
 re-render Cachetools and re-run its proofs; suppressing the verdict until then would be
 the exact failure mode this document exists to prevent.
