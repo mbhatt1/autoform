@@ -419,7 +419,7 @@ theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
     applyFunc ctx (k+1) h fn self? vs kws =
       (let base : Env := match self? with | some s => [("self", s)] | none => []
        let ρ' := bindParams fn base vs kws
-       if kwargsRejected fn kws then (h, .exn (.str "TypeError")) else
+       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
        match execStmt ctx k h ρ' fn.body with
        | (h₁, .ret v)     => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
@@ -1867,8 +1867,9 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
   have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv] []
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
     rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv] []]
-    simp only [f_counter_bump, kwargsRejected_nil, Bool.false_eq_true, if_false,
-      bindParams_mk,
+    simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+      List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+      Bool.false_eq_true, if_false, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
@@ -1941,8 +1942,9 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         f_counter_init (some (.ref 0)) [Val.int 0] []
       = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val .unit) := by
     rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0] []]
-    simp only [f_counter_init, kwargsRejected_nil, Bool.false_eq_true, if_false,
-      bindParams_mk,
+    simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+      List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+      Bool.false_eq_true, if_false, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
     rw [hinitbody]
   have halloc : evalExpr ctxT (G+10) [] [("xs", Val.list (ys.map Val.int))]
@@ -2000,8 +2002,9 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         execStmt_seq_normal ctxT (G+10) _ _ hforIn]
     exact hret
   rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)] []]
-  simp only [f_counter_total, kwargsRejected_nil, Bool.false_eq_true, if_false,
-    bindParams_mk,
+  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+    List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+    Bool.false_eq_true, if_false, bindParams_mk,
     List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
   rw [hbody]
 

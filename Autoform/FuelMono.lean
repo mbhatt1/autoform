@@ -450,7 +450,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy))
       · intro ctx hctx h fn hfree self? vs kws h' r hy hne
         simp only [applyFunc] at hy ⊢
-        by_cases hk : kwargsRejected fn kws = true
+        by_cases hk : (kwargsRejected fn kws || posRejected fn vs) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
@@ -460,7 +460,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h fn hfree cap vs kws h' r hy hne
         simp only [applyClosure] at hy ⊢
-        by_cases hk : kwargsRejected fn kws = true
+        by_cases hk : (kwargsRejected fn kws || posRejected fn vs) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
         split at hy <;> first

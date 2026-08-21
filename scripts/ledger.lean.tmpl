@@ -2,6 +2,17 @@ import Autoform.Generated.@MODULE@
 import Autoform.Ledger
 open Autoform.Core Autoform.Generated
 
+-- The verifiable-core number below is computed through `ResolveIndex`, not through the
+-- per-call-site `Ctx.resolvable` scan. Before reporting it, re-derive it the slow way and
+-- compare. A mismatch aborts: a ledger that silently reported the faster number would be
+-- exactly the "silence reads as success" failure this project keeps catching.
+#eval do
+  if program.callClosureAgrees then
+    IO.println s!"call-closure index agrees with Ctx.resolvable on @MODULE@ ({program.callClosed.length} functions)"
+  else
+    throw (IO.userError
+      "@MODULE@: ResolveIndex disagrees with Ctx.resolvable — the ledger's verifiable core is NOT trustworthy")
+
 #eval IO.println (program.ledger "@MODULE@")
 #eval do
   let core := program.coreNames

@@ -610,14 +610,32 @@ def Val.truthy : Val → Bool
   | .bobj _ (.str t)    => t != ""
   | .bobj _ _           => true
 
-/-- What a value iterates over, if anything. -/
+/-- What a value iterates over, if anything.
+
+A `str` iterates over its characters as **one-character strings**, as CPython does:
+`list("ab") == ['a', 'b']` and `g(*"ab") == ('a', 'b')` under CPython 3.9.6. Core had no
+`str` case at all, which made `g(*"ab")` a `TypeError` and `for c in "ab"` a hole — a
+measured divergence on extremely common code, recorded as a theorem until this change
+and now recorded as agreement (`CallingConvention.str_is_iterable`).
+
+The encoding is character-for-character the one `Stdlib.elems` already used for `str`,
+which is what made the omission here a plain inconsistency rather than a design choice:
+`list("ab")` worked while `for c in "ab"` did not. `String.toList` is the codepoint
+decomposition, so this iterates `Char`s as CPython 3 iterates a `str`, not bytes.
+
+Note the base case: the empty string iterates to `[]`, so `g(*"")` is `()` — matching
+CPython — rather than an error, and a `str` case that returned `some []` for *every*
+string would satisfy that pin while being useless, which is why the non-empty case is
+pinned separately. -/
 def Val.iterable : Val → Option (List Val)
   | .list vs  => some vs
   | .tuple vs => some vs
   | .dict kvs => some (kvs.map (·.1))
+  | .str s    => some (s.toList.map (fun c => .str c.toString))
   | .bobj _ (.list vs)  => some vs
   | .bobj _ (.tuple vs) => some vs
   | .bobj _ (.dict kvs) => some (kvs.map (·.1))
+  | .bobj _ (.str s)    => some (s.toList.map (fun c => .str c.toString))
   | _         => none
 
 /-- Result of evaluating an expression. -/

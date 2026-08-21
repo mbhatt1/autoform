@@ -1947,10 +1947,11 @@ been unsound, not merely imprecise.
 
 * **Default parameter values.** `def k(a=None, **kw)` binds `a` to `None`; Core leaves it
   unbound and reads `unit`. Not modelled, and `unit` is not `None`.
-* **Surplus positional arguments.** `f(1,2,3)` into `def f(a,b)` is a `TypeError` in
-  CPython; `applyFunc` truncates, as it always has.
-  `CallingConvention.surplusPositional_is_a_known_divergence` states the disagreement as a
-  theorem rather than omitting the case.
+* **Under-supplied calls.** `f(1)` into `def f(a,b)` is a `TypeError` in CPython; Core
+  leaves `b` unbound and reads `unit`. It stays accepted because Core has no default
+  values and so cannot tell a missing argument from a defaulted one — rejecting it would
+  reject calls CPython accepts. (The *surplus* direction, `f(1,2,3)`, used to truncate and
+  now raises: `posRejected`, `surplusPositional_now_agrees_with_cpython`.)
 * **Keyword-only parameters** (`def f(*, a)`) are not distinguished from positional ones.
 * **A starred form outside an argument list** (`a, *b = xs`) is the narrower hole
   `op:starred-outside-call`. It does not occur in `cachetools`; the label exists so that
@@ -1958,22 +1959,84 @@ been unsound, not merely imprecise.
 * **Keyword arguments to modelled builtins** — `Stdlib.builtin`/`Stdlib.method` take
   positional arguments only, so these are the named holes `call:<f>:keyword-to-builtin`
   and `mcall:<m>:keyword-to-builtin`.
-* **Two measured divergences, both recorded as theorems rather than omitted.**
-  `g(*"ab")` is `('a','b')` in CPython and `TypeError` in Core, because `Val.iterable` has
-  no `str` case — a gap that already affected `for c in "ab"` and predates this work
-  (`str_is_not_iterable_in_core`). And `h(1, a=2)` where `a` is also positional is
+* **One measured divergence left, recorded as a theorem rather than omitted.**
+  `h(1, a=2)` where `a` is also positional is
   `TypeError: got multiple values for argument 'a'` in CPython, while Core lets the
-  keyword shadow the positional (`duplicate_argument_is_not_detected`).
+  keyword shadow the positional (`duplicate_argument_is_not_detected`). The other one
+  recorded here is closed: `Val.iterable` now has a `str` case, so `g(*"ab")` is
+  `('a','b')` and `for c in "ab"` iterates one-character strings, as in CPython
+  (`str_is_iterable`, `str_iteration_is_not_empty`, both pinned with `#guard_msgs`).
 
 ### The anti-vacuity evidence
 
-`Autoform/CallingConvention.lean` is 20 `#eval`s against CPython 3.9.6, each carrying the
-value CPython printed, plus ten kernel-checked theorems. It covers `f(*[1,2])`,
+`Autoform/CallingConvention.lean` is 31 `#eval`s against CPython 3.9.6, each carrying the
+value CPython printed — seven of them pinned with `#guard_msgs` so a regression fails the
+build — plus 15 kernel-checked theorems. It covers `f(*[1,2])`,
 `f(1,*[2])`, `def g(*a)` at 0/1/3 arguments, `def h(a,*rest)` (the interaction with a
 positional parameter, including the empty remainder), `k(**{'a':1})` vs `k(**{'z':9})`,
 all four forms in one call, `*` on a tuple and on a dict (which iterates keys), and the
 four `TypeError` cases. Every one agrees. Without it, a construct that always returned
 `unit` would have produced the same hole table.
+
+### The blast radius of making surplus positional arguments raise, measured
+
+Turning a silent truncation into an exception can only be an improvement if the sites it
+newly rejects were already wrong. So they were counted, not assumed. Over every free-call
+site whose argument list has no starred or keyword form (where the positional count is
+statically exact), resolving the callee with `Ctx.resolve` and asking `posRejected`:
+
+| corpus | free-call sites | resolve in-program | now raise |
+|---|---|---|---|
+| V8Base | 2,822 | 460 | 0 |
+| Cachetools | 139 | 36 | 6 |
+| LinuxLib | 15,449 | 4,530 | 257 |
+| Ansible | 7,527 | 2,605 | 439 |
+
+Every rejected site falls into one of two classes, and neither was correct before:
+
+* **The resolution is right and the arity is genuinely wrong** — then CPython raises too,
+  and Core now agrees where it used to invent a result.
+* **The resolution is wrong** — then Core was already executing the wrong function, and
+  the arity mismatch is the *symptom* that says so. Both large numbers are this class,
+  and each points at a real defect the truncation was hiding:
+  - `LinuxLib`: `static int __bpf_fill_ja(struct bpf_test *self, unsigned int len,
+    unsigned int plen)` renders as `params := ["len", "plen"]`. The exporter's
+    receiver-stripping heuristic fires on a **C** function whose first parameter happens
+    to be named `self`, and the call site passes three arguments. Truncation bound
+    `len := self` and `plen := len` and ran the body on garbage.
+  - `Ansible`: `type(x)`, `list(x)` and `main(x)` suffix-resolve to the *methods*
+    `PluginLoader.type`, `SshAgentClient.list` and `__main__.main`, so the builtin is
+    never reached — `Ctx.resolve` is consulted before `Stdlib.builtin`.
+
+Both are pre-existing and neither is fixed here (`cartographer/export_ast.sc` and the
+resolution rule are separate changes); what changed is that they are now loud.
+
+### The same two fixes, run rather than argued
+
+`scripts/core_oracle.py` executes the ledger's claimed core against synthetic inputs. It
+was run twice on `Cachetools` — once with `Val.iterable`'s `str` case and `posRejected`
+reverted, once with them — 2,424 cases each, same inputs, same fuel:
+
+| | claimed core | exercised | never holed | holes at runtime |
+|---|---|---|---|---|
+| before | 101 | 101 | 39 | 62 |
+| after | 101 | 101 | **41** | 60 |
+
+No function that executed hole-free before stops doing so; two start
+(`_condition_info.Descriptor.Wrapper.__call__`, `_unlocked.cache_clear`), and three hole
+labels fall (`field:_obj:non-object` 24 → 0, `field:__enter__:non-object` 370 → 351,
+`binop:+` 66 → 61). No new label appears.
+
+Read that gain narrowly. Both functions are in `_cachedmethod.py`, which is where all six
+of the corpus' newly-rejected call sites are, so the likeliest cause is that `posRejected`
+raises `TypeError` *before* the body reaches the construct that used to hole — an
+exception is not a hole, and the oracle counts holes. That is a real improvement in
+faithfulness (CPython raises there too, on a call Core was mis-resolving) but it is not
+two more functions' worth of coverage, and it is not claimed as such.
+
+This run also required fixing `scripts/core_oracle.py`, which had been emitting a harness
+that did not elaborate — see the commit; it reported "0 executed" where it should have
+reported a type error.
 
 ### What is *not* established
 

@@ -1,0 +1,61 @@
+/-
+Blast radius of `posRejected`: how many free-call sites in a rendered corpus pass more
+positional arguments than the callee they resolve to can accept.
+
+    sed 's/@MODULE@/LinuxLib/g' scripts/arity_blast.lean.tmpl > /tmp/A.lean
+    lake env lean /tmp/A.lean
+
+Only argument lists with no starred/keyword form are counted, because those are the ones
+whose positional count is statically exact. A non-zero number is not automatically a
+regression: it is either a genuine arity error (which CPython raises on too) or a
+mis-resolution, and the printed exemplars say which. See STRATEGY.md, "The blast radius
+of making surplus positional arguments raise, measured".
+-/
+import Autoform.Generated.@MODULE@
+import Autoform.Ledger
+open Autoform.Core
+
+namespace Blast
+
+/-- Free-call sites `(callee, #positional-args)`, counting only argument lists with no
+starred/keyword forms — where the count is statically exact. -/
+partial def eCalls : Expr → List (String × Nat)
+  | .call f as =>
+      let sub := (as.map eCalls).flatten
+      if as.any (fun a => match a with
+                          | .starred _ | .kwargE _ _ | .dstarred _ => true
+                          | _ => false)
+      then sub else (f, as.length) :: sub
+  | .binop _ a b | .index a b | .isOp _ a b | .inOp _ a b => eCalls a ++ eCalls b
+  | .unop _ a | .field a _ | .starred a | .kwargE _ a | .dstarred a => eCalls a
+  | .mcall r _ as => eCalls r ++ (as.map eCalls).flatten
+  | .alloc _ as | .listE as | .tupleE as => (as.map eCalls).flatten
+  | .dictE kvs => (kvs.map (fun kv => eCalls kv.1 ++ eCalls kv.2)).flatten
+  | .cond a b c => eCalls a ++ eCalls b ++ eCalls c
+  | _ => []
+
+partial def sCalls : Stmt → List (String × Nat)
+  | .expr e | .assign _ e | .ret e | .raise e => eCalls e
+  | .setField r _ v => eCalls r ++ eCalls v
+  | .setIndex r i v => eCalls r ++ eCalls i ++ eCalls v
+  | .seq a b => sCalls a ++ sCalls b
+  | .ifte c a b => eCalls c ++ sCalls a ++ sCalls b
+  | .loop c a => eCalls c ++ sCalls a
+  | .forIn _ e b => eCalls e ++ sCalls b
+  | .tryCatch b _ h => sCalls b ++ sCalls h
+  | _ => []
+
+def report (name : String) (p : Program) : IO Unit := do
+  let ctx : Ctx := { dialect := p.dialect, table := p.table }
+  let sites := (p.funcs.map (fun f => sCalls f.body)).flatten
+  let resolved := sites.filterMap (fun (n, k) =>
+    match ctx.resolve n with | some fn => some (fn, k) | none => none)
+  let rejected := resolved.filter (fun (fn, k) => posRejected fn (List.replicate k .unit))
+  IO.println s!"{name}: {sites.length} free-call sites, {resolved.length} resolve in-program, {rejected.length} now raise"
+  for (fn, k) in rejected.take 6 do
+    IO.println s!"    {fn.name} has {fn.posParams.length} params, called with {k}"
+
+end Blast
+
+#eval show IO Unit from do
+  Blast.report "@MODULE@" Autoform.Generated.program
