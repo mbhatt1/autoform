@@ -73,13 +73,12 @@ class TestTopLevelShape:
                 pytest.fail("%s: %s" % (name, e))
             assert d in (".python", ".cLike"), (name, d)
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "KNOWN GAP, reported not hidden: `.cc` is absent from render_lean.DIALECT. "
-        "ast-V8Numbers.json is 104 `.cc` files and 53 `.h` files, so the dialect is "
-        "decided today by the *headers* alone — the .cc votes are silently discarded. "
-        "It happens to come out `.cLike` either way, but a corpus of pure `.cc` would "
-        "abort the render. Add `.cc`/`.cxx`/`.hpp`/`.hh` to DIALECT and delete this "
-        "xfail (which is strict: it fails the moment the gap is closed)."))
+    # Was a strict xfail recording that `.cc` was absent from render_lean.DIALECT:
+    # ast-V8Numbers.json is 104 `.cc` against 53 `.h`, so the dialect was decided by the
+    # HEADERS alone and a pure-`.cc` corpus aborted the render. That is no longer
+    # hypothetical — extracting a 4-function V8 sample produced exactly such a corpus and
+    # the renderer refused. `.cc`/`.cxx`/`.hh`/`.hpp` were added; the xfail was strict, so
+    # it failed the moment the gap closed, which is how this test came to be a real one.
     def test_all_extensions_present_in_the_dialect_table(self, corpora, render_lean):
         for name, funcs in corpora.items():
             exts = {os.path.splitext(f.get("file", ""))[1] for f in funcs}
