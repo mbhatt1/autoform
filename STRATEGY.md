@@ -1978,6 +1978,39 @@ all four forms in one call, `*` on a tuple and on a dict (which iterates keys), 
 four `TypeError` cases. Every one agrees. Without it, a construct that always returned
 `unit` would have produced the same hole table.
 
+### The blast radius of making surplus positional arguments raise, measured
+
+Turning a silent truncation into an exception can only be an improvement if the sites it
+newly rejects were already wrong. So they were counted, not assumed. Over every free-call
+site whose argument list has no starred or keyword form (where the positional count is
+statically exact), resolving the callee with `Ctx.resolve` and asking `posRejected`:
+
+| corpus | free-call sites | resolve in-program | now raise |
+|---|---|---|---|
+| V8Base | 2,822 | 460 | 0 |
+| Cachetools | 139 | 36 | 6 |
+| LinuxLib | 15,449 | 4,530 | 257 |
+| Ansible | 7,527 | 2,605 | 439 |
+
+Every rejected site falls into one of two classes, and neither was correct before:
+
+* **The resolution is right and the arity is genuinely wrong** — then CPython raises too,
+  and Core now agrees where it used to invent a result.
+* **The resolution is wrong** — then Core was already executing the wrong function, and
+  the arity mismatch is the *symptom* that says so. Both large numbers are this class,
+  and each points at a real defect the truncation was hiding:
+  - `LinuxLib`: `static int __bpf_fill_ja(struct bpf_test *self, unsigned int len,
+    unsigned int plen)` renders as `params := ["len", "plen"]`. The exporter's
+    receiver-stripping heuristic fires on a **C** function whose first parameter happens
+    to be named `self`, and the call site passes three arguments. Truncation bound
+    `len := self` and `plen := len` and ran the body on garbage.
+  - `Ansible`: `type(x)`, `list(x)` and `main(x)` suffix-resolve to the *methods*
+    `PluginLoader.type`, `SshAgentClient.list` and `__main__.main`, so the builtin is
+    never reached — `Ctx.resolve` is consulted before `Stdlib.builtin`.
+
+Both are pre-existing and neither is fixed here (`cartographer/export_ast.sc` and the
+resolution rule are separate changes); what changed is that they are now loud.
+
 ### What is *not* established
 
 `scripts/differential.py` on this corpus produced **0 COMPARED cases** — the recorded

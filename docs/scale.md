@@ -186,11 +186,35 @@ miss is unconditionally O(F) with a string-suffix test per entry. `Program.callC
 runs `f.calls.all ctx.resolvable` over every hole-free function, making the ledger
 O(F × calls-per-function × F). At F = 10,623 that is the 363 seconds.
 
-**Fix:** `Program.table` should be a `Std.HashMap String Func`, with a second map keyed by
-last dotted segment for the suffix fallback, built once per `Ctx`. This is not only a
-ledger problem — `Ctx.resolve` is on the interpreter's hot path (`evalExpr`'s `.call`,
-`.mcall` and `.alloc` cases all go through it), so every future evaluation and every
-conformance run pays the same O(F) per call on a large program.
+**Fixed, for the ledger only.** The prescribed fix — make `Program.table` a
+`Std.HashMap String Func` — turned out not to be available: `Autoform/Contracts.lean`,
+`Autoform/Refine.lean` and `Autoform/CallingConvention.lean` `simp` through
+`Ctx.resolve.go` on the association list, so the list shape is load-bearing for the
+proofs and changing it breaks them.
+
+What was done instead is a `ResolveIndex` that lives in `Autoform/Ledger.lean`, is built
+once per program, and answers exactly what `Ctx.resolvable` answers (exact keys, plus a
+count of table entries per dotted tail, so the *unique*-suffix rule and the first-match
+method rule stay distinct). `Ctx.resolve` itself is untouched. The quadratic definition is
+kept as `Program.callClosedRef`, and `Program.callClosureAgrees` re-derives the answer
+both ways: `scripts/ledger.lean.tmpl` aborts if they differ, so the faster number can
+never be reported unchecked.
+
+Measured in one process per corpus, `callClosedRef` vs `callClosed`, identical results:
+
+| corpus | functions | verifiable core | before | after |
+|---|---|---|---|---|
+| Cachetools | 209 | 101 | 65 ms | 2 ms |
+| V8Numbers | 157 | 78 | 50 ms | 1 ms |
+| V8Base | 1,920 | 830 | 670 ms | 11 ms |
+| LinuxCrypto | 1,955 | 347 | 1,150 ms | 14 ms |
+| LinuxLib | 3,368 | 920 | 1,789 ms | 21 ms |
+| Ansible | 5,547 | 2,205 | 10,806 ms | 72 ms |
+
+**Still open:** `Ctx.resolve` is also on the interpreter's hot path (`evalExpr`'s `.call`,
+`.mcall` and `.alloc` cases all go through it), so every evaluation and every conformance
+run still pays O(F) per call on a large program. The index above does nothing for that,
+and the assoc-list constraint from the proofs applies there too.
 
 ### 4. Memory grows with the generated module
 
