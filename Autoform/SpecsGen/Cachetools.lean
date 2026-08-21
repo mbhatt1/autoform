@@ -174,12 +174,17 @@ theorem const_cachetools___init___py__module___DefaultSize___getitem : ∀ fuel,
     (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module___DefaultSize___getitem :
-    Refines P "cachetools/__init__.py:<module>._DefaultSize.__getitem__" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
-  intro args _
+    Refines P "cachetools/__init__.py:<module>._DefaultSize.__getitem__" 8
+      (fun args => posRejected f_cachetools___init___py__module___DefaultSize___getitem__ args = false)
+      (fun _ => .ret (Val.int (1))) := by
+  intro args hdom
+  simp [posRejected, f_cachetools___init___py__module___DefaultSize___getitem__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P]
+  first
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___DefaultSize___setitem : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] }, expected := EResult.val (Val.unit) },
@@ -367,12 +372,17 @@ theorem const_cachetools___init___py__module___DefaultSize_pop : ∀ fuel, FUEL 
     (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module___DefaultSize_pop :
-    Refines P "cachetools/__init__.py:<module>._DefaultSize.pop" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
-  intro args _
+    Refines P "cachetools/__init__.py:<module>._DefaultSize.pop" 8
+      (fun args => posRejected f_cachetools___init___py__module___DefaultSize_pop args = false)
+      (fun _ => .ret (Val.int (1))) := by
+  intro args hdom
+  simp [posRejected, f_cachetools___init___py__module___DefaultSize_pop, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P]
+  first
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
@@ -918,12 +928,17 @@ theorem const_cachetools___init___py__module__Cache_getsizeof : ∀ fuel, FUEL �
     (by rfl) (by rfl)
 
 theorem uconst_cachetools___init___py__module__Cache_getsizeof :
-    Refines P "cachetools/__init__.py:<module>.Cache.getsizeof" 8 (fun _ => True) (fun _ => .ret (Val.int (1))) := by
-  intro args _
+    Refines P "cachetools/__init__.py:<module>.Cache.getsizeof" 8
+      (fun args => posRejected f_cachetools___init___py__module__Cache_getsizeof args = false)
+      (fun _ => .ret (Val.int (1))) := by
+  intro args hdom
+  simp [posRejected, f_cachetools___init___py__module__Cache_getsizeof, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P]
+  first
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___TimedCache__Timer___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.fn "monotonic"] }, expected := EResult.val (Val.unit) },

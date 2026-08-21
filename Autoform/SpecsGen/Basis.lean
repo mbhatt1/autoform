@@ -292,15 +292,25 @@ differently. `hmod` says the receiver is not a **module object** — since modul
 were modelled, reading an absent attribute off one is `.hole "module-attr:…"`, not
 `.unit`, so an accessor spec that ignored the distinction would be false exactly on
 those receivers. Weakening the statement to a domain where it is true beats stating a
-convenient falsehood. -/
+convenient falsehood.
+
+A fourth hypothesis arrived with the surplus-positional fix. `posRejected fn args = false`
+says the call is not arity-rejected. Since `hp`/`hv` pin `fn.params = []` and no `*args`,
+that is exactly `args = []` -- and it has to be said, because `applyFunc` now raises
+`TypeError` on a surplus positional instead of truncating it. The previous statement
+quantified over *arbitrary* `args` and was true only because surplus arguments were
+silently dropped; it is now false for `args ≠ []`, and stating the domain is the honest
+repair. Nothing in the generated corpora loses a theorem: a projection method is called
+with no arguments.
+-/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
-    (r : Ref) (args : List Val)
+    (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil,
+  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -321,11 +331,11 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (fld doc : String)
     (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
-    (r : Ref) (args : List Val)
+    (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil,
+  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]

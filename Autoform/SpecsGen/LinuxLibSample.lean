@@ -84,20 +84,30 @@ Counts for this run are in `Autoform/SpecsGen/report.json`.
 -/
 
 theorem uconst_alloc_mod_tags_mem :
-    Refines P "alloc_mod_tags_mem" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "alloc_mod_tags_mem" 8
+      (fun args => posRejected f_alloc_mod_tags_mem args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_alloc_mod_tags_mem, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_alloc_mod_tags_mem rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_alloc_mod_tags_mem, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_alloc_mod_tags_mem, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_alloc_mod_tags_mem, ctxOf, P, hdom]
 
 theorem uconst_span_iteration_check_duplicate_0 :
-    Refines P "span_iteration_check<duplicate>0" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "span_iteration_check<duplicate>0" 8
+      (fun args => posRejected f_span_iteration_check_duplicate_0 args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_span_iteration_check_duplicate_0, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_span_iteration_check_duplicate_0 rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_span_iteration_check_duplicate_0, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_span_iteration_check_duplicate_0, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_span_iteration_check_duplicate_0, ctxOf, P, hdom]
 
 def dom_runs_bad_io_access : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.int (-32479), Val.int (-8683)] },
@@ -148,12 +158,17 @@ theorem returns_bad_io_access : ∀ fuel, FUEL ≤ fuel → ((dom_returns_bad_io
     (by rfl) (by rfl)
 
 theorem uconst_debugfs_errno_set :
-    Refines P "debugfs_errno_set" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "debugfs_errno_set" 8
+      (fun args => posRejected f_debugfs_errno_set args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_debugfs_errno_set, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_debugfs_errno_set rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_debugfs_errno_set, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_debugfs_errno_set, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_debugfs_errno_set, ctxOf, P, hdom]
 
 def dom_charact_bad_io_access : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-32479), Val.int (-8683)] }, expected := Autoform.Core.EResult.val (Autoform.Core.Val.unit) },

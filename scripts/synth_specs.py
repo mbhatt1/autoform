@@ -220,7 +220,22 @@ def observe(ast_path, src_root, tests_override, per_fn):
     funcs = json.load(open(ast_path))
     holefree = [f for f in funcs if not D.has_hole(f["body"])]
     wanted = set(f["name"] for f in holefree if D.classify(f))
-    rels = sorted(set(f.get("file", "") for f in funcs))
+    # The exporter emits one synthetic `<module-objects>:<module>` entry with an empty
+    # `file`, which is not a source path. Passed through, `root + ""` is the source root
+    # itself and `build_lineno_index` dies with IsADirectoryError -- a crash, at least,
+    # rather than a silent miss, but it stops the whole run. Drop empty paths here and
+    # SAY how many, so a corpus that is mostly empty paths cannot look like a clean run.
+    allrels = sorted(set(f.get("file", "") for f in funcs))
+    rels = [r for r in allrels if r and not r.endswith("/")]
+    if len(rels) != len(allrels):
+        print("   %d AST entr%s carry no source path (synthetic module entries); "
+              "excluded from the line-number index, %d real path(s) remain"
+              % (len(allrels) - len(rels), "y" if len(allrels)-len(rels)==1 else "ies",
+                 len(rels)))
+    if not rels:
+        raise SystemExit("ABORT: not one AST entry names a source file. Nothing can be "
+                         "traced, and a run that reports 0 observations here would read "
+                         "as 'the tests exercise nothing'.")
     root = D.resolve_src_root(src_root, rels)
     tests = [tests_override] if tests_override else D.find_tests(root)
     index = D.build_lineno_index(root, rels)
@@ -1069,34 +1084,34 @@ PROOF_CONST = """theorem %(id)s :
 
 PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
       hmod
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      args hmod
+      [] rfl hmod
 """
 
 FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.

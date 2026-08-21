@@ -180,36 +180,56 @@ theorem returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : ∀ fuel, FUE
     (by rfl) (by rfl)
 
 theorem uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool :
-    Refines P "v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()" 8
+      (fun args => posRejected f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const :
-    Refines P "v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>" 8
+      (fun args => posRejected f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_ args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool :
-    Refines P "v8.base.EmulatedVirtualAddressSubspace.CanAllocateSubspaces:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.EmulatedVirtualAddressSubspace.CanAllocateSubspaces:bool()" 8
+      (fun args => posRejected f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_EmulatedVirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_FPU_GetFlushDenormals_bool :
-    Refines P "v8.base.FPU.GetFlushDenormals:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.FPU.GetFlushDenormals:bool()" 8
+      (fun args => posRejected f_v8_base_FPU_GetFlushDenormals_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_FPU_GetFlushDenormals_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_FPU_GetFlushDenormals_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_FPU_GetFlushDenormals_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_FPU_GetFlushDenormals_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_FPU_GetFlushDenormals_bool__, ctxOf, P, hdom]
 
 def dom_idempotent_v8_base_SetPrintStackTrace_void_void : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.str "_\u0095\u001c;\u00b8"] },
@@ -261,104 +281,139 @@ theorem idempotent_v8_base_SetFatalFunction_void_void : ∀ fuel, FUEL ≤ fuel 
 
 theorem uproj_v8_base_SharedMemoryMapping_GetMemory_void____const :
     MRefines P "v8.base.SharedMemoryMapping.GetMemory:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "ptr_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_SharedMemoryMapping_GetMemory_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemoryMapping_GetMemory_void____const_ "ptr_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemoryMapping_GetMemory_void____const_ "ptr_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_SharedMemory_GetMemory_void____const :
     MRefines P "v8.base.SharedMemory.GetMemory:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "ptr_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_SharedMemory_GetMemory_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemory_GetMemory_void____const_ "ptr_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemory_GetMemory_void____const_ "ptr_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_SharedMemory_GetSize_size_t___const :
     MRefines P "v8.base.SharedMemory.GetSize:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_SharedMemory_GetSize_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemory_GetSize_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_SharedMemory_GetSize_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_PageAllocator_CanAllocateSharedPages_bool :
-    Refines P "v8.base.PageAllocator.CanAllocateSharedPages:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.PageAllocator.CanAllocateSharedPages:bool()" 8
+      (fun args => posRejected f_v8_base_PageAllocator_CanAllocateSharedPages_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_PageAllocator_CanAllocateSharedPages_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_PageAllocator_CanAllocateSharedPages_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_PageAllocator_CanAllocateSharedPages_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_PageAllocator_CanAllocateSharedPages_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_PageAllocator_CanAllocateSharedPages_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SealPages_bool_void__size_t :
-    Refines P "v8.base.OS.SealPages:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SealPages:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_OS_SealPages_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SealPages_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SealPages_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_HasLazyCommits_bool :
-    Refines P "v8.base.OS.HasLazyCommits:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.HasLazyCommits:bool()" 8
+      (fun args => posRejected f_v8_base_OS_HasLazyCommits_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_HasLazyCommits_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_HasLazyCommits_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char :
-    Refines P "v8.base.OS.SetMemoryRegionName:bool(void*,size_t,char*)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SetMemoryRegionName:bool(void*,size_t,char*)" 8
+      (fun args => posRejected f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_bool_void__size_t_char__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SealPages_duplicate_0_bool_void__size_t :
-    Refines P "v8.base.OS.SealPages<duplicate>0:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SealPages<duplicate>0:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_0_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_CanReserveAddressSpace_bool :
-    Refines P "v8.base.OS.CanReserveAddressSpace:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.OS.CanReserveAddressSpace:bool()" 8
+      (fun args => posRejected f_v8_base_OS_CanReserveAddressSpace_bool__ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_CanReserveAddressSpace_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_CanReserveAddressSpace_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_HasLazyCommits_duplicate_0_bool :
-    Refines P "v8.base.OS.HasLazyCommits<duplicate>0:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.OS.HasLazyCommits<duplicate>0:bool()" 8
+      (fun args => posRejected f_v8_base_OS_HasLazyCommits_duplicate_0_bool__ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_HasLazyCommits_duplicate_0_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_HasLazyCommits_duplicate_0_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_0_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_0_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_0_bool__, ctxOf, P, hdom]
 
 def dom_idempotent_v8_base_PosixInitializeCommon_void_char : List Case :=
   [{ heap := h0 ++ [], self := none, args := [Val.bool true] },
@@ -457,268 +512,368 @@ theorem idempotent_v8_base_OS_Initialize_duplicate_0_void_char : ∀ fuel, FUEL 
     (by rfl) (by rfl)
 
 theorem uconst_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool :
-    Refines P "v8.base.OS.IsHardwareEnforcedShadowStacksEnabled:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.IsHardwareEnforcedShadowStacksEnabled:bool()" 8
+      (fun args => posRejected f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsHardwareEnforcedShadowStacksEnabled_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_ActivationFrameAlignment_int :
-    Refines P "v8.base.OS.ActivationFrameAlignment:int()" 8 (fun _ => True) (fun _ => .ret (Val.int (16))) := by
-  intro args _
+    Refines P "v8.base.OS.ActivationFrameAlignment:int()" 8
+      (fun args => posRejected f_v8_base_OS_ActivationFrameAlignment_int__ args = false)
+      (fun _ => .ret (Val.int (16))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_ActivationFrameAlignment_int__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_ActivationFrameAlignment_int__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_int__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_int__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_int__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char :
-    Refines P "v8.base.OS.SetMemoryRegionName<duplicate>0:bool(void*,size_t,char*)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SetMemoryRegionName<duplicate>0:bool(void*,size_t,char*)" 8
+      (fun args => posRejected f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_0_bool_void__size_t_char__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SealPages_duplicate_1_bool_void__size_t :
-    Refines P "v8.base.OS.SealPages<duplicate>1:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SealPages<duplicate>1:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_1_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool :
-    Refines P "v8.base.OS.CanReserveAddressSpace<duplicate>0:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.OS.CanReserveAddressSpace<duplicate>0:bool()" 8
+      (fun args => posRejected f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_CanReserveAddressSpace_duplicate_0_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_HasLazyCommits_duplicate_1_bool :
-    Refines P "v8.base.OS.HasLazyCommits<duplicate>1:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.HasLazyCommits<duplicate>1:bool()" 8
+      (fun args => posRejected f_v8_base_OS_HasLazyCommits_duplicate_1_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_HasLazyCommits_duplicate_1_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_HasLazyCommits_duplicate_1_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_1_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_1_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_1_bool__, ctxOf, P, hdom]
 
 theorem uproj_v8_base_PosixMemoryMappedFile_memory_void____const :
     MRefines P "v8.base.PosixMemoryMappedFile.memory:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "memory_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PosixMemoryMappedFile_memory_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_memory_void____const_ "memory_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_memory_void____const_ "memory_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_PosixMemoryMappedFile_size_size_t___const :
     MRefines P "v8.base.PosixMemoryMappedFile.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PosixMemoryMappedFile_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_size_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_size_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_OS_DirectorySeparator_char :
-    Refines P "v8.base.OS.DirectorySeparator:char()" 8 (fun _ => True) (fun _ => .ret (Val.str "/")) := by
-  intro args _
+    Refines P "v8.base.OS.DirectorySeparator:char()" 8
+      (fun args => posRejected f_v8_base_OS_DirectorySeparator_char__ args = false)
+      (fun _ => .ret (Val.str "/")) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_DirectorySeparator_char__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_DirectorySeparator_char__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_char__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_char__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_char__, ctxOf, P, hdom]
 
 theorem uconst_n_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation :
-    Refines P "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>0:bool(v8.base.AddressSpaceReservation)" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>0:bool(v8.base.AddressSpaceReservation)" 8
+      (fun args => posRejected f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_0_bool_v8_base_AddressSpaceReservation_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_ActivationFrameAlignment_duplicate_0_int :
-    Refines P "v8.base.OS.ActivationFrameAlignment<duplicate>0:int()" 8 (fun _ => True) (fun _ => .ret (Val.int (16))) := by
-  intro args _
+    Refines P "v8.base.OS.ActivationFrameAlignment<duplicate>0:int()" 8
+      (fun args => posRejected f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__ args = false)
+      (fun _ => .ret (Val.int (16))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_0_int__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t :
-    Refines P "v8.base.OS.DiscardSystemPages<duplicate>2:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.OS.DiscardSystemPages<duplicate>2:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DiscardSystemPages_duplicate_2_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_DirectorySeparator_duplicate_1_char :
-    Refines P "v8.base.OS.DirectorySeparator<duplicate>1:char()" 8 (fun _ => True) (fun _ => .ret (Val.str "\\\\")) := by
-  intro args _
+    Refines P "v8.base.OS.DirectorySeparator<duplicate>1:char()" 8
+      (fun args => posRejected f_v8_base_OS_DirectorySeparator_duplicate_1_char__ args = false)
+      (fun _ => .ret (Val.str "\\\\")) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_DirectorySeparator_duplicate_1_char__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_DirectorySeparator_duplicate_1_char__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_duplicate_1_char__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_duplicate_1_char__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_DirectorySeparator_duplicate_1_char__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char :
-    Refines P "v8.base.OS.SetMemoryRegionName<duplicate>1:bool(void*,size_t,char*)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SetMemoryRegionName<duplicate>1:bool(void*,size_t,char*)" 8
+      (fun args => posRejected f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SetMemoryRegionName_duplicate_1_bool_void__size_t_char__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_SealPages_duplicate_2_bool_void__size_t :
-    Refines P "v8.base.OS.SealPages<duplicate>2:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.SealPages<duplicate>2:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_SealPages_duplicate_2_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_HasLazyCommits_duplicate_3_bool :
-    Refines P "v8.base.OS.HasLazyCommits<duplicate>3:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.HasLazyCommits<duplicate>3:bool()" 8
+      (fun args => posRejected f_v8_base_OS_HasLazyCommits_duplicate_3_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_HasLazyCommits_duplicate_3_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_HasLazyCommits_duplicate_3_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_3_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_3_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_3_bool__, ctxOf, P, hdom]
 
 theorem uproj_v8_base_Win32MemoryMappedFile_memory_void____const :
     MRefines P "v8.base.Win32MemoryMappedFile.memory:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "memory_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Win32MemoryMappedFile_memory_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Win32MemoryMappedFile_memory_void____const_ "memory_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Win32MemoryMappedFile_memory_void____const_ "memory_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Win32MemoryMappedFile_size_size_t___const :
     MRefines P "v8.base.Win32MemoryMappedFile.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Win32MemoryMappedFile_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Win32MemoryMappedFile_size_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Win32MemoryMappedFile_size_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_n_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation :
-    Refines P "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>1:bool(v8.base.AddressSpaceReservation)" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>1:bool(v8.base.AddressSpaceReservation)" 8
+      (fun args => posRejected f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_AddressSpaceReservation_FreeSubReservation_duplicate_1_bool_v8_base_AddressSpaceReservation_, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_ActivationFrameAlignment_duplicate_1_int :
-    Refines P "v8.base.OS.ActivationFrameAlignment<duplicate>1:int()" 8 (fun _ => True) (fun _ => .ret (Val.int (8))) := by
-  intro args _
+    Refines P "v8.base.OS.ActivationFrameAlignment<duplicate>1:int()" 8
+      (fun args => posRejected f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__ args = false)
+      (fun _ => .ret (Val.int (8))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_ActivationFrameAlignment_duplicate_1_int__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_OS_HasLazyCommits_duplicate_4_bool :
-    Refines P "v8.base.OS.HasLazyCommits<duplicate>4:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.HasLazyCommits<duplicate>4:bool()" 8
+      (fun args => posRejected f_v8_base_OS_HasLazyCommits_duplicate_4_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_HasLazyCommits_duplicate_4_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_HasLazyCommits_duplicate_4_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_4_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_4_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_HasLazyCommits_duplicate_4_bool__, ctxOf, P, hdom]
 
 theorem uproj_v8_base_PosixMemoryMappedFile_memory_duplicate_0_void____const :
     MRefines P "v8.base.PosixMemoryMappedFile.memory<duplicate>0:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "memory_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PosixMemoryMappedFile_memory_duplicate_0_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_memory_duplicate_0_void____const_ "memory_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_memory_duplicate_0_void____const_ "memory_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_PosixMemoryMappedFile_size_duplicate_0_size_t___const :
     MRefines P "v8.base.PosixMemoryMappedFile.size<duplicate>0:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PosixMemoryMappedFile_size_duplicate_0_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_size_duplicate_0_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PosixMemoryMappedFile_size_duplicate_0_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_TimeTicks_IsHighResolution_bool :
-    Refines P "v8.base.TimeTicks.IsHighResolution:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.TimeTicks.IsHighResolution:bool()" 8
+      (fun args => posRejected f_v8_base_TimeTicks_IsHighResolution_bool__ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_TimeTicks_IsHighResolution_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_TimeTicks_IsHighResolution_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_TimeTicks_IsHighResolution_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_TimeTicks_IsHighResolution_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_TimeTicks_IsHighResolution_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_ThreadTicks_IsSupported_bool :
-    Refines P "v8.base.ThreadTicks.IsSupported:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.ThreadTicks.IsSupported:bool()" 8
+      (fun args => posRejected f_v8_base_ThreadTicks_IsSupported_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_ThreadTicks_IsSupported_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_ThreadTicks_IsSupported_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_ThreadTicks_IsSupported_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_ThreadTicks_IsSupported_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_ThreadTicks_IsSupported_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t :
-    Refines P "v8.base.VirtualAddressSpacePageAllocator.SealPages:bool(void*,size_t)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.VirtualAddressSpacePageAllocator.SealPages:bool(void*,size_t)" 8
+      (fun args => posRejected f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpacePageAllocator_SealPages_bool_void__size_t_, ctxOf, P, hdom]
 
 theorem uproj_v8_base_VirtualAddressSubspace_ActiveMemoryProtectionKey_optional :
     MRefines P "v8.base.VirtualAddressSubspace.ActiveMemoryProtectionKey:optional()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "pkey_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_VirtualAddressSubspace_ActiveMemoryProtectionKey_optional__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_VirtualAddressSubspace_ActiveMemoryProtectionKey_optional__ "pkey_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_VirtualAddressSubspace_ActiveMemoryProtectionKey_optional__ "pkey_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_heappure_v8_base_AddressRegion___init : List Case :=
@@ -867,32 +1022,32 @@ theorem commutes_v8_base_AddressRegion___init_1 : ∀ fuel, FUEL ≤ fuel → ((
 
 theorem uproj_v8_base_AddressRegion_begin_Address___const :
     MRefines P "v8.base.AddressRegion.begin:Address()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "address_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_AddressRegion_begin_Address___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressRegion_begin_Address___const_ "address_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressRegion_begin_Address___const_ "address_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_AddressRegion_size_size_t___const :
     MRefines P "v8.base.AddressRegion.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_AddressRegion_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressRegion_size_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressRegion_size_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_runs_v8_UnsignedDiv32_uint32_t_uint32_t_uint32_t : List Case :=
@@ -1161,1157 +1316,1157 @@ theorem commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t : ∀ fuel, FUEL ≤
 
 theorem uproj_v8_base_BoundedPageAllocator_AllocatePageSize_size_t :
     MRefines P "v8.base.BoundedPageAllocator.AllocatePageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "allocate_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_AllocatePageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_BoundedPageAllocator_CommitPageSize_size_t :
     MRefines P "v8.base.BoundedPageAllocator.CommitPageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "commit_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_CommitPageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_location_status_v8_base_BoundedPageAllocator_AllocationStatus___const :
     MRefines P "v8.base.BoundedPageAllocator.get_last_allocation_status:v8.base.BoundedPageAllocator.AllocationStatus()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "allocation_status_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_get_last_allocation_status_v8_base_BoundedPageAllocator_AllocationStatus___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_get_last_allocation_status_v8_base_BoundedPageAllocator_AllocationStatus___const_ "allocation_status_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_get_last_allocation_status_v8_base_BoundedPageAllocator_AllocationStatus___const_ "allocation_status_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_vendor_char____const :
     MRefines P "v8.base.CPU.vendor:char*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "vendor_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_vendor_char____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_vendor_char____const_ "vendor_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_vendor_char____const_ "vendor_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_stepping_int___const :
     MRefines P "v8.base.CPU.stepping:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "stepping_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_stepping_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_stepping_int___const_ "stepping_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_stepping_int___const_ "stepping_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_model_int___const :
     MRefines P "v8.base.CPU.model:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "model_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_model_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_model_int___const_ "model_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_model_int___const_ "model_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_ext_model_int___const :
     MRefines P "v8.base.CPU.ext_model:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "ext_model_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_ext_model_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_ext_model_int___const_ "ext_model_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_ext_model_int___const_ "ext_model_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_family_int___const :
     MRefines P "v8.base.CPU.family:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "family_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_family_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_family_int___const_ "family_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_family_int___const_ "family_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_ext_family_int___const :
     MRefines P "v8.base.CPU.ext_family:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "ext_family_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_ext_family_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_ext_family_int___const_ "ext_family_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_ext_family_int___const_ "ext_family_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_type_int___const :
     MRefines P "v8.base.CPU.type:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "type_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_type_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_type_int___const_ "type_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_type_int___const_ "type_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_implementer_int___const :
     MRefines P "v8.base.CPU.implementer:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "implementer_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_implementer_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_implementer_int___const_ "implementer_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_implementer_int___const_ "implementer_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_architecture_int___const :
     MRefines P "v8.base.CPU.architecture:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "architecture_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_architecture_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_architecture_int___const_ "architecture_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_architecture_int___const_ "architecture_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_variant_int___const :
     MRefines P "v8.base.CPU.variant:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "variant_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_variant_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_variant_int___const_ "variant_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_variant_int___const_ "variant_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_part_int___const :
     MRefines P "v8.base.CPU.part:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "part_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_part_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_part_int___const_ "part_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_part_int___const_ "part_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_fpu_bool___const :
     MRefines P "v8.base.CPU.has_fpu:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_fpu_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_fpu_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fpu_bool___const_ "has_fpu_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fpu_bool___const_ "has_fpu_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_icache_line_size_int___const :
     MRefines P "v8.base.CPU.icache_line_size:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "icache_line_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_icache_line_size_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_icache_line_size_int___const_ "icache_line_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_icache_line_size_int___const_ "icache_line_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_dcache_line_size_int___const :
     MRefines P "v8.base.CPU.dcache_line_size:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "dcache_line_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_dcache_line_size_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_dcache_line_size_int___const_ "dcache_line_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_dcache_line_size_int___const_ "dcache_line_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_cmov_bool___const :
     MRefines P "v8.base.CPU.has_cmov:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_cmov_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_cmov_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cmov_bool___const_ "has_cmov_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cmov_bool___const_ "has_cmov_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sahf_bool___const :
     MRefines P "v8.base.CPU.has_sahf:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sahf_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sahf_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sahf_bool___const_ "has_sahf_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sahf_bool___const_ "has_sahf_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_mmx_bool___const :
     MRefines P "v8.base.CPU.has_mmx:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_mmx_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_mmx_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mmx_bool___const_ "has_mmx_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mmx_bool___const_ "has_mmx_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sse_bool___const :
     MRefines P "v8.base.CPU.has_sse:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sse_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sse_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse_bool___const_ "has_sse_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse_bool___const_ "has_sse_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sse2_bool___const :
     MRefines P "v8.base.CPU.has_sse2:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sse2_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sse2_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse2_bool___const_ "has_sse2_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse2_bool___const_ "has_sse2_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sse3_bool___const :
     MRefines P "v8.base.CPU.has_sse3:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sse3_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sse3_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse3_bool___const_ "has_sse3_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse3_bool___const_ "has_sse3_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_ssse3_bool___const :
     MRefines P "v8.base.CPU.has_ssse3:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_ssse3_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_ssse3_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_ssse3_bool___const_ "has_ssse3_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_ssse3_bool___const_ "has_ssse3_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sse41_bool___const :
     MRefines P "v8.base.CPU.has_sse41:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sse41_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sse41_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse41_bool___const_ "has_sse41_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse41_bool___const_ "has_sse41_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sse42_bool___const :
     MRefines P "v8.base.CPU.has_sse42:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sse42_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sse42_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse42_bool___const_ "has_sse42_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sse42_bool___const_ "has_sse42_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_osxsave_bool___const :
     MRefines P "v8.base.CPU.has_osxsave:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_osxsave_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_osxsave_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_osxsave_bool___const_ "has_osxsave_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_osxsave_bool___const_ "has_osxsave_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_avx_bool___const :
     MRefines P "v8.base.CPU.has_avx:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_avx_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_avx_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_bool___const_ "has_avx_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_bool___const_ "has_avx_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_avx2_bool___const :
     MRefines P "v8.base.CPU.has_avx2:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_avx2_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_avx2_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx2_bool___const_ "has_avx2_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx2_bool___const_ "has_avx2_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_avx_vnni_bool___const :
     MRefines P "v8.base.CPU.has_avx_vnni:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_avx_vnni_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_avx_vnni_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_vnni_bool___const_ "has_avx_vnni_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_vnni_bool___const_ "has_avx_vnni_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_avx_vnni_int8_bool___const :
     MRefines P "v8.base.CPU.has_avx_vnni_int8:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_avx_vnni_int8_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_avx_vnni_int8_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_vnni_int8_bool___const_ "has_avx_vnni_int8_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx_vnni_int8_bool___const_ "has_avx_vnni_int8_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_fma3_bool___const :
     MRefines P "v8.base.CPU.has_fma3:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_fma3_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_fma3_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fma3_bool___const_ "has_fma3_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fma3_bool___const_ "has_fma3_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_f16c_bool___const :
     MRefines P "v8.base.CPU.has_f16c:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_f16c_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_f16c_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_f16c_bool___const_ "has_f16c_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_f16c_bool___const_ "has_f16c_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_bmi1_bool___const :
     MRefines P "v8.base.CPU.has_bmi1:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_bmi1_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_bmi1_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_bmi1_bool___const_ "has_bmi1_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_bmi1_bool___const_ "has_bmi1_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_bmi2_bool___const :
     MRefines P "v8.base.CPU.has_bmi2:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_bmi2_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_bmi2_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_bmi2_bool___const_ "has_bmi2_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_bmi2_bool___const_ "has_bmi2_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_lzcnt_bool___const :
     MRefines P "v8.base.CPU.has_lzcnt:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_lzcnt_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_lzcnt_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lzcnt_bool___const_ "has_lzcnt_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lzcnt_bool___const_ "has_lzcnt_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_popcnt_bool___const :
     MRefines P "v8.base.CPU.has_popcnt:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_popcnt_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_popcnt_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_popcnt_bool___const_ "has_popcnt_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_popcnt_bool___const_ "has_popcnt_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_apx_f_bool___const :
     MRefines P "v8.base.CPU.has_apx_f:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_apx_f_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_apx_f_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_apx_f_bool___const_ "has_apx_f_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_apx_f_bool___const_ "has_apx_f_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_avx10_1_bool___const :
     MRefines P "v8.base.CPU.has_avx10_1:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_avx10_1_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_avx10_1_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx10_1_bool___const_ "has_avx10_1_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_avx10_1_bool___const_ "has_avx10_1_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_is_atom_bool___const :
     MRefines P "v8.base.CPU.is_atom:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "is_atom_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_is_atom_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_atom_bool___const_ "is_atom_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_atom_bool___const_ "is_atom_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_intel_jcc_erratum_bool___const :
     MRefines P "v8.base.CPU.has_intel_jcc_erratum:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_intel_jcc_erratum_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_intel_jcc_erratum_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_intel_jcc_erratum_bool___const_ "has_intel_jcc_erratum_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_intel_jcc_erratum_bool___const_ "has_intel_jcc_erratum_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_cetss_bool___const :
     MRefines P "v8.base.CPU.has_cetss:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_cetss_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_cetss_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cetss_bool___const_ "has_cetss_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cetss_bool___const_ "has_cetss_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_non_stop_time_stamp_counter_bool___const :
     MRefines P "v8.base.CPU.has_non_stop_time_stamp_counter:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_non_stop_time_stamp_counter_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_non_stop_time_stamp_counter_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_non_stop_time_stamp_counter_bool___const_ "has_non_stop_time_stamp_counter_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_non_stop_time_stamp_counter_bool___const_ "has_non_stop_time_stamp_counter_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_is_running_in_vm_bool___const :
     MRefines P "v8.base.CPU.is_running_in_vm:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "is_running_in_vm_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_is_running_in_vm_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_running_in_vm_bool___const_ "is_running_in_vm_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_running_in_vm_bool___const_ "is_running_in_vm_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_idiva_bool___const :
     MRefines P "v8.base.CPU.has_idiva:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_idiva_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_idiva_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_idiva_bool___const_ "has_idiva_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_idiva_bool___const_ "has_idiva_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_neon_bool___const :
     MRefines P "v8.base.CPU.has_neon:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_neon_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_neon_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_neon_bool___const_ "has_neon_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_neon_bool___const_ "has_neon_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_thumb2_bool___const :
     MRefines P "v8.base.CPU.has_thumb2:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_thumb2_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_thumb2_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_thumb2_bool___const_ "has_thumb2_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_thumb2_bool___const_ "has_thumb2_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_vfp_bool___const :
     MRefines P "v8.base.CPU.has_vfp:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_vfp_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_vfp_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp_bool___const_ "has_vfp_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp_bool___const_ "has_vfp_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_vfp3_bool___const :
     MRefines P "v8.base.CPU.has_vfp3:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_vfp3_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_vfp3_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp3_bool___const_ "has_vfp3_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp3_bool___const_ "has_vfp3_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_vfp3_d32_bool___const :
     MRefines P "v8.base.CPU.has_vfp3_d32:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_vfp3_d32_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_vfp3_d32_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp3_d32_bool___const_ "has_vfp3_d32_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_vfp3_d32_bool___const_ "has_vfp3_d32_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_jscvt_bool___const :
     MRefines P "v8.base.CPU.has_jscvt:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_jscvt_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_jscvt_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_jscvt_bool___const_ "has_jscvt_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_jscvt_bool___const_ "has_jscvt_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_dot_prod_bool___const :
     MRefines P "v8.base.CPU.has_dot_prod:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_dot_prod_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_dot_prod_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_dot_prod_bool___const_ "has_dot_prod_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_dot_prod_bool___const_ "has_dot_prod_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_lse_bool___const :
     MRefines P "v8.base.CPU.has_lse:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_lse_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_lse_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lse_bool___const_ "has_lse_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lse_bool___const_ "has_lse_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_mte_bool___const :
     MRefines P "v8.base.CPU.has_mte:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_mte_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_mte_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mte_bool___const_ "has_mte_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mte_bool___const_ "has_mte_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sha3_bool___const :
     MRefines P "v8.base.CPU.has_sha3:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sha3_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sha3_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sha3_bool___const_ "has_sha3_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sha3_bool___const_ "has_sha3_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_pmull1q_bool___const :
     MRefines P "v8.base.CPU.has_pmull1q:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_pmull1q_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_pmull1q_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_pmull1q_bool___const_ "has_pmull1q_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_pmull1q_bool___const_ "has_pmull1q_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_fp16_bool___const :
     MRefines P "v8.base.CPU.has_fp16:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_fp16_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_fp16_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fp16_bool___const_ "has_fp16_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_fp16_bool___const_ "has_fp16_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_hbc_bool___const :
     MRefines P "v8.base.CPU.has_hbc:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_hbc_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_hbc_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_hbc_bool___const_ "has_hbc_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_hbc_bool___const_ "has_hbc_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_cssc_bool___const :
     MRefines P "v8.base.CPU.has_cssc:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_cssc_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_cssc_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cssc_bool___const_ "has_cssc_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_cssc_bool___const_ "has_cssc_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_mops_bool___const :
     MRefines P "v8.base.CPU.has_mops:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_mops_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_mops_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mops_bool___const_ "has_mops_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_mops_bool___const_ "has_mops_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_sve_bool___const :
     MRefines P "v8.base.CPU.has_sve:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_sve_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_sve_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sve_bool___const_ "has_sve_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_sve_bool___const_ "has_sve_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_svebitperm_bool___const :
     MRefines P "v8.base.CPU.has_svebitperm:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_svebitperm_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_svebitperm_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_svebitperm_bool___const_ "has_svebitperm_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_svebitperm_bool___const_ "has_svebitperm_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_is_fp64_mode_bool___const :
     MRefines P "v8.base.CPU.is_fp64_mode:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "is_fp64_mode_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_is_fp64_mode_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_fp64_mode_bool___const_ "is_fp64_mode_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_is_fp64_mode_bool___const_ "is_fp64_mode_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_msa_bool___const :
     MRefines P "v8.base.CPU.has_msa:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_msa_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_msa_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_msa_bool___const_ "has_msa_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_msa_bool___const_ "has_msa_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_vlen_unsigned_int___const :
     MRefines P "v8.base.CPU.vlen:unsigned int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "vlen_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_vlen_unsigned_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_vlen_unsigned_int___const_ "vlen_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_vlen_unsigned_int___const_ "vlen_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_rvv_bool___const :
     MRefines P "v8.base.CPU.has_rvv:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_rvv_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_rvv_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_rvv_bool___const_ "has_rvv_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_rvv_bool___const_ "has_rvv_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zba_bool___const :
     MRefines P "v8.base.CPU.has_zba:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zba_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zba_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zba_bool___const_ "has_zba_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zba_bool___const_ "has_zba_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zbb_bool___const :
     MRefines P "v8.base.CPU.has_zbb:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zbb_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zbb_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zbb_bool___const_ "has_zbb_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zbb_bool___const_ "has_zbb_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zbs_bool___const :
     MRefines P "v8.base.CPU.has_zbs:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zbs_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zbs_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zbs_bool___const_ "has_zbs_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zbs_bool___const_ "has_zbs_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zfa_bool___const :
     MRefines P "v8.base.CPU.has_zfa:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zfa_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zfa_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zfa_bool___const_ "has_zfa_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zfa_bool___const_ "has_zfa_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_rvc_bool___const :
     MRefines P "v8.base.CPU.has_rvc:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_rvc_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_rvc_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_rvc_bool___const_ "has_rvc_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_rvc_bool___const_ "has_rvc_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zfh_bool___const :
     MRefines P "v8.base.CPU.has_zfh:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zfh_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zfh_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zfh_bool___const_ "has_zfh_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zfh_bool___const_ "has_zfh_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_zvfh_bool___const :
     MRefines P "v8.base.CPU.has_zvfh:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_zvfh_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_zvfh_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zvfh_bool___const_ "has_zvfh_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_zvfh_bool___const_ "has_zvfh_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_riscv_mmu_v8_base_CPU_RV_MMU_MODE___const :
     MRefines P "v8.base.CPU.riscv_mmu:v8.base.CPU.RV_MMU_MODE()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "riscv_mmu_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_riscv_mmu_v8_base_CPU_RV_MMU_MODE___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_riscv_mmu_v8_base_CPU_RV_MMU_MODE___const_ "riscv_mmu_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_riscv_mmu_v8_base_CPU_RV_MMU_MODE___const_ "riscv_mmu_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_lsx_bool___const :
     MRefines P "v8.base.CPU.has_lsx:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_lsx_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_lsx_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lsx_bool___const_ "has_lsx_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lsx_bool___const_ "has_lsx_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_CPU_has_lasx_bool___const :
     MRefines P "v8.base.CPU.has_lasx:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "has_lasx_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_CPU_has_lasx_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lasx_bool___const_ "has_lasx_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_CPU_has_lasx_bool___const_ "has_lasx_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_EmulatedVirtualAddressSubspace_mapped_size_size_t___const :
     MRefines P "v8.base.EmulatedVirtualAddressSubspace.mapped_size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "mapped_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_EmulatedVirtualAddressSubspace_mapped_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_EmulatedVirtualAddressSubspace_mapped_size_size_t___const_ "mapped_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_EmulatedVirtualAddressSubspace_mapped_size_size_t___const_ "mapped_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_heappure_v8_base_Hasher___init : List Case :=
@@ -2412,17 +2567,17 @@ theorem idempotent_v8_base_Hasher___init_1 : ∀ fuel, FUEL ≤ fuel → ((dom_i
 
 theorem uproj_v8_base_Hasher_hash_size_t___const :
     MRefines P "v8.base.Hasher.hash:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "hash_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Hasher_hash_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Hasher_hash_size_t___const_ "hash_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Hasher_hash_size_t___const_ "hash_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_runs_v8_base_hash64_uint64_t_uint64_t : List Case :=
@@ -2571,47 +2726,47 @@ theorem idempotent_v8_base_hash_value_size_t_shortunsigned : ∀ fuel, FUEL ≤ 
 
 theorem uproj_v8_base_DiyFp_f_uint64_t___const :
     MRefines P "v8.base.DiyFp.f:uint64_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "f_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_DiyFp_f_uint64_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_DiyFp_f_uint64_t___const_ "f_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_DiyFp_f_uint64_t___const_ "f_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_DiyFp_e_int___const :
     MRefines P "v8.base.DiyFp.e:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "e_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_DiyFp_e_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_DiyFp_e_int___const_ "e_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_DiyFp_e_int___const_ "e_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Double_AsUint64_uint64_t___const :
     MRefines P "v8.base.Double.AsUint64:uint64_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "d64_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Double_AsUint64_uint64_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Double_AsUint64_uint64_t___const_ "d64_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Double_AsUint64_uint64_t___const_ "d64_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T : List Case :=
@@ -2832,32 +2987,32 @@ theorem commutes_v8_base_internal_RangeCheck___init_1 : ∀ fuel, FUEL ≤ fuel 
 
 theorem uproj_v8_base_internal_RangeCheck_IsOverflowFlagSet_bool___const :
     MRefines P "v8.base.internal.RangeCheck.IsOverflowFlagSet:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "is_overflow_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_internal_RangeCheck_IsOverflowFlagSet_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_internal_RangeCheck_IsOverflowFlagSet_bool___const_ "is_overflow_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_internal_RangeCheck_IsOverflowFlagSet_bool___const_ "is_overflow_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_internal_RangeCheck_IsUnderflowFlagSet_bool___const :
     MRefines P "v8.base.internal.RangeCheck.IsUnderflowFlagSet:bool()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "is_underflow_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_internal_RangeCheck_IsUnderflowFlagSet_bool___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_internal_RangeCheck_IsUnderflowFlagSet_bool___const_ "is_underflow_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_internal_RangeCheck_IsUnderflowFlagSet_bool___const_ "is_underflow_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_runs_v8_base_MulWithWraparound_int16_t_int16_t_int16_t : List Case :=
@@ -2934,160 +3089,165 @@ theorem commutes_v8_base_MulWithWraparound_int16_t_int16_t_int16_t : ∀ fuel, F
 
 theorem uproj_v8_base_PageAllocator_AllocatePageSize_size_t :
     MRefines P "v8.base.PageAllocator.AllocatePageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "allocate_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PageAllocator_AllocatePageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_PageAllocator_CommitPageSize_size_t :
     MRefines P "v8.base.PageAllocator.CommitPageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "commit_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_PageAllocator_CommitPageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_PageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_OS_IsRemapPageSupported_bool :
-    Refines P "v8.base.OS.IsRemapPageSupported:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.OS.IsRemapPageSupported:bool()" 8
+      (fun args => posRejected f_v8_base_OS_IsRemapPageSupported_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_OS_IsRemapPageSupported_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_OS_IsRemapPageSupported_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsRemapPageSupported_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsRemapPageSupported_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_OS_IsRemapPageSupported_bool__, ctxOf, P, hdom]
 
 theorem uproj_v8_base_AddressSpaceReservation_base_void____const :
     MRefines P "v8.base.AddressSpaceReservation.base:void*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "base_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_AddressSpaceReservation_base_void____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressSpaceReservation_base_void____const_ "base_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressSpaceReservation_base_void____const_ "base_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_AddressSpaceReservation_size_size_t___const :
     MRefines P "v8.base.AddressSpaceReservation.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_AddressSpaceReservation_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressSpaceReservation_size_size_t___const_ "size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_AddressSpaceReservation_size_size_t___const_ "size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_Options_name_char____const :
     MRefines P "v8.base.Thread.Options.name:char*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "name_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_Options_name_char____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_name_char____const_ "name_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_name_char____const_ "name_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_Options_stack_size_int___const :
     MRefines P "v8.base.Thread.Options.stack_size:int()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "stack_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_Options_stack_size_int___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_stack_size_int___const_ "stack_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_stack_size_int___const_ "stack_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_Options_priority_v8_base_Thread_Priority___const :
     MRefines P "v8.base.Thread.Options.priority:v8.base.Thread.Priority()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "priority_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_Options_priority_v8_base_Thread_Priority___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_priority_v8_base_Thread_Priority___const_ "priority_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_Options_priority_v8_base_Thread_Priority___const_ "priority_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_name_char____const :
     MRefines P "v8.base.Thread.name:char*()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "name_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_name_char____const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_name_char____const_ "name_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_name_char____const_ "name_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_data_v8_base_Thread_PlatformData :
     MRefines P "v8.base.Thread.data:v8.base.Thread.PlatformData*()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "data_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_data_v8_base_Thread_PlatformData___ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_data_v8_base_Thread_PlatformData___ "data_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_data_v8_base_Thread_PlatformData___ "data_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Thread_priority_v8_base_Thread_Priority___const :
     MRefines P "v8.base.Thread.priority:v8.base.Thread.Priority()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "priority_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Thread_priority_v8_base_Thread_Priority___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_priority_v8_base_Thread_Priority___const_ "priority_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Thread_priority_v8_base_Thread_Priority___const_ "priority_" rfl rfl rfl rfl r [] rfl
       hmod
 
 def dom_identity_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot : List Case :=
@@ -3164,252 +3324,267 @@ theorem involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_S
 
 theorem uproj_v8_base_Semaphore_native_handle_NativeHandle :
     MRefines P "v8.base.Semaphore.native_handle:NativeHandle()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "native_handle_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Semaphore_native_handle_NativeHandle__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Semaphore_native_handle_NativeHandle__ "native_handle_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Semaphore_native_handle_NativeHandle__ "native_handle_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Semaphore_native_handle_ANY___const :
     MRefines P "v8.base.Semaphore.native_handle:ANY()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "native_handle_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Semaphore_native_handle_ANY___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Semaphore_native_handle_ANY___const_ "native_handle_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Semaphore_native_handle_ANY___const_ "native_handle_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_time_internal_TimeBase_ToInternalValue_int64_t___const :
     MRefines P "v8.base.time_internal.TimeBase.ToInternalValue:int64_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "us_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_time_internal_TimeBase_ToInternalValue_int64_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_time_internal_TimeBase_ToInternalValue_int64_t___const_ "us_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_time_internal_TimeBase_ToInternalValue_int64_t___const_ "us_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_ase_RegionAllocator_Region_state_v8_base_RegionAllocator_RegionState :
     MRefines P "v8.base.RegionAllocator.Region.state:v8.base.RegionAllocator.RegionState()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "state_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_RegionAllocator_Region_state_v8_base_RegionAllocator_RegionState__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_Region_state_v8_base_RegionAllocator_RegionState__ "state_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_Region_state_v8_base_RegionAllocator_RegionState__ "state_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_RegionAllocator_free_size_size_t___const :
     MRefines P "v8.base.RegionAllocator.free_size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "free_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_RegionAllocator_free_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_free_size_size_t___const_ "free_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_free_size_size_t___const_ "free_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_RegionAllocator_page_size_size_t___const :
     MRefines P "v8.base.RegionAllocator.page_size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_RegionAllocator_page_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_page_size_size_t___const_ "page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RegionAllocator_page_size_size_t___const_ "page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_LsanPageAllocator_AllocatePageSize_size_t :
     MRefines P "v8.base.LsanPageAllocator.AllocatePageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "allocate_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_LsanPageAllocator_AllocatePageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_LsanPageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_LsanPageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_LsanPageAllocator_CommitPageSize_size_t :
     MRefines P "v8.base.LsanPageAllocator.CommitPageSize:size_t()" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "commit_page_size_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_LsanPageAllocator_CommitPageSize_size_t__ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_LsanPageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_LsanPageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_RandomNumberGenerator_initial_seed_int64_t___const :
     MRefines P "v8.base.RandomNumberGenerator.initial_seed:int64_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "initial_seed_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_RandomNumberGenerator_initial_seed_int64_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RandomNumberGenerator_initial_seed_int64_t___const_ "initial_seed_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_RandomNumberGenerator_initial_seed_int64_t___const_ "initial_seed_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_RandomNumberGenerator_min_unsigned_int :
-    Refines P "v8.base.RandomNumberGenerator.min:unsigned int()" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "v8.base.RandomNumberGenerator.min:unsigned int()" 8
+      (fun args => posRejected f_v8_base_RandomNumberGenerator_min_unsigned_int__ args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_RandomNumberGenerator_min_unsigned_int__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_RandomNumberGenerator_min_unsigned_int__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_RandomNumberGenerator_min_unsigned_int__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_RandomNumberGenerator_min_unsigned_int__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_RandomNumberGenerator_min_unsigned_int__, ctxOf, P, hdom]
 
 theorem uproj_v8_base_Vector_size_size_t___const :
     MRefines P "v8.base.Vector.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "length_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Vector_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_size_size_t___const_ "length_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_size_size_t___const_ "length_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Vector_begin_ANY___const :
     MRefines P "v8.base.Vector.begin:ANY()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "start_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Vector_begin_ANY___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_begin_ANY___const_ "start_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_begin_ANY___const_ "start_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Vector_cbegin_ANY___const :
     MRefines P "v8.base.Vector.cbegin:ANY()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "start_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Vector_cbegin_ANY___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_cbegin_ANY___const_ "start_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_cbegin_ANY___const_ "start_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_Vector_data_ANY___const :
     MRefines P "v8.base.Vector.data:ANY()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "start_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_Vector_data_ANY___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_data_ANY___const_ "start_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_Vector_data_ANY___const_ "start_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_OwnedVector_size_size_t___const :
     MRefines P "v8.base.OwnedVector.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "length_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_OwnedVector_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_OwnedVector_size_size_t___const_ "length_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_OwnedVector_size_size_t___const_ "length_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uproj_v8_base_EmbeddedVector_size_size_t___const :
     MRefines P "v8.base.EmbeddedVector.size:size_t()<const>" 4
-      (fun h self _ => ∃ r, self = .ref r ∧
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r "length_")
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_EmbeddedVector_size_size_t___const_ rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_EmbeddedVector_size_size_t___const_ "length_" rfl rfl rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_EmbeddedVector_size_size_t___const_ "length_" rfl rfl rfl rfl r [] rfl
       hmod
 
 theorem uconst_v8_base_VirtualAddressSpace_SetName_bool_std_string :
-    Refines P "v8.base.VirtualAddressSpace.SetName:bool(std.string&)" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.VirtualAddressSpace.SetName:bool(std.string&)" 8
+      (fun args => posRejected f_v8_base_VirtualAddressSpace_SetName_bool_std_string__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_VirtualAddressSpace_SetName_bool_std_string__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_VirtualAddressSpace_SetName_bool_std_string__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpace_SetName_bool_std_string__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpace_SetName_bool_std_string__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSpace_SetName_bool_std_string__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool :
-    Refines P "v8.base.VirtualAddressSubspace.CanAllocateSubspaces:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool true)) := by
-  intro args _
+    Refines P "v8.base.VirtualAddressSubspace.CanAllocateSubspaces:bool()" 8
+      (fun args => posRejected f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__ args = false)
+      (fun _ => .ret (Val.bool true)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_VirtualAddressSubspace_CanAllocateSubspaces_bool__, ctxOf, P, hdom]
 
 def dom_charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-21249), Val.int (-9223372036854775511)] }, expected := Autoform.Core.EResult.val (Autoform.Core.Val.int (-21249)) },

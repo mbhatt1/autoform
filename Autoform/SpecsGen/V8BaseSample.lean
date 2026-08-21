@@ -180,20 +180,30 @@ theorem returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : ∀ fuel, FUE
     (by rfl) (by rfl)
 
 theorem uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool :
-    Refines P "v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()" 8 (fun _ => True) (fun _ => .ret (Val.bool false)) := by
-  intro args _
+    Refines P "v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()" 8
+      (fun args => posRejected f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__ args = false)
+      (fun _ => .ret (Val.bool false)) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool__, ctxOf, P, hdom]
 
 theorem uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const :
-    Refines P "v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>" 8 (fun _ => True) (fun _ => .ret (Val.int (0))) := by
-  intro args _
+    Refines P "v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>" 8
+      (fun args => posRejected f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_ args = false)
+      (fun _ => .ret (Val.int (0))) := by
+  intro args hdom
+  simp [posRejected, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, Func.posParams] at hdom
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_ rfl]
-  simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P]
+  first
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, execStmt, evalExpr, Env.set, f_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const_, ctxOf, P, hdom]
 
 def dom_charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t : List Obs :=
   [{ case := { heap := h0 ++ [], self := none, args := [Val.int (-21249), Val.int (-9223372036854775511)] }, expected := Autoform.Core.EResult.val (Autoform.Core.Val.int (-21249)) },
