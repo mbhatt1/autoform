@@ -1,4 +1,4 @@
-import Autoform.Generated.V8Base
+import Autoform.Generated.V8BaseSample
 import Autoform.Harness.Audit
 
 /-!
@@ -18,12 +18,14 @@ division by zero. So the property worth proving is that the guard covers the tra
 inputs, for *every* `lhs` — not for a sample.
 
 `SignedMod32` calls nothing, so the context below carries an empty function table. That is
-deliberate: it makes each theorem independent of the other 1,734 functions in the module.
+deliberate: it makes each theorem independent of the other functions in the corpus. The module imported here is a
+4-function extract of `v8/src/base` (`ast-V8BaseSample.json`), tracked so the repository
+builds from a clean clone; the full 1,920-function render is a build product.
 -/
 
 namespace Autoform.V8Spec
 
-open Autoform.Core Autoform.Generated
+open Autoform.Core Autoform.Generated.V8BaseSample
 
 /-- The C dialect, with no other function in scope. -/
 def C : Ctx := { dialect := .cLike, table := [], globals := 0 }

@@ -8,7 +8,7 @@ Do not edit: regenerate. Every `Stmt.hole` / `Expr.hole` marks a construct the
 transpiler did not translate, tagged with the CPG node label responsible.
 -/
 
-namespace Autoform.Generated
+namespace Autoform.Generated.SC
 open Autoform.Core
 
 /-- `sc.py:<module>.safemod`  (from `sc.py`) -/
@@ -30,4 +30,4 @@ def program : Program := { dialect := .python, funcs := [
   f_sc_py__module__safemod
 ] }
 
-end Autoform.Generated
+end Autoform.Generated.SC

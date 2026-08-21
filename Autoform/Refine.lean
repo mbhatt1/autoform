@@ -861,8 +861,12 @@ namespace Demo
 
 /-! ### Verbatim copy of `Autoform/Generated/CMath.lean` (C, from `math.c`)`
 
-Copied rather than imported: each generated module declares
-`Autoform.Generated.program`, so no two of them can be imported into the same file.
+Copied rather than imported: when this was written every generated module declared
+`Autoform.Generated.program`, so no two of them could be imported into the same file.
+That restriction is gone -- each corpus now lives in `Autoform.Generated.<Module>` --
+but the copy is kept deliberately: this section's point is that the terms below are
+byte-identical to the renderer's output, which a reader can check here without
+chasing an import.
 Only the `program` binder is renamed; every `Func` is character-for-character as
 emitted by `cartographer/render_lean.py`. -/
 
@@ -930,8 +934,12 @@ def CMathProgram : Program := { dialect := .cLike, funcs := [
 
 /-! ### Verbatim copy of `Autoform/Generated/Sample.lean` (Python, from `lib.py`)`
 
-Copied rather than imported: each generated module declares
-`Autoform.Generated.program`, so no two of them can be imported into the same file.
+Copied rather than imported: when this was written every generated module declared
+`Autoform.Generated.program`, so no two of them could be imported into the same file.
+That restriction is gone -- each corpus now lives in `Autoform.Generated.<Module>` --
+but the copy is kept deliberately: this section's point is that the terms below are
+byte-identical to the renderer's output, which a reader can check here without
+chasing an import.
 Only the `program` binder is renamed; every `Func` is character-for-character as
 emitted by `cartographer/render_lean.py`. -/
 

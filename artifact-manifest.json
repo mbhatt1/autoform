@@ -6,64 +6,64 @@
       "ast_sha256": "d327705c2ac80eb87cbd96b58f14a86dc2b4c4fbdc9b6ee4a192bd82481ddad0",
       "ast_tracked": false,
       "provenance": "AST /tmp/final-Ansible.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 21161374,
-      "render_sha256": "e667584d4057456dd5d3742697a6b1859f77cbe598570c27c562685aa32e26cc"
+      "render_bytes": 21161390,
+      "render_sha256": "44d9de639959c299344762382dbc815c225a24a5476460e628dd411608512cf0"
     },
     "CMath": {
       "ast_bytes": 4564,
       "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
       "ast_tracked": true,
-      "render_bytes": 3542,
-      "render_sha256": "8bf22f29a928f0122e820bfbf9ff1b4331e36ebd1f44b90d56415a8cc9101ad3"
+      "render_bytes": 3554,
+      "render_sha256": "ea75b9f54e0c923015eb92a4a07a33cc1507efc2e230f792b43fc0e7e669f9dd"
     },
     "Cachetools": {
       "ast_bytes": 575196,
       "ast_sha256": "368bf5615c24ea1fecdff4bafe94694340f1ce06a396f0afd32fbb89625f28fd",
       "ast_tracked": true,
-      "render_bytes": 304710,
-      "render_sha256": "34f0afe0c1119cf4600168df6d29fae1a386af27ea2feeb2970c39160c49d84b"
+      "render_bytes": 304732,
+      "render_sha256": "e11db3a6cf5337f7ad25fde2ff92dbd8c311192689aebdca04d9c8b004616ff5"
     },
     "LangC": {
       "ast_bytes": 175419,
       "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
       "ast_tracked": true,
-      "render_bytes": 75839,
-      "render_sha256": "4d1850b6e9f187a0c18be108a3e70aa58c748999567ce51ae867e550ca537fc7"
+      "render_bytes": 75851,
+      "render_sha256": "c609038da4f075a0c862e71efc4f3cc86fe4f4fb182278fa474efb438f7ad2c6"
     },
     "LangGo": {
       "ast_bytes": 408379,
       "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
       "ast_tracked": true,
-      "render_bytes": 178015,
-      "render_sha256": "82a0d23f597d12739a841a51c6a3ebc6729c9fe3d0a17fb71dc08d576dfc7510"
+      "render_bytes": 178029,
+      "render_sha256": "4f37b5154fccd9fa82e3bdd856b9d417b35d86fa295d5d95ce5dae74a759e925"
     },
     "LangJS": {
       "ast_bytes": 110740,
       "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
       "ast_tracked": true,
-      "render_bytes": 48616,
-      "render_sha256": "a9236e931fef4dc7372d6e67b4e5720e8ff3aca4e7f6f273a7271a3c69c18570"
+      "render_bytes": 48630,
+      "render_sha256": "abf5f56d98c7361de9a2e740d854c848cac8dde26d1fa62c4e51347006167f54"
     },
     "LangJava": {
       "ast_bytes": 1131529,
       "ast_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
       "ast_tracked": true,
-      "render_bytes": 802026,
-      "render_sha256": "497f8a3aa870065886e93fbb681875500a3f3f556931bf119d8a3ca45cb0ebd1"
+      "render_bytes": 802044,
+      "render_sha256": "58fea5e61ae0672836c257375b3edc85072254d4e840cc9aa82c511ee6e73088"
     },
     "LangKt": {
       "ast_bytes": 3550,
       "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
       "ast_tracked": true,
-      "render_bytes": 3192,
-      "render_sha256": "4e71ebf29d51e3daf8979ba0130073ff5822c4dfee9720933f947fc7b7b254d9"
+      "render_bytes": 3206,
+      "render_sha256": "9aafb78dcb95b43d576abe56ac23dc60b1a66ee215af5818fe08252e6b21fe71"
     },
     "LangTS": {
       "ast_bytes": 226862,
       "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
       "ast_tracked": true,
-      "render_bytes": 116204,
-      "render_sha256": "b98f4691fc66c51d03177e5642f9ed6f08354fd407e7391da9d2164edd289049"
+      "render_bytes": 116218,
+      "render_sha256": "f3909c054f5d4cbad7599c1bd38383a7075b4bbccabaaf3673653cdd3ab9e669"
     },
     "LinuxCrypto": {
       "ast_bytes": 14819746,
@@ -71,8 +71,8 @@
       "ast_sha256": "8183ff880b342454bb6e249752d8942238a7f9c2a3051a4a92cb0b1f2806950e",
       "ast_tracked": false,
       "provenance": "AST /tmp/final-LinuxCrypto.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 4436970,
-      "render_sha256": "936965557cd4d359da5bc7f4975db0e566cc4066a9a8acf81c48da763174bd3b"
+      "render_bytes": 4436994,
+      "render_sha256": "437a5326c8455d6ff6a0f47de77b473d203dc0514c0ce60b2a172f0b8392af1a"
     },
     "LinuxLib": {
       "ast_bytes": 19617588,
@@ -80,22 +80,22 @@
       "ast_sha256": "69473d5a377f2b5feea0d98cf4240493efb57dcb2ec786db2b91455b35f9bcbf",
       "ast_tracked": false,
       "provenance": "AST /tmp/final-LinuxLib.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 6011388,
-      "render_sha256": "412a83b8212616c43a19006b05b6cc82268e1473bf83a8e5203149b5e7a54678"
+      "render_bytes": 6011406,
+      "render_sha256": "f09f955c22970630bed4a8d015572c46a4e198871dbf805050fca4ae958f0975"
     },
     "Sample": {
       "ast_bytes": 6416,
       "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
       "ast_tracked": true,
-      "render_bytes": 4421,
-      "render_sha256": "afbd9a02a31f006291d8404c45c73d37cd6b5a51b67e20006dee287983be32c7"
+      "render_bytes": 4435,
+      "render_sha256": "a90963858818f648a60b5fbb89d3bbf9a79a74cb0356d5386e518111ff1139a1"
     },
     "Stress": {
       "ast_bytes": 4324,
       "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
       "ast_tracked": true,
-      "render_bytes": 3736,
-      "render_sha256": "552af5a6465faa6077a183fcd7415c4f16cf065aaf25e4d6678f30fd4ccd31cf"
+      "render_bytes": 3750,
+      "render_sha256": "0625a76aa80405f0fff3fce1668b2c08e27dd72c6c98ff951834a77b0607d83e"
     },
     "V8Base": {
       "ast_bytes": 2918566,
@@ -103,15 +103,15 @@
       "ast_sha256": "5b22b0146fe0fc4cb566e23edf438668569d172c9396f8351bf3afe6d16f9455",
       "ast_tracked": false,
       "provenance": "AST /tmp/final-V8Base.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 1703042,
-      "render_sha256": "190662122248175fc75069c8625a5a907022e7be61267bda70344b6e6cefb964"
+      "render_bytes": 1703056,
+      "render_sha256": "4861ef851ed910f327b6404450539d95a824948ccafa0b071d01014bec943b17"
     },
     "V8Numbers": {
       "ast_bytes": 404091,
       "ast_sha256": "1ade03d08e9c9480eea39bdebeec34781e94964702de94afe865491ea92be96b",
       "ast_tracked": true,
-      "render_bytes": 212747,
-      "render_sha256": "28344a6fbc8f04c3db2e5b6d62400ff262f45b7767fd02b60e0530355b1af8ac"
+      "render_bytes": 212767,
+      "render_sha256": "0bbcddf34e7b2ba44700de76c82e172b5e15a520c65de70d2c97ce8c49865744"
     }
   },
   "policy": "The AST is the tracked source of truth; Autoform/Generated/*.lean is a build product and is not tracked. See docs/integrity.md. Hashes here pin the identity of both halves; scripts/check_render.py verifies them."

@@ -62,3 +62,11 @@ ast-V8Base.json
 # Hypothesis's example database, written by scripts/synth_specs.py when it borrows
 # Hypothesis as a value generator. Run state, not source.
 .hypothesis/
+
+# Tracked exceptions to "track the AST, not the render": these two are tiny (4 and 7
+# functions), proofs in Autoform/Specs and Autoform/SpecsGen name them directly, and
+# tracking them is what lets the repository build from a clean clone -- the root import
+# graph reaches them. The full V8Base/LinuxLib renders remain build products.
+!Autoform/Generated/V8BaseSample.lean
+!Autoform/Generated/LinuxLibSample.lean
+!Autoform/Generated/CMath.lean

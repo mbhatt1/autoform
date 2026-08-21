@@ -22,7 +22,7 @@ Do not edit: regenerate. Every `Stmt.hole` / `Expr.hole` marks a construct the
 transpiler did not translate, tagged with the CPG node label responsible.
 -/
 
-namespace Autoform.Generated
+namespace Autoform.Generated.Cachetools
 open Autoform.Core
 
 /-- `cachetools/__init__.py:<module>._DefaultSize.__getitem__`  (from `cachetools/__init__.py`) -/
@@ -6242,4 +6242,4 @@ def program : Program := { dialect := .python, builtinBases := [("_HashedTuple",
   f_cachetools_keys_py__module_
 ] }
 
-end Autoform.Generated
+end Autoform.Generated.Cachetools

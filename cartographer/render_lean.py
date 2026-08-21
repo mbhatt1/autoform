@@ -360,7 +360,13 @@ def ident(name: str) -> str:
 
 # Integer division/modulo convention by source language. Getting this wrong is silent
 # mistranslation, so it is recorded per program rather than assumed.
+# `.cc`/`.cxx`/`.hh`/`.hpp` are C++ exactly as `.cpp` is. Their absence was not
+# hypothetical: V8's `src/base` is 104 `.cc` files against 53 `.h`, so its dialect was
+# being decided by the *headers* alone, and a corpus of `.cc` files with no header
+# aborted the render outright. Found by tests/test_render_lean.py, which recorded it as
+# a strict xfail before it had a fix.
 DIALECT = {".py": ".python", ".c": ".cLike", ".h": ".cLike", ".cpp": ".cLike",
+           ".cc": ".cLike", ".cxx": ".cLike", ".hh": ".cLike", ".hpp": ".cLike",
            ".java": ".cLike", ".js": ".cLike", ".ts": ".cLike", ".kt": ".cLike",
            ".go": ".cLike"}
 
@@ -440,7 +446,14 @@ def _run_main():
         "transpiler did not translate, tagged with the CPG node label responsible.",
         "-/",
         "",
-        "namespace Autoform.Generated",
+        # Each corpus gets its OWN namespace, `Autoform.Generated.<Module>`, so that
+        # `program` becomes `Autoform.Generated.<Module>.program` and two rendered
+        # corpora can live in one import graph. When every module declared
+        # `namespace Autoform.Generated`, importing a second one failed outright with
+        # "environment already contains 'Autoform.Generated.program'", which is why the
+        # proof modules for cachetools and for V8 could never share a build -- and hence
+        # why they sat outside the root import graph, unchecked by `leanchecker --fresh`.
+        f"namespace Autoform.Generated.{module}",
         "open Autoform.Core",
         "",
     ]
@@ -504,7 +517,7 @@ def _run_main():
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
     out.append("")
-    out.append("end Autoform.Generated")
+    out.append(f"end Autoform.Generated.{module}")
     with open(dst, "w") as fh:
         fh.write("\n".join(out))
     print(f"rendered {len(funcs)} functions -> {dst}")

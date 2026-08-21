@@ -67,7 +67,7 @@ so re-rendering it is a separate change that also deletes declarations
 `Autoform/SpecsGen/Cachetools.lean` depends on. `scripts/check_render.py` reports that
 staleness today and still does; this file touches neither artifact. -/
 def cachetoolsWithBases : Program :=
-  { Autoform.Generated.program with builtinBases := [("_HashedTuple", .tuple)] }
+  { Autoform.Generated.Cachetools.program with builtinBases := [("_HashedTuple", .tuple)] }
 
 /-- The same program with `builtinBases` empty — exactly what STRATEGY.md §34 measured.
 
@@ -75,7 +75,7 @@ def cachetoolsWithBases : Program :=
 base in it, so `Generated.program` is no longer the "before" picture and this fixture has
 to clear the field explicitly. Reading it as the before-state again would make every
 divergence guard below vacuous. -/
-def cachetoolsBefore : Program := { Autoform.Generated.program with builtinBases := [] }
+def cachetoolsBefore : Program := { Autoform.Generated.Cachetools.program with builtinBases := [] }
 
 /-- `hashkey` applied to a varargs tuple, then compared with a plain `Val`. -/
 private def hashkeyEq (p : Program) (args : List Val) (res : Val) : Bool :=

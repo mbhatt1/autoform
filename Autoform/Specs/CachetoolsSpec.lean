@@ -34,7 +34,7 @@ records what could not be proved, as stated obligations rather than `sorry`.
 
 namespace Autoform.Specs.Cachetools
 
-open Autoform.Core Autoform.Refine Autoform.Generated
+open Autoform.Core Autoform.Refine Autoform.Generated.Cachetools
 
 /-! ## 0. The subject
 
@@ -43,7 +43,7 @@ resolves its entry point through `P`'s function table by its fully-qualified CPG
 so deleting or renaming a function in the generated module breaks these proofs too. -/
 
 /-- The translated program: `Autoform/Generated/Cachetools.lean`, unmodified. -/
-abbrev P : Program := Autoform.Generated.program
+abbrev P : Program := Autoform.Generated.Cachetools.program
 
 /-! ## 1. Method calls
 

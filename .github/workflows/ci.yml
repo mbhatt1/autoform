@@ -174,7 +174,7 @@ jobs:
           # see STRATEGY.md 40 -- so its count is recorded to stop the text being deleted
           # while it waits for regeneration, NOT as a claim that it proves anything. The
           # elaboration verdict is the step below; read them together. SpecsGen/Cachetools
-          # DOES elaborate again and is built by the standalone step above; 72 of its laws
+          # DOES elaborate again and is imported from Autoform.lean, so `lake build` proves it; 72 of its laws
           # are now Prop-valued open obligations (the fuel transport is refuted, not
           # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
           # its text count is higher than the old floor and the floor stays where it was.
@@ -190,28 +190,19 @@ jobs:
       - name: SpecsGen modules elaborate
         run: python3 scripts/check_specs.py Basis
 
-      # Modules that cannot be imported from Autoform.lean, elaborated explicitly.
+      # The "Standalone modules elaborate" step that used to live here is GONE, and the
+      # reason it is gone is that its five modules -- Autoform.BuiltinBase,
+      # Autoform.Contracts, Autoform.Specs.CachetoolsSpec, Autoform.SpecsGen.Cachetools
+      # and Autoform.Specs.V8Spec -- are now imported from Autoform.lean, so `lake build`
+      # above elaborates every one of them and `leanchecker --fresh` in the trust audit
+      # replays them. They were outside the graph only because every generated corpus
+      # declared `Autoform.Generated.program`; each corpus now owns
+      # `Autoform.Generated.<Module>`, so cachetools and V8 coexist in one build.
       #
-      # Every Autoform/Generated/<M>.lean defines `Autoform.Generated.program`, so at
-      # most ONE generated corpus fits in a single import graph; Autoform.Overflow
-      # already takes the slot with Generated.CMath. The five modules below need a
-      # different corpus, so `lake build` on the root target never touches them -- and
-      # that is exactly how all four Cachetools modules (161 theorems) came to stop
-      # elaborating while CI stayed green: nothing built them, and the inventory step
-      # above counts TEXT. Naming them here makes every theorem in them elaborate on
-      # every run. A module no build touches will rot; do not delete a line from this
-      # list without moving the module into Autoform.lean.
-      - name: Standalone modules elaborate (not reachable from Autoform.lean)
-        run: |
-          set -euo pipefail
-          for m in Autoform.BuiltinBase \
-                   Autoform.Contracts \
-                   Autoform.Specs.CachetoolsSpec \
-                   Autoform.SpecsGen.Cachetools \
-                   Autoform.Specs.V8Spec; do
-            echo "=== lake build $m"
-            lake build "$m"
-          done
+      # Do NOT re-add a step like that for a module you merely hope is checked: check that
+      # Autoform.lean imports it. `Autoform.SpecsGen.V8Base` is the one module still
+      # outside, for elaboration cost rather than namespaces (see Autoform.lean), and it
+      # is gated by scripts/check_specs.py, not by grep.
 
       # SpecsGen/Cachetools.lean used to be pinned here as KNOWN BROKEN. It elaborates
       # again as of this change, and is built by the step above. Its `C_tfFree` premise

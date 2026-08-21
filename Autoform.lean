@@ -21,19 +21,43 @@ import Autoform.CallingConvention
 import Autoform.SpecsGen.Basis
 
 -- ---------------------------------------------------------------------------
--- Modules that cannot join this import graph, and why.
+-- Every module in the repository is now in this graph.
 --
--- Every `Autoform/Generated/<M>.lean` defines `Autoform.Generated.program`, so at most
--- ONE generated corpus can be in a single import graph. `Autoform.Overflow` (above)
--- already brings in `Generated.CMath`, which locks the slot: `Autoform/BuiltinBase.lean`,
--- `Autoform/Contracts.lean`, `Autoform/Specs/CachetoolsSpec.lean` and
--- `Autoform/SpecsGen/Cachetools.lean` all need `Generated.Cachetools`, and
--- `Autoform/Specs/V8Spec.lean` needs `Generated.V8Base`.
+-- Until today each `Autoform/Generated/<M>.lean` declared `namespace Autoform.Generated`
+-- and defined `program` inside it, so importing two generated corpora failed outright:
+-- "environment already contains 'Autoform.Generated.program'". At most one corpus could
+-- be in any single import graph, and `Autoform.Overflow` (above) took the slot with
+-- `Generated.CMath`. That is why `Autoform/BuiltinBase.lean`, `Autoform/Contracts.lean`,
+-- `Autoform/Specs/CachetoolsSpec.lean`, `Autoform/SpecsGen/Cachetools.lean` and
+-- `Autoform/Specs/V8Spec.lean` sat outside this file, gated by a separate CI step -- and
+-- therefore outside `leanchecker --fresh`, which replays only what is reachable from
+-- `Autoform`.
 --
--- Those five are therefore gated by explicit `lake build <module>` steps in
--- `.github/workflows/ci.yml` ("standalone modules elaborate"). That is not a formality:
--- they had ALL stopped elaborating while `lake build` stayed green, because nothing built
--- them and the inventory check counted `theorem` lines with grep. A module no build ever
--- touches will rot, so a module that cannot be imported must be named in CI instead.
--- `Autoform/Specs/CppCastSpec.lean` needs no generated corpus, so it simply joins here.
+-- `cartographer/render_lean.py` now emits `namespace Autoform.Generated.<Module>`, so the
+-- programs are `Autoform.Generated.Cachetools.program`, `Autoform.Generated.V8Base.program`
+-- and so on, and any number of corpora coexist. The consequence below is the one this
+-- change existed for: theorems about cachetools (Python) and theorems about V8 (C++) are
+-- in ONE build, kernel-checked together, replayed together by `leanchecker --fresh`.
+import Autoform.BuiltinBase
+import Autoform.Contracts
+import Autoform.Specs.CachetoolsSpec
+import Autoform.SpecsGen.Cachetools
+import Autoform.Specs.V8Spec
+import Autoform.SpecsGen.V8BaseSample
+import Autoform.SpecsGen.LinuxLib
+import Autoform.SpecsGen.LinuxLibSample
 import Autoform.Specs.CppCastSpec
+
+-- ---------------------------------------------------------------------------
+-- The one module still outside this graph, and why.
+--
+-- `Autoform/SpecsGen/V8Base.lean` (229 synthesised laws over the 1,920-function V8 base
+-- corpus) is NOT here, and the reason is no longer the namespace collision this change
+-- removed -- `Autoform.Specs.V8Spec`, which imports the same `Generated.V8Base`, is in
+-- the graph two lines above. The reason is elaboration cost: a single `lean` process on
+-- that file ran past 57 minutes of CPU and 16 GB of RSS without finishing (see
+-- `scripts/check_specs.py`, which exists for exactly this module and has always recorded
+-- it as not proving). Importing it would make every `lake build` in the repository
+-- unbounded, so it stays gated behind `scripts/check_specs.py V8Base` until its laws are
+-- regenerated in a form that elaborates. Its CI inventory floor is a floor on TEXT and
+-- says so; do not read it as a proof count.

@@ -12,7 +12,7 @@ open Autoform.Core Autoform.Refine Autoform.SpecsGen
 set_option maxRecDepth 20000
 set_option maxHeartbeats 1000000
 
-abbrev P : Program := Autoform.Generated.program
+abbrev P : Program := Autoform.Generated.Cachetools.program
 
 /-- The module-initialiser heap, evaluated once by `initGlobals P 5000 moduleInits` and
 frozen into this literal so that the kernel does not re-run the initialisers for every
@@ -24,7 +24,7 @@ def gref : Ref := 0
 def base : Nat := h0.length
 def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
 def FUEL : Nat := 400
-open Autoform.Generated
+open Autoform.Generated.Cachetools
 
 /-- **The fuel-transport hypothesis is false for this corpus, and here is the refutation.**
 

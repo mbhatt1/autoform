@@ -547,7 +547,7 @@ this as a reader obligation. -/
 
 namespace Demo
 
-open Autoform.Generated
+open Autoform.Generated.Cachetools
 
 set_option maxRecDepth 40000
 
@@ -970,13 +970,13 @@ are evidence for a reader, not part of any proof. -/
 
 -- The full program agrees with `methodkey_refines`: `_HashedTuple` at address 0, with no
 -- hole and no contract. This is the line that used to print `hole "op:starredUnpack"`.
-#eval reprStr (runFunc Autoform.Generated.program 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
+#eval reprStr (runFunc Autoform.Generated.Cachetools.program 40 "cachetools/keys.py:<module>.methodkey" [.int 1])
 
 -- Re-holing the starred call reproduces the old behaviour on the full program, which is
 -- what `keysProgramHoled` is a slice of.
 def reholed : Program :=
-  { Autoform.Generated.program with
-    funcs := Autoform.Generated.program.funcs.map fun f =>
+  { Autoform.Generated.Cachetools.program with
+    funcs := Autoform.Generated.Cachetools.program.funcs.map fun f =>
       if f.name == "cachetools/keys.py:<module>.methodkey" then
         methodkeyWith (.hole "op:starredUnpack") else f }
 
@@ -984,7 +984,7 @@ def reholed : Program :=
 
 -- `hashkey` on the full program, showing the `**kwargs` branch is reachable: passing a
 -- keyword argument takes the `if kwargs:` branch that the empty call does not.
-#eval reprStr (runFunc Autoform.Generated.program 40 "cachetools/keys.py:<module>.hashkey" [.int 1])
+#eval reprStr (runFunc Autoform.Generated.Cachetools.program 40 "cachetools/keys.py:<module>.hashkey" [.int 1])
 
 /-! ### Axiom audit
 

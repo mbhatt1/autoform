@@ -2084,20 +2084,26 @@ via `#guard_msgs` (which fails the build on change and, unlike `native_decide`, 
 axiom). Pinning three points is a weaker claim than a universally quantified proof, and
 the two must not be confused.
 
-### A structural limit this exposed
+### A structural limit this exposed — and its removal
 
-**Only one generated corpus can be in a single import graph.** Every
-`Autoform/Generated/<M>.lean` defines `Autoform.Generated.program`, so importing two of
-them fails with "environment already contains 'Autoform.Generated.program'". `V8Spec`
-therefore builds standalone (`lake build Autoform.Specs.V8Spec`) and is deliberately NOT
-in `Autoform.lean`'s import list.
+**Only one generated corpus could be in a single import graph.** Every
+`Autoform/Generated/<M>.lean` defined `Autoform.Generated.program`, so importing two of
+them failed with "environment already contains 'Autoform.Generated.program'". `V8Spec`
+therefore built standalone (`lake build Autoform.Specs.V8Spec`) and was deliberately NOT
+in `Autoform.lean`'s import list — along with `BuiltinBase`, `Contracts`,
+`Specs/CachetoolsSpec` and `SpecsGen/Cachetools`. That was acceptable for one corpus and
+blocked the goal for many: a repository that proves things about V8 *and* cachetools
+could not put those proofs in one build. It also meant `leanchecker --fresh`, which
+replays the `Autoform` root graph, never saw those five modules.
 
-This is acceptable for one corpus and blocks the goal for many: a repository that proves
-things about V8 *and* Linux *and* Ansible cannot put those proofs in one build today. The
-fix is to give each generated module its own namespace rather than a shared `program`,
-which is a mechanical change to `render_lean.py` and every spec that names `program` —
-recorded here rather than done, because it invalidates the committed proofs about
-`cachetools` until they are re-pointed.
+**Fixed (2026-08-21).** `cartographer/render_lean.py` now emits
+`namespace Autoform.Generated.<Module>`, so each corpus owns its own `program`
+(`Autoform.Generated.Cachetools.program`, `Autoform.Generated.V8Base.program`, ...) and
+any number of corpora coexist. Every spec that named `program` was re-pointed, every
+corpus was re-rendered (the diff is exactly the two namespace lines), and all five
+previously-gated modules are now imported from `Autoform.lean`. Theorems about a Python
+library and theorems about a C++ engine are in one build, kernel-checked together and
+replayed together by `leanchecker --fresh`.
 
 ### An error that produced a theorem
 

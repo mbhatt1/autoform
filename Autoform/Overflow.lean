@@ -620,7 +620,7 @@ theorem cmath_analysable_names :
 /-- The same measurement against the **machine-generated** module itself, which also
 carries `math.c`'s module-level initializer: 5 of 6. -/
 theorem cmath_generated_coverage :
-    coverage Autoform.Generated.program = (5, 6) := by decide
+    coverage Autoform.Generated.CMath.program = (5, 6) := by decide
 
 end Coverage
 
