@@ -153,6 +153,7 @@ open Autoform.Core Autoform.Generated
   for f in program.verifiableCore do IO.println ("@@holefree@@" ++ f.name)
   for f in program.funcs do IO.println ("@@fn@@" ++ f.name)
   IO.println ("@@count@@" ++ toString program.funcs.length)
+  IO.println ("@@holes@@" ++ toString program.holes.length)
 """
 
 
@@ -163,16 +164,17 @@ def claimed_core(module, scratch):
     open(p, "w").write(CORE_PROBE.format(mod=module))
     r = subprocess.run(["lake", "env", "lean", p], capture_output=True, text=True,
                        env=env(), cwd=REPO, timeout=1800)
-    core, holefree, names, total = [], [], [], 0
+    core, holefree, names, total, holes = [], [], [], 0, None
     for l in r.stdout.splitlines():
         if l.startswith("@@core@@"):     core.append(l[8:])
         elif l.startswith("@@holefree@@"): holefree.append(l[12:])
         elif l.startswith("@@fn@@"):     names.append(l[6:])
         elif l.startswith("@@count@@"):  total = int(l[9:])
+        elif l.startswith("@@holes@@"):  holes = int(l[9:])
     if not core:
         print("could not read the claimed core from Lean:\n" +
               (r.stdout + r.stderr)[:1500])
-    return core, holefree, names, total
+    return core, holefree, names, total, holes
 
 
 # --------------------------------------------------------------------- input synthesis
@@ -204,6 +206,40 @@ def walk(n, out=None):
     return out
 
 
+def count_ast_holes(funcs):
+    """Total `hole` nodes in the AST bodies — a body-derived fingerprint that any
+    transpiler change moves, unlike the function-name set."""
+    n = 0
+    for f in funcs:
+        for node in walk(f.get("body")):
+            # Two node kinds carry holes: `hole` in expression position and `holeS` in
+            # statement position. Counting only `hole` undercounted V8Base by 324 and
+            # made a matching AST look stale — a fingerprint that cries wolf gets
+            # ignored, which is the same failure as one that stays silent.
+            if node.get("k") in ("hole", "holeS"): n += 1
+    return n
+
+
+def class_of(name):
+    """Owning class of a qualified function name, or None if it is free-standing.
+
+    Python names arrive as `file.py:<module>.Class.meth`; C and C++ names arrive as
+    `v8.base.Win32Time.InDST:bool(v8.base.WindowsTimezoneCache*)`, with no `:<module>.`
+    anywhere. `synth_cases` already handles both, but `class_fields` matched only the
+    Python form and silently returned {} for every C++ class — so every synthetic
+    receiver was fieldless, every `self.f` access holed, and the oracle charged the
+    module for holes the harness had manufactured. That is §27 exactly (the apparatus,
+    not the artifact), and it is why both call sites now share this one function.
+    """
+    m = re.fullmatch(r'.+?:<module>\.(.+)', name)
+    # For C/C++ the return type and parameter list follow a ':' and contain dots of
+    # their own (`Get:optional(v8.base.X*)`); splitting the whole string on '.' picked
+    # the class out of the *signature*. Cut the signature off first.
+    head = m.group(1) if m else name.split(":", 1)[0]
+    if "." not in head: return None
+    return head.rsplit(".", 1)[0].split(".")[-1]
+
+
 def class_fields(funcs):
     """class name -> field names, harvested from `self.f = ...` and `self.f` reads.
 
@@ -213,9 +249,8 @@ def class_fields(funcs):
     """
     out = {}
     for f in funcs:
-        m = re.fullmatch(r'.+?:<module>\.(.+)', f["name"] or "")
-        if not m or "." not in m.group(1): continue
-        cls = m.group(1).rsplit(".", 1)[0].split(".")[-1]
+        cls = class_of(f["name"] or "")
+        if cls is None: continue
         s = out.setdefault(cls, set())
         for n in walk(f["body"]):
             if n.get("k") == "setField" and (n.get("r") or {}).get("v") == "self":
@@ -228,10 +263,8 @@ def class_fields(funcs):
 def synth_cases(fentry, n_inputs, fields_of):
     """N synthetic (heap, self, args) tuples for one function."""
     name = fentry["name"]
-    m = re.fullmatch(r'.+?:<module>\.(.+)', name)
-    qual = m.group(1) if m else name
-    is_method = "." in qual
-    cls = qual.rsplit(".", 1)[0].split(".")[-1] if is_method else None
+    cls = class_of(name)
+    is_method = cls is not None
     params = list(fentry["params"])
     # Joern keeps `self` out of `params` for methods; `applyFunc` binds it separately.
     flds = fields_of.get(cls, []) if is_method else []
@@ -326,17 +359,13 @@ private def orun (c : OCase) : EResult :=
   else
     match octx.resolve c.fn with
     | none    => .hole s!"entry:{{c.fn}}"
-    -- `applyFunc` takes keyword arguments as a sixth explicit argument since Python
-    -- kwargs landed in the Core semantics. This harness used to call it with five, which
-    -- elaborated to a partially applied function; `.2` on it was an invalid projection,
-    -- the `#eval` was aborted for depending on `sorry`, and EVERY batch came back with
-    -- no answer. Bisection then split each batch to singletons, all of which also
-    -- failed, and the run finished reporting every claimed-core function INCONCLUSIVE —
-    -- silence reading as "nothing to report" rather than as breakage. We pass `[]`:
-    -- the synthetic and traced cases are positional-only.
-    -- (The same defect was found independently on the semantics branch, where it
-    -- surfaced as "0 executed" -- a number that reads like a weak corpus and was
-    -- actually a type error nobody printed.)
+    -- `applyFunc` takes keyword arguments as a sixth explicit parameter. Omitting them
+    -- left the application partially applied, so `.2` was a projection on a function and
+    -- EVERY case failed to elaborate: the driver then read back no answers, bisected to
+    -- singletons, and would have classified the entire claimed core INCONCLUSIVE. Silence
+    -- that reads as "nothing refuted" is the failure this repo keeps re-learning; the
+    -- kwargs list is passed explicitly here so a future signature change is a type error
+    -- rather than a quiet zero.
     | some fn => (applyFunc octx {fuel} h fn c.slf c.args []).2
 """
 
@@ -421,6 +450,13 @@ def main():
     ap.add_argument("--fuel", type=int, default=5000)
     ap.add_argument("--out", default="core-oracle.json")
     ap.add_argument("--scratch", default="/tmp")
+    # Batch size. Each batch costs one `lake env lean` start plus one import of the
+    # generated module, which on a 1.7 MB C++ module (V8Base) dominates the per-case
+    # interpretation cost by an order of magnitude: at the historical 20 the V8Base run
+    # projected to ~11 h. Larger batches amortise that import; a batch that fails is
+    # still bisected, so the classification is unchanged, only the wall clock.
+    ap.add_argument("--chunk", type=int, default=20,
+                    help="cases per Lean invocation (default 20)")
     a = ap.parse_args()
 
     funcs = json.load(open(a.ast))
@@ -437,7 +473,7 @@ def main():
         print("note: %s — %s" % (rel, why))
 
     # ---- 2. the claim under test, read from the artifact that makes it
-    core, holefree, lean_names, nfuncs = claimed_core(a.module, a.scratch)
+    core, holefree, lean_names, nfuncs, lean_holes = claimed_core(a.module, a.scratch)
     if not core:
         print("ABORT: no claimed core to test.")
         return 2
@@ -465,8 +501,33 @@ def main():
         print("note: the module declares %d functions the AST does not list "
               "(e.g. %s) — filtered synthetic wrappers, not staleness"
               % (len(extra), sorted(extra)[0].split(":<module>.")[-1]))
-    print("freshness: OK — every one of %s's %d functions is present in the loaded "
-          ".olean" % (os.path.basename(a.ast), len(ast_names)))
+    # Name-set agreement is necessary but NOT sufficient: a regenerated AST whose
+    # *bodies* changed (a hole label resolved, a construct newly translated) has exactly
+    # the same names. Reading only names, this gate went quiet on a V8Base AST that was
+    # one transpiler commit behind the module — 1731 holes on disk against 1475 in the
+    # .olean — which is the same silence-reads-as-success shape §19 is about. Compare a
+    # body-derived quantity too: the total hole count, which every transpiler change
+    # moves. Not fatal (the AST is used only for parameter shapes and receiver fields;
+    # the claim under test and the execution both come from Lean), but never silent.
+    ast_holes = count_ast_holes(funcs)
+    body_stale = lean_holes is not None and ast_holes != lean_holes
+    if body_stale:
+        print("WARNING — AST BODIES ARE NOT THE MODULE'S: %s holds %d holes, the loaded "
+              "module holds %d. The names match, so this gate would otherwise have "
+              "passed in silence. Execution and the claim under test both come from "
+              "Lean and are unaffected; the AST here supplies only parameter shapes and "
+              "receiver field names, so synthetic inputs may be shaped for a previous "
+              "revision. Recorded in the output as ast_body_staleness."
+              % (os.path.basename(a.ast), ast_holes, lean_holes))
+    elif lean_holes is None:
+        print("WARNING: the Lean probe reported no hole count — body-staleness "
+              "UNCHECKED, not verified.")
+    print("freshness: names OK — every one of %s's %d functions is present in the "
+          "loaded .olean; hole counts %s (AST %d, module %s)"
+          % (os.path.basename(a.ast), len(ast_names),
+             "AGREE" if not body_stale and lean_holes is not None else "DISAGREE"
+             if body_stale else "UNCHECKED", ast_holes,
+             "?" if lean_holes is None else lean_holes))
     print("ledger claims: %d functions total, %d hole-free, %d VERIFIABLE CORE"
           % (nfuncs, len(holefree), len(core)))
     core_set = set(core)
@@ -500,19 +561,17 @@ def main():
     drv = Driver(a.module, a.fuel, a.scratch)
 
     # ---- 3b. SMOKE GATE. If the harness itself cannot elaborate, every case comes back
-    # unanswered and the report reads "INCONCLUSIVE" for the whole core — a silence that
-    # looks like a finding. That is exactly what happened on 2026-08-19: `applyFunc`
-    # had gained a keyword-argument parameter, the generated scratch file no longer
+    # unanswered and the report reads "INCONCLUSIVE" for the whole core -- a silence that
+    # looks like a finding. That is exactly what happened on 2026-08-19: `applyFunc` had
+    # gained a keyword-argument parameter, the generated scratch file no longer
     # type-checked, and the oracle would have reported 0 refutations over 318 functions.
     # One case must answer before any of them are believed.
     #
-    # Three independent branches (V8Base, LinuxLib, LinuxCrypto evidence, plus the
-    # semantics work) each hit this and each wrote its own guard; they are the same
-    # guard. This one is kept because it prints what Lean actually said, which is the
-    # part that turns "no answer" into a diagnosis. LinuxLib's variant additionally
-    # checked the first *batch*; that is subsumed -- if case 0 answers, the header
-    # elaborates, and a later empty batch is bisected down to a per-case report by the
-    # every-depth print in Driver.eval above.
+    # Four branches hit this independently and each wrote a guard. Two survive here and
+    # they are not redundant: this one fails BEFORE spending hours executing, and prints
+    # what Lean actually said, which is the part that turns "no answer" into a diagnosis;
+    # the all-cases-unanswered abort further down is the backstop for the case where
+    # case 0 happens to answer and nothing else does.
     if cases:
         if not drv.eval(cases, [0]):
             print("ABORT: the oracle harness produced no answer for its first case. The "
@@ -520,10 +579,10 @@ def main():
                   "unanswered and the report would read as 'nothing refuted'. Lean said:")
             print((drv.last or "")[:2000])
             return 2
-        print("smoke gate: OK — the harness elaborates and the interpreter answers.")
+        print("smoke gate: OK -- the harness elaborates and the interpreter answers.")
 
     got = {}
-    CHUNK = 20
+    CHUNK = max(1, a.chunk)
     order = list(range(len(cases)))
     t0 = time.time()
     for i in range(0, len(order), CHUNK):
@@ -533,6 +592,16 @@ def main():
                                                  len(order), time.time() - t0))
     print("executed %d/%d cases; %d got no answer from the interpreter"
           % (len(got), len(cases), len(cases) - len(got)))
+    # A harness that answers nothing answers nothing ABOUT NOTHING: every function would
+    # land in INCONCLUSIVE and the run would look like "no refutations". That is a broken
+    # apparatus, not a result, and it must be loud. (It happened: the driver called
+    # `applyFunc` without its kwargs argument and no case elaborated at all.)
+    if cases and not got:
+        print("ABORT: the interpreter produced no answer for ANY of the %d cases. This "
+              "is an apparatus failure, not a verification result — reporting a core of "
+              "all-INCONCLUSIVE would read as 'nothing refuted'. Nothing written."
+              % len(cases))
+        return 2
 
     # ---- 5. classify. hole / outOfFuel / result are three outcomes, never two.
     per = {n: {"cases": 0, "answered": 0, "ok": 0, "holes": {}, "fuel": 0,
@@ -594,6 +663,13 @@ def main():
 
     out = {
         "module": a.module, "ast": os.path.abspath(a.ast),
+        "ast_body_staleness": {
+            "ast_holes": ast_holes, "module_holes": lean_holes,
+            "stale": bool(body_stale),
+            "note": ("the AST on disk is not the revision the module was rendered from; "
+                     "it supplies only parameter shapes and receiver fields here, while "
+                     "the claim and the execution come from Lean")
+                    if body_stale else "AST and module agree on hole count"},
         "source_root": os.path.abspath(src_root) if src_root else None,
         "fuel": a.fuel, "synthetic_inputs_per_function": a.inputs,
         "claim": {"functions": nfuncs, "hole_free": len(holefree),

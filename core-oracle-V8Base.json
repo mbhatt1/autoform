@@ -1,0 +1,8126 @@
+{
+ "module": "V8Base",
+ "ast": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-4/ast-V8Base.json",
+ "ast_body_staleness": {
+  "ast_holes": 1513,
+  "module_holes": 1513,
+  "stale": false,
+  "note": "AST and module agree on hole count"
+ },
+ "source_root": null,
+ "fuel": 5000,
+ "synthetic_inputs_per_function": 12,
+ "claim": {
+  "functions": 1920,
+  "hole_free": 1290,
+  "verifiable_core_static": 807
+ },
+ "executed": {
+  "cases": 9684,
+  "answered": 9684,
+  "core_functions_exercised": 807,
+  "core_functions_with_real_inputs": 0
+ },
+ "result": {
+  "verifiable_core_executed": 682,
+  "verifiable_core_executed_real_inputs_only": 0,
+  "holed_on_some_input": 125,
+  "holed_on_a_real_input": 0,
+  "inconclusive_never_exercised": 0
+ },
+ "holed_functions": [
+  {
+   "name": "v8.base.debug.StackTrace.__init__",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:sizeOf": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.debug.StackTrace.__init__",
+   "cases": 24,
+   "answered": 24,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:sizeOf": 24
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.CPU.GetInstance:v8.base.CPU&()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "mcall:CPU.vendor_": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "mcall:CPU.vendor_",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "mcall:CPU.vendor_",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "mcall:CPU.vendor_",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "mcall:CPU.vendor_",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.debug.PrintBacktraceOutputHandler.HandleOutput:void(char*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:strlen": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:strlen",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:strlen",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:strlen",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:strlen",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.debug.WarmUpBacktrace:void()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:sizeOf": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:sizeOf",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.FatalOOM:void(v8.base.OOMType,char*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kProcess:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kProcess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:kProcess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:kProcess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:kProcess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '', fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.InitialScaledStartValues:void(double,int,bool,v8.base.Bignum*,v8.base.Bignum*,v8.base.Bignum*,v8.base.Bignum*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:IsDenormal": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:IsDenormal",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:IsDenormal",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:IsDenormal",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {}, {}, {}, {})"
+    },
+    {
+     "label": "call:IsDenormal",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[int 1, str 'a'], int 2, int 0, {str 'a': int 1}, str '', {str 'a': int 1}, bool True)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.ShiftLeft:void(int)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:/": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.Clamp:void()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>": 11,
+    "index:unsupported": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:>",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.PageAllocator.GetRandomMmapAddr:void*()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:Pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len', fn 'len', list[], int 2)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>0:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool True, bool True, int 2, list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>1:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13, list[], int 7, int 0)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>2:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '', int 2, int 7, {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>3:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000, list[int 1, int 2], {}, {int 1: int 2})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.FreeSubReservation:bool(v8.base.AddressSpaceReservation)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:vmar_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:vmar_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:vmar_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:vmar_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:vmar_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool False)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>5:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 7, fn 'len', tuple[], bool False)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.TimeCurrentMillis:double()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:IsNull": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>6:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a', fn 'len', list[str 'a'], {})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>7:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000, int 7, str 'key', {})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.TimeCurrentMillis<duplicate>0:double()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:IsNull": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin<duplicate>8:optional(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '', tuple[int 1, str 'a'], int -1, int 1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Win32Time.InDST:bool(v8.base.WindowsTimezoneCache*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:initialized_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Win32Time.DaylightSavingsOffset:int64_t(v8.base.WindowsTimezoneCache*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:initialized_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Win32Time.LocalTimezone:char*(v8.base.WindowsTimezoneCache*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:initialized_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.TimeCurrentMillis<duplicate>1:double()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:IsNull": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:IsNull",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.WindowsTimezoneCache.LocalTimezone:char*(double)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:initialized_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:initialized_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 256)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.IsHardwareEnforcedShadowStacksEnabled<duplicate>0:bool()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:cast:opaque-type": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:cast:opaque-type",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:opaque-type",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:opaque-type",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:opaque-type",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.~PreciseSleepTimer:ANY()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:timer_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:timer_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:timer_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:timer_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:timer_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Stack.GetStackStartUnchecked:v8.base.Stack.StackSlot()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:pthread_self": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Stack.GetReservedStackLimit:v8.base.Stack.StackSlot()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:cast:pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:cast:pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Stack.GetStackStart<duplicate>0:v8.base.Stack.StackSlot()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:pthread_self": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:pthread_self",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.GetCurrentThreadId:int()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:cast:scalar": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "op:cast:scalar",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.RandomPageAddress:Address()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:Pointer": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "call:Pointer",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.ActiveMemoryProtectionKey:optional()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.charToDigitDecode:int8_t(uint8_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 2,
+    "binop:<": 10
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "binop:<",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "binop:<",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "binop:<",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.ControlledCrashesAreHarmless:bool()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.DcheckFailuresAreIgnored:bool()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.FatalErrorsWithNoSecurityImpactShouldExit:bool()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kExitIfNoSecurityImpact:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kExitIfNoSecurityImpact:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitIfNoSecurityImpact:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitIfNoSecurityImpact:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExitIfNoSecurityImpact:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.AddressRegion.==:bool(v8.base.AddressRegion)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:address_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:address_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:address_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:address_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:address_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.Stats.<clinit>:v8.base.BoundedPageAllocator.Stats()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kSuccess:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kSuccess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kSuccess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kSuccess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kSuccess:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.__init__",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK_NOT_NULL": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK_NOT_NULL",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:DCHECK_NOT_NULL",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:DCHECK_NOT_NULL",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:DCHECK_NOT_NULL",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.MagicNumbersForDivision.==:bool(v8.base.MagicNumbersForDivision&)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:multiplier:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:multiplier:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:multiplier:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:multiplier:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:multiplier:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.ActiveMemoryProtectionKey:optional()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.FreeDeleter.():void(void*)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:free": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.bit_equal_to.():bool(float,float)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:bit_cast:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[], str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.bit_equal_to.():bool(double,double)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:bit_cast:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[], str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.LeakyObject.__init__",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "op:new": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "op:new",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "op:new",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "op:new",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "op:new",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.comparison_underlying_type.<clinit>:v8.base.comparison_underlying_type()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:is_enum_v<decay>:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:is_enum_v<decay>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_enum_v<decay>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_enum_v<decay>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_enum_v<decay>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.is_signed_vs_unsigned.<clinit>:v8.base.is_signed_vs_unsigned()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:is_integral_v<lhs_underlying>:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:is_integral_v<lhs_underlying>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_integral_v<lhs_underlying>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_integral_v<lhs_underlying>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:is_integral_v<lhs_underlying>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.__init__",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "control:FOR": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "control:FOR",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.Equal:bool(v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key', list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.LessEqual:bool(v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool True, str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.Less:bool(v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1, int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.PlusEqual:bool(v8.base.Bignum&,v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a', {int 1: int 2}, int 256)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.PlusLessEqual:bool(v8.base.Bignum&,v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool False, str '', int 2)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.PlusLess:bool(v8.base.Bignum&,v8.base.Bignum&,v8.base.Bignum&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool False, str 'key', int 1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.DiyFp.Minus:v8.base.DiyFp(v8.base.DiyFp&,v8.base.DiyFp&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "call:DCHECK",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 256, str '0')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.DiyFp.Normalize:v8.base.DiyFp(v8.base.DiyFp&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:DCHECK_NE": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:DCHECK_NE",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:DCHECK_NE",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:DCHECK_NE",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:DCHECK_NE",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.double_to_uint64:uint64_t(double)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:bit_cast:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:bit_cast:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Double.SignificandSizeForOrderOfMagnitude:int(int)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:+": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U16FromNativeEndian:uint16_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U32FromNativeEndian:uint32_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U64FromNativeEndian:uint64_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I16FromNativeEndian:int16_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I32FromNativeEndian:int32_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I64FromNativeEndian:int64_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U16FromLittleEndian:uint16_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U32FromLittleEndian:uint32_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U64FromLittleEndian:uint64_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I16FromLittleEndian:int16_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I32FromLittleEndian:int32_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I64FromLittleEndian:int64_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:FromLittleEndian:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:FromLittleEndian:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.internal.IsValueNegative:bool(T)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:is_signed_v<T>:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:is_signed_v<T>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:is_signed_v<T>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:is_signed_v<T>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:is_signed_v<T>:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.AlignedFree:void(void*)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:free": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:free",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool False)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.Contains:bool(void*,size_t)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0)"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len', str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Thread.__init__",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:i32": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:i32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "unop:cast:i32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:i32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:i32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.TimeDelta./:int64_t(v8.base.TimeDelta&)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:delta_:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:delta_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:delta_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:delta_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:delta_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 2)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Milliseconds:v8.base.TimeDelta(double)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kMicrosecondsPerMillisecond:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kMicrosecondsPerMillisecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:kMicrosecondsPerMillisecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:kMicrosecondsPerMillisecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:kMicrosecondsPerMillisecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Seconds:v8.base.TimeDelta(double)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kMicrosecondsPerSecond:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kMicrosecondsPerSecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:kMicrosecondsPerSecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:kMicrosecondsPerSecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:kMicrosecondsPerSecond:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Minutes:v8.base.TimeDelta(int)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kMicrosecondsPerMinute:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kMicrosecondsPerMinute:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:kMicrosecondsPerMinute:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:kMicrosecondsPerMinute:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:kMicrosecondsPerMinute:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool True)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Hours:v8.base.TimeDelta(int)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kMicrosecondsPerHour:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kMicrosecondsPerHour:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:kMicrosecondsPerHour:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:kMicrosecondsPerHour:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:kMicrosecondsPerHour:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.FromDays:v8.base.TimeDelta(int)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kMicrosecondsPerDay:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kMicrosecondsPerDay:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "field:kMicrosecondsPerDay:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "field:kMicrosecondsPerDay:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "field:kMicrosecondsPerDay:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.is_free:bool()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kFree:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kFree:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kFree:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kFree:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kFree:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.is_allocated:bool()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kAllocated:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kAllocated:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kAllocated:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kAllocated:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kAllocated:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.is_excluded:bool()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:kExcluded:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:kExcluded:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExcluded:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExcluded:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:kExcluded:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.RegionAllocator.__init__",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "call:begin": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "call:begin",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "call:begin",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "call:begin",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "call:begin",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.LsanVirtualAddressSpace.ActiveMemoryProtectionKey:optional()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:nullopt:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:nullopt:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.detail.tuple_slice_impl:ANY(T&,std.index_sequence,...)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 0,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:get:non-object": 12
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:get:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, int 0, int 0)"
+    },
+    {
+     "label": "field:get:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "field:get:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {})"
+    },
+    {
+     "label": "field:get:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[], int 256, fn 'len')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.IsClamped:bool()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:-": 10,
+    "index:unsupported": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:-",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.Contains:bool(v8.base.Address,size_t,v8.base.Address,size_t)<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>=": 11
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k', str 'k', str 'k')"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {}, {}, {})"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13, {str 'a': int 1}, bool True, str 'a')"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, bool True, bool True, int -13)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.SignalSafeMapsParser.IsValid:bool()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:>=": 11
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:>=",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.+:v8.base.Time(v8.base.TimeDelta&,v8.base.Time&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-arithmetic-not-modelled": 2,
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key', str 'a')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, int 0)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.+:v8.base.TimeTicks(v8.base.TimeDelta&,v8.base.TimeTicks&)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 1,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-arithmetic-not-modelled": 1,
+    "binop:+": 10
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-arithmetic-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(fn 'len', {str 'a': int 1})"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000, {str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Win32Time.t:int64_t()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:t_:non-object": 10
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:t_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:t_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:t_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:t_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Bignum.BigitLength:int()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:+": 10
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I8FromLittleEndian:int8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 2,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 10
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Win32Time.ft:FILETIME()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 3,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "field:ft_:non-object": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "field:ft_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:ft_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:ft_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "field:ft_:non-object",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.AddressRegion.end:Address()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 3,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Stack.StackSlot.__init__",
+   "cases": 24,
+   "answered": 24,
+   "clean": 15,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Stack.StackSlot.__init__",
+   "cases": 24,
+   "answered": 24,
+   "clean": 15,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({str 'a': int 1})"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Vector.end:ANY()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 3,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Vector.cend:ANY()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 3,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:+": 9
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "binop:+",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.bits.SignedMod32:int32_t(int32_t,int32_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:%": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({str 'a': int 1}, str 'key')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a', bool False)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.bits.SignedMod64:int64_t(int64_t,int64_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:%": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[str 'a'], tuple[])"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000, str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "v8.UnsignedDiv32:uint32_t(uint32_t,uint32_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:/": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a', list[int 1, int 2])"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 256, str 'a')"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({str 'a': int 1}, int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "v8.UnsignedMod64:uint64_t(uint64_t,uint64_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:%": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[int 1, str 'a'], int 7)"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0', str '0')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2], str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.WraparoundAdd32:int32_t(int32_t,int32_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u32": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000, str 'a')"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 2, unit)"
+    }
+   ]
+  },
+  {
+   "name": "v8.WraparoundNeg32:int32_t(int32_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u32": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[])"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U8FromLittleEndian:uint8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 2)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 1000000)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Vector.first:ANY()<const>",
+   "cases": 12,
+   "answered": 12,
+   "clean": 4,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 8
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U8FromNativeEndian:uint8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(unit)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I8FromNativeEndian:int8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 6,
+    "unop:cast:i8": 1
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.U8FromBigEndian:uint8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 256)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -1)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.I8FromBigEndian:int8_t(std.span)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(unit)"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 7)"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.MulWithWraparound:int16_t(int16_t,int16_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u32": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({}, {})"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[int 1, int 2], bool True)"
+    },
+    {
+     "label": "unop:cast:u32",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int 0, list[])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.Vector.first:ANY()",
+   "cases": 12,
+   "answered": 12,
+   "clean": 5,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "index:unsupported": 7
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    },
+    {
+     "label": "index:unsupported",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "()"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.hash_value:size_t(bool)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 6,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 6
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[int 1, str 'a'])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.hash_value:size_t(unsigned char)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 6,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 6
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(tuple[])"
+    }
+   ]
+  },
+  {
+   "name": "v8.UnsignedDiv64:uint64_t(uint64_t,uint64_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 7,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:/": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '', int 1)"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(bool False, int 7)"
+    },
+    {
+     "label": "binop:/",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13, list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.UnsignedMod32:uint32_t(uint32_t,uint32_t)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 7,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "binop:%": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k', str 'k')"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(int -13, {int 1: int 2})"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0', bool True)"
+    },
+    {
+     "label": "binop:%",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(list[], list[int 1, int 2])"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.hash_value:size_t(shortunsigned)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 7,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "unop:cast:u64": 5
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "({})"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'a')"
+    },
+    {
+     "label": "unop:cast:u64",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.isDirectorySeparator:bool(char)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 8,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-equality-not-modelled": 4
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'key')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.isDirectorySeparator<duplicate>1:bool(char)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 9,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-equality-not-modelled": 3
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '0')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    }
+   ]
+  },
+  {
+   "name": "v8.base.OS.isDirectorySeparator<duplicate>0:bool(char)",
+   "cases": 12,
+   "answered": 12,
+   "clean": 10,
+   "outOfFuel": 0,
+   "hole_labels": {
+    "str:pointer-equality-not-modelled": 2
+   },
+   "real_input_holes": 0,
+   "examples": [
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str 'k')"
+    },
+    {
+     "label": "str:pointer-equality-not-modelled",
+     "origin": "synthetic",
+     "self": "ref 0",
+     "args": "(str '')"
+    }
+   ]
+  }
+ ],
+ "verified_functions": [
+  {
+   "name": "?<duplicate>0:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "Copy:ANY(InputIt,InputIt,OutputIt)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "MemoryFence:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "OS.GetGCFakeMMapFile:char*()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "StackCrawlState.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "__readfsdword",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "_vsnprintf_s:int(char*,size_t,size_t,char*,va_list)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "_wfopen_s:int(FILE**,wchar_t*,wchar_t*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "abort-mode.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "abort-mode.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "address-region.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "base-export.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "bits.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "bounded-page-allocator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "compiler-specific.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-arm.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-helper.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-loong64.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-mips64.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-ppc.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-riscv.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-s390.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu-x86.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "cpu/cpu.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace_android.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace_fuchsia.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace_posix.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace_win.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "debug/stack_trace_zos.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "division-by-constant.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "division-by-constant.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "emulated-virtual-address-subspace.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "emulated-virtual-address-subspace.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "export-template.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "file-utils.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "file-utils.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "fopen_s:int(FILE**,char*,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "fpu.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "fpu.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "free_deleter.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "hash32:uint32_t(uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "hashing.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ieee754.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ieee754.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "immediate-crash.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "lazy-instance.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "localtime_s:int(tm*,time_t*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "mach_vm_map",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "mach_vm_remap",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "madvise",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "madvise:int(caddr_t,size_t,int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "memcopy.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/bignum-dtoa.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/bignum-dtoa.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/bignum.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/bignum.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/cached-powers.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/cached-powers.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/diy-fp.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/diy-fp.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/double.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/dtoa.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/dtoa.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/fast-dtoa.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/fast-dtoa.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/fixed-dtoa.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/fixed-dtoa.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/strtod.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numbers/strtod.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/basic_ops_impl.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/byte_conversions.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/byte_conversions_unittest.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/integral_constant_like.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/safe_conversions.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/safe_conversions_impl.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "numerics/safe_math.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "once.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "overflowing-math.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "page-allocator.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "page-allocator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "pkey_alloc:int(unsigned int,unsigned int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "pkey_free:int(int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "pkey_get:int(int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "pkey_mprotect:int(void*,size_t,int,int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "pkey_set:int(int,unsigned)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/condition-variable.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/condition-variable.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/elapsed-timer.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/memory.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/mutex.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/mutex.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-aix.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-cygwin.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-darwin.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-freebsd.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-fuchsia.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-linux.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-linux.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-openbsd.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-posix-time.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-posix-time.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-posix.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-posix.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-qnx.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-solaris.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-starboard.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-win32.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-win32.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform-zos.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/platform.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/semaphore.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/semaphore.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/time.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/wrappers.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "platform/yield-processor.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "region-allocator.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "region-allocator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/lsan-page-allocator.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/lsan-page-allocator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/lsan-virtual-address-space.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/lsan-virtual-address-space.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/lsan.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/msan.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sanitizer/ubsan.h:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "strings.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "strings.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "strncpy_s:int(char*,size_t,char*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sys-info.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "sys-info.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "template-utils.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "timezone-cache.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "ubsan.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "utils/random-number-generator.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "utils/random-number-generator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedDiv32:ANY(int32_t,int32_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedDiv64:ANY(int64_t,int64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedMod32:ANY(int32_t,int32_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedMod64:ANY(int64_t,int64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedMulHigh32:ANY(int32_t,int32_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedMulHigh64:ANY(int64_t,int64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedMulHighAndAdd32:ANY(int32_t,int32_t,int32_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedSaturatedAdd64:ANY(int64_t,int64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.SignedSaturatedSub64:ANY(int64_t,int64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.UnsignedMulHigh32:ANY(uint32_t,uint32_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.UnsignedMulHigh64:ANY(uint64_t,uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.<<:ANY(std.ostream&,v8.base.Time&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.<enum>0.<clinit>:v8.base.<enum>0()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AIXTimezoneCache.~AIXTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.<clinit>:v8.base.AddressRegion()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.begin:Address()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.is_empty:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.set_size:void(size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressRegion.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.<clinit>:v8.base.AddressSpaceReservation()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>0:bool(v8.base.AddressSpaceReservation)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.FreeSubReservation<duplicate>1:bool(v8.base.AddressSpaceReservation)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.base:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AddressSpaceReservation.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.AllocationResult.<clinit>:v8.base.AllocationResult()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Bignum.=:v8.base.Bignum&(v8.base.Bignum&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Bignum.AddUInt16:void(uint16_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Bignum.BigitAt:ANY(int)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Bignum.DivideModuloIntBignum:ANY(v8.base.Bignum&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.=:v8.base.BoundedPageAllocator&(v8.base.BoundedPageAllocator&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.AllocatePageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.AllocatePages:void*(size_t,size_t,Permission,v8.PageAllocator.AllocationHint)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.AllocatePages:void*(void*,size_t,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.AllocatePagesAt:bool(v8.base.BoundedPageAllocator.Address,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.CommitPageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.RecordStats:v8.base.BoundedPageAllocator.Stats()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.ResizeAllocationAt:bool(void*,size_t,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.SetPermissions:bool(void*,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.begin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.get_last_allocation_status:v8.base.BoundedPageAllocator.AllocationStatus()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.size:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.BoundedPageAllocator.~BoundedPageAllocator:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>1:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>2:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>3:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>4:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.DetectFeatures<duplicate>5:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.StarboardDetectCPU:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.architecture:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.dcache_line_size:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.exposes_num_virtual_address_bits:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.ext_family:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.ext_model:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.family:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_apx_f:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_avx10_1:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_avx2:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_avx:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_avx_vnni:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_avx_vnni_int8:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_bmi1:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_bmi2:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_cetss:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_cmov:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_cssc:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_dot_prod:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_f16c:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_fma3:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_fp16:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_fpu:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_hbc:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_idiva:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_intel_jcc_erratum:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_jscvt:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_lasx:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_lse:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_lsx:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_lzcnt:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_mmx:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_mops:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_msa:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_mte:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_neon:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_non_stop_time_stamp_counter:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_osxsave:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_pmull1q:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_popcnt:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_rvc:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_rvv:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sahf:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sha3:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sse2:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sse3:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sse41:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sse42:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sse:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_ssse3:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_sve:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_svebitperm:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_thumb2:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_vfp3:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_vfp3_d32:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_vfp:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zba:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zbb:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zbs:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zfa:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zfh:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.has_zvfh:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.icache_line_size:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.implementer:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.is_atom:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.is_fp64_mode:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.is_running_in_vm:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.model:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.part:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.riscv_mmu:v8.base.CPU.RV_MMU_MODE()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.stepping:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.type:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.variant:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.vendor:char*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CPU.vlen:unsigned int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CallOnce:void(v8.base.OnceType*,v8.base.FunctionWithArgs.type,Args)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ClearLsb:int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ConditionVariable.=:v8.base.ConditionVariable&(v8.base.ConditionVariable&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ConditionVariable.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ConditionVariable.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ConditionVariable.~ConditionVariable:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Copy:ANY(InputIt,InputIt,OutputIt)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CygwinTimezoneCache.LocalTimeOffset:double(double,bool)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.CygwinTimezoneCache.~CygwinTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.e:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.f:uint64_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.set_e:void(int)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.DiyFp.set_f:void(uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Double.<clinit>:v8.base.Double()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Double.AsUint64:uint64_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Double.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Double.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ElapsedTimer.<clinit>:v8.base.ElapsedTimer()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ElapsedTimer.IsPaused:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ElapsedTimer.Pause:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ElapsedTimer.Resume:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ElapsedTimer.Start:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.+:v8.base.Vector(size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.=:v8.base.EmbeddedVector&(v8.base.EmbeddedVector&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.SubVector:v8.base.Vector(size_t,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.SubVectorFrom:v8.base.Vector(size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.Vector:v8.base.Vector()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.[]:ANY(size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.[]:ANY(size_t)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.begin:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.begin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.data:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.end:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.end:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmbeddedVector.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.AllocatePages:ANY(v8.base.Address,size_t,size_t,PagePermissions)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.AllocateSharedPages:ANY(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.AllocateSubspace:ANY(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.CanAllocateSubspaces:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.RandomPageAddress:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EmulatedVirtualAddressSubspace.mapped_size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.EnsureConsoleOutput:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.FPU.GetFlushDenormals:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.FPU.SetFlushDenormals:void(bool)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.FlushDenormalsScope.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.GetSharedLibraryAddresses:ANY(FILE*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Hasher.<clinit>:v8.base.Hasher()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Hasher.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Hasher.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Hasher.hash:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.I8ToBigEndian:array(int8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.I8ToLittleEndian:array(int8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.I8ToNativeEndian:array(int8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LeakyInstanceTrait.Destroy:void(T*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LeakyObject.=:v8.base.LeakyObject&(v8.base.LeakyObject&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanPageAllocator.AllocatePageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanPageAllocator.AllocateSharedPages:ANY(size_t,void*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanPageAllocator.CommitPageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanPageAllocator.~LsanPageAllocator:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanVirtualAddressSpace.AllocatePages:ANY(v8.base.Address,size_t,size_t,PagePermissions)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanVirtualAddressSpace.AllocateSharedPages:ANY(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanVirtualAddressSpace.AllocateSubspace:ANY(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.LsanVirtualAddressSpace.~LsanVirtualAddressSpace:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.MagicNumbersForDivision.<clinit>:v8.base.MagicNumbersForDivision()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.MagicNumbersForDivision.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.=:v8.base.Mutex&(v8.base.Mutex&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.AssertHeldAndUnmark:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.AssertUnheldAndMark:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.Lock:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.TryLock:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.Unlock:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Mutex.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.=:v8.base.OS&(v8.base.OS&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.ActivationFrameAlignment:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.ActivationFrameAlignment<duplicate>0:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.ActivationFrameAlignment<duplicate>1:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>10:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>1:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>2:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>3:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>4:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>5:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>6:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>7:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>8:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AdjustSchedulingParams<duplicate>9:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AllocatePageSize:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.AllocatePageSize<duplicate>0:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.ArmUsingHardFloat:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CanReserveAddressSpace:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CanReserveAddressSpace<duplicate>0:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CanReserveAddressSpace<duplicate>1:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CommitPageSize:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CommitPageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CommitPageSize<duplicate>0:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.ConvertUtf8StringToUtf16:ANY(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.CreateSharedMemoryHandleForTesting:ANY(size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.DebugBreak:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.DirectorySeparator:char()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.DirectorySeparator<duplicate>0:char()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.DirectorySeparator<duplicate>1:char()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.DiscardSystemPages<duplicate>2:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.EnsureWin32MemoryAPILoaded:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.FOpen:ANY(char*,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetFirstFreeMemoryRangeWithin:ANY(v8.base.OS.Address,v8.base.OS.Address,size_t,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetGCFakeMMapFile:char*()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetLastError:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetRandomMmapAddr<duplicate>0:void*()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetSharedLibraryAddresses:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.GetSharedLibraryAddresses<duplicate>10:vector()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.HasLazyCommits:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.HasLazyCommits<duplicate>0:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.HasLazyCommits<duplicate>1:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.HasLazyCommits<duplicate>3:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.HasLazyCommits<duplicate>4:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.Initialize<duplicate>0:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.Initialize<duplicate>1:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.Initialize<duplicate>2:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.IsHardwareEnforcedShadowStacksEnabled:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.IsRemapPageSupported:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.MemoryMappedFile.memory:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.MemoryMappedFile.size:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.MemoryMappedFile.~MemoryMappedFile:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.MemoryRange.<clinit>:v8.base.OS.MemoryRange()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.OpenTemporaryFile:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SealPages:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SealPages<duplicate>0:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SealPages<duplicate>1:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SealPages<duplicate>2:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SetMemoryRegionName:bool(void*,size_t,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SetMemoryRegionName<duplicate>0:bool(void*,size_t,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SetMemoryRegionName<duplicate>1:bool(void*,size_t,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SharedLibraryAddress.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SharedLibraryAddress.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>10:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>1:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>2:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>6:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>7:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.SignalCodeMovingGC<duplicate>9:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OS.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.=:v8.base.OwnedVector&(v8.base.OwnedVector&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.==:bool(std.nullptr_t)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.[]:ANY(size_t)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.as_vector:v8.base.Vector()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.begin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.data:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.empty:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.end:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.rbegin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.rend:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.OwnedVector.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.AllocatePageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.AllocateSharedPages:ANY(size_t,void*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.AllocateSharedPages:unique_ptr(size_t,void*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.CanAllocateSharedPages:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.CommitPageSize:size_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.RemapShared:void*(void*,void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PageAllocator.~PageAllocator:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixDefaultTimezoneCache.~PosixDefaultTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixInitializeCommon:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.memory:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.memory<duplicate>0:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixMemoryMappedFile.size<duplicate>0:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixTimezoneCache.<clinit>:v8.base.PosixTimezoneCache()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixTimezoneCache.Clear:void(v8.base.TimezoneCache.TimeZoneDetection)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PosixTimezoneCache.~PosixTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.=:v8.base.PreciseSleepTimer&(v8.base.PreciseSleepTimer&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.IsInitialized:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.PreciseSleepTimer.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.():unsigned int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.MurmurHash3:ANY(uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.NextBool:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.NextInt64:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.NextInt:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.NextSample:ANY(uint64_t,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.NextSampleSlow:ANY(uint64_t,size_t,std.unordered_set&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.initial_seed:int64_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RandomNumberGenerator.min:unsigned int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RecursiveMutex.=:v8.base.RecursiveMutex&(v8.base.RecursiveMutex&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RecursiveMutex.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RecursiveMutex.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.=:v8.base.RegionAllocator&(v8.base.RegionAllocator&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.AllocateAlignedRegion:ANY(size_t,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.AllocateRegion:ANY(size_t,v8.base.RegionAllocator.AllocationStrategy)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.AllocateRegion:ANY(v8.base.RandomNumberGenerator*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.AllocateRegion:ANY(v8.base.RegionAllocator.Address,size_t,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.CheckRegion:ANY(v8.base.RegionAllocator.Address)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.FindRegion:ANY(v8.base.RegionAllocator.Address)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.GetLargestFreeRegionSize:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.set_state:void(v8.base.RegionAllocator.RegionState)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.Region.state:v8.base.RegionAllocator.RegionState()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.TrimRegion:ANY(v8.base.RegionAllocator.Address,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.free_size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.page_size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.set_on_merge_callback:void(v8.base.RegionAllocator.SplitMergeCallback)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RegionAllocator.set_on_split_callback:void(v8.base.RegionAllocator.SplitMergeCallback)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.RelativePath:ANY(char*,char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.=:v8.base.Semaphore&(v8.base.Semaphore&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.Signal:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.Wait:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.WaitFor:bool(v8.base.TimeDelta&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.native_handle:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.native_handle:NativeHandle()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Semaphore.~Semaphore:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SetFatalFunction:void(void)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SetPrintStackTrace:void(void)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SetThreadName:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SharedMemory.GetMemory:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SharedMemory.GetSize:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SharedMemory.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SharedMemoryMapping.GetMemory:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SharedMemoryMapping.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SignalSafeMapsParser.Next:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SignedDivisionByConstant:ANY(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SolarisTimezoneCache.~SolarisTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Stack.GetCommittedStackLimit:v8.base.Stack.StackSlot()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Stack.GetRealStackAddressForSlot:v8.base.Stack.StackSlot(v8.base.Stack.StackSlot)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Stack.ObtainCurrentThreadStackStart<duplicate>4:v8.base.Stack.StackSlot()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Stack.SetCurrentThreadStackBounds<duplicate>0:void(uintptr_t,uintptr_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.StarboardDefaultTimezoneCache.~StarboardDefaultTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.StarboardTimezoneCache.<clinit>:v8.base.StarboardTimezoneCache()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.StarboardTimezoneCache.Clear:void(v8.base.TimezoneCache.TimeZoneDetection)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.StarboardTimezoneCache.~StarboardTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.AddressSpaceEnd:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.AmountOfPhysicalMemory:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.AmountOfPhysicalMemory:int64_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.AmountOfVirtualMemory:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.AmountOfVirtualMemory:int64_t()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.SysInfo.NumberOfProcessors:int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.=:v8.base.Thread&(v8.base.Thread&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.CreateThreadLocalKey:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Dispatch:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.GetExistingThreadLocal:void*(v8.base.Thread.LocalStorageKey)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.__init__",
+   "inputs": 36,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.name:char*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.priority:v8.base.Thread.Priority()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Options.stack_size:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.PlatformData.PlatformData<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.PlatformData.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.PlatformData.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.Run:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.data:v8.base.Thread.PlatformData*()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.name:char*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Thread.priority:v8.base.Thread.Priority()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.GetForThread:v8.base.ThreadTicks(HANDLE&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.IsSupported:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.IsSupportedWin:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.TSCTicksPerSecond:double()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.WaitUntilInitialized:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.WaitUntilInitializedWin:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ThreadTicks.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.FromFiletime:v8.base.Time(_FILETIME)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.FromTimespec:v8.base.Time(timespec)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.FromTimeval:v8.base.Time(timeval)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.Now:v8.base.Time()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.NowFromSystemTime:v8.base.Time()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Time.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeConstants.<clinit>:v8.base.TimeConstants()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.FromMachTimespec:v8.base.TimeDelta(mach_timespec)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.FromTimespec:v8.base.TimeDelta(timespec)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.InMicroseconds:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.InMilliseconds:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.InMillisecondsRoundedUp:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.InNanoseconds:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.InSeconds:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.IsZero:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeDelta.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeTicks.IsHighResolution:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeTicks.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimeTicks.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimezoneCache.Clear:void(v8.base.TimezoneCache.TimeZoneDetection)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimezoneCache.DaylightSavingsOffset:double(double)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimezoneCache.LocalTimeOffset:double(double,bool)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimezoneCache.LocalTimezone:char*(double)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.TimezoneCache.~TimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.U8ToBigEndian:array(uint8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.U8ToLittleEndian:array(uint8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.U8ToNativeEndian:array(uint8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.UInt128.IsZero:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.UInt128.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.UnsignedDivisionByConstant:v8.base.MagicNumbersForDivision(T,unsigned)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Use.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VLQBase64Decode:ANY(char*,size_t,size_t*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.begin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.cbegin:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.data:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.empty:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Vector.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.ActiveMemoryProtectionKey:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.AllocatePages:ANY(v8.base.Address,size_t,size_t,PagePermissions)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.AllocateSharedPages:ANY(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.AllocateSubspace:ANY(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.CanAllocateSubspaces:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.RandomPageAddress:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.SetName:bool(std.string&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpace.~VirtualAddressSpace:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpaceBase.FreeSubspace:void(v8.base.VirtualAddressSubspace*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.=:v8.base.VirtualAddressSpacePageAllocator&(v8.base.VirtualAddressSpacePageAllocator&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.AllocatePages:void*(void*,size_t,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.SealPages:bool(void*,size_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.SetPermissions:bool(void*,size_t,Permission)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSpacePageAllocator.~VirtualAddressSpacePageAllocator:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.ActiveMemoryProtectionKey:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.ActiveMemoryProtectionKey:optional()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.AllocatePages:ANY(v8.base.Address,size_t,size_t,PagePermissions)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.AllocateSharedPages:ANY(v8.base.Address,size_t,PagePermissions,SharedMemoryHandle,uint64_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.AllocateSubspace:ANY(v8.base.Address,size_t,size_t,PagePermissions,std.optional,std.optional)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.CanAllocateSubspaces:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.VirtualAddressSubspace.RandomPageAddress:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Win32MemoryMappedFile.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Win32MemoryMappedFile.memory:void*()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Win32MemoryMappedFile.size:size_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Win32Time.DaylightSavingsOffset:ANY(v8.base.WindowsTimezoneCache*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.Win32Time.LocalOffset:ANY(v8.base.WindowsTimezoneCache*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.WindowsTimezoneCache.Clear:void(v8.base.TimezoneCache.TimeZoneDetection)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.WindowsTimezoneCache.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.WindowsTimezoneCache.~WindowsTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.ZOSTimezoneCache.~ZOSTimezoneCache:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.CountLeadingZeros:unsigned int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.CountPopulation:unsigned int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.CountTrailingZeros:unsigned int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.CountTrailingZerosNonZero:unsigned int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.IsPowerOfTwo:bool(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.bits.WhichPowerOfTwo:int(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.charToDigitDecodeForTesting:ANY(uint8_t)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.BacktraceOutputHandler.HandleOutput:void(char*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.BacktraceOutputHandler.OutputFileDescriptor:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.BacktraceOutputHandler.~BacktraceOutputHandler:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.DisableSignalStackDump:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.DisableSignalStackDump<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.DisableSignalStackDump<duplicate>1:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.DisableSignalStackDump<duplicate>2:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.EnableInProcessStackDumping<duplicate>0:bool()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.PrintBacktraceOutputHandler.=:v8.base.debug..PrintBacktraceOutputHandler&(v8.base.debug.PrintBacktraceOutputHandler&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.PrintBacktraceOutputHandler.OutputFileDescriptor:int()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.PrintBacktraceOutputHandler.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.PrintBacktraceOutputHandler.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.InitTrace:void(_CONTEXT*)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.OutputToStream<duplicate>1:void(std.ostream*)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.Print<duplicate>1:void()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.Print<duplicate>3:void()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.StackTrace<duplicate>0:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.StackTrace<duplicate>1:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.StackTrace<duplicate>3:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.ToString:ANY()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StackTrace.~StackTrace:ANY()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StreamBacktraceOutputHandler.=:v8.base.debug..StreamBacktraceOutputHandler&(v8.base.debug.StreamBacktraceOutputHandler&)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StreamBacktraceOutputHandler.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.debug.StreamBacktraceOutputHandler.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.detail.make_array_helper:ANY(Function,std.index_sequence,...)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.duplicate_type_in_index_of_type_error:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.BigEnoughPromotionImpl.<clinit>:v8.base.internal.BigEnoughPromotionImpl()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.BigEnoughPromotionImpl.<clinit>:v8.base.internal.BigEnoughPromotionImpl()<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.BigEnoughPromotionImpl.<clinit>:v8.base.internal.BigEnoughPromotionImpl()<duplicate>1",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.CommonMaxOrMin:Dst(bool)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.FastIntegerArithmeticPromotionImpl.<clinit>:v8.base.internal.FastIntegerArithmeticPromotionImpl()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.FastIntegerArithmeticPromotionImpl.<clinit>:v8.base.internal.FastIntegerArithmeticPromotionImpl()<duplicate>0",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.IsValueInRangeFastOp.<clinit>:v8.base.internal.IsValueInRangeFastOp()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.MakeStrictNum:StrictNumeric(T)",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.<clinit>:v8.base.internal.RangeCheck()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.==:bool(v8.base.internal.RangeCheck&)<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsInvalid:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsOverflow:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsOverflowFlagSet:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsUnderflow:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsUnderflowFlagSet:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.IsValid:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.RangeCheck.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.SaturateFastAsmOp.<clinit>:v8.base.internal.SaturateFastAsmOp()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.SaturateFastOp.<clinit>:v8.base.internal.SaturateFastOp()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.StrictNumeric.!:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.StrictNumeric.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.internal.StrictNumeric.__init__",
+   "inputs": 24,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.time_internal.TimeBase.IsNull:bool()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.time_internal.TimeBase.ToInternalValue:int64_t()<const>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.base.time_internal.TimeBase.__init__",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "v8.internal.ZosFuncForJSEnv:void()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vector.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "virtual-address-space-page-allocator.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "virtual-address-space-page-allocator.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "virtual-address-space.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "virtual-address-space.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vlen_intrinsic:unsigned int()",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vlq-base64.cc:<global>",
+   "inputs": 12,
+   "real_inputs": 0
+  },
+  {
+   "name": "vlq-base64.h:<global><cpp>",
+   "inputs": 12,
+   "real_inputs": 0
+  }
+ ],
+ "inconclusive_functions": [],
+ "hole_labels": {
+  "field:nullopt:non-object": 144,
+  "field:FromLittleEndian:non-object": 144,
+  "call:DCHECK": 84,
+  "binop:+": 68,
+  "index:unsupported": 64,
+  "op:sizeOf": 60,
+  "field:initialized_:non-object": 48,
+  "unop:cast:u64": 47,
+  "call:IsNull": 36,
+  "field:bit_cast:non-object": 36,
+  "binop:%": 29,
+  "binop:/": 25,
+  "call:Pointer": 24,
+  "call:pthread_self": 24,
+  "field:kExitWithSuccessAndIgnoreDcheckFailures:non-object": 24,
+  "call:free": 24,
+  "unop:cast:u32": 23,
+  "binop:>=": 22,
+  "mcall:CPU.vendor_": 12,
+  "call:strlen": 12,
+  "field:kProcess:non-object": 12,
+  "call:IsDenormal": 12,
+  "field:vmar_:non-object": 12,
+  "op:cast:opaque-type": 12,
+  "field:timer_:non-object": 12,
+  "op:cast:pointer": 12,
+  "op:cast:scalar": 12,
+  "field:kExitIfNoSecurityImpact:non-object": 12,
+  "field:address_:non-object": 12,
+  "field:kSuccess:non-object": 12,
+  "call:DCHECK_NOT_NULL": 12,
+  "field:multiplier:non-object": 12,
+  "op:new": 12,
+  "field:is_enum_v<decay>:non-object": 12,
+  "field:is_integral_v<lhs_underlying>:non-object": 12,
+  "control:FOR": 12,
+  "call:DCHECK_NE": 12,
+  "field:is_signed_v<T>:non-object": 12,
+  "unop:cast:i32": 12,
+  "field:delta_:non-object": 12,
+  "field:kMicrosecondsPerMillisecond:non-object": 12,
+  "field:kMicrosecondsPerSecond:non-object": 12,
+  "field:kMicrosecondsPerMinute:non-object": 12,
+  "field:kMicrosecondsPerHour:non-object": 12,
+  "field:kMicrosecondsPerDay:non-object": 12,
+  "field:kFree:non-object": 12,
+  "field:kAllocated:non-object": 12,
+  "field:kExcluded:non-object": 12,
+  "call:begin": 12,
+  "field:get:non-object": 12,
+  "binop:>": 11,
+  "binop:-": 10,
+  "field:t_:non-object": 10,
+  "binop:<": 10,
+  "str:pointer-equality-not-modelled": 9,
+  "field:ft_:non-object": 9,
+  "str:pointer-arithmetic-not-modelled": 3,
+  "unop:cast:i8": 1
+ },
+ "skipped": {
+  "skip_varargs": 0,
+  "skip_unencodable_args": 0,
+  "skip_unencodable_ret": 0,
+  "skip_no_instance": 0
+ },
+ "unencodable_reasons": {}
+}
