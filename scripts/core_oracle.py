@@ -326,7 +326,11 @@ private def orun (c : OCase) : EResult :=
   else
     match octx.resolve c.fn with
     | none    => .hole s!"entry:{{c.fn}}"
-    | some fn => (applyFunc octx {fuel} h fn c.slf c.args).2
+    -- The trailing `[]` is the keyword-argument list `applyFunc` gained with the calling
+    -- convention. Without it this file did not elaborate, every batch bisected down to
+    -- nothing, and the run reported "0 executed" — a number that reads like a weak corpus
+    -- and was actually a type error nobody printed.
+    | some fn => (applyFunc octx {fuel} h fn c.slf c.args []).2
 """
 
 FOOTER = """
@@ -378,9 +382,13 @@ class Driver:
             mid = len(idxs) // 2
             got.update(self.eval(cases, idxs[:mid], depth + 1))
             got.update(self.eval(cases, idxs[mid:], depth + 1))
-        elif len(got) < len(idxs) and depth == 0:
-            print("  lean answered nothing for a singleton batch: %s"
-                  % (out.stdout[:150] + out.stderr[:300]).replace("\n", " ")[:300])
+        elif len(got) < len(idxs):
+            # Print at every depth, not just depth 0. A header that fails to elaborate
+            # loses *every* batch, and the depth-0 guard meant the reason was never shown.
+            errs = [l for l in (out.stdout + out.stderr).splitlines() if "error" in l]
+            print("  lean answered nothing for case %s: %s"
+                  % (idxs, " ".join(errs)[:300] or
+                     (out.stdout[:150] + out.stderr[:300]).replace("\n", " ")[:300]))
         return got
 
 
