@@ -172,6 +172,12 @@ than quietly regenerating the artefacts.
 * Hand-written vocabulary that generated specs are written in belongs in
   `Autoform/SpecsGen/Basis.lean` — small enough to read, because generated Lean is only as
   trustworthy as the vocabulary it is generated in.
+* `tests/` is the Python tooling's own test suite: `python3 -m pytest tests/ -q` (about
+  30 s, no Lean toolchain required; add `-rx` to print the reason behind each strict
+  `xfail`, which is how known gaps are recorded rather than hidden). Run it before
+  touching anything under `scripts/` or `cartographer/*.py` — every one of the five
+  regressions it opens with was a checker that failed *silently*, and each is pinned by a
+  reconstruction of the old behaviour asserted to be broken. See `tests/README.md`.
 * Orchestration, HTTP, sandboxing and anything driving an external runtime stays in Python.
   Anything that touches a Lean term should be written in Lean, where `Lean.Environment` and
   proof terms are ordinary data.
