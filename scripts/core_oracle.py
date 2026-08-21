@@ -505,6 +505,14 @@ def main():
     # had gained a keyword-argument parameter, the generated scratch file no longer
     # type-checked, and the oracle would have reported 0 refutations over 318 functions.
     # One case must answer before any of them are believed.
+    #
+    # Three independent branches (V8Base, LinuxLib, LinuxCrypto evidence, plus the
+    # semantics work) each hit this and each wrote its own guard; they are the same
+    # guard. This one is kept because it prints what Lean actually said, which is the
+    # part that turns "no answer" into a diagnosis. LinuxLib's variant additionally
+    # checked the first *batch*; that is subsumed -- if case 0 answers, the header
+    # elaborates, and a later empty batch is bisected down to a per-case report by the
+    # every-depth print in Driver.eval above.
     if cases:
         if not drv.eval(cases, [0]):
             print("ABORT: the oracle harness produced no answer for its first case. The "
