@@ -57,7 +57,7 @@ context has to point at it. The generated module builds exactly the same context
 `scripts/differential.py` uses, so a case that was recorded against CPython is replayed
 here in the configuration it was recorded in. -/
 def runCase (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Heap × EResult :=
-  applyFunc ctx fuel c.heap fn c.self c.args
+  applyFunc ctx fuel c.heap fn c.self c.args []
 
 /-! ### Structural predicates on results
 
@@ -217,12 +217,12 @@ def runMethod (p : Program) (fuel : Nat) (h : Heap) (name : String) (self : Val)
     (args : List Val) : Heap × EResult :=
   match (ctxOf p).resolve name with
   | none    => (h, .hole s!"entry:{name}")
-  | some fn => applyFunc (ctxOf p) fuel h fn (some self) args
+  | some fn => applyFunc (ctxOf p) fuel h fn (some self) args []
 
 theorem runMethod_of_resolve (p : Program) (fuel : Nat) (name : String) (h : Heap)
     (self : Val) (args : List Val) (fn : Func)
     (hres : (ctxOf p).resolve name = some fn) :
-    runMethod p fuel h name self args = applyFunc (ctxOf p) fuel h fn (some self) args := by
+    runMethod p fuel h name self args = applyFunc (ctxOf p) fuel h fn (some self) args [] := by
   unfold runMethod; rw [hres]
 
 /-- **Method refinement.** For every receiver/argument tuple in `dom` and every fuel budget
@@ -283,18 +283,31 @@ name in `Autoform/Generated/…` and the `rfl` fails.
 
 `hp : fn.params = []` is not decoration. If a parameter were also called `self` it would
 shadow the receiver in `Env`, and the theorem would be false — the hypothesis is the
-honest way to say the proof depends on that not happening. -/
+honest way to say the proof depends on that not happening.
+
+Two more hypotheses came from the semantics growing, and both are honest for the same
+reason. `hv`/`hkw` say the function has no `*args`/`**kwargs`: `applyFunc` now binds
+through `bindParams` and rejects unexpected keywords, and a variadic accessor would bind
+differently. `hmod` says the receiver is not a **module object** — since module objects
+were modelled, reading an absent attribute off one is `.hole "module-attr:…"`, not
+`.unit`, so an accessor spec that ignored the distinction would be false exactly on
+those receivers. Weakening the statement to a domain where it is true beats stating a
+convenient falsehood. -/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
-    (hp : fn.params = []) (r : Ref) (args : List Val) :
-    applyFunc ctx (n + 4) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
+    (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
+    (r : Ref) (args : List Val)
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  rw [hb, hp]
-  simp only [execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil,
+    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
-  · rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;> simp [hgr, hf, hc]
+  · have hm := hmod o hgr
+    rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
+        simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
@@ -307,15 +320,19 @@ nothing else. -/
 theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld doc : String)
     (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
-    (hp : fn.params = []) (r : Ref) (args : List Val) :
-    applyFunc ctx (n + 5) h fn (some (.ref r)) args = (h, .val (fieldOf h r fld)) := by
+    (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
+    (r : Ref) (args : List Val)
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   unfold applyFunc
-  rw [hb, hp]
-  simp only [execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil,
+    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
-  · rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;> simp [hgr, hf, hc]
+  · have hm := hmod o hgr
+    rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
+        simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
 /-! ## 3b. Fuel independence
@@ -356,7 +373,7 @@ theorem runCase_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
     runCase ctx k' fn c = runCase ctx k fn c := by
   have hne : (runCase ctx k fn c).2 ≠ .outOfFuel := by
     intro hEq; rw [hEq] at hd; simp [defined] at hd
-  have he : applyFunc ctx k c.heap fn c.self c.args
+  have he : applyFunc ctx k c.heap fn c.self c.args []
       = ((runCase ctx k fn c).1, (runCase ctx k fn c).2) := rfl
   simpa [runCase] using applyFunc_fuel_mono hctx hfn hk he hne
 

@@ -26,3 +26,7 @@ contracts-*.json
 # the source it is rendered from; ignoring one half of a pair makes them impossible to
 # check against each other from a clean clone, which is exactly the drift
 # scripts/check_docs.py exists to catch. 2.5 MB for all six corpora.
+
+# Hypothesis's example database, written by scripts/synth_specs.py when it borrows
+# Hypothesis as a value generator. Run state, not source.
+.hypothesis/

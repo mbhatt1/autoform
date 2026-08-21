@@ -92,8 +92,15 @@ def lean_run(src: str, tag: str, timeout: int = 900):
     path = os.path.join(SCRATCH, "autoform_synth_%s.lean" % tag)
     with open(path, "w", encoding="utf-8") as f:
         f.write(src)
-    r = subprocess.run(["lake", "env", "lean", path], capture_output=True, text=True,
-                       env=ENV, cwd=REPO)
+    try:
+        r = subprocess.run(["lake", "env", "lean", path], capture_output=True, text=True,
+                           env=ENV, cwd=REPO, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # The `timeout` argument was accepted and then not passed to `subprocess.run`,
+        # so a chunk that diverged hung the whole generator with no output at all. A
+        # timeout is a *result* — "this could not be evaluated in %d s" — and the caller
+        # records it as `not_checked`, never as a pass.
+        return 124, "", "lake env lean exceeded %d s on %s" % (timeout, path), path
     return r.returncode, r.stdout, r.stderr, path
 
 
@@ -183,7 +190,7 @@ def mine_artifacts(funcs, src_root):
         if ".git" in root:
             continue
         for fn in files:
-            if not fn.endswith(".py"):
+            if not fn.endswith((".py", ".c", ".cc", ".cpp", ".h", ".hpp")):
                 continue
             p = os.path.join(root, fn)
             try:
@@ -335,10 +342,161 @@ def fuzz_cases(rec, rng, n):
 
 
 # ---------------------------------------------------------------------------
+# 3b. Synthetic domains — the corpora with no CPython to trace
+# ---------------------------------------------------------------------------
+#
+# Everything above this point takes its domain from `differential.py`'s trace hook, which
+# means it takes its domain from *CPython*. That is the right source when the corpus is
+# Python and it is the only source the generator has ever had — which is exactly why
+# every theorem in this repository is about one Python library. V8 and Linux have no
+# CPython to trace: there is no interpreter of ours that can run `bits.cc`, and a
+# recorded call for a C++ function is not something this repository can honestly produce.
+#
+# So the domain is *synthesized* instead: arguments drawn from the same Hypothesis pools
+# the fuzzer already uses, typed by the C/C++ signature carried in the function's name.
+# What this buys and what it costs, stated plainly:
+#
+#   * `conform_*` is impossible here and is NOT generated. A cross-runtime theorem needs
+#     the other runtime. Emitting one against outcomes this system computed itself would
+#     be the interpreter agreeing with itself — the precise failure the family exists to
+#     avoid. The synthetic families are structural (§4.2) and algebraic (§4.3) only.
+#   * `const_*`, `raises_*` and `projects_*` are also not generated: all three are *mined
+#     from observed outcomes*, and there are none.
+#   * Everything else is unchanged, including every anti-vacuity gate: a law is still
+#     refuted against its domain before emission, still dropped if any case holes, still
+#     screened, and still has to survive the `≠ outOfFuel` guard to be lifted off `FUEL`.
+#
+# One gate is *added* for this mode. With a recorded domain, a law about an argument was
+# at least about an argument some caller really passed. With a synthesized one, a
+# function that ignores its parameters satisfies `commutes` and `idempotent` trivially,
+# so the screen below requires the subject to actually mention the parameter the law is
+# about (`argument_insensitive`).
+
+_SIG_ARGS = re.compile(r'\(([^()]*)\)\s*$')
+
+
+def param_types(fname, params):
+    """Guess each parameter's type from the C/C++ signature carried in the function name.
+
+    `render_lean.py` keeps Joern's full signature (`…SignedMulHigh32:int32_t(int32_t,
+    int32_t)`), so the types are right there. When the parse fails — Python names carry
+    no signature, C++ templates nest parentheses — every parameter falls back to "any",
+    which draws from every pool. A wrong guess costs a refuted candidate, never a wrong
+    theorem: the refutation pass runs the real semantics either way."""
+    m = _SIG_ARGS.search(fname or "")
+    raw = [t.strip() for t in m.group(1).split(",")] if m and m.group(1).strip() else []
+    if len(raw) != len(params):
+        return ["any"] * len(params)
+    out = []
+    for t in raw:
+        low = t.lower()
+        if "*" in t or "char" in low and "*" in t:
+            out.append("any")
+        elif "bool" in low:
+            out.append("bool")
+        elif any(k in low for k in ("int", "long", "short", "size_t", "unsigned",
+                                    "uint", "byte", "word")):
+            out.append("int")
+        elif "string" in low:
+            out.append("str")
+        elif "double" in low or "float" in low:
+            out.append("float")          # not modelled; forces a fallback draw
+        else:
+            out.append("any")
+    return out
+
+
+def synth_args(types, rng):
+    ints, strs = _pools()
+    out = []
+    for t in types:
+        if t == "int":
+            out.append(("int", rng.choice(ints)))
+        elif t == "bool":
+            out.append(("bool", rng.random() < 0.5))
+        elif t == "str":
+            out.append(("str", rng.choice(strs)))
+        else:
+            r = rng.random()
+            if r < 0.55:
+                out.append(("int", rng.choice(ints)))
+            elif r < 0.8:
+                out.append(("str", rng.choice(strs)))
+            elif r < 0.9:
+                out.append(("bool", rng.random() < 0.5))
+            else:
+                out.append(("list", [("int", rng.choice(ints))]))
+    return out
+
+
+def synth_cases(f, rng, n):
+    """`n` synthetic calls of `f`: empty local heap, no receiver, fuzzed arguments.
+
+    The heap is empty because these corpora have no objects to record — a C translation
+    unit's state lives in the globals frame, which the generated module already carries as
+    `h0`, and `case_lit` prepends it."""
+    types = param_types(f.get("name", ""), f.get("params", []))
+    seen, out = set(), []
+    for _ in range(n * 4):
+        if len(out) >= n:
+            break
+        c = {"heap": [], "self": None, "args": synth_args(types, rng)}
+        k = json.dumps(c, sort_keys=True)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(c)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # 4. Lean rendering of cases
 # ---------------------------------------------------------------------------
 
+def lean_str(s):
+    """A Lean 4 string literal.
+
+    `json.dumps` is *almost* right and was used here until it was measured: it emits
+    `\\b` and `\\f` for U+0008 and U+000C, which Lean 4's lexer rejects
+    ("invalid escape sequence"), and 213 candidates of a V8 run came back `not_checked`
+    for that reason alone — a whole chunk of the population silently unevaluated because
+    one fuzzed string held a backspace. Everything outside the printable ASCII range is
+    written as `\\uXXXX`, which Lean does accept."""
+    out = ['"']
+    for ch in s:
+        o = ord(ch)
+        if ch == '"':
+            out.append('\\"')
+        elif ch == "\\":
+            out.append("\\\\")
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\r":
+            out.append("\\r")
+        elif 0x20 <= o < 0x7F:
+            out.append(ch)
+        elif o <= 0xFFFF:
+            out.append("\\u%04x" % o)
+        else:                       # outside the BMP: Lean has no \U escape
+            out.append("\\u%04x\\u%04x"
+                       % (0xD800 + ((o - 0x10000) >> 10),
+                          0xDC00 + ((o - 0x10000) & 0x3FF)))
+    out.append('"')
+    return "".join(out)
+
+
 def val_lit(v):
+    """`differential.lean_val`, with string literals written by `lean_str`."""
+    t = v[0]
+    if t == "str":
+        return "Val.str " + lean_str(v[1])
+    if t in ("list", "tuple"):
+        return "Val.%s [%s]" % (t, ", ".join(val_lit(x) for x in v[1]))
+    if t == "dict":
+        return "Val.dict [%s]" % ", ".join("(%s, %s)" % (val_lit(a), val_lit(b))
+                                           for a, b in v[1])
     return D.lean_val(v)
 
 
@@ -350,8 +508,8 @@ def heap_lit(heap):
     are the form that survives a structure gaining one."""
     return "[%s]" % ", ".join(
         "{ cls := %s, fields := [%s] }"
-        % (json.dumps(cls), ", ".join("(%s, %s)" % (json.dumps(k), val_lit(v))
-                                      for k, v in fields))
+        % (lean_str(cls), ", ".join("(%s, %s)" % (lean_str(k), val_lit(v))
+                                    for k, v in fields))
         for cls, fields in heap)
 
 
@@ -370,7 +528,7 @@ def eresult_lit(outcome):
     kind, payload = outcome
     if kind == "val":
         return "EResult.val (%s)" % val_lit(payload)
-    return "EResult.exn (Val.str %s)" % json.dumps(payload)
+    return "EResult.exn (Val.str %s)" % lean_str(payload)
 
 
 def obs_lit(rec):
@@ -406,12 +564,13 @@ class Cand:
                 "checked": self.checked, "note": self.note}
 
 
-GUARD = {"conform": "gRunObs", "runs": "gRun", "returns": "gRun",
+GUARD = {"conform": "gRunObs", "charact": "gRunObs", "runs": "gRun", "returns": "gRun",
          "heappure": "gRun", "const": "gRun", "projects": "gRun",
          "identity": "gRun", "nonneg": "gRun", "raises": "gRun",
          "idempotent": "gIdem", "involutive": "gInvol", "commutes": "gComm"}
 
-MONO = {"conform": "lawConform_fuel_mono", "runs": "lawRuns_fuel_mono",
+MONO = {"conform": "lawConform_fuel_mono", "charact": "lawConform_fuel_mono",
+        "runs": "lawRuns_fuel_mono",
         "returns": "lawReturns_fuel_mono", "heappure": "lawHeapPreserved_fuel_mono",
         "const": "lawConst_fuel_mono", "projects": "lawProjects_fuel_mono",
         "identity": "lawIdentity_fuel_mono", "nonneg": "lawNonneg_fuel_mono",
@@ -442,8 +601,12 @@ def can_hole_or_loop(body):
                 "loop", "forIn", "setIndex"))
 
 
-def gen_candidates(core, byname, recs, rng):
-    """Mine candidates for every call-closed function the suite actually exercised."""
+def gen_candidates(core, byname, recs, rng, synthetic=False):
+    """Mine candidates for every call-closed function the suite actually exercised.
+
+    With `synthetic=True` there is no suite and no recorded call: the domain is fuzzed
+    from the signature instead, and the three families that are mined *from observations*
+    (`conform`, `const`, `raises`, `projects`) are not generated at all. See §3b."""
     cands = []
     by_fn = {}
     for r in recs:
@@ -460,7 +623,7 @@ def gen_candidates(core, byname, recs, rng):
         tf = has_try_finally(f["body"])
 
         # ---- §4 source 4: cross-implementation equivalence, one theorem per function.
-        if obs:
+        if obs and not synthetic:
             seen, uniq = set(), []
             for r in obs:
                 k = json.dumps([r["heap"], r["self"], r["args"]], sort_keys=True)
@@ -478,6 +641,8 @@ def gen_candidates(core, byname, recs, rng):
 
         # ---- the fuzz domain every behavioural law is refuted against
         base = []
+        if synthetic:
+            base = synth_cases(f, rng, MAX_DOMAIN)
         for r in obs[:4]:
             base.append({"heap": r["heap"], "self": r["self"], "args": r["args"]})
             base.extend(fuzz_cases(r, rng, 3))
@@ -514,17 +679,29 @@ def gen_candidates(core, byname, recs, rng):
         add("heappure", "algebraic (§4.3)", "lawHeapPreserved C FUEL %s" % fdef,
             note="the call leaves the heap structurally unchanged", trivial=triv_heap)
         add("nonneg", "algebraic (§4.3)", "lawNonneg C FUEL %s" % fdef,
-            note="integer result is non-negative")
+            note="integer result is non-negative", trivial=triv_hole)
+        # Does the body actually *read* the parameter a law is about? On a synthesized
+        # domain a function that ignores its arguments satisfies `commutes` and
+        # `idempotent` for a reason that has nothing to do with the law.
+        pnames = f.get("params", []) or []
+        blob = json.dumps(core_body)
+        reads = [('"v": %s' % json.dumps(p)) in blob for p in pnames]
         if any(len(c["args"]) >= 1 for c in dom):
+            ins1 = synthetic and not (reads[:1] or [False])[0]
             add("identity", "algebraic (§4.3)", "lawIdentity C FUEL %s" % fdef,
-                note="returns its first argument unchanged")
+                note="returns its first argument unchanged",
+                extra={"argument_insensitive": ins1})
             add("idempotent", "algebraic (§4.3)", "lawIdempotent C FUEL %s" % fdef,
-                note="f (f x) = f x")
+                note="f (f x) = f x",
+                extra={"argument_insensitive": ins1})
             add("involutive", "algebraic (§4.3)", "lawInvolutive C FUEL %s" % fdef,
-                note="f (f x) = x")
+                note="f (f x) = x",
+                extra={"argument_insensitive": ins1})
         if any(len(c["args"]) >= 2 for c in dom):
+            ins2 = synthetic and not all(reads[:2] or [False, False])
             add("commutes", "algebraic (§4.3)", "lawCommutes C FUEL %s" % fdef,
-                note="symmetric in its first two arguments")
+                note="symmetric in its first two arguments",
+                extra={"argument_insensitive": ins2})
 
         # constants and projections are mined from what was observed, then refuted
         vals = [r["outcome"] for r in obs if r["outcome"][0] == "val"]
@@ -535,7 +712,7 @@ def gen_candidates(core, byname, recs, rng):
         exns = [r["outcome"] for r in obs if r["outcome"][0] == "exn"]
         if exns and not vals and all(e[1] == exns[0][1] for e in exns):
             add("raises", "artifact (§4.1)",
-                "lawRaises C FUEL %s (Val.str %s)" % (fdef, json.dumps(exns[0][1])),
+                "lawRaises C FUEL %s (Val.str %s)" % (fdef, lean_str(exns[0][1])),
                 note="always raises %s — the postcondition of a guard the suite "
                      "exercised" % exns[0][1])
         flds = set()
@@ -546,7 +723,7 @@ def gen_candidates(core, byname, recs, rng):
                     flds.update(k for k, _ in r["heap"][idx][1])
         for fld in sorted(flds)[:6]:
             add("projects", "algebraic (§4.3)",
-                "lawProjects C FUEL %s %s" % (fdef, json.dumps(fld)),
+                "lawProjects C FUEL %s %s" % (fdef, lean_str(fld)),
                 note="the accessor reads field %s" % fld,
                 tag="_" + re.sub(r'[^A-Za-z0-9]', '_', fld))
 
@@ -758,6 +935,84 @@ def guard_pass(cands, module, chunk=120):
 
 
 # ---------------------------------------------------------------------------
+# 6b. Characterization: what the translated function actually computes
+# ---------------------------------------------------------------------------
+#
+# Measured, not assumed: the mutation gate (`scripts/mutate.py`, the *sufficient* half of
+# the anti-vacuity check) rated the structural families WEAK on Linux. `lawRuns` and
+# `lawReturns` forbid only `.hole` and `.outOfFuel`, and most mutations of a body preserve
+# both — `radix_tree_tagged` with its two arguments swapped still returns a value, so the
+# theorem still proves and the mutant survives. On cachetools the family with teeth was
+# `conform_*`, which pins the exact outcome; C and C++ corpora have no runtime this
+# repository can drive, so that family does not exist for them.
+#
+# This is the honest replacement, and its name is chosen so that it can never be mistaken
+# for the other one:
+#
+#   * `conform_*` says *CPython produced this*. It is cross-implementation evidence.
+#   * `charact_*` says *this translation computes this*. It is a **characterization**
+#     (regression) theorem. The right-hand side is this system's own output, so it is
+#     emphatically NOT evidence that the translation is faithful to C, and the report
+#     records it under a separate key for exactly that reason.
+#
+# What it is good for is the thing the structural families are bad at: it pins every bit
+# of the result, so any mutation of the subject that changes what it computes breaks the
+# proof. A specification that cannot be broken by breaking the code is worthless, and this
+# is how the C corpora get one at all.
+#
+# Anti-vacuity, unchanged: a case whose result is `.hole` or `.outOfFuel` is dropped
+# (`EResult.beq .outOfFuel .outOfFuel` is `true`, which is the vacuity this whole file is
+# organised against), a subject with nothing left is dropped, and the `≠ outOfFuel` guard
+# still has to pass before the theorem is lifted off `FUEL`.
+
+def characterize(cands, module, chunk=60):
+    """Emit one `charact_*` candidate per subject that already has a surviving law."""
+    subjects = {}
+    for c in cands:
+        if c.kind == "law" and c.status == "candidate" and c.dom_kind == "case":
+            subjects.setdefault(c.subject, c)
+    todo = list(subjects.values())
+    out = []
+    for i in range(0, len(todo), chunk):
+        part = todo[i:i + chunk]
+        src = [HEADER % (module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL)]
+        for c in part:
+            src.append(domain_defs(c))
+            src.append('#eval IO.println ("@@%s@@" ++ String.intercalate "@|@" '
+                       '((dom_%s).map (fun x => ((repr (runCase C FUEL %s x).2).pretty '
+                       '(width := 100000000)))))\n' % (c.id, c.id, c.fdef))
+        src.append("end Autoform.SpecsGen.%s\n" % module)
+        rc, sout, err, path = lean_run("\n".join(src), "charact%d" % i, timeout=1800)
+        got = {}
+        for line in sout.splitlines():
+            m = re.match(r'@@([A-Za-z0-9_]+)@@(.*)$', line)
+            if m:
+                got[m.group(1)] = m.group(2).split("@|@")
+        for c in part:
+            res = got.get(c.id)
+            if res is None:
+                continue
+            keep = [(case, r) for case, r in zip(c.dom, res)
+                    if not (r.startswith("Autoform.Core.EResult.hole")
+                            or r.startswith("Autoform.Core.EResult.outOfFuel"))]
+            if len(keep) < MIN_LAW_DOMAIN:
+                continue
+            dom = ["{ case := %s, expected := %s }" % (case, r) for case, r in keep]
+            n = Cand("charact_" + c.id.split("_", 1)[1], "charact",
+                     "characterization (§4.2, NOT cross-runtime)", c.subject, c.fdef,
+                     "lawConform C FUEL %s" % c.fdef, dom, dom_kind="obs",
+                     note="the translated function computes exactly these results on "
+                          "these inputs. Right-hand sides are THIS interpreter's own "
+                          "output, recorded at FUEL: a regression/characterization "
+                          "theorem, not cross-implementation evidence")
+            n.extra["try_finally"] = c.extra.get("try_finally", False)
+            n.extra["self_recorded"] = True
+            out.append(n)
+    cands.extend(out)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # 7. The vacuity screen — the same check names §15 applied to FVSpec
 # ---------------------------------------------------------------------------
 
@@ -774,6 +1029,12 @@ def screen(cands):
             continue                                   # screened by construction below
         if not c.dom:
             c.status, c.reason = "vacuous", "empty_quantification: no domain"
+            continue
+        if c.extra.get("argument_insensitive"):
+            c.status = "vacuous"
+            c.reason = ("argument_insensitive: on a synthesized domain this law would "
+                        "hold because the body never reads the parameter it is about, "
+                        "not because the function has the property")
             continue
         if c.extra.get("structurally_trivial"):
             c.status = "vacuous"
@@ -808,30 +1069,34 @@ PROOF_CONST = """theorem %(id)s :
 
 PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
-      (fun _ self _ => ∃ r, self = .ref r)
+      (fun h self _ => ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+  rintro h _ args ⟨r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl r args
+    applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r args
+      hmod
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
-      (fun _ self _ => ∃ r, self = .ref r)
+      (fun h self _ => ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨r, rfl⟩
+  rintro h _ args ⟨r, rfl, hmod⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
-    applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl r args
+    applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
+      args hmod
 """
 
 FUEL_THM = """/-- Holds at **every** fuel budget at or above `FUEL`.
@@ -897,9 +1162,12 @@ Counts for this run are in `Autoform/SpecsGen/report.json`.
 '''
 
 
-def emit(cands, module, obligations_extra):
+def emit(cands, module, obligations_extra, ns=None):
+    """`ns` overrides the namespace, for the mutation-gate sample module: two files that
+    share a namespace also share declaration names, and importing both would clash."""
+    ns = ns or module
     survivors = [c for c in cands if c.status in ("candidate", "proved")]
-    out = [HEADER % (module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL)]
+    out = [HEADER % (module, ns, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL)]
     out.insert(1, DOC % {"module": module})
     obs = []
     thms = []
@@ -945,7 +1213,7 @@ def emit(cands, module, obligations_extra):
                                % (json.dumps(n), json.dumps(s), json.dumps(sub),
                                   json.dumps(r)) for n, s, sub, r in obs))
     out.append("#eval IO.println (renderObligations %s obligations)\n"
-               % json.dumps(module))
+               % json.dumps(ns))
     out.append("/-! ## Anti-vacuity gate\n\n`#audit_depends` fails the build if a "
                "theorem's proof term never mentions the generated definition it claims "
                "to be about — the necessary half of the gate. The sufficient half is "
@@ -957,22 +1225,31 @@ def emit(cands, module, obligations_extra):
                "`native_decide`\" is checked here rather than asserted in prose. -/\n")
     for tid, _fdef in thms:
         out.append("#audit_axioms %s" % tid)
-    out.append("\nend Autoform.SpecsGen.%s\n" % module)
+    out.append("\nend Autoform.SpecsGen.%s\n" % ns)
     return "\n".join(out), thms, obs
 
 
-def compile_repair(cands, module, path, rounds=6):
+def compile_repair(cands, module, path, rounds=6, timeout=5400, ns=None):
     """Emit, compile, and demote whatever will not prove to an open obligation.
 
     A generator that cannot prove a statement has exactly two honest options: state it
     without proof, or drop it. `sorry` is neither."""
     demoted = []
     for _ in range(rounds):
-        src, thms, _obs = emit(cands, module, demoted)
+        src, thms, _obs = emit(cands, module, demoted, ns=ns)
         with open(path, "w", encoding="utf-8") as f:
             f.write(src)
-        r = subprocess.run(["lake", "env", "lean", path], capture_output=True, text=True,
-                           env=ENV, cwd=REPO)
+        try:
+            r = subprocess.run(["lake", "env", "lean", path], capture_output=True,
+                               text=True, env=ENV, cwd=REPO, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kernel evaluation of a whole module of by-computation proofs is expensive
+            # and *can* diverge. A round that never returns is not a round that passed:
+            # stop, and say which file to look at.
+            print("  emission round exceeded %d s; the module is left on disk at %s but "
+                  "is NOT proved. Reduce --max-subjects or --domain and re-run."
+                  % (timeout, path))
+            return False, demoted, "compile timeout after %d s" % timeout
         if r.returncode == 0:
             for c in cands:
                 if c.status == "candidate":
@@ -1025,10 +1302,46 @@ def main():
                     help="cache the traced calls here; the repository's suite takes "
                          "minutes to run under `sys.settrace` and the recording is "
                          "deterministic, so re-running it on every iteration is waste")
+    ap.add_argument("--synthetic", action="store_true",
+                    help="there is no runtime of ours that can execute this corpus (C, "
+                         "C++): skip the trace step and fuzz the domain from the "
+                         "signature instead. Drops the conform/const/raises/projects "
+                         "families, which are mined from observations, and adds the "
+                         "`argument_insensitive` screen. See §3b")
+    ap.add_argument("--no-characterize", dest="characterize", action="store_false",
+                    help="skip the `charact_*` family (characterization theorems that "
+                         "pin what the translation computes). They are the only family "
+                         "the mutation gate can bite on when a corpus has no runtime to "
+                         "trace, so skipping them makes the output weaker, not purer")
+    ap.add_argument("--out", default=None,
+                    help="write the emitted module here instead of "
+                         "Autoform/SpecsGen/<Module>.lean. A targeted run "
+                         "(--only-subjects) must use it, or it would silently replace "
+                         "the full corpus module with a two-function one")
+    ap.add_argument("--only-subjects", default=None,
+                    help="`;`-separated function names (a C++ signature contains commas: mine candidates for exactly "
+                         "these call-closed functions and no others. Used to build a "
+                         "small module quickly (the mutation-gate target); a run made "
+                         "with it is recorded in the report as a targeted run, never as "
+                         "a census of the corpus")
+    ap.add_argument("--sample-subjects", type=int, default=4,
+                    help="also emit `<Module>Sample.lean`: the proved theorems about "
+                         "this many subjects, in their own namespace, as a mutation-gate "
+                         "target that rebuilds in minutes rather than an hour. 0 to skip")
+    ap.add_argument("--domain", type=int, default=8,
+                    help="cases per mined law (default %d). The kernel evaluates every "
+                         "one of them in every proof, so this is the main lever on how "
+                         "long emission takes" % 8)
+    ap.add_argument("--max-subjects", type=int, default=0,
+                    help="cap the number of call-closed functions candidates are mined "
+                         "for (0 = no cap). The cap is recorded in the report: a corpus "
+                         "with 1,000 analysable functions is not a corpus with as many "
+                         "as this run looked at")
     ap.add_argument("--json", dest="json_path",
                     default=os.path.join(OUTDIR, "report.json"))
     args = ap.parse_args()
 
+    globals()["MAX_DOMAIN"] = args.domain
     os.makedirs(OUTDIR, exist_ok=True)
     rng = random.Random(20260819)
 
@@ -1096,7 +1409,19 @@ def main():
              art["pbt_files"], art["pbt_properties"]))
 
     print("== 2. observations from the repository's own test suite")
-    if args.obs_cache and os.path.exists(args.obs_cache):
+    if args.synthetic:
+        # LOUD, not silent: this run has no cross-runtime evidence at all, and the
+        # report has to say so where a reader will trip over it rather than in a
+        # footnote. A quiet zero here would look exactly like a suite that ran and
+        # found nothing.
+        print("   SYNTHETIC MODE: this corpus has no runtime this repository can "
+              "trace, so NO observations are recorded and NO conformance theorem is "
+              "generated. The domains below are fuzzed from the signatures; the "
+              "families that are mined from observed outcomes (conform, const, "
+              "raises, projects) are absent by construction, not by accident.")
+        recs, stats, tests = [], {"skip_varargs": 0, "skip_unencodable_args": 0,
+                                  "skip_unencodable_ret": 0}, []
+    elif args.obs_cache and os.path.exists(args.obs_cache):
         blob = json.load(open(args.obs_cache))
         funcs, recs, stats, tests = (json.load(open(args.ast)), blob["recs"],
                                      blob["stats"], blob["tests"])
@@ -1108,11 +1433,40 @@ def main():
             json.dump({"recs": recs, "stats": stats, "tests": tests},
                       open(args.obs_cache, "w"))
     incore = [r for r in recs if r["name"] in set(core)]
+    if not args.synthetic and not recs:
+        print("REFUSING TO RUN: the trace step recorded zero calls, so every mined law "
+              "would be about a domain nobody supplied. That is silence, not a result. "
+              "Point --tests at a suite, or pass --synthetic if this corpus genuinely "
+              "has no runtime to trace.")
+        return 4
     print("   %d calls recorded over %d functions; %d of them in the call-closed core"
           % (len(recs), len(set(r["name"] for r in recs)), len(incore)))
 
     print("== 3. candidate generation")
-    cands = gen_candidates(core, byname, incore, rng)
+    subjects = core
+    if args.only_subjects:
+        want = [n.strip() for n in args.only_subjects.split(";") if n.strip()]
+        subjects = [n for n in core if n in want]
+        missing = [n for n in want if n not in subjects]
+        if missing:
+            # Asking for a function that is not in the call-closed core and getting a
+            # quietly smaller run is exactly the silence this repository keeps paying
+            # for. Name them.
+            print("   !! not in the call-closed core, so NOT mined: %s"
+                  % ", ".join(missing))
+        if not subjects:
+            print("REFUSING TO RUN: --only-subjects matched nothing in the call-closed "
+                  "core.")
+            return 5
+        print("   targeted run: %d of %d call-closed functions named on the command line"
+              % (len(subjects), len(core)))
+    elif args.max_subjects and len(core) > args.max_subjects:
+        # Deterministic and stated, so the report is not silently a sample presented as
+        # a census: sorted by name, first N.
+        subjects = sorted(core)[:args.max_subjects]
+        print("   capped at %d of %d call-closed functions (--max-subjects); the "
+              "report records the cap" % (len(subjects), len(core)))
+    cands = gen_candidates(subjects, byname, incore, rng, synthetic=args.synthetic)
     print("   %d candidates" % len(cands))
 
     print("== 4. refutation (fuzz every candidate before emitting anything)")
@@ -1136,6 +1490,17 @@ def main():
         json.dump(cache, open(args.refute_cache, "w"))
     refuted = [c for c in cands if c.status == "refuted"]
     nochk = [c for c in cands if c.status == "not_checked"]
+    if nochk:
+        # A candidate nobody could evaluate is not a candidate that passed. Say so where
+        # it cannot be mistaken for a verdict, and say why.
+        why = {}
+        for c in nochk:
+            e = (c.checked or {}).get("error", "")[-120:]
+            why[e] = why.get(e, 0) + 1
+        print("   !! %d candidates could NOT be evaluated at all — these are NOT "
+              "passes and are not emitted. Distinct Lean errors:" % len(nochk))
+        for e, n in sorted(why.items(), key=lambda kv: -kv[1])[:5]:
+            print("      %4d x %s" % (n, e.replace("\n", " ")))
     print("   %d refuted, %d not checkable, %d survive"
           % (len(refuted), len(nochk),
              len([c for c in cands if c.status == "candidate"])))
@@ -1150,6 +1515,16 @@ def main():
         print("   %-24s %d" % (k, v))
     survivors = [c for c in cands if c.status == "candidate"]
     print("   %d flagged vacuous, %d emitted" % (len(vac), len(survivors)))
+
+    print("== 5a. characterization (what the translation computes; NOT cross-runtime)")
+    if args.characterize:
+        made = characterize(cands, args.module)
+        print("   %d characterization theorems staged over %d subjects. These pin the "
+              "exact result and are what the mutation gate can bite on; they are NOT "
+              "evidence about the original C/C++/Python runtime and are reported "
+              "separately." % (len(made), len(set(c.subject for c in made))))
+    else:
+        print("   skipped (--no-characterize)")
 
     print("== 5b. fuel-independence guards (FuelMono side condition, evaluated)")
     guard_pass(cands, args.module)
@@ -1166,18 +1541,75 @@ def main():
                  c.extra.get("outOfFuel_second_run", 0)))
 
     print("== 6. emission + proof")
-    path = os.path.join(OUTDIR, "%s.lean" % args.module)
-    ok, demoted, log = compile_repair(cands, args.module, path)
+    path = args.out or os.path.join(OUTDIR, "%s.lean" % args.module)
+    if args.only_subjects and not args.out:
+        print("REFUSING TO RUN: a targeted --only-subjects run would overwrite the "
+              "corpus-wide module at %s with a handful of functions. Pass --out."
+              % path)
+        return 6
+    ns_override = (os.path.splitext(os.path.basename(path))[0]
+                   if args.out else args.module)
+    ok, demoted, log = compile_repair(cands, args.module, path, ns=ns_override)
     proved = [c for c in cands if c.proved]
     unproved = [c for c in cands if c.status == "unproved"]
     print("   %s: %d theorems proved, %d statements left open"
           % ("clean" if ok else "BUILD FAILED", len(proved), len(unproved)))
+
+    # ---- the mutation-gate target
+    #
+    # `#audit_depends` is the *necessary* half of the anti-vacuity gate; `scripts/mutate.py`
+    # is the sufficient half, and it has to rebuild the spec module once per mutant. The
+    # full module takes tens of minutes of kernel evaluation to check, so mutating against
+    # it is not something anyone will actually run. This emits a small, separately
+    # namespaced module carved from the same generated theorems -- same families, same
+    # proofs, a handful of subjects -- so the sufficient half can be run at all. It is a
+    # SAMPLE and the report says so: a kill rate measured on it is evidence about these
+    # families, not a statement about every emitted theorem.
+    sample_info = None
+    if ok and args.sample_subjects:
+        subs, chosen = [], []
+        for c in [c for c in cands if c.proved]:
+            if c.subject not in subs:
+                if len(subs) >= args.sample_subjects:
+                    continue
+                subs.append(c.subject)
+            chosen.append(c)
+        if chosen:
+            spath = os.path.join(OUTDIR, "%sSample.lean" % args.module)
+            src, sthms, _ = emit(chosen, args.module, [], ns=args.module + "Sample")
+            with open(spath, "w", encoding="utf-8") as f:
+                f.write(src)
+            rs = subprocess.run(["lake", "env", "lean", spath], capture_output=True,
+                                text=True, env=ENV, cwd=REPO, timeout=3600)
+            sample_info = {"file": spath, "theorems": len(sthms), "subjects": subs,
+                           "build_clean": rs.returncode == 0,
+                           "purpose": "fast target for scripts/mutate.py --spec-file; a "
+                                      "sample of the emitted families, not all of them"}
+            if rs.returncode != 0:
+                print("  sample module did not build; that is a failure, not a pass:\n%s"
+                      % (rs.stdout + rs.stderr)[-400:])
+            else:
+                print("   mutation-gate sample: %d theorems over %d subjects -> %s"
+                      % (len(sthms), len(subs), spath))
 
     considered = [c for c in cands if c.status != "not_checked"]
     vac_rate = (100.0 * len(vac) / len(considered)) if considered else 0.0
     report = {
         "module": args.module,
         "corpus": os.path.abspath(args.src_root),
+        "mode": "synthetic" if args.synthetic else "traced",
+        "cross_runtime_evidence": (not args.synthetic),
+        "self_recorded_families": ["charact"],
+        "self_recorded_note": ("`charact_*` right-hand sides are this interpreter's own "
+                               "output. They are characterization/regression theorems "
+                               "and are NOT cross-implementation evidence; only "
+                               "`conform_*` is, and it needs a runtime this repository "
+                               "can drive."),
+        "families_unavailable": (["conform", "const", "raises", "projects"]
+                                 if args.synthetic else []),
+        "subjects_considered": len(subjects),
+        "max_subjects": args.max_subjects or None,
+        "only_subjects": args.only_subjects,
         "functions": len(funcs),
         "call_closed": len(core),
         "artifacts": art,
@@ -1196,6 +1628,7 @@ def main():
                                                  if c.proved and c.kind == "law"
                                                  and not c.extra.get("fuel_mono")]),
         "build_clean": ok,
+        "mutation_sample": sample_info,
         "fuel_independent": len([c for c in cands
                                  if c.proved and c.extra.get("fuel_mono")]),
         "fuel_obligations_remaining": len([c for c in cands

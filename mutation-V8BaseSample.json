@@ -1,0 +1,831 @@
+{
+  "file": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-8/Autoform/Generated/V8Base.lean",
+  "module": "Autoform.Generated.V8Base",
+  "seed": 20260819,
+  "operators": "generated-ast",
+  "spec_file": "/Users/mbhatt/autoform/.claude/worktrees/wf_1d09ec09-18b-8/Autoform/SpecsGen/V8BaseSample.lean",
+  "spec_module": "Autoform.SpecsGen.V8BaseSample",
+  "decls": [
+    "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+    "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_"
+  ],
+  "mutants_generated": 34,
+  "mutants_run": 12,
+  "invalid": 3,
+  "inconclusive": 0,
+  "theorems": {
+    "C_tfFree": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": {
+      "killed": 1,
+      "survived": 8,
+      "score": 0.1111111111111111,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": {
+      "killed": 0,
+      "survived": 9,
+      "score": 0.0,
+      "scope": "all-mutants",
+      "coverage_score": 0.0,
+      "verdict": "VACUOUS",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    },
+    "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": {
+      "killed": 4,
+      "survived": 5,
+      "score": 0.4444444444444444,
+      "scope": "all-mutants",
+      "coverage_score": 0.4444444444444444,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-binop:%->/",
+          "line": 285,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        }
+      ]
+    },
+    "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": {
+      "killed": 1,
+      "survived": 8,
+      "score": 0.1111111111111111,
+      "scope": "all-mutants",
+      "coverage_score": 0.1111111111111111,
+      "verdict": "WEAK",
+      "survivors": [
+        {
+          "op": "ast-int:1->0",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-int:1->0",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 281,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+          "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))"
+        },
+        {
+          "op": "ast-name:lhs->rhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 282,
+          "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-int:1->2",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))"
+        },
+        {
+          "op": "ast-name:rhs->lhs",
+          "line": 271,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+          "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }"
+        },
+        {
+          "op": "ast-binop:==->!=",
+          "line": 268,
+          "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+          "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+          "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))"
+        }
+      ]
+    }
+  },
+  "mutants": [
+    {
+      "op": "ast-int:0->-1",
+      "line": 269,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "              (.ret (.lit (.int 0)))",
+      "after": "              (.ret (.lit (.int -1)))",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 268,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-binop:%->/",
+      "line": 285,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+      "after": "            (.ret (.binop \"/\" (.name \"lhs\") (.name \"rhs\")))) }",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "killed"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:1->0",
+      "line": 282,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 0)))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:rhs->lhs",
+      "line": 281,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+      "after": "                (.binop \"==\" (.name \"lhs\") (.lit (.int 0)))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:lhs->rhs",
+      "line": 271,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+      "after": "            (.ret (.binop \"%\" (.name \"rhs\") (.name \"rhs\")))) }",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "killed",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 282,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 283,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "              (.ret (.lit (.int 0)))",
+      "after": "              (.ret (.lit (.int -1)))",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-int:0->-1",
+      "line": 281,
+      "decl": "f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.lit (.int 0)))",
+      "after": "                (.binop \"==\" (.name \"rhs\") (.lit (.int -1)))",
+      "verdict": "invalid"
+    },
+    {
+      "op": "ast-int:1->2",
+      "line": 268,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "after": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 2)))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "killed",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-name:rhs->lhs",
+      "line": 271,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"rhs\")))) }",
+      "after": "            (.ret (.binop \"%\" (.name \"lhs\") (.name \"lhs\")))) }",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "killed",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "killed",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    },
+    {
+      "op": "ast-binop:==->!=",
+      "line": 268,
+      "decl": "f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_",
+      "before": "                (.binop \"==\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "after": "                (.binop \"!=\" (.name \"rhs\") (.unop \"-\" (.lit (.int 1)))))",
+      "verdict": {
+        "C_tfFree": "survived",
+        "runs_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "survived",
+        "runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived",
+        "uconst_v8_base_debug_EnableInProcessStackDumping_duplicate_0_bool": "survived",
+        "uconst_v8_base_debug_BacktraceOutputHandler_OutputFileDescriptor_int___const": "survived",
+        "charact_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t": "killed",
+        "charact_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t": "survived"
+      },
+      "timeout": false
+    }
+  ],
+  "coarse_attributions": 0
+}
