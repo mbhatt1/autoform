@@ -183,10 +183,19 @@ class TestHoleContract:
         assert not bad, sorted(bad)
 
     def test_import_holes_use_the_documented_vocabulary(self, corpora):
-        """The import resolver has exactly two honest outcomes it can report as a hole:
-        a module *value* it refuses to invent, and a name it could not resolve. A third
-        label means somebody widened the resolver without saying so."""
-        allowed = {"import:module-value", "import:unresolved"}
+        """The import resolver reports a hole under a closed vocabulary, and each label
+        names *why* the import was not translated. The set below is the whole of it;
+        a label outside it means somebody widened the resolver without saying so.
+
+        `import:absent:*` are the three-way split of what `import:unresolved` used to
+        conflate (see cartographer/export_ast.sc `absentModule`): a relative import
+        whose target is not in the CPG, one whose *prefix* is in the CPG (so more
+        exporter work could resolve it), and one that is simply external. Widening this
+        set is fine when the exporter genuinely gains a label -- but it must be a
+        deliberate edit here, not a silent pass."""
+        allowed = {"import:module-value", "import:unresolved",
+                   "import:absent:relative", "import:absent:prefix-in-cpg",
+                   "import:absent:external"}
         seen = set()
         for funcs in corpora.values():
             for n in walk(funcs):

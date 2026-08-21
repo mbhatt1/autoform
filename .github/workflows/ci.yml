@@ -123,6 +123,16 @@ jobs:
       - name: check_docs — documented figures match the artifacts
         run: python3 scripts/check_docs.py
 
+      # The Python tooling is ~8,000 lines that gate every downstream claim; until
+      # tests/ existed none of it was tested. Each of the five regression classes in
+      # tests/test_regressions.py reconstructs a *silent* failure that once shipped,
+      # so a green run here is evidence the checkers still fail when they should.
+      - name: pytest — the Python tooling
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/ -q
+
       # Cheap, deterministic guard on the one invariant this repo has an
       # explicit rule about: the fuel-monotonicity exclusion list. Widening
       # it is how a genuine break gets hidden instead of proved.

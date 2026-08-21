@@ -122,8 +122,15 @@ def _docs_repo(tmp_path, ledger_functions, ast_functions, doc_functions=None):
                  % doc_functions)
     with open(os.path.join(d, "docs", "contracts.md"), "w") as fh:
         fh.write("hole-free and 45 are call-closed\n")
+        # check_docs was widened after this fixture was first written; every row in
+        # its CHECKS table must have a line here, or the run fails with "no longer
+        # matches" and the fixture -- not the checker -- is what is broken.
+        fh.write("On `cachetools`, 100 of %d functions are hole-free.\n"
+                 % doc_functions)
     with open(os.path.join(d, "docs", "languages.md"), "w") as fh:
         fh.write("| Python | x | %d | 42%% |\n" % doc_functions)
+        fh.write("the ledger's population (%d for cachetools) is the denominator.\n"
+                 % doc_functions)
     with open(os.path.join(d, "README.md"), "w") as fh:
         fh.write("| 0 holes, all named |\n")
     return d
