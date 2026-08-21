@@ -1,0 +1,96 @@
+{
+  "module": "LinuxCrypto",
+  "dialect": "c",
+  "source": "linux/crypto (1955 functions, from /tmp/final-LinuxCrypto.json)",
+  "produced": "2026-08-19",
+  "why_this_file_exists": "ledger-*.json and sacm-*.json are gitignored, so the numbers they carry would not survive the commit. This is a small, committable transcription of the three runs, plus two recomputations made independently of the artifacts themselves.",
+  "ledger": {
+    "artifact": "ledger-LinuxCrypto.json (gitignored)",
+    "wall_clock_seconds": 3,
+    "functions": 1955,
+    "ast_nodes": 78136,
+    "holes": 5886,
+    "hole_free_upper_bound": 692,
+    "verifiable_core_static": 318,
+    "dynamic_hole_risk_constructs": 18541,
+    "top_hole_labels": {
+      "op:arrayInitializer": 617,
+      "op:addressOf:field:unknown-type": 462,
+      "control:GOTO": 434,
+      "expr:BLOCK-prelude": 425,
+      "op:sizeOf": 369,
+      "op:xor": 342,
+      "stmt:UNKNOWN:static": 237,
+      "op:and": 235,
+      "op:cast:pointer": 210,
+      "control:FOR": 181
+    },
+    "distinct_hole_labels": 370,
+    "note": "The ledger is quadratic in Ctx.resolve, but at 1955 functions it finished in 3 s, not the 363 s Django needed. It is not a bottleneck at this size."
+  },
+  "assurance_case": {
+    "artifact": "sacm-LinuxCrypto.json (gitignored)",
+    "top_claim": "UNDEVELOPED",
+    "goals": {
+      "G1 module behaves as specified": "UNDEVELOPED",
+      "G2 semantics+transpiler agree with the real runtime": "UNDEVELOPED (conformance.json absent: no differential run exists for any C corpus)",
+      "G3 every function translated without holes": "UNSUPPORTED (1263/1955 functions carry at least one hole)",
+      "G3.1 the 318-function core is statically hole-free and call-closed": "SUPPORTED (STATIC) but COUNTERED by D3.1",
+      "G3.2 the core is hole-free at RUNTIME": "DEFEATED by execution (182/318)",
+      "G4 specifications are non-vacuous": "UNDEVELOPED (mutation.json absent for this module)",
+      "G5 theorems kernel-checked, no unsound axiom": "UNDEVELOPED (no theorems about LinuxCrypto exist, and no module-scoped axiom dump)"
+    },
+    "defeaters": {
+      "D3.1": "REFUTED BY EXECUTION: 136 of the 318 claimed-core functions hole when run.",
+      "D3": "Func.total is computed from the AST it describes; undefeated except where execution looked."
+    },
+    "artifacts_missing": ["audit", "axioms", "conformance", "contracts", "graph", "mutation"],
+    "note": "sacm.py reads the fixed filename core-oracle.json and requires its module tag to match, so it was run with --root pointing at a scratch directory holding ast-LinuxCrypto.json, ledger-LinuxCrypto.json and core-oracle-LinuxCrypto.json copied to core-oracle.json. Run from the repo root it reports G3.2 UNSUPPORTED / coverage 0% because the repo-root core-oracle.json is tagged Cachetools. That provenance check is correct behaviour, not a bug; the per-module filename is the gap."
+  },
+  "execution_oracle": {
+    "artifact": "core-oracle-LinuxCrypto.json (committed)",
+    "inputs": "synthetic only, 12 per function, fuel 5000, seed 20260819",
+    "real_inputs": 0,
+    "real_input_reason": "core_oracle.py derives real arguments by tracing a Python test suite with differential.py's tracer. LinuxCrypto is C kernel code with no runnable in-tree suite reachable from here, so every input is synthetic. Zero real-input evidence: no claim here rests on a recorded call.",
+    "cases_executed": 3816,
+    "cases_answered": 3816,
+    "claimed_core": 318,
+    "core_functions_exercised": 318,
+    "never_holed": 182,
+    "holed_on_some_input": 136,
+    "holed_on_a_real_input": 0,
+    "inconclusive": 0,
+    "static_overstatement_ratio": 1.75,
+    "comparison_cachetools": {
+      "claimed_core": 74, "never_holed": 30, "ratio": 2.47,
+      "note": "Python. The C ratio is LOWER, but only because C's static core is already tiny (318/1955 = 16% vs 74/238 = 31%) and, as the recomputation below shows, mostly empty."
+    },
+    "top_runtime_hole_labels": {
+      "unop:-": 298, "op:indirection:pointer": 96, "control:FOR": 84,
+      "field:sk:non-object": 84, "call:crypto_skcipher_reqtfm": 72,
+      "call:ahash_request_ctx": 60, "op:addressOf:field:unknown-type": 48,
+      "op:alloc:array-decl": 48, "call:kpp_tfm_ctx": 48
+    },
+    "refuted_regardless_of_input_shape": 100,
+    "refuted_only_via_argument_shape": 29,
+    "refuted_mixed": 7,
+    "shape_caveat": "29 of the 136 refutations hole only with labels of the form field:X:non-object / setField:X:non-object, i.e. because a synthetic int was passed where the C code expects a pointer to a struct. Those are weaker evidence: the apparatus chose the shape. The other 107 hole on constructs (unop:-, control:FOR, op:indirection:pointer, op:alloc:array-decl, call:<untranslated callee>) that no choice of argument avoids.",
+    "call_closure_refuted": "Labels of the form call:crypto_skcipher_reqtfm, call:ahash_request_ctx, call:kpp_tfm_ctx are callee resolutions that failed at runtime inside functions the ledger declared CALL-CLOSED. Static call closure is itself overstated here, not just hole-freedom."
+  },
+  "independent_recomputation": {
+    "method": "Recomputed from ast-LinuxCrypto.json, not from the oracle's own output: classify each surviving function by whether its body is semantically empty (skip, or a seq of skips).",
+    "survivors_total": 182,
+    "survivors_with_empty_body": 154,
+    "survivors_that_do_anything": 28,
+    "module_wide_empty_body_functions": 154,
+    "refuted_functions_with_empty_body": 0,
+    "reading": "Every empty-body function in the module lands in the survivor set, and they make up 85% of it. An empty body cannot hole; it also cannot be evidence. The honest verifiable core of LinuxCrypto is 28 functions out of 1955 (1.4%), several of them the crypto_null no-ops (null_crypt, null_final, null_setkey, skcipher_noexport). Against that denominator the static claim of 318 overstates by 11.4x, not 1.75x.",
+    "empty_bodies_are_a_transpiler_artifact": "Joern materialises kernel macros and declarations (EXPORT_SYMBOL, DEFINE_MUTEX, MODULE_ALIAS_CRYPTO, DECLARE_WORK, per-file <global> nodes) as functions with no body. They are counted in all three of the 1955 / 692 / 318 figures."
+  },
+  "tool_fix": {
+    "file": "scripts/core_oracle.py",
+    "bug": "The Lean harness called `applyFunc ctx fuel h fn self args` — a signature that no longer exists: applyFunc gained a trailing `List (String x Val)` keyword-argument parameter. The scratch module failed to elaborate, so Lean answered nothing for every case and each one was bucketed as no_answer. The run would have reported 318/318 INCONCLUSIVE, 0 refuted, on a corpus where 136 functions actually hole.",
+    "fix": "pass [] for kwargs, and add a SMOKE GATE: the first case must produce an answer or the run aborts with Lean's diagnostics printed, instead of reporting a core-wide silence as a result.",
+    "unfixed_elsewhere": "scripts/differential.py line ~1557 emits the same stale call and is owned by another agent this session. It was not touched. Any differential/conformance run for any module will fail there until it is updated."
+  }
+}
