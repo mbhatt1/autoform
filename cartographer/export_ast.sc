@@ -1160,9 +1160,24 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     (1 until segs.length).exists(i => moduleAtTolerant(segs.take(i).mkString("/")).isDefined)
   }
 
-  /** A module this CPG does not contain, named by *why* we do not have it. */
+  /** A module this CPG does not contain, named by *why* we do not have it.
+    *
+    * `__future__` is not a module in the ordinary sense and is handled first. A
+    * `from __future__ import annotations` is a COMPILER DIRECTIVE: it changes how the
+    * *compiler* treats the source and binds a `_Feature` object nobody reads. Its runtime
+    * effect on the translated program is nothing, so `Lit.unit` is the exact value, not an
+    * approximation -- the same argument as eliding an uncontended lock in a sequential
+    * semantics. 518 of Ansible's 2,400 absent-module holes are this one import, and each
+    * of them was making a module initialiser unanalysable for a directive that does not
+    * execute.
+    *
+    * Deliberately only `__future__`. Every other absent module is a real value the program
+    * may read, and inventing one would be the mistranslation this label exists to prevent. */
   def absentModule(path: String, relative: Boolean): ujson.Obj =
-    if (relative)                  hole("import:absent:relative")
+    if (path.split('/').lastOption.contains("__future__") ||
+        path.split('/').headOption.contains("__future__"))
+                                   ujson.Obj("k" -> "unit")
+    else if (relative)             hole("import:absent:relative")
     else if (prefixInCpg(path))    hole("import:absent:prefix-in-cpg")
     else                           hole("import:absent:external")
 
