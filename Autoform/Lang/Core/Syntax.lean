@@ -201,6 +201,21 @@ def typeName : BuiltinBase → String
 
 end BuiltinBase
 
+/-- The mutable container payload an object carries, if any.
+
+**Step 1 of `docs/boxed-containers.md`, and deliberately inert.** Nothing constructs a
+payload other than `.none` yet, so no behaviour changes and no corpus needs regeneration.
+The point of landing it separately is that the oracle numbers move at step 3, and a number
+that moves two steps after the field appeared cannot be attributed to the field. -/
+inductive Payload where
+  /-- An ordinary instance: no builtin container behind it. -/
+  | none  : Payload
+  | list  : List Val → Payload
+  | dict  : List (Val × Val) → Payload
+  /-- `tuple` SUBCLASS instances only -- plain tuples stay values, see the doc's section 1. -/
+  | tuple : List Val → Payload
+  deriving Repr, Inhabited
+
 /-- A heap object: its class and its mutable fields. -/
 structure Obj where
   cls    : String
@@ -208,6 +223,13 @@ structure Obj where
   /-- Bindings captured by the class that produced this object, if it was defined inside
   a function. Resolved after the object's own fields and before globals. -/
   captured : List (String × Val) := []
+  /-- The builtin container this object IS, if it is one. `.none` for every object Core
+  currently builds. -/
+  payload  : Payload := .none
+  /-- Bumped by every mutation. Iterators record it, so that a change during iteration can
+  become CPython's `RuntimeError` rather than a silently different answer. Inert until
+  step 4. -/
+  version  : Nat := 0
   deriving Repr, Inhabited
 
 /-- The heap. Index into the list is the `Ref`; allocation appends. -/
@@ -232,6 +254,21 @@ def getField (h : Heap) (r : Ref) (f : String) : Val :=
 /-- Write a field, shadowing any previous binding. -/
 def setField (h : Heap) (r : Ref) (f : String) (v : Val) : Heap :=
   h.mapIdx fun i o => if i == r then { o with fields := (f, v) :: o.fields } else o
+
+/-- Read an object's container payload. `.none` for a dangling reference, which is the same
+answer as for an ordinary instance -- the caller must already have established the
+reference is live, exactly as `getField` requires. -/
+def payload (h : Heap) (r : Ref) : Payload :=
+  match h.get r with
+  | none   => .none
+  | some o => o.payload
+
+/-- Replace an object's container payload and BUMP ITS VERSION. The two always move
+together: a payload write that left the version alone would be invisible to an iterator,
+which is the silent-wrong failure this field exists to prevent. -/
+def setPayload (h : Heap) (r : Ref) (p : Payload) : Heap :=
+  h.mapIdx fun i o =>
+    if i == r then { o with payload := p, version := o.version + 1 } else o
 
 end Heap
 

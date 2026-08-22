@@ -1,7 +1,14 @@
 # Boxed containers for Core
 
-**Status: unimplemented design.** Nothing in this document is built. It is written to be
-read before `Syntax.lean` and `Semantics.lean` are changed.
+**Status: step 1 of 5 landed; steps 2-5 unimplemented.** Read this before changing
+`Syntax.lean` or `Semantics.lean`.
+
+Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) is in the tree and is
+INERT: nothing constructs a payload other than `.none`. It cost zero proof changes and zero
+corpus regeneration, and the oracle is unchanged at 35 compared / 169-174 agree, which is
+the check that it is really inert. It is landed separately for the reason section 10 gives --
+the numbers move at step 3, and a number that moves two steps after the field appeared cannot
+be blamed on the field.
 
 **Problem.** `Val.list`, `Val.tuple` and `Val.dict` are *values*. Python's are *objects*.
 The consequences are all currently visible in the ledger and the oracle:
