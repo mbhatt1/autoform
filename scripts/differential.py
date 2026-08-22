@@ -551,6 +551,25 @@ def bind_args(order, loc, enc, ast_params, self_name):
             slf = enc.enc(loc[n])
             continue
         v = loc[n]
+        if kind == "star":
+            # SPREAD, do not pass the packed tuple.
+            #
+            # A frame's `*args` local is already the packed tuple. Passing it as one
+            # positional argument was right while Core had no calling convention -- it
+            # simply bound to the first parameter. Now `bindParams` packs the surplus
+            # positionals itself, so passing the packed value packs it AGAIN:
+            # `hashkey(0)` came out as `((0,), {})` against CPython's `(0,)`, and was
+            # reported as a divergence in the semantics. The bug was here.
+            for elem in v:
+                args.append(enc.enc(elem))
+            continue
+        if kind == "dstar":
+            # The harness has no keyword channel (it calls `applyFunc … args []`), so a
+            # non-empty `**kwargs` cannot be represented and must be refused rather than
+            # flattened into positionals, which would bind to the wrong parameters.
+            if v:
+                raise ParamMismatch("non-empty **%s cannot be passed positionally" % n)
+            continue
         args.append(enc.enc(v))
     return slf, args
 
