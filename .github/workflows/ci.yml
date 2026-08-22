@@ -115,6 +115,40 @@ jobs:
       - name: check_specs_fresh — specs describe the corpus in the tree
         run: python3 scripts/check_specs_fresh.py
 
+      # THE CONFORMANCE ORACLE MUST NOT BE DARK.
+      #
+      # differential.py is the only check that compares the semantics to a real runtime;
+      # everything else compares the project to itself. It reported 534 of 534 cases
+      # INCONCLUSIVE ("lean-no-answer") on cachetools for an unknown number of commits
+      # while every gate in this file stayed green, because an oracle that CANNOT RUN
+      # reported identically to one that ran and abstained -- and the headline read
+      # "0 divergences", the best possible number.
+      #
+      # So this step does not check the agreement RATE, which moves with the corpus. It
+      # checks that the oracle decided anything at all. Zero compared cases is a failure.
+      # The corpus is not vendored: ast-Cachetools.json is tracked, the sources are not.
+      # The harness needs the sources because it records its inputs by tracing the
+      # project's own test suite, which is the whole reason its cases are realistic.
+      - name: Fetch the cachetools corpus
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cachetools
+          git clone --depth 1 https://github.com/tkem/cachetools /tmp/cachetools
+          test -d /tmp/cachetools/src
+
+      - name: Conformance oracle is alive (compared > 0)
+        run: |
+          set -euo pipefail
+          AUTOFORM_NO_REEXEC=1 python3 scripts/differential.py \
+            ast-Cachetools.json /tmp/cachetools Cachetools 5 | tee /tmp/conf-ci.log
+          compared=$(sed -n 's/.*, \([0-9]*\) COMPARED .*/\1/p' /tmp/conf-ci.log | head -1)
+          echo "compared=${compared:-0}"
+          if [ "${compared:-0}" -eq 0 ]; then
+            echo "FAIL: the conformance oracle compared 0 cases. It is not deciding" >&2
+            echo "anything, which is indistinguishable from agreeing about everything." >&2
+            exit 1
+          fi
+
       # check_docs cross-checks the ledger against the AST, and the ledger
       # is gitignored (it is a build product). On a fresh clone it is absent,
       # and check_docs correctly treats absence as a FAILURE rather than a
