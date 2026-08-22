@@ -2813,3 +2813,29 @@ is worth: it proves the pipeline can still report a disagreement end to end -- e
 harness, parser, comparison. It does not prove the semantics are right about anything the
 oracle never reaches, which is still 145 of 180 hole-free functions.
 
+## 50. A loader bug that looked like unreachable code
+
+`load_module` loaded a corpus file BY PATH, which gives it a synthetic top-level name
+(`cachetools__init___py`). Every RELATIVE import inside such a module then fails: `from . import
+keys` has no package to be relative to. `load_module` caught the exception and returned
+`None`, the caller did `continue`, and the functions in that file got no cases.
+
+That is not an edge case. It is every package `__init__.py`, which is where a library puts
+its public API. Here it cost `cached`, `cachedmethod` and `_cache` -- and the report called
+them "hole-free, no case built", which reads as "the harness could not think of an argument"
+rather than "the file never loaded".
+
+Asking for the module by package name first, and keeping the path loader as the fallback for
+a corpus that is not an importable package:
+
+    compared    35 -> 38 of 180 hole-free (19% -> 21%)
+    cases       174 -> 189
+    agree       189/189 (100%), 0 divergences
+
+Fifteen new cases, all agreeing. This is the third distinct failure this session where the
+oracle reported a SEMANTIC blocker for something that was purely mechanical -- after the
+false "constructor rejected" cause (section 48) and the lazily-imported submodules that made
+`find_class` return `None` for 48 functions. The pattern is consistent enough to state as a
+rule: when the report says a function is unreachable, check that the harness can load and
+call it AT ALL before believing anything about the semantics.
+

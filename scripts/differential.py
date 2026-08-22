@@ -1085,7 +1085,21 @@ def call_in_child_twice(fn, args):
 
 
 def load_module(path, root):
-    name = re.sub(r'[^A-Za-z0-9_]', '_', os.path.relpath(path, root))
+    """The module for a source file.
+
+    Ask for it BY PACKAGE NAME first. Loading a file by path gives it a synthetic top-level
+    name (`cachetools__init___py`), which makes every RELATIVE import inside it fail --
+    `from . import keys` has no package to be relative to. That is not an edge case: it is
+    every package `__init__.py`, and here it silently cost `cached`, `cachedmethod` and
+    `_cache` their cases, which then reported as "hole-free, no case built" as though the
+    functions were unreachable rather than the loader broken.
+
+    The path loader stays as the fallback, for a corpus that is not an importable package."""
+    rel = os.path.relpath(path, root)
+    m = find_module(rel)
+    if m is not None:
+        return m
+    name = re.sub(r'[^A-Za-z0-9_]', '_', rel)
     spec = importlib.util.spec_from_file_location(name, path)
     m = importlib.util.module_from_spec(spec)
     sys.path.insert(0, root)
