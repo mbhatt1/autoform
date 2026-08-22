@@ -2839,3 +2839,30 @@ false "constructor rejected" cause (section 48) and the lazily-imported submodul
 rule: when the report says a function is unreachable, check that the harness can load and
 call it AT ALL before believing anything about the semantics.
 
+## 51. Reaching closures through their factory: reach up, coverage flat
+
+A decorator's `wrapper`, and the `Descriptor.Wrapper` classes cachetools builds inside
+`_condition`/`_locked`/`_unlocked`, do not exist until their factory runs. They are closures,
+not module attributes. Splitting the qualified name on the last dot classified them as
+`Class.method`, so the report said "class not found" -- true, and useless: nothing is wrong
+with the class, it has not been created yet.
+
+`resolve_via_factory` calls the factory with synthesized arguments and then walks the
+remaining name segments, accepting three shapes: an attribute of the result
+(`wrapper.cache_clear`), the result ITSELF when the factory returns the thing being named
+(`_locked` returns `wrapper`), or a nested class to construct.
+
+    exercised    85 -> 91
+    COMPARED     38 -> 38, unchanged
+    cases        189 -> 189 compared, INCONCLUSIVE 236 -> 266
+
+**The headline did not move, and that is the honest result.** All six newly reached
+functions produce cases that Core cannot answer: they land in `runtime holes mcall` (20 ->
+21), `call` (15 -> 16) and `field` (6 -> 10). What changed is the ATTRIBUTION. Those six were
+being counted against the harness's inability to construct a receiver; they are now counted
+against holes in the semantics, which is where the work actually is.
+
+Kept rather than reverted -- unlike section 48a, which cost a compared function and fixed
+nothing -- because it costs nothing measured and it stops six functions being blamed on the
+wrong component. The capability pays off when those holes close, not before.
+

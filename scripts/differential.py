@@ -856,6 +856,98 @@ def _ctor_fallback(n):
     return 1
 
 
+def _direct_cases(fn, f, pool, ncases, out):
+    """Call a plain callable with synthesized arguments and append the cases it yields."""
+    try:
+        order = frame_param_order(fn.__code__)
+    except Exception:                                       # noqa: BLE001
+        return 0
+    if any(k in ("star", "dstar", "kwonly") for _, k in order):
+        return 0
+    names = [n for n, _ in order]
+    if names != list(f["params"]):
+        return 0
+    made = 0
+    for attempt in range(ncases * 3):
+        if made >= ncases:
+            break
+        argv = []
+        for n in names:
+            cand = pool.get(n) or []
+            argv.append(cand[attempt % len(cand)] if cand else random.randint(-8, 8))
+        enc = Encoder()
+        try:
+            eargs = [enc.enc(a) for a in argv]
+        except Unencodable:
+            return made
+        enc.freeze()
+        try:
+            with time_limit(2.0):
+                got = fn(*argv)
+            outcome = ("val", enc.enc_result(got))
+        except Timeout:
+            return made
+        except Unencodable:
+            continue
+        except Exception as e:                              # noqa: BLE001
+            outcome = ("exn", type(e).__name__)
+        out.append({"name": f["name"], "heap": enc.heap, "self": None,
+                    "args": eargs, "outcome": outcome, "origin": "constructed"})
+        made += 1
+    return made
+
+
+def _factory_args(fn, pool):
+    """Arguments for calling a factory, drawn from observed values then by name."""
+    try:
+        order = frame_param_order(fn.__code__)
+    except Exception:                                       # noqa: BLE001
+        return []
+    if any(k in ("star", "dstar", "kwonly") for _, k in order):
+        return []
+    out = []
+    for n, _ in order:
+        cand = pool.get(n) or []
+        out.append(cand[0] if cand else _ctor_fallback(n))
+    return out
+
+
+def resolve_via_factory(mod, clsname, attr, pool):
+    """The callable named `clsname.attr`, reached by CALLING the factory that defines it.
+
+    A decorator's `wrapper` and the `Descriptor.Wrapper` classes cachetools builds inside
+    `_condition`/`_locked`/`_unlocked` do not exist until their factory runs -- they are
+    closures, not module attributes. Splitting the qualified name on the last dot had
+    classified them as `Class.method`, so the report said "class not found", which is true
+    and useless: nothing is wrong with the class, it simply has not been created yet.
+
+    Returns a routine to call directly, a class to construct, or None. Never raises: a
+    factory that rejects fabricated arguments is a missing case, not a failure."""
+    segs = clsname.split(".")
+    root = getattr(mod, segs[0], None)
+    if root is None or not inspect.isroutine(root):
+        return None
+    try:
+        with time_limit(2.0):
+            obj = root(*_factory_args(root, pool))
+    except Exception:                                       # noqa: BLE001
+        return None
+    for sname in segs[1:]:
+        obj = getattr(obj, sname, None)
+        if obj is None:
+            return None
+    target = getattr(obj, attr, None)
+    if target is not None and (inspect.isroutine(target) or isinstance(target, type)):
+        return target
+    # the factory's RESULT may itself be the thing named `attr` (`_locked` returns
+    # `wrapper`), in which case there is no attribute to look up
+    if inspect.isroutine(obj) and getattr(obj, "__qualname__", "").split(".")[-1] == attr:
+        return obj
+    if isinstance(obj, type):
+        return obj
+    return None
+
+
 def constructed_cases(methods, reached, live, pool, stats, ncases):
     """Exercise hole-free methods the test suite never called.
 
@@ -905,6 +997,15 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                     why[qual] = "module for %s not imported by the suite" % rel
                     continue
                 if pobj is not None and inspect.isroutine(pobj):
+                    tgt = resolve_via_factory(m, clsname, attr, pool)
+                    if tgt is not None and inspect.isroutine(tgt):
+                        made = _direct_cases(tgt, f, pool, ncases, out)
+                        if made:
+                            why.pop(qual, None)
+                            continue
+                        why[qual] = ("reached through %s(...), but no case survived "
+                                     "encoding" % parent)
+                        continue
                     why[qual] = ("nested function, not a method: needs %s(...) called and "
                                  "its result captured" % parent)
                 else:
