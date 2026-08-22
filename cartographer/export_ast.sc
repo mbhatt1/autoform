@@ -184,6 +184,44 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
   val skip = ujson.Obj("k" -> "skip")
 
+  /** Kernel synchronisation primitives, which a SEQUENTIAL semantics cannot observe.
+    *
+    * Core is a single-threaded interpreter: no threads, no scheduler, no interleaving.
+    * In that semantics `spin_lock(&l)` acquires an uncontended lock and `spin_unlock(&l)`
+    * releases it, and neither changes any value the program can read. Eliding them is not
+    * an approximation of concurrent behaviour -- it is the exact behaviour of the
+    * semantics Core defines, and the assumption it rests on ("execution is sequential") is
+    * one Core makes globally, not a new one introduced here.
+    *
+    * This matters because these calls dominate the C hole count: 2,577 of the 2,867
+    * `op:addressOf:local` sites across Linux `lib/` and `crypto/` -- 90% -- are `&lock`
+    * passed to one of these. They were holes for a reason that has nothing to do with
+    * pointers: `&l` cannot be represented, so the call could not be translated, so a
+    * `mutex_lock` made its whole function unanalysable.
+    *
+    * WHAT IS GIVEN UP, stated plainly: Core will run a program whose locking is wrong
+    * exactly as it runs one whose locking is right, so no data race, deadlock or missing
+    * critical section is detectable here. That was already true -- Core has no threads to
+    * race -- and it is now true without also losing the surrounding code.
+    *
+    * Kept deliberately narrow: acquire/release pairs for the standard lock families only.
+    * A primitive that RETURNS something (`spin_trylock`, `down_read_trylock`) is NOT here,
+    * because its result is a value the program branches on. */
+  var syncElided: Int = 0
+
+  val syncPrimitives: Set[String] = Set(
+    "spin_lock", "spin_unlock", "spin_lock_irq", "spin_unlock_irq",
+    "spin_lock_bh", "spin_unlock_bh", "spin_lock_nested", "spin_lock_nest_lock",
+    "raw_spin_lock", "raw_spin_unlock", "raw_spin_lock_irq", "raw_spin_unlock_irq",
+    "read_lock", "read_unlock", "write_lock", "write_unlock",
+    "read_lock_irq", "read_unlock_irq", "write_lock_irq", "write_unlock_irq",
+    "mutex_lock", "mutex_unlock", "mutex_lock_nested",
+    "rcu_read_lock", "rcu_read_unlock",
+    "down_read", "up_read", "down_write", "up_write",
+    "local_lock", "local_unlock", "local_irq_save", "local_irq_restore",
+    "preempt_disable", "preempt_enable")
+
+
   def kidsOf(n: AstNode): List[AstNode] = n.astChildren.collect { case a: AstNode => a }.l
 
   /** Joern's ARGUMENT index: -1 = the callee/receiver expression, 0 = the implicit
@@ -2320,6 +2358,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           holeS("op:delete-" + x.methodFullName.stripPrefix("<operator>."))
         case _ => holeS("op:delete-shape")
       }
+    // A synchronisation primitive in statement position is `Stmt.skip`: Core is
+    // sequential, so an uncontended acquire/release changes nothing the program can
+    // read. See `syncPrimitives` for what is given up (nothing Core could observe)
+    // and why the trylock family is excluded (it returns a value).
+    case c: Call if syncPrimitives.contains(c.methodFullName.split("\\.").last) =>
+      syncElided += 1; skip
     case c: Call => ujson.Obj("k" -> "exprS", "e" -> expr(c))
     case cs: ControlStructure =>
       val kids = kidsOf(cs)
@@ -2735,6 +2779,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   val doc = ujson.Arr.from(all)
   println(s"data model assumed for target-sized integer types: ${dataModel.toLowerCase}"
         + (if (modelInts.isEmpty) " (UNKNOWN -- `long`/`size_t` casts are holes)" else ""))
+  if (syncElided > 0) println(s"elided $syncElided sequentially-unobservable synchronisation call(s)")
   println(s"exported ${funcs.size} functions + ${inits.size} module initializers to $out "
         + s"(${countKind(doc, "closure")} closures, ${countKind(doc, "setGlobal")} global writes)")
 }
