@@ -2644,3 +2644,38 @@ Coverage remains the honest weak number: 28 of 180 hole-free functions. 250 INCO
 are runtime holes with named causes -- `call:set`, `setField:cache_clear:non-object`,
 `mcall:warn:keyword-to-builtin` -- each one unmodelled construct, not a mystery.
 
+## 47. Function objects: the next change, specified but not made
+
+The largest single block of INCONCLUSIVE cases is `setField:<f>:non-object` -- six functions
+in `cachetools/_cached.py`, thirty cases. The construct is the decorator epilogue:
+
+    wrapper.cache_clear = clear
+
+In Python a function IS a heap object with a `__dict__`, so this is an ordinary attribute
+write. In Core, `Val.fn` is a bare `String` with no identity, `Stmt.setField` requires a
+`.ref`, and the write holes. `Val.ref` already exists and already carries the reference
+identity `is` compares, so nothing new is needed in the heap -- only in what a function value
+IS.
+
+The change, in the order it has to happen:
+
+1. `Stmt.setField` on a receiver that evaluates to `.fn`/`.clos`: allocate a heap object
+   carrying the function, REBIND the receiver variable to the new `.ref`, then write the
+   field. `execStmt` already returns `.normal ρ`, so the rebinding has somewhere to go. This
+   only works when the receiver is a `.name`; a function value reached any other way has no
+   place to rebind and must keep holing, which is correct rather than convenient.
+2. The call path must dispatch through a `.ref` whose object carries a function -- the same
+   site as the unbound-method rule in section 46.
+3. `FuelMono` has a `setField` case and the call case; both need the branch taken, the same
+   mechanical repair as section 46.
+
+What makes this bigger than section 46 is that section 46 was GUARDED to be a no-op
+everywhere else -- C++ has no `self`, so exactly one proof moved. This one changes what a
+function value is, on every path that handles one, in every corpus. It is the right change
+and it is specified here in full; it is not a change to make in the last twenty minutes of a
+session, because a value-model edit that builds green while being subtly wrong is the exact
+failure this project has caught six times already and would have no gate left to catch it.
+
+Cost of NOT making it: 6 functions, 30 cases, coverage 28 -> 34 of 180 hole-free. Modelling
+`set` is worth 3 more functions and is a second, independent value-model addition.
+
