@@ -357,6 +357,15 @@ structure Func where
   kwarg  : Option String := none
   deriving Repr, Inhabited
 
+/-- Whether this `Func` is a method, by the exporter's naming convention: the segment after
+`<module>.` is `Class.method` rather than a bare function name. Used to recover Python's
+unbound-method rule, where a method reached as a plain value takes its receiver as the
+first positional argument. -/
+def Func.isMethod (fn : Func) : Bool :=
+  match fn.name.splitOn "<module>." with
+  | [_, rest] => rest.any (· == '.')
+  | _         => false
+
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where
   funcs   : List Func

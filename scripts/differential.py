@@ -34,6 +34,20 @@ import wasm_backend
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
+
+def _corpus_commit(src_root):
+    """The corpus checkout's commit, or why it could not be determined. Never raises:
+    provenance that fails the run is worse than provenance that reports its own absence."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "-C", src_root, "rev-parse", "HEAD"],
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode == 0:
+            return out.stdout.strip()
+        return "not-a-git-checkout"
+    except Exception as e:                                          # noqa: BLE001
+        return "unavailable: %s" % type(e).__name__
+
 # Every scratch artefact lives under one private directory. A fixed `/tmp` path is a
 # phantom-result generator: several agents run this harness at once, and a shared
 # `/tmp/autoform_diff.lean` means one run can report conformance computed from another
@@ -1704,6 +1718,14 @@ def main():
                                "Core has only .python and .cLike; %s is run under an "
                                "approximation. A divergence may be a dialect gap rather "
                                "than a transpiler fault." % lang),
+              # PROVENANCE. `functions_covered` is built from tracing the corpus's own
+              # test suite, so it moves when the CHECKOUT moves -- and a coverage number
+              # that silently tracks an unpinned `--depth 1` clone is the same trap as a
+              # metric computed from the artifact it describes. Two runs of this harness
+              # reported 107 and 82 covered functions with identical harness code, an
+              # identical AST and an identical seed; the only free variable was the
+              # checkout. Record it, so the next such gap is a diff and not an argument.
+              "corpus_commit": _corpus_commit(src_root),
               "functions_total": len(funcs), "functions_hole_free": len(holefree),
               "functions_covered": len(set(c["name"] for c in cases)),
               "cases": len(cases), "agree": 0, "total": 0, "divergences": 0,

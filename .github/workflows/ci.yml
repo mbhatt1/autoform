@@ -133,7 +133,13 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf /tmp/cachetools
-          git clone --depth 1 https://github.com/tkem/cachetools /tmp/cachetools
+          # PINNED. `--depth 1` tracks upstream HEAD, so the corpus -- and therefore the
+          # coverage denominator, which comes from tracing the corpus's own test suite --
+          # could move without a commit here. That is the drifting-corpus trap this
+          # project has already been caught by once. ast-Cachetools.json is exported from
+          # THIS commit; re-pin and re-export together, never separately.
+          git clone --no-checkout https://github.com/tkem/cachetools /tmp/cachetools
+          git -C /tmp/cachetools checkout -q 01af8e5
           test -d /tmp/cachetools/src
 
       - name: Conformance oracle is alive (compared > 0)

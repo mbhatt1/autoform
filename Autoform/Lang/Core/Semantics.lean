@@ -867,7 +867,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
           match ρ.get f with
           | .fn g      => match ctx.resolve g with
-                          | some fn => applyFunc ctx n h₁ fn none vs kws
+                          | some fn =>
+                            -- An unbound method reached through a VARIABLE -- a decorator's
+                            -- wrapped function, a callback, `cache_getitem = Cache.__getitem__`
+                            -- -- receives its receiver as the first POSITIONAL argument. That
+                            -- is what `self` is in Python; the receiver is only implicit at a
+                            -- `.`-call. `applyFunc` binds the receiver separately, so the head
+                            -- has to be split off here, or it lands on `self`'s successor and
+                            -- the call reports a spurious arity `TypeError`.
+                            if fn.isMethod && fn.vararg.isNone
+                               && vs.length == fn.params.length + 1 then
+                              applyFunc ctx n h₁ fn (some (vs.headD .unit)) vs.tail kws
+                            else applyFunc ctx n h₁ fn none vs kws
                           | none    => (h₁, .hole s!"call:{g}")
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs kws

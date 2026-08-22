@@ -271,7 +271,21 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         rw [hg] at hy
                         dsimp only at hy ⊢
                         cases hres2 : Ctx.resolve ctx g with
-                        | some fn2 => rw [hres2] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                        | some fn2 =>
+                            -- Two `applyFunc` calls now, not one: the unbound-method rule
+                            -- splits the receiver off the positionals. Fuel monotonicity is
+                            -- indifferent to WHICH arguments are passed, so `ihF` discharges
+                            -- both branches -- but the branch has to be taken, or the goal
+                            -- and the hypothesis are shaped differently.
+                            rw [hres2] at hy
+                            dsimp only at hy ⊢
+                            split at hy
+                            · next hc =>
+                                simp only [hc, if_true]
+                                exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                            · next hc =>
+                                simp only [hc, if_false, Bool.false_eq_true]
+                                exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
                         | none => rw [hres2] at hy; exact hy
                     case clos g cap =>
                         rw [hg] at hy

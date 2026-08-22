@@ -2594,3 +2594,53 @@ Every one of these four faults reported as INCONCLUSIVE or as a divergence in Co
 as a fault in the checker. **An oracle reports its own defects in the vocabulary of the
 thing it is checking**, which is why they survived: each one looked like a limitation of
 the semantics, and the semantics was innocent in all four cases.
+
+## 46. The unbound-method rule, and a denominator that moved on its own
+
+`applyFunc` binds a receiver separately from the positional arguments, which is right for a
+`.`-call, where Python supplies the receiver implicitly. It is wrong for a method reached as
+a VALUE. `LRUCache.__getitem__(self, key, cache_getitem)` calls `cache_getitem(self, key)`,
+and cachetools passes `Cache.__getitem__` in that slot. There the receiver is an ordinary
+first positional -- that is all `self` ever is. Core bound it to `self`'s successor instead
+and reported a spurious arity `TypeError`, on 27 of the 38 divergences then outstanding.
+
+The fix is Python's actual rule, applied at the one call path that was wrong -- a variable
+holding `.fn g` -- and guarded so it is a no-op everywhere else:
+
+    if fn.isMethod && fn.vararg.isNone && vs.length == fn.params.length + 1
+
+C++ functions have no `self`, so V8 and Linux are untouched; exactly one proof in the whole
+corpus needed repair (`FuelMono`, which is indifferent to WHICH arguments are passed but
+still has to take the branch). Divergences fell 38 -> 5, agreement 79% -> 96%.
+
+`Func.isMethod` reads the EXPORTER'S NAMING CONVENTION (`<module>.Class.method`), which is a
+coupling between Core and the front end, not a semantic property. The right shape is a
+`receiver` field on `Func`. That changes `Func`, which re-generates every AST and breaks the
+hand-written `CachetoolsSpec` and `Contracts` proofs -- a larger change than is wise while
+the conformance number is still moving. A stated shortcut, not a hidden one.
+
+### The part that was not a win
+
+The same run's denominator FELL: 107 exercised / 40 compared before, 82 / 28 after. A
+semantics change cannot do that. `cases` is built by tracing CPython and is complete before
+Lean is invoked once; `random` is seeded at a fixed value; two consecutive runs agreed
+exactly. So the harness is deterministic and the drop came from an input.
+
+The obvious suspect was the corpus. It was not: re-parsing the current checkout and
+re-running the exporter produced an AST BYTE-IDENTICAL to the committed one, all 209
+functions, no name added or lost. So `ast-Cachetools.json` and the sources do match.
+
+Which leaves the checkout the EARLIER run traced, three days and one `/tmp` clearing ago,
+and that state cannot be reconstructed. The honest position is that the 96% and the 79% were
+measured over different case sets, and only the 96% has a recorded provenance.
+
+So the response is not an argument, it is a pin. `--depth 1` tracked upstream HEAD, meaning
+the coverage denominator could move with no commit in this repository -- the drifting-corpus
+trap, which this project has already been caught by once (the 15 false V8 laws in section 31
+were a stale corpus, not a generator defect). CI now checks out a fixed commit, and
+`conformance.json` records `corpus_commit` for every run. The next such gap is a diff.
+
+Coverage remains the honest weak number: 28 of 180 hole-free functions. 250 INCONCLUSIVE
+are runtime holes with named causes -- `call:set`, `setField:cache_clear:non-object`,
+`mcall:warn:keyword-to-builtin` -- each one unmodelled construct, not a mystery.
+
