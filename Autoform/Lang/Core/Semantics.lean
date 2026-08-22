@@ -796,11 +796,14 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val y) =>
-            -- `is` is reference identity for objects, structural for immediates.
-            let same := match x, y with
-                        | .ref p, .ref q => p == q
-                        | p, q           => Val.beq p q
-            (h₂, .val (.bool (if neg then !same else same)))
+            -- `is` is reference identity. It used to fall back to a STRUCTURAL compare
+            -- for immediates, which is a guess about interning: right for CPython's small
+            -- ints, wrong for `[1] is [1]` (two allocations, `False`) and for large ints.
+            -- `Val.identical` answers only where Core actually knows, and the rest becomes
+            -- a hole rather than a plausible-looking wrong answer.
+            match Val.identical x y with
+            | some same => (h₂, .val (.bool (if neg then !same else same)))
+            | none      => (h₂, .hole "is:unboxed-value-identity")
         | (h₂, r) => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .inOp neg a b =>

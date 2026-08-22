@@ -1,7 +1,15 @@
 # Boxed containers for Core
 
-**Status: step 1 of 5 landed; steps 2-5 unimplemented.** Read this before changing
-`Syntax.lean` or `Semantics.lean`.
+**Status: step 1 landed, step 2 half landed, steps 3-5 unimplemented.** Read this before
+changing `Syntax.lean` or `Semantics.lean`.
+
+Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
+section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`
+strictly more honest at no cost to the oracle (35 compared / 169-174 agree, unchanged). The
+`Val.eqPy` half is not landed, and is the piece this document calls the largest mechanical
+cost of the design -- `Val.beq` is structurally recursive and reducible by `rfl`/`decide`,
+which `Refine.lean` depends on, so re-typing it to take a heap and fuel cannot be sliced into
+a piece that leaves the corpora verifying.
 
 Step 1 (`Payload`/`version` on `Obj`, `Heap.payload`/`setPayload`) is in the tree and is
 INERT: nothing constructs a payload other than `.none`. It cost zero proof changes and zero

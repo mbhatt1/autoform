@@ -562,6 +562,83 @@ end Program
 Structural equality on values is written by hand: the nested `List`/`Prod` occurrences
 block `deriving DecidableEq`.
 -/
+/-- Which CONSTRUCTOR a value is. Two values of different kinds are never the same object,
+which is what makes most of `Val.identical` decidable. -/
+def Val.kind : Val → Nat
+  | .int _       => 0
+  | .str _       => 1
+  | .bool _      => 2
+  | .float _     => 3
+  | .unit        => 4
+  | .list _      => 5
+  | .tuple _     => 6
+  | .dict _      => 7
+  | .ref _       => 8
+  | .fn _        => 9
+  | .clos _ _    => 10
+  | .clsClos _ _ => 11
+  | .bobj _ _    => 12
+
+/-- Python `is` -- reference identity, as a PARTIAL function.
+
+`none` means "Core cannot answer this", not "false". Two unboxed containers have no identity
+to compare: `[1] is [1]` is `False` in CPython because two allocations happened, and `True`
+under a structural comparison, and Core cannot tell which it is looking at until containers
+are boxed (`docs/boxed-containers.md` step 3). `1 is 1` is `True` only because CPython
+interns small integers -- a fact about the runtime, not the language.
+
+Answering `none` makes those a hole, `is:unboxed-value-identity`. That REDUCES what Core
+answers, and the project prefers it: the previous structural fallback was right for interned
+ints and wrong for everything else, and being quietly wrong is the failure mode this codebase
+keeps finding. -/
+def Val.identical : Val → Val → Option Bool
+  | .ref a, .ref b => some (a == b)
+  | .unit,  .unit  => some true
+  -- A NAMED function denotes one function object, so `f is g` is decidable on names.
+  -- `Cache.__init__` needs exactly this: `self.getsizeof is not Cache.getsizeof` is how
+  -- cachetools detects an overridden sizer, and `none` there would turn a working
+  -- constructor into a hole.
+  | .fn a,  .fn b  => some (a == b)
+  -- `True`/`False`/`None` are singletons in CPython, so identity follows value.
+  | .bool a, .bool b => some (a == b)
+  -- Closures are NOT decidable the same way: two calls to one factory make two distinct
+  -- objects sharing a name. Different names are still definitely different.
+  | .clos a _,    .clos b _    => if a == b then none else some false
+  | .clsClos a _, .clsClos b _ => if a == b then none else some false
+  -- Different KINDS are never the same object. Same kind and not covered above -- two ints,
+  -- two strings, two unboxed containers -- stays `none`, because the answer depends on
+  -- interning and on allocation, neither of which Core can see until step 3.
+  | x, y => if x.kind == y.kind then none else some false
+
+/-! `Val.identical` is `rfl`-checkable, so these pin it cheaply. They are not vacuous: each
+one dies under the corresponding mutation, which is what stops the relation drifting back
+towards the structural guess it replaced. -/
+section IdentityCharacterization
+
+/-- The case `Cache.__init__` depends on: the same named function is the same object. -/
+theorem identical_fn_same : Val.identical (.fn "f") (.fn "f") = some true := rfl
+/-- ...and two different names are two different objects. -/
+theorem identical_fn_diff : Val.identical (.fn "f") (.fn "g") = some false := rfl
+/-- `None is None`. -/
+theorem identical_unit : Val.identical .unit .unit = some true := rfl
+/-- References compare by address, which is the whole point of the relation. -/
+theorem identical_ref_same : Val.identical (.ref 3) (.ref 3) = some true := rfl
+theorem identical_ref_diff : Val.identical (.ref 3) (.ref 4) = some false := rfl
+/-- **Interning is not modelled**: `1 is 1` is not answered, rather than answered `true`.
+This is the equation that distinguishes the new relation from the old fallback. -/
+theorem identical_int_unknown : Val.identical (.int 1) (.int 1) = none := rfl
+/-- Two unboxed containers likewise: CPython says `False` (two allocations), a structural
+compare says `True`, and Core does not yet know which it is looking at. -/
+theorem identical_list_unknown :
+    Val.identical (.list [.int 1]) (.list [.int 1]) = none := rfl
+/-- Different kinds are decidable even when neither kind is. -/
+theorem identical_cross_kind : Val.identical (.int 1) (.fn "f") = some false := rfl
+/-- `1 is True` is `False` in CPython. -/
+theorem identical_int_bool : Val.identical (.int 1) (.bool true) = some false := rfl
+
+end IdentityCharacterization
+
+
 mutual
 /-- Structural equality on values. -/
 def Val.beq : Val → Val → Bool
