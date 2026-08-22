@@ -42,6 +42,16 @@ theorem uconst_v8_base_OS_HasLazyCommits_duplicate_0_bool :
 -- ob_idempotent_v8_base_PosixInitializeCommon_void_char rather than proved; see the module header for the measured cost.
 theorem idempotent_v8_base_PosixInitializeCommon_void_char_at_FUEL : ((dom_idempotent_v8_base_PosixInitializeCommon_void_char).all (lawIdempotent C FUEL f_v8_base_PosixInitializeCommon_void_char__)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem idempotent_v8_base_PosixInitializeCommon_void_char : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_PosixInitializeCommon_void_char).all (lawIdempotent C fuel f_v8_base_PosixInitializeCommon_void_char__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_v8_base_PosixInitializeCommon_void_char__) (lawIdempotent C FUEL f_v8_base_PosixInitializeCommon_void_char__) (lawIdempotent C fuel f_v8_base_PosixInitializeCommon_void_char__)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_PosixInitializeCommon_void_char__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_idempotent_v8_base_PosixInitializeCommon_void_char : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_PosixInitializeCommon_void_char).all (lawIdempotent C fuel f_v8_base_PosixInitializeCommon_void_char__)) = true
 

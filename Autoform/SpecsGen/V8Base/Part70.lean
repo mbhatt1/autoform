@@ -20,6 +20,16 @@ def ob_charact_v8_base_hash32_uint32_t_uint32_t : Prop :=
 -- ob_charact_v8_base_hash_value_size_t_unsigned_char rather than proved; see the module header for the measured cost.
 theorem charact_v8_base_hash_value_size_t_unsigned_char_at_FUEL : ((dom_charact_v8_base_hash_value_size_t_unsigned_char).all (lawConform C FUEL f_v8_base_hash_value_size_t_unsigned_char_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem charact_v8_base_hash_value_size_t_unsigned_char : ∀ fuel, FUEL ≤ fuel → ((dom_charact_v8_base_hash_value_size_t_unsigned_char).all (lawConform C fuel f_v8_base_hash_value_size_t_unsigned_char_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_v8_base_hash_value_size_t_unsigned_char_) (lawConform C FUEL f_v8_base_hash_value_size_t_unsigned_char_) (lawConform C fuel f_v8_base_hash_value_size_t_unsigned_char_)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_hash_value_size_t_unsigned_char_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_charact_v8_base_hash_value_size_t_unsigned_char : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_charact_v8_base_hash_value_size_t_unsigned_char).all (lawConform C fuel f_v8_base_hash_value_size_t_unsigned_char_)) = true
 

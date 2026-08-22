@@ -20,6 +20,16 @@ def ob_idempotent_v8_base_hash_value_size_t_unsigned_char : Prop :=
 -- ob_idempotent_v8_base_hash_value_size_t_shortunsigned rather than proved; see the module header for the measured cost.
 theorem idempotent_v8_base_hash_value_size_t_shortunsigned_at_FUEL : ((dom_idempotent_v8_base_hash_value_size_t_shortunsigned).all (lawIdempotent C FUEL f_v8_base_hash_value_size_t_shortunsigned_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem idempotent_v8_base_hash_value_size_t_shortunsigned : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_hash_value_size_t_shortunsigned).all (lawIdempotent C fuel f_v8_base_hash_value_size_t_shortunsigned_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_v8_base_hash_value_size_t_shortunsigned_) (lawIdempotent C FUEL f_v8_base_hash_value_size_t_shortunsigned_) (lawIdempotent C fuel f_v8_base_hash_value_size_t_shortunsigned_)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_hash_value_size_t_shortunsigned_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_idempotent_v8_base_hash_value_size_t_shortunsigned : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_hash_value_size_t_shortunsigned).all (lawIdempotent C fuel f_v8_base_hash_value_size_t_shortunsigned_)) = true
 

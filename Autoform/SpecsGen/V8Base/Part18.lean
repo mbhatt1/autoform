@@ -14,6 +14,16 @@ namespace Autoform.SpecsGen.V8Base.Part18
 
 theorem commutes_v8_base_AddressRegion___init_1_at_FUEL : ((dom_commutes_v8_base_AddressRegion___init_1).all (lawCommutes C FUEL f_v8_base_AddressRegion___init__)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem commutes_v8_base_AddressRegion___init_1 : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_v8_base_AddressRegion___init_1).all (lawCommutes C fuel f_v8_base_AddressRegion___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_v8_base_AddressRegion___init__) (lawCommutes C FUEL f_v8_base_AddressRegion___init__) (lawCommutes C fuel f_v8_base_AddressRegion___init__)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_AddressRegion___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_commutes_v8_base_AddressRegion___init_1 : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_commutes_v8_base_AddressRegion___init_1).all (lawCommutes C fuel f_v8_base_AddressRegion___init__)) = true
 

@@ -16,6 +16,16 @@ namespace Autoform.SpecsGen.V8Base.Part57
 -- ob_involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot rather than proved; see the module header for the measured cost.
 theorem involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_at_FUEL : ((dom_involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot).all (lawInvolutive C FUEL f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot : ∀ fuel, FUEL ≤ fuel → ((dom_involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot).all (lawInvolutive C fuel f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gInvol C FUEL f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_) (lawInvolutive C FUEL f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_) (lawInvolutive C fuel f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_)
+    (fun c hgc hlc =>
+      lawInvolutive_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_involutive_alStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot).all (lawInvolutive C fuel f_v8_base_Stack_GetRealStackAddressForSlot_v8_base_Stack_StackSlot_v8_base_Stack_StackSlot_)) = true
 

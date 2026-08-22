@@ -27,5 +27,15 @@ def ob_charact_v8_base_internal_RangeCheck___init : Prop :=
 -- ob_charact_v8_base_MulWithWraparound_int16_t_int16_t_int16_t rather than proved; see the module header for the measured cost.
 theorem charact_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_at_FUEL : ((dom_charact_v8_base_MulWithWraparound_int16_t_int16_t_int16_t).all (lawConform C FUEL f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem charact_v8_base_MulWithWraparound_int16_t_int16_t_int16_t : ∀ fuel, FUEL ≤ fuel → ((dom_charact_v8_base_MulWithWraparound_int16_t_int16_t_int16_t).all (lawConform C fuel f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRunObs C FUEL f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_) (lawConform C FUEL f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_) (lawConform C fuel f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_)
+    (fun c hgc hlc =>
+      lawConform_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_MulWithWraparound_int16_t_int16_t_int16_t_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 
 end Autoform.SpecsGen.V8Base.Part72

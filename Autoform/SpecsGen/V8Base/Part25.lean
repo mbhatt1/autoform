@@ -14,6 +14,16 @@ namespace Autoform.SpecsGen.V8Base.Part25
 
 theorem commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t_at_FUEL : ((dom_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t).all (lawCommutes C FUEL f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t : ∀ fuel, FUEL ≤ fuel → ((dom_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t).all (lawCommutes C fuel f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gComm C FUEL f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_) (lawCommutes C FUEL f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_) (lawCommutes C fuel f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)
+    (fun c hgc hlc =>
+      lawCommutes_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t).all (lawCommutes C fuel f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)) = true
 

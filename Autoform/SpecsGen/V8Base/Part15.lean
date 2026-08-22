@@ -31,6 +31,16 @@ theorem uproj_v8_base_VirtualAddressSubspace_ActiveMemoryProtectionKey_optional 
 -- ob_heappure_v8_base_AddressRegion___init rather than proved; see the module header for the measured cost.
 theorem heappure_v8_base_AddressRegion___init_at_FUEL : ((dom_heappure_v8_base_AddressRegion___init).all (lawHeapPreserved C FUEL f_v8_base_AddressRegion___init__)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem heappure_v8_base_AddressRegion___init : ∀ fuel, FUEL ≤ fuel → ((dom_heappure_v8_base_AddressRegion___init).all (lawHeapPreserved C fuel f_v8_base_AddressRegion___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_v8_base_AddressRegion___init__) (lawHeapPreserved C FUEL f_v8_base_AddressRegion___init__) (lawHeapPreserved C fuel f_v8_base_AddressRegion___init__)
+    (fun c hgc hlc =>
+      lawHeapPreserved_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_AddressRegion___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_heappure_v8_base_AddressRegion___init : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_heappure_v8_base_AddressRegion___init).all (lawHeapPreserved C fuel f_v8_base_AddressRegion___init__)) = true
 

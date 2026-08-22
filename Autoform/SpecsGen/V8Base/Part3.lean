@@ -14,6 +14,16 @@ namespace Autoform.SpecsGen.V8Base.Part3
 
 theorem returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_at_FUEL : ((dom_returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawReturns C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : ∀ fuel, FUEL ≤ fuel → ((dom_returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawReturns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_) (lawReturns C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_) (lawReturns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)
+    (fun c hgc hlc =>
+      lawReturns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_returns_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawReturns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true
 

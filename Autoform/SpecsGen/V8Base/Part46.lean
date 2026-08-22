@@ -46,6 +46,16 @@ theorem uproj_v8_base_Double_AsUint64_uint64_t___const :
 -- ob_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T rather than proved; see the module header for the measured cost.
 theorem identity_v8_base_internal_MakeStrictNum_StrictNumeric_T_at_FUEL : ((dom_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T).all (lawIdentity C FUEL f_v8_base_internal_MakeStrictNum_StrictNumeric_T_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem identity_v8_base_internal_MakeStrictNum_StrictNumeric_T : ∀ fuel, FUEL ≤ fuel → ((dom_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T).all (lawIdentity C fuel f_v8_base_internal_MakeStrictNum_StrictNumeric_T_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_v8_base_internal_MakeStrictNum_StrictNumeric_T_) (lawIdentity C FUEL f_v8_base_internal_MakeStrictNum_StrictNumeric_T_) (lawIdentity C fuel f_v8_base_internal_MakeStrictNum_StrictNumeric_T_)
+    (fun c hgc hlc =>
+      lawIdentity_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_internal_MakeStrictNum_StrictNumeric_T_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_identity_v8_base_internal_MakeStrictNum_StrictNumeric_T).all (lawIdentity C fuel f_v8_base_internal_MakeStrictNum_StrictNumeric_T_)) = true
 

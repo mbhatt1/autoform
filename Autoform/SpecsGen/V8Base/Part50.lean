@@ -14,6 +14,16 @@ namespace Autoform.SpecsGen.V8Base.Part50
 
 theorem heappure_v8_base_internal_RangeCheck___init_1_at_FUEL : ((dom_heappure_v8_base_internal_RangeCheck___init_1).all (lawHeapPreserved C FUEL f_v8_base_internal_RangeCheck___init__)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem heappure_v8_base_internal_RangeCheck___init_1 : ∀ fuel, FUEL ≤ fuel → ((dom_heappure_v8_base_internal_RangeCheck___init_1).all (lawHeapPreserved C fuel f_v8_base_internal_RangeCheck___init__)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_v8_base_internal_RangeCheck___init__) (lawHeapPreserved C FUEL f_v8_base_internal_RangeCheck___init__) (lawHeapPreserved C fuel f_v8_base_internal_RangeCheck___init__)
+    (fun c hgc hlc =>
+      lawHeapPreserved_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_internal_RangeCheck___init__.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_heappure_v8_base_internal_RangeCheck___init_1 : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_heappure_v8_base_internal_RangeCheck___init_1).all (lawHeapPreserved C fuel f_v8_base_internal_RangeCheck___init__)) = true
 

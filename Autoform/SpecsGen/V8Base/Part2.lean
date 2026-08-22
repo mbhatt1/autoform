@@ -20,6 +20,16 @@ def ob_returns_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t : Prop :=
 -- ob_runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t rather than proved; see the module header for the measured cost.
 theorem runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_at_FUEL : ((dom_runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawRuns C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : ∀ fuel, FUEL ≤ fuel → ((dom_runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawRuns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gRun C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_) (lawRuns C FUEL f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_) (lawRuns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)
+    (fun c hgc hlc =>
+      lawRuns_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_runs_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t).all (lawRuns C fuel f_v8_base_bits_SignedMod64_int64_t_int64_t_int64_t_)) = true
 

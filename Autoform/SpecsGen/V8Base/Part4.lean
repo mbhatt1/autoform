@@ -29,6 +29,16 @@ theorem uconst_v8_base_FPU_GetFlushDenormals_bool :
 -- ob_idempotent_v8_base_SetPrintStackTrace_void_void rather than proved; see the module header for the measured cost.
 theorem idempotent_v8_base_SetPrintStackTrace_void_void_at_FUEL : ((dom_idempotent_v8_base_SetPrintStackTrace_void_void).all (lawIdempotent C FUEL f_v8_base_SetPrintStackTrace_void_void_)) = true := by rfl
 
+-- Transported to every fuel budget at or above FUEL.
+theorem idempotent_v8_base_SetPrintStackTrace_void_void : ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_SetPrintStackTrace_void_void).all (lawIdempotent C fuel f_v8_base_SetPrintStackTrace_void_void_)) = true := by
+  intro fuel hf
+  exact all_transfer _ (gIdem C FUEL f_v8_base_SetPrintStackTrace_void_void_) (lawIdempotent C FUEL f_v8_base_SetPrintStackTrace_void_void_) (lawIdempotent C fuel f_v8_base_SetPrintStackTrace_void_void_)
+    (fun c hgc hlc =>
+      lawIdempotent_fuel_mono (hctx := C_tfFree) (hfn := (by rfl : tfFreeS f_v8_base_SetPrintStackTrace_void_void_.body = true))
+        (hk := hf) (hg := hgc) (h := hlc))
+    (by rfl) (by rfl)
+
+
 def ob_idempotent_v8_base_SetPrintStackTrace_void_void : Prop :=
   ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_v8_base_SetPrintStackTrace_void_void).all (lawIdempotent C fuel f_v8_base_SetPrintStackTrace_void_void_)) = true
 
