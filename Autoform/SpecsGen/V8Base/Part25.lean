@@ -1,0 +1,67 @@
+import Autoform.SpecsGen.Basis
+import Autoform.Harness.Audit
+import Autoform.Generated.V8Base
+import Autoform.SpecsGen.V8Base.Base
+
+set_option maxRecDepth 20000
+set_option maxHeartbeats 1000000
+
+open Autoform.Core Autoform.Refine Autoform.SpecsGen
+open Autoform.SpecsGen.V8Base.Base
+open Autoform.Generated.V8Base
+
+namespace Autoform.SpecsGen.V8Base.Part25
+
+theorem commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t_at_FUEL : ((dom_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t).all (lawCommutes C FUEL f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)) = true := by rfl
+
+def ob_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t : Prop :=
+  ∀ fuel, FUEL ≤ fuel → ((dom_commutes_v8_WraparoundAdd32_int32_t_int32_t_int32_t).all (lawCommutes C fuel f_v8_WraparoundAdd32_int32_t_int32_t_int32_t_)) = true
+
+
+theorem uproj_v8_base_BoundedPageAllocator_AllocatePageSize_size_t :
+    MRefines P "v8.base.BoundedPageAllocator.AllocatePageSize:size_t()" 4
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self _ => (h, match self with
+                           | .ref r => .ret (fieldOf h r "allocate_page_size_")
+                           | _      => .ret .unit)) := by
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  refine forall_ge_of_forall_add (N := 4) ?_
+  intro k
+  rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_AllocatePageSize_size_t__ rfl]
+  simpa [Nat.add_comm, Nat.add_left_comm] using
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_AllocatePageSize_size_t__ "allocate_page_size_" rfl rfl rfl rfl r [] rfl
+      hmod
+
+theorem uproj_v8_base_BoundedPageAllocator_CommitPageSize_size_t :
+    MRefines P "v8.base.BoundedPageAllocator.CommitPageSize:size_t()" 4
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self _ => (h, match self with
+                           | .ref r => .ret (fieldOf h r "commit_page_size_")
+                           | _      => .ret .unit)) := by
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  refine forall_ge_of_forall_add (N := 4) ?_
+  intro k
+  rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_CommitPageSize_size_t__ rfl]
+  simpa [Nat.add_comm, Nat.add_left_comm] using
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_CommitPageSize_size_t__ "commit_page_size_" rfl rfl rfl rfl r [] rfl
+      hmod
+
+theorem uproj_location_status_v8_base_BoundedPageAllocator_AllocationStatus___const :
+    MRefines P "v8.base.BoundedPageAllocator.get_last_allocation_status:v8.base.BoundedPageAllocator.AllocationStatus()<const>" 4
+      (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
+        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+      (fun h self _ => (h, match self with
+                           | .ref r => .ret (fieldOf h r "allocation_status_")
+                           | _      => .ret .unit)) := by
+  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  refine forall_ge_of_forall_add (N := 4) ?_
+  intro k
+  rw [runMethod_of_resolve _ _ _ _ _ _ f_v8_base_BoundedPageAllocator_get_last_allocation_status_v8_base_BoundedPageAllocator_AllocationStatus___const_ rfl]
+  simpa [Nat.add_comm, Nat.add_left_comm] using
+    applyFunc_ret_field_self (ctxOf P) k h f_v8_base_BoundedPageAllocator_get_last_allocation_status_v8_base_BoundedPageAllocator_AllocationStatus___const_ "allocation_status_" rfl rfl rfl rfl r [] rfl
+      hmod
+
+
+end Autoform.SpecsGen.V8Base.Part25

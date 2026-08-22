@@ -48,6 +48,14 @@ import Autoform.SpecsGen.LinuxLib
 import Autoform.SpecsGen.LinuxLibSample
 import Autoform.Specs.CppCastSpec
 
+-- V8 `src/base` laws: 73 modules, with the shared context and all 73 domains in
+-- `V8Base.Base`. One Lean process retains every `rfl` term it elaborates, and each of
+-- these evaluates the interpreter over a domain against a 1,920-function program; 63 in
+-- one module reached 15.3 GB after 76 minutes without finishing, and every part was also
+-- re-proving `C_tfFree`, an `rfl` over all 1,920 bodies. Split plus a shared base builds
+-- 73/73 in about ten minutes.
+import Autoform.SpecsGen.V8Base
+
 -- ---------------------------------------------------------------------------
 -- The one module still outside this graph, and why.
 --
