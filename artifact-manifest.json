@@ -83,6 +83,13 @@
    "render_bytes": 6011406,
    "render_sha256": "f09f955c22970630bed4a8d015572c46a4e198871dbf805050fca4ae958f0975"
   },
+  "LinuxLibSample": {
+   "ast_bytes": 1324,
+   "ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+   "ast_tracked": true,
+   "render_bytes": 3309,
+   "render_sha256": "935b692090250865c7a21058c1a715d02100edea2007bbbfde5d53783b52b3ce"
+  },
   "Sample": {
    "ast_bytes": 6416,
    "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
@@ -98,13 +105,20 @@
    "render_sha256": "0625a76aa80405f0fff3fce1668b2c08e27dd72c6c98ff951834a77b0607d83e"
   },
   "V8Base": {
-   "ast_bytes": 2918566,
+   "ast_bytes": 3198147,
    "ast_hint": "/tmp/final-V8Base.json",
-   "ast_sha256": "5b22b0146fe0fc4cb566e23edf438668569d172c9396f8351bf3afe6d16f9455",
-   "ast_tracked": false,
+   "ast_sha256": "76119976758cf3999d3c87aa4d9c57fdf2b8cae2a5a7cb2a6f9bcb6738759708",
+   "ast_tracked": true,
    "provenance": "AST /tmp/final-V8Base.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-   "render_bytes": 1703056,
-   "render_sha256": "4861ef851ed910f327b6404450539d95a824948ccafa0b071d01014bec943b17"
+   "render_bytes": 1816866,
+   "render_sha256": "2e65d1e30cdb14cda0a387655a3b40a22c85e888ed24cd510adf05285fecb7e9"
+  },
+  "V8BaseSample": {
+   "ast_bytes": 1539,
+   "ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+   "ast_tracked": true,
+   "render_bytes": 3594,
+   "render_sha256": "5fecb27b09384b58e403dcca3f696a97fd1d8256c7e11d11d825cae8ba2f1af2"
   },
   "V8Numbers": {
    "ast_bytes": 404091,
@@ -143,8 +157,8 @@
   },
   "SpecsGen/V8Base": {
    "corpus": "V8Base",
-   "corpus_ast_sha256": "5b22b0146fe0fc4cb566e23edf438668569d172c9396f8351bf3afe6d16f9455",
-   "source": "/tmp/final-V8Base.json"
+   "corpus_ast_sha256": "76119976758cf3999d3c87aa4d9c57fdf2b8cae2a5a7cb2a6f9bcb6738759708",
+   "source": "ast-V8Base.json"
   },
   "SpecsGen/V8BaseSample": {
    "corpus": "V8BaseSample",

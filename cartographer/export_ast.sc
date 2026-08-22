@@ -1842,7 +1842,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // and it is a different hole from the statement form, which is why the label says
     // `:value`.
     else if (incrOps.contains(mfn))
-      hole("op:" + mfn.stripPrefix("<operator>.") + ":value")
+      hole("op:" + opLabel(mfn) + ":value")
     // `<operator>.alloc` with children is a **stack array declaration** (`char b[N]`),
     // not a `new`. Core has no arrays and no sizes, so it stays a hole — but under a
     // label that says which of the two it was, because they are not the same problem.
@@ -1891,7 +1891,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // f-strings. Python only — see `pyFile`.
     else if (mfn == "<operator>.formatString" && pyFile) fstring(kids)
     else if (mfn.startsWith("<operator>"))
-      hole("op:" + mfn.stripPrefix("<operator>."))
+      hole("op:" + opLabel(mfn))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
     // A *fourth* literal is the `as` alias: `import typing as t`, `from p import x as y`.
     // That shape was not matched at all, so all 492 aliased imports in Ansible fell
@@ -2110,6 +2110,36 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     *
     * `LOCAL` children (`for (int i = 0; ...)`) are declarations and carry no behaviour;
     * the initializing assignment is a separate child and is kept. */
+  /** Rewrite every `continue` belonging to *this* do-while into `if (C) continue else
+    * break`. See the `DO` case for why: a do-while's `continue` jumps to the condition
+    * test, and the `while (true)` shape has no test to jump to. Stops at nested
+    * `loop`/`forIn` for the same reason `pushStep` does. */
+  /** A bounded label for an unmapped operator.
+    *
+    * `mfn.stripPrefix("<operator>.")` assumes the name HAS that prefix. Joern also emits
+    * bare `<operator>()`, which left the prefix in place and produced
+    * `op:<operator>():bool()` -- frontend text verbatim, so the label space grew with the
+    * corpus and the ledger's group-by-cause counted one "cause" per spelling. Anything
+    * that is not a clean `<operator>.name` becomes `op:unnamed-operator`. */
+  def opLabel(mfn: String): String = {
+    val n = mfn.stripPrefix("<operator>.")
+    if (n.isEmpty || n.contains("<") || n.contains("(")) "unnamed-operator" else n
+  }
+
+  def pushDoTest(v: ujson.Value, cond: ujson.Value): ujson.Value = v match {
+    case o: ujson.Obj =>
+      o.value.get("k").map(_.str) match {
+        case Some("cont") =>
+          ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
+                    "e" -> ujson.Obj("k" -> "brk"))
+        case Some("loop") | Some("forIn") => o
+        case _ =>
+          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond)) })
+      }
+    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond)))
+    case other        => other
+  }
+
   def forStmt(cs: ControlStructure): ujson.Obj = {
     val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
     if (ks.size != 4) holeS("control:FOR:elided-clause")
@@ -2292,12 +2322,37 @@ import io.shiftleft.codepropertygraph.generated.nodes._
         case "IF" if kids.size >= 2 =>
           ujson.Obj("k" -> "ifte", "c" -> expr(kids(0)), "t" -> stmt(kids(1)),
                     "e" -> (if (kids.size > 2) stmt(kids(2)) else skip))
-        case "WHILE" | "DO" if kids.size >= 2 =>
+        case "WHILE" if kids.size >= 2 =>
           // A `while` whose condition is the frontend's synthetic iterator probe only
           // makes sense inside the `for` shape above; on its own it is not a condition.
           if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
           else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
                          "body" -> outsideLoopScope(stmt(kids(1))))
+
+        // `do B while (C)` is NOT `while (C) B`, and translating it as one was a silent
+        // mistranslation: a do-while runs its body at least once, so with `C` initially
+        // false the two disagree on the first iteration. Checked against `cc -O0`:
+        // `do { n = n + 1; } while (0)` returns 1, `while (0) { n = n + 1; }` returns 0.
+        // The translation type-checked and looked right, which is how it survived.
+        //
+        // The faithful shape is `while (true) { B; if (C) skip else break }`. `break`
+        // needs nothing: C's `break` leaves the loop, and so does this one. `continue`
+        // does: in a do-while it jumps to the CONDITION TEST, whereas here it would skip
+        // the test and spin forever — so each `continue` belonging to this loop becomes
+        // `if (C) continue else break`, which is exactly what the standard says. Nested
+        // loops keep their own `continue` (`pushDoTest` stops at `loop`/`forIn`), and `C`
+        // may be evaluated more than once per source iteration only on paths where the
+        // original would have evaluated it too.
+        case "DO" if kids.size >= 2 =>
+          if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
+          else {
+            val cond = expr(kids(0))
+            val test = ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
+                                 "e" -> ujson.Obj("k" -> "brk"))
+            val body = pushDoTest(outsideLoopScope(stmt(kids(1))), cond)
+            ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                      "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> test))
+          }
         case "FOR"      => forStmt(cs)
         // `goto L` where `L` has been proved to be the single forward exit label of this
         // function, and this `goto` is not inside any loop or switch: see `methodBody`.
@@ -2332,7 +2387,18 @@ import io.shiftleft.codepropertygraph.generated.nodes._
       seqOf(globalDeclNames(u).map(x => ujson.Obj("k" -> "declGlobal", "x" -> x)))
     case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
       holeS("scope:nonlocal-write")
-    case u: Unknown    => holeS("stmt:UNKNOWN:" + u.code.trim.takeWhile(_ != ' '))
+    // The label carries the frontend's PARSER NODE TYPE, not the source text.
+    //
+    // It used to be the first word of the code, which made the label space unbounded:
+    // V8 alone produced `stmt:UNKNOWN:)`, `stmt:UNKNOWN:}`, `stmt:UNKNOWN:V8_WEAK;` and
+    // `stmt:UNKNOWN:requires(!internal::can_use_memcpy_v<InputIt,`. A taxonomy whose
+    // cardinality grows with the corpus cannot be counted, compared across runs, or acted
+    // on -- the ledger groups by label, so every new source fragment became its own
+    // "cause". The parser type is a closed set and says the same thing about the remedy:
+    // `CASTProblemDeclaration` means the C preprocessor was not run.
+    case u: Unknown    =>
+      val kind = Option(u.parserTypeName).map(_.trim).filter(_.nonEmpty).getOrElse("node")
+      holeS("stmt:UNKNOWN:" + kind)
     // A `namespace v8 { ... }` is a *naming* construct: it has no runtime effect at all,
     // and the functions and classes inside it are exported as their own entries with
     // their qualified names already on them. Nothing is dropped by skipping it — the
@@ -2607,9 +2673,19 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     }
     // Emitted only when present, so an AST with no variadic parameters renders exactly
     // as it did before this existed.
-    ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
-      .foreach(p => obj("vararg") = p.name)
-    ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
+    //
+    // PYTHON ONLY. `paramStars` is gated on `.py`, but `isVariadic` is not: C and C++
+    // set it for `...`, and C varargs are NOT Python varargs. `void V8_Fatal(char*, ...)`
+    // was being marked `vararg`, which tells `bindParams` to pack surplus arguments into
+    // a `Val.tuple` under Python's calling convention -- a silent mistranslation of every
+    // printf-style function in V8. C's `...` has no calling convention Core models: the
+    // callee reads it through `va_arg`, which is not translated. So the field is not
+    // emitted at all for non-Python, and such a call keeps whatever hole it already had.
+    if (pyFile) {
+      ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
+        .foreach(p => obj("vararg") = p.name)
+      ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
+    }
     obj
   }
 

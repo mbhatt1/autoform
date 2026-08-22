@@ -192,9 +192,14 @@ class TestHoleContract:
         exporter work could resolve it), and one that is simply external. Widening this
         set is fine when the exporter genuinely gains a label -- but it must be a
         deliberate edit here, not a silent pass."""
+        # Widened when the module-object work replaced `import:module-value` /
+        # `import:unresolved` with a taxonomy that says WHY resolution failed. The point
+        # of the test is that the vocabulary is CLOSED, not that it never grows: a label
+        # outside this set means the exporter invented a category nobody documented.
         allowed = {"import:module-value", "import:unresolved",
                    "import:absent:relative", "import:absent:prefix-in-cpg",
-                   "import:absent:external"}
+                   "import:absent:external", "import:member-not-found",
+                   "import:operand"}
         seen = set()
         for funcs in corpora.values():
             for n in walk(funcs):

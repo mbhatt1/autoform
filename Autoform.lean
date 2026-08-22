@@ -55,6 +55,7 @@ import Autoform.Specs.CppCastSpec
 -- re-proving `C_tfFree`, an `rfl` over all 1,920 bodies. Split plus a shared base builds
 -- 73/73 in about ten minutes.
 import Autoform.SpecsGen.V8Base
+import Autoform.Specs.DoWhileSpec
 
 -- ---------------------------------------------------------------------------
 -- The one module still outside this graph, and why.
