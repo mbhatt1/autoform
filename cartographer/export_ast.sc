@@ -208,6 +208,36 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     * A primitive that RETURNS something (`spin_trylock`, `down_read_trylock`) is NOT here,
     * because its result is a value the program branches on. */
   var syncElided: Int = 0
+  var metaElided: Int = 0
+
+  /** Kernel declaration macros that emit METADATA, not code.
+    *
+    * `MODULE_LICENSE("GPL")` writes a string into an ELF section read by the module
+    * loader; it compiles to no instructions and no function can observe it. Joern parses
+    * C without running the preprocessor, so these arrive as `CASTProblemDeclaration`
+    * nodes and became `stmt:UNKNOWN` holes -- and because they sit at file scope, each one
+    * made its module initialiser unanalysable. On Linux `lib/` that is ~300 holes for
+    * declarations with no runtime semantics at all.
+    *
+    * Same argument as eliding an uncontended lock in a sequential semantics: `Stmt.skip`
+    * is the exact translation, not an approximation of one.
+    *
+    * `module_param` is deliberately NOT here. It binds a variable from the module command
+    * line at load time, which is an assignment the program can observe -- eliding it would
+    * be a claim about a value, not about metadata. */
+  val kernelMetaMacros: Set[String] = Set(
+    "MODULE_LICENSE", "MODULE_AUTHOR", "MODULE_DESCRIPTION", "MODULE_VERSION",
+    "MODULE_ALIAS", "MODULE_PARM_DESC", "MODULE_FIRMWARE", "MODULE_DEVICE_TABLE",
+    "MODULE_SOFTDEP", "MODULE_INFO", "MODULE_IMPORT_NS",
+    "EXPORT_SYMBOL", "EXPORT_SYMBOL_GPL", "EXPORT_SYMBOL_NS", "EXPORT_SYMBOL_NS_GPL",
+    "EXPORT_TRACEPOINT_SYMBOL", "EXPORT_TRACEPOINT_SYMBOL_GPL")
+
+  /** Does this unparsed declaration start with one of them? */
+  def isKernelMeta(code: String): Boolean = {
+    val head = code.trim.takeWhile(c => c.isLetterOrDigit || c == '_')
+    kernelMetaMacros.contains(head)
+  }
+
 
   val syncPrimitives: Set[String] = Set(
     "spin_lock", "spin_unlock", "spin_lock_irq", "spin_unlock_irq",
@@ -2460,6 +2490,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     // on -- the ledger groups by label, so every new source fragment became its own
     // "cause". The parser type is a closed set and says the same thing about the remedy:
     // `CASTProblemDeclaration` means the C preprocessor was not run.
+    case u: Unknown if isKernelMeta(u.code) => metaElided += 1; skip
     case u: Unknown    =>
       val kind = Option(u.parserTypeName).map(_.trim).filter(_.nonEmpty).getOrElse("node")
       holeS("stmt:UNKNOWN:" + kind)
@@ -2794,6 +2825,7 @@ import io.shiftleft.codepropertygraph.generated.nodes._
   val doc = ujson.Arr.from(all)
   println(s"data model assumed for target-sized integer types: ${dataModel.toLowerCase}"
         + (if (modelInts.isEmpty) " (UNKNOWN -- `long`/`size_t` casts are holes)" else ""))
+  if (metaElided > 0) println(s"elided $metaElided kernel metadata declaration(s)")
   if (syncElided > 0) println(s"elided $syncElided sequentially-unobservable synchronisation call(s)")
   println(s"exported ${funcs.size} functions + ${inits.size} module initializers to $out "
         + s"(${countKind(doc, "closure")} closures, ${countKind(doc, "setGlobal")} global writes)")

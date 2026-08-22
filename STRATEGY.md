@@ -2401,3 +2401,51 @@ The honest statement of the caveat is therefore: **`op:addressOf` is blocked on 
 coverage, and a location model is the second step, not the first.** The label should say
 so; it currently says `unknown-type`, which points at type inference — the one remedy the
 measurement rules out.
+
+## §42 — Three caveats that were one construct each
+
+§41 established that `op:addressOf` is a corpus-boundary problem rather than a
+pointer-model one. Following the same method on the next two largest labels found the same
+shape three times running: a caveat recorded as needing a large subsystem was dominated by
+a single family of constructs with **no runtime semantics at all**.
+
+| caveat, as recorded | what it actually was | fix |
+|---|---|---|
+| `op:addressOf` needs a location model (~3x `Val.bobj`) | 90% `&lock` passed to `spin_lock`/`mutex_lock`/`rcu_read_lock` | 35-entry set, one `case` arm |
+| `import:absent:external` needs module semantics | 546 were `from __future__ import annotations` | one branch |
+| `stmt:UNKNOWN` needs a preprocessed kernel build | ~490 were `MODULE_LICENSE`-family metadata | 18-entry set |
+
+Each rests on the same argument, and it is an argument about what Core *is* rather than an
+approximation of what it is not:
+
+* Core is a **sequential** interpreter — no threads, no scheduler. An uncontended
+  acquire/release changes nothing a program can read, so `Stmt.skip` is the exact
+  translation.
+* `from __future__ import annotations` is a **compiler directive**. It binds a `_Feature`
+  object nobody reads.
+* `MODULE_LICENSE("GPL")` writes a string into an **ELF section**. It compiles to no
+  instructions.
+
+In every case the construct was a hole for a reason unrelated to its own difficulty: `&l`
+could not be represented, so a `mutex_lock` made its whole function unanalysable; a
+file-scope macro made its module initialiser unanalysable. The cost was never in the
+construct, it was in what the construct dragged down with it.
+
+What is given up is stated at each site and is narrow: no data race, deadlock or missing
+critical section is detectable — which was already true, Core has no threads to race. The
+boundaries are drawn where behaviour becomes observable: `spin_trylock` is excluded because
+it returns a value the program branches on, and `module_param` is excluded because it binds
+a variable from the command line.
+
+Combined effect across all five corpora:
+
+    session start   12,947 functions   ~3,900 hole-free (30%)   40,581 holes
+    now             12,947 functions    7,586 hole-free (59%)   18,428 holes
+
+**The remaining caveats should be assumed mischaracterised until measured.** That has now
+been the outcome three times in a row, and the measurement each time cost minutes while the
+design work it displaced was estimated in weeks. The one place the method found a genuine
+gap is worth naming too: 574 `static … __init …` declarations in Linux `lib/` are entire
+FUNCTION DEFINITIONS that Joern's parser drops because of GCC attributes. Those are not
+holes — they are functions missing from the corpus, and no amount of Core work reaches them.
+That is the real content of "needs a preprocessed build".
