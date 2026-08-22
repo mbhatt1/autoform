@@ -12,13 +12,10 @@ open Autoform.Generated.V8Base
 
 namespace Autoform.SpecsGen.V8Base.Part44
 
-theorem runs_v8_base_hash32_uint32_t_uint32_t_refuted : ((dom_runs_v8_base_hash32_uint32_t_uint32_t).all (lawRuns C FUEL f_v8_base_hash32_uint32_t_uint32_t_)) = false := by rfl
+theorem runs_v8_base_hash32_uint32_t_uint32_t_at_FUEL : ((dom_runs_v8_base_hash32_uint32_t_uint32_t).all (lawRuns C FUEL f_v8_base_hash32_uint32_t_uint32_t_)) = true := by rfl
 
 
--- REFUTED by computation: `lawReturns` does not hold for `f_v8_base_hash32_uint32_t_uint32_t_` over its own
--- domain at `FUEL`. The generator emitted a law its refutation pass should have
--- killed before emission; that is a defect in scripts/synth_specs.py.
-theorem returns_v8_base_hash32_uint32_t_uint32_t_refuted : ((dom_returns_v8_base_hash32_uint32_t_uint32_t).all (lawReturns C FUEL f_v8_base_hash32_uint32_t_uint32_t_)) = false := by rfl
+theorem returns_v8_base_hash32_uint32_t_uint32_t_at_FUEL : ((dom_returns_v8_base_hash32_uint32_t_uint32_t).all (lawReturns C FUEL f_v8_base_hash32_uint32_t_uint32_t_)) = true := by rfl
 
 
 -- Holds at `FUEL` by kernel computation. The forall-fuel transport is recorded as
