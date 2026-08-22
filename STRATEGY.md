@@ -2755,3 +2755,18 @@ Adding the constructor would move those 9 functions from `blocked (value model):
 blocker underneath is mutable containers on the heap, which is also what
 `mcall:clear:unboxed-container` and `setIndex:immutable-containers` are.
 
+### 48a. A fix that was measured and reverted
+
+The 9 `unencodable receiver/arguments: callable` cases looked self-inflicted -- the widened
+constructor search fabricates a `lambda`, and a fabricated lambda has no counterpart in the
+AST -- so the obvious repair was to draw those arguments from functions the corpus defines.
+
+It was implemented, measured, and reverted. `COMPARED` went 35 -> 34 and the 9 cases did not
+move, because the premise was wrong: a lambda HAS a `__qualname__` (`<lambda>`) and encodes
+fine. The unnamed callables are `functools.partial` objects, which have neither `__name__`
+nor `__qualname__` and which the change never touched. It made constructors reject arguments
+they had been accepting, and fixed nothing.
+
+Recorded because the reasoning is more re-derivable than the result: the next person to read
+`unencodable ...: callable` will suspect the fabricated lambdas too. They are not the cause.
+
