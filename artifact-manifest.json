@@ -105,13 +105,13 @@
    "render_sha256": "0625a76aa80405f0fff3fce1668b2c08e27dd72c6c98ff951834a77b0607d83e"
   },
   "V8Base": {
-   "ast_bytes": 3198147,
+   "ast_bytes": 3198007,
    "ast_hint": "/tmp/final-V8Base.json",
-   "ast_sha256": "76119976758cf3999d3c87aa4d9c57fdf2b8cae2a5a7cb2a6f9bcb6738759708",
+   "ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
    "ast_tracked": true,
    "provenance": "AST /tmp/final-V8Base.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-   "render_bytes": 1816866,
-   "render_sha256": "2e65d1e30cdb14cda0a387655a3b40a22c85e888ed24cd510adf05285fecb7e9"
+   "render_bytes": 1818414,
+   "render_sha256": "bf6b2e1ef9f656ef3f11c0ffb59cb75b8dc66d32928fbe5e179eb6fbc46f5763"
   },
   "V8BaseSample": {
    "ast_bytes": 1539,
@@ -121,11 +121,11 @@
    "render_sha256": "5fecb27b09384b58e403dcca3f696a97fd1d8256c7e11d11d825cae8ba2f1af2"
   },
   "V8Numbers": {
-   "ast_bytes": 404091,
-   "ast_sha256": "1ade03d08e9c9480eea39bdebeec34781e94964702de94afe865491ea92be96b",
+   "ast_bytes": 427703,
+   "ast_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
    "ast_tracked": true,
-   "render_bytes": 212767,
-   "render_sha256": "0bbcddf34e7b2ba44700de76c82e172b5e15a520c65de70d2c97ce8c49865744"
+   "render_bytes": 221465,
+   "render_sha256": "bb8655a789de83b0f0e929be15c91264d670d0657c29ff3577e3dbec63fc5bcb"
   }
  },
  "policy": "The AST is the tracked source of truth; Autoform/Generated/*.lean is a build product and is not tracked. See docs/integrity.md. Hashes here pin the identity of both halves; scripts/check_render.py verifies them.",
@@ -157,7 +157,7 @@
   },
   "SpecsGen/V8Base": {
    "corpus": "V8Base",
-   "corpus_ast_sha256": "76119976758cf3999d3c87aa4d9c57fdf2b8cae2a5a7cb2a6f9bcb6738759708",
+   "corpus_ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
    "source": "ast-V8Base.json"
   },
   "SpecsGen/V8BaseSample": {

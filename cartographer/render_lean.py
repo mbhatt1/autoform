@@ -76,6 +76,25 @@ def lean_int(i) -> str:
     i = int(i)
     return f"({i})" if i < 0 else str(i)
 
+def lean_float_bits(v) -> int:
+    """The IEEE-754 binary64 bit pattern of a decimal float literal.
+
+    `Autoform/Lang/Core/Float.lean` models floats by bit pattern and its docstring names
+    exactly this conversion: `struct.unpack('<Q', struct.pack('<d', x))[0]`. Emitting BITS
+    rather than decimal text is the point -- `Format.ofDecimal` can round a decimal
+    correctly on the way in, but going back out to decimal is not modelled, so bits are the
+    only spelling that round-trips through the differential harness.
+
+    Python's float() is correctly rounded, so this is the same value a C or Python compiler
+    would produce for the same source text. A literal that does not parse is an error here
+    rather than a silent 0.0: 854 lines of verified IEEE-754 are not improved by feeding
+    them a guess.
+    """
+    import struct
+    x = float(str(v).rstrip("fFlL"))
+    return struct.unpack("<Q", struct.pack("<d", x))[0]
+
+
 def lean_bool(b) -> str:
     return "true" if b else "false"
 
@@ -104,6 +123,7 @@ def expr_shape(n):
     if k == "str":    return ".lit", [("atom", f"(.str {lean_str(f('v'))})")]
     if k == "bool":   return ".lit", [("atom", f"(.bool {lean_bool(f('v'))})")]
     if k == "unit":   return ".lit", [("atom", ".unit")]
+    if k == "float":  return ".lit", [("atom", f"(.float (Fl.ofBits {lean_float_bits(f('v'))}))")]
     if k == "name":   return ".name", [("atom", lean_str(f('v')))]
     if k == "binop":  return ".binop", [("atom", lean_str(f('op'))), ("e", f('a')), ("e", f('b'))]
     if k == "unop":   return ".unop", [("atom", lean_str(f('op'))), ("e", f('a'))]

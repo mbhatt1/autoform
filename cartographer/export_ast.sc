@@ -1335,7 +1335,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
           // so emitting `Lit.float` here is real pending work, not a permanent hole.
           else if (c.matches("""[-+]?(\d+\.\d*|\.\d+|\d+)([eE][-+]?\d+)?[fFlL]?""") &&
                    c.exists(ch => ch == '.' || ch == 'e' || ch == 'E'))
-            hole("lit:float")
+            // `Autoform/Lang/Core/Float.lean` models IEEE-754 by bit pattern and has sat in
+            // the tree, fully verified and entirely unused by the pipeline, since it was
+            // written. The decimal text is emitted here and `render_lean.py` converts it to
+            // the exact binary64 pattern: Python's float() is correctly rounded, and it is
+            // the same conversion `Float.lean` names in its own docstring.
+            ujson.Obj("k" -> "float", "v" -> c)
           // Joern synthesises `<global>` as a namespace marker. It is not a literal the
           // source contains, and counting it as an unparsed one overstated the literal
           // problem roughly tenfold on V8.
