@@ -106,6 +106,15 @@ jobs:
       - name: check_render — committed modules are renders of committed ASTs
         run: python3 scripts/check_render.py
 
+      # A specification is a statement about a SPECIFIC RENDERING of a corpus. Closing a
+      # hole changes what the translated function computes, so improving coverage can turn
+      # a true law false -- three separate times in one day it did, and each time the build
+      # stayed green because nothing tied a spec to the corpus version it was generated
+      # against. This binds them by AST hash. A mismatch means re-generate the specs; it
+      # does NOT mean re-record the hash, which would make the gate agree with anything.
+      - name: check_specs_fresh — specs describe the corpus in the tree
+        run: python3 scripts/check_specs_fresh.py
+
       # check_docs cross-checks the ledger against the AST, and the ledger
       # is gitignored (it is a build product). On a fresh clone it is absent,
       # and check_docs correctly treats absence as a FAILURE rather than a
