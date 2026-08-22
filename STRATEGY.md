@@ -2770,3 +2770,46 @@ they had been accepting, and fixed nothing.
 Recorded because the reasoning is more re-derivable than the result: the next person to read
 `unencodable ...: callable` will suspect the fabricated lambdas too. They are not the cause.
 
+## 49. `self` was stripped from functions that were not methods
+
+`applyFunc` binds a receiver itself, so the exporter drops the `self` parameter. It dropped
+it from EVERY function whose first parameter was named `self`, and that is not the same set:
+
+    def methodkey(self, *args, **kwargs):      # module scope, cachetools/keys.py
+        return hashkey(*args, **kwargs)
+
+`methodkey` is a module-level function. Its `self` is an ordinary positional -- Python does
+not treat the name specially, only the binding does. With it stripped, `methodkey(10, -4)`
+put both arguments into `*args` and Core computed `hashkey(10, -4)` where CPython computes
+`hashkey(-4)`. It surfaced as `cpython=tuple[int -4]` against a `_HashedTuple` carrying two
+elements, which reads as a builtin-subclass representation problem and is nothing of the
+kind: a parameter was missing.
+
+The first fix used `astParentType == "TYPE_DECL"`, which is not what pythonsrc marks methods
+with. It stripped nothing and changed 140 functions -- caught by diffing the re-export
+against the committed AST before installing it, which is the only reason it did not land.
+The working signal is one this exporter already computes: `classNames` holds every real
+`class` statement, so a function is a method exactly when the segment before its own name is
+one of them. Nine functions changed, and all nine are genuinely not methods -- `methodkey`,
+`typedmethodkey`, and the `wrapper`/`cache_clear`/`classmethod_wrapper` closures that
+decorators build inside a factory.
+
+    agree         169/174 (97%) -> 174/174 (100%)
+    divergences   5 -> 0
+    compared      35 of 180 hole-free, unchanged
+
+### 100% is the number this project distrusts
+
+A dead oracle reports zero divergences, and so does a perfect one. The liveness gate in CI
+only checks `COMPARED > 0`, which this passes at 35 -- necessary, not sufficient. So the
+claim was tested directly: `_DefaultSize.__getitem__` was edited to return `2` where CPython
+returns `1`, the module rebuilt, and the oracle re-run.
+
+    DIVERGENCE ..._DefaultSize.__getitem__(int -1): cpython=int 1 lean=int 2
+
+It found it, on every case, and the fault was reverted and the build re-verified. The 100% is
+an oracle that adjudicated 174 cases and agreed, not one that abstained. Note what the check
+is worth: it proves the pipeline can still report a disagreement end to end -- encoder, Lean
+harness, parser, comparison. It does not prove the semantics are right about anything the
+oracle never reaches, which is still 145 of 180 hole-free functions.
+

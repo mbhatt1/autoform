@@ -2744,7 +2744,24 @@ import io.shiftleft.codepropertygraph.generated.nodes._
     declaredGlobals = Set.empty
     boundMethods = Map.empty
     attrsOf = Map.empty
-    val ps = m.parameter.l.sortBy(_.index).filterNot(_.name == "self")
+    // `self` is stripped ONLY for a method of a class, where `applyFunc` binds the
+    // receiver itself. A MODULE-LEVEL function whose first parameter happens to be named
+    // `self` is not a method and its `self` is an ordinary positional: cachetools defines
+    // `def methodkey(self, *args, **kwargs)` at file scope, and stripping it made Core
+    // compute `hashkey(10, -4)` where CPython computes `hashkey(-4)`. That was 5 of the
+    // remaining divergences, and it read as a `_HashedTuple` shape problem rather than a
+    // missing parameter.
+    // `astParentType` is not `TYPE_DECL` for pythonsrc methods -- using it strips nothing
+    // and changes 140 functions. The reliable signal is the one this file already computes:
+    // `classNames` holds every real `class` statement, so a function is a method exactly
+    // when the segment before its own name is one of them. Split on `:<module>.` first --
+    // the filename itself contains dots (`__init__.py`).
+    val qualSegs = exportName(m).split(":<module>\\.").lastOption
+                     .map(_.split('.').toList).getOrElse(Nil)
+    val isMethodDecl =
+      qualSegs.length >= 2 && classNames.contains(qualSegs(qualSegs.length - 2))
+    val ps = m.parameter.l.sortBy(_.index)
+               .filterNot(p => isMethodDecl && p.name == "self")
     val stars = ps.map(p => p.name -> paramStars(p, m.filename)).toMap
     val obj = ujson.Obj(
       "name"   -> exportName(m),

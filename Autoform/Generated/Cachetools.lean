@@ -4174,7 +4174,7 @@ def f_cachetools__cachedmethod_py__module___condition : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._condition.wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.wrapper"
-  , params := ["pending", "args", "kwargs"]
+  , params := ["self", "pending", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq
@@ -4301,7 +4301,7 @@ def f_cachetools__cachedmethod_py__module___condition_wrapper__lambda_1 : Func :
 /-- `cachetools/_cachedmethod.py:<module>._condition.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.cache_clear"
-  , params := []
+  , params := ["self"]
   , body := (.seq
             (.assign
               "c"
@@ -4325,7 +4325,7 @@ def f_cachetools__cachedmethod_py__module___condition_cache_clear : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_classmethod_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper"
-  , params := ["args", "kwargs"]
+  , params := ["self", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq
@@ -4413,7 +4413,7 @@ def f_cachetools__cachedmethod_py__module___locked : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._locked.wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.wrapper"
-  , params := ["args", "kwargs"]
+  , params := ["self", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq
@@ -4491,7 +4491,7 @@ def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._locked.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.cache_clear"
-  , params := []
+  , params := ["self"]
   , body := (.seq
             (.assign
               "c"
@@ -4579,7 +4579,7 @@ def f_cachetools__cachedmethod_py__module___unlocked : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.wrapper`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.wrapper"
-  , params := ["args", "kwargs"]
+  , params := ["self", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq
@@ -4620,7 +4620,7 @@ def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_cache_clear : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear"
-  , params := []
+  , params := ["self"]
   , body := (.seq
             (.assign
               "c"
@@ -5060,7 +5060,7 @@ def f_cachetools_keys_py__module__hashkey : Func :=
 /-- `cachetools/keys.py:<module>.methodkey`  (from `cachetools/keys.py`) -/
 def f_cachetools_keys_py__module__methodkey : Func :=
   { name := "cachetools/keys.py:<module>.methodkey"
-  , params := ["args", "kwargs"]
+  , params := ["self", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq
@@ -5124,7 +5124,7 @@ def f_cachetools_keys_py__module__typedkey : Func :=
 /-- `cachetools/keys.py:<module>.typedmethodkey`  (from `cachetools/keys.py`) -/
 def f_cachetools_keys_py__module__typedmethodkey : Func :=
   { name := "cachetools/keys.py:<module>.typedmethodkey"
-  , params := ["args", "kwargs"]
+  , params := ["self", "args", "kwargs"]
   , vararg := some "args"
   , kwarg := some "kwargs"
   , body := (.seq

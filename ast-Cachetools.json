@@ -21024,6 +21024,7 @@
   "name": "cachetools/_cachedmethod.py:<module>._condition.wrapper",
   "file": "cachetools/_cachedmethod.py",
   "params": [
+   "self",
    "pending",
    "args",
    "kwargs"
@@ -21676,7 +21677,9 @@
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition.cache_clear",
   "file": "cachetools/_cachedmethod.py",
-  "params": [],
+  "params": [
+   "self"
+  ],
   "body": {
    "k": "seq",
    "a": {
@@ -21837,6 +21840,7 @@
   "name": "cachetools/_cachedmethod.py:<module>._condition.classmethod_wrapper",
   "file": "cachetools/_cachedmethod.py",
   "params": [
+   "self",
    "args",
    "kwargs"
   ],
@@ -22241,6 +22245,7 @@
   "name": "cachetools/_cachedmethod.py:<module>._locked.wrapper",
   "file": "cachetools/_cachedmethod.py",
   "params": [
+   "self",
    "args",
    "kwargs"
   ],
@@ -22637,7 +22642,9 @@
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked.cache_clear",
   "file": "cachetools/_cachedmethod.py",
-  "params": [],
+  "params": [
+   "self"
+  ],
   "body": {
    "k": "seq",
    "a": {
@@ -23064,6 +23071,7 @@
   "name": "cachetools/_cachedmethod.py:<module>._unlocked.wrapper",
   "file": "cachetools/_cachedmethod.py",
   "params": [
+   "self",
    "args",
    "kwargs"
   ],
@@ -23244,7 +23252,9 @@
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked.cache_clear",
   "file": "cachetools/_cachedmethod.py",
-  "params": [],
+  "params": [
+   "self"
+  ],
   "body": {
    "k": "seq",
    "a": {
@@ -25228,6 +25238,7 @@
   "name": "cachetools/keys.py:<module>.methodkey",
   "file": "cachetools/keys.py",
   "params": [
+   "self",
    "args",
    "kwargs"
   ],
@@ -25508,6 +25519,7 @@
   "name": "cachetools/keys.py:<module>.typedmethodkey",
   "file": "cachetools/keys.py",
   "params": [
+   "self",
    "args",
    "kwargs"
   ],
