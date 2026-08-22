@@ -289,6 +289,15 @@ class P:
         if qual in ("Val.unit",):            return ("unit",)
         if qual in ("EResult.outOfFuel",):   return ("outOfFuel",)
         if name in ("true", "false"):        return ("bool", name == "true")
+        # `Val.bobj cls payload` takes TWO arguments -- the only Val constructor that
+        # does. Parsed as a one-argument constructor it consumed the class name and left
+        # the payload dangling, so every `_HashedTuple` result came back "unparsable" and
+        # was counted INCONCLUSIVE. Core produced the right value; the oracle could not
+        # read it.
+        if qual == "Val.bobj":
+            cls = self.atom()
+            payload = self.atom()
+            return ("bobj", cls[1] if cls[0] == "str" else "?", payload)
         arg = self.atom()
         if qual == "Val.int":   return ("int", arg[1])
         if qual == "Val.str":   return ("str", arg[1])
@@ -317,12 +326,30 @@ def parse_result(line):
 
 # ---------------------------------------------------------------------- comparison
 
+def unwrap_bobj(v):
+    """A `Val.bobj cls payload` compares as its payload.
+
+    `class _HashedTuple(tuple)` translates to `Val.bobj "_HashedTuple" (tuple …)`, and
+    Core's `Val.beq` compares such a value BY CONTENTS, ignoring the class — which is
+    CPython's answer for a builtin subclass that does not override `__eq__`
+    (`hashkey(0) == (0,)` is `True`). CPython hands the oracle a plain tuple, so comparing
+    the payload is the same relation the semantics implements, not a convenience.
+
+    Before this the harness had no `bobj` case at all: `hashkey` and `methodkey` came back
+    `representation:value-vs-object` and were counted INCONCLUSIVE — the oracle refusing to
+    look at a value Core had been fixed to produce correctly."""
+    while isinstance(v, tuple) and len(v) == 3 and v[0] == "bobj":
+        v = v[2]
+    return v
+
+
 def same(py, ln, base):
     """Compare an encoded Python value against a parsed Lean value.
 
     Dicts compare order-insensitively: Core's `Val.dict` is an association list whose
     order is observable, but Python's insertion order is not part of the contract we
     are checking here, and pretending otherwise would manufacture divergences."""
+    ln = unwrap_bobj(ln)
     if py[0] != ln[0]:
         # Core has no separate tuple/list distinction at some call sites; still, do not
         # paper over it — report as a mismatch.
@@ -356,6 +383,7 @@ def same(py, ln, base):
 
 def shape_clash(py, ln):
     """True when the two sides disagree about value-vs-object representation."""
+    ln = unwrap_bobj(ln)
     containers = ("list", "tuple", "dict")
     if py[0] == "ref" and ln[0] in containers: return True
     if ln[0] == "ref" and py[0] in containers: return True
@@ -1773,8 +1801,15 @@ def main():
               "private def h0 : Heap := gp.1",
               "private def gref : Ref := gp.2",
               "private def base : Nat := h0.length",
+              # `builtinBases` must be carried, or `Expr.alloc` cannot know that
+              # `class _HashedTuple(tuple)` has a builtin base and produces a plain
+              # `Val.ref` instead of a `Val.bobj`. The oracle then reports
+              # `representation:value-vs-object` and counts the case INCONCLUSIVE -- the
+              # harness refusing to look at a value Core was fixed to produce correctly,
+              # because the harness dropped the field on the way in.
               "private def dctx : Ctx := "
-              "{ dialect := program.dialect, table := program.table, globals := gref }",
+              "{ dialect := program.dialect, table := program.table, globals := gref, "
+              "builtinBases := program.builtinBases }",
               "",
               "private structure DCase where",
               "  idx  : Nat",
