@@ -2362,3 +2362,42 @@ agree exactly with the figures this workflow started from.
   pinned Joern. That is the honest baseline it was built to establish, not a pass.
 * `scripts/differential.py`'s trace step on cachetools, which is what blocks the
   regeneration above.
+
+## §41 — `op:addressOf` is a corpus-boundary problem, not a location-model problem
+
+The largest remaining hole label was recorded as needing a location model — `Val.ptr` with
+a base object and access path, arrays as heap objects, a size model, estimated at roughly
+three times the `Val.bobj` change and touching `Semantics`, `FuelMono`, `Refine`,
+`Overflow`, the renderer and the ledger. That estimate is right about the work and wrong
+about the problem.
+
+Measured over Linux `lib/`, for every `op:addressOf:local:unknown-type` site:
+
+    passed to a call defined IN the analysed program      64   ( 2%)
+    passed to an EXTERNAL call                          2,724  (98%)
+    not a direct call argument                              0   ( 0%)
+
+`kstrtoul(s, 0, &n)` is the shape. The callee is not in `lib/`, so it is not translated,
+so **what it does to the pointer is unknowable whatever the pointer model is**. A location
+model would let Core represent `&n`; it would not let Core say what happens to `n`,
+because the function that writes it does not exist in the program.
+
+The same measurement on the other corpora:
+
+    linux crypto/   94 sites: 32% in-program, 52% external, 16% other
+    v8 src/base      3 sites: 100% external
+
+So the remedy is not a pointer model but a **wider corpus**. Parsing the callees — the
+rest of `lib/`'s dependencies, or the kernel with its headers — converts the 98% into the
+2% case, and only then does a location model buy anything. Building the model first would
+be building the expensive half of a two-part fix, in the wrong order, and the 2% figure
+says how little it would return on its own.
+
+This also explains why the earlier syntactic type-recovery pass moved the number by only
+66. It was inferring types for variables whose *use* is outside the corpus; there was
+nothing local left to infer from.
+
+The honest statement of the caveat is therefore: **`op:addressOf` is blocked on corpus
+coverage, and a location model is the second step, not the first.** The label should say
+so; it currently says `unknown-type`, which points at type inference — the one remedy the
+measurement rules out.
