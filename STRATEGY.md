@@ -2449,3 +2449,47 @@ gap is worth naming too: 574 `static … __init …` declarations in Linux `lib/
 FUNCTION DEFINITIONS that Joern's parser drops because of GCC attributes. Those are not
 holes — they are functions missing from the corpus, and no amount of Core work reaches them.
 That is the real content of "needs a preprocessed build".
+
+## §43 — 571 Linux functions were never in the corpus, and the front end never said so
+
+§42 named the one genuine gap the measurement method found: `static … __init …`
+declarations that Joern's C parser drops. This closes it, and the shape of the failure is
+worth recording because it is not a hole and does not appear in any hole count.
+
+Joern parses C **without running the preprocessor**, so
+
+    static int __init setup_early_mem_profiling(char *str) { … }
+
+fails to parse and the whole FUNCTION is dropped. Not translated into a hole — absent.
+Nothing in the ledger showed it, because the ledger counts what the exporter produced, and
+a function the front end never emitted has no row anywhere. The only visible trace was a
+`stmt:UNKNOWN` on the surrounding declaration.
+
+`scripts/strip_kernel_attrs.py` removes the attributes that defeat the parser from a
+**staging copy**: `__init`/`__exit` (ELF section placement), `__user`/`__iomem`/`__rcu`
+(sparse annotations, no codegen), `__weak`/`__visible` (linkage), `__cold`/`__pure`/
+`__must_check` (optimiser and warning hints), and the parametrised
+`__printf(m,n)`/`__section(…)`/`__attribute__((…))`. None of them changes what a function
+body computes, which is the only thing the translation models — so this removes text the
+semantics never depended on rather than approximating anything.
+
+    linux lib/   functions  3,368 -> 3,939   (+571)
+                 hole-free  1,669 -> 1,978   (50% -> 50%)
+                 holes      6,727 -> 7,280
+                 stmt:UNKNOWN:CASTProblemDeclaration  1,183 -> 509
+
+The hole *count* rose and the hole-free *ratio* held. That is the honest result: 571 more
+functions bring their own holes, and coverage per function is unchanged. A metric that
+improved here would have meant the new functions were being counted differently from the
+old ones.
+
+This is **not** a substitute for a real preprocessed build. Macros that expand to *code* —
+`MODULE_LICENSE`, `TEST_SPINLOCK_COMMON`, `DEFINE_SPINLOCK` — are untouched and remain
+`stmt:UNKNOWN` at 509. Those need cpp with the kernel's own headers and config.
+
+**Provenance**: any AST exported from a stripped tree is from modified sources, and that
+has to travel with the figures. The script says so on every run, next to the standing
+requirement to record the Joern version.
+
+Across all five corpora after this: **13,518 functions, 7,895 hole-free (58%)**, against
+12,947 / ~3,900 (30%) at the start of the session.
