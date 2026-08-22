@@ -2493,3 +2493,57 @@ requirement to record the Joern version.
 
 Across all five corpora after this: **13,518 functions, 7,895 hole-free (58%)**, against
 12,947 / ~3,900 (30%) at the start of the session.
+
+## §44 — The conformance oracle was dark, and every other gate was green
+
+`scripts/differential.py` reported **534 of 534 cases INCONCLUSIVE (`lean-no-answer`)** on
+`cachetools` — the corpus this project knows best. It was not deciding anything. Meanwhile
+`lake build` (472 jobs), `audit_all.py`, `check_render` (17/17), `check_docs` (8/8),
+`check_specs_fresh` (7/7) and 131 tests were all passing.
+
+Four separate faults, three of them introduced by work done the same day:
+
+1. **`applyFunc` arity.** Modelling Python's calling convention gave `applyFunc` a `kws`
+   parameter. The harness's generated Lean kept five arguments, so `drun` failed to
+   elaborate — but the `@@meta@@` line above it only mentions `base`/`gref` and still
+   printed, so the harness saw a live Lean process and recorded every case as
+   "lean did not answer". **An arity change disabled the only oracle that compares the
+   semantics to a real runtime, and looked like the semantics abstaining.**
+2. **Per-corpus namespaces.** The harness did `open Autoform.Generated` and referred to
+   bare `program`, which after §-namespacing lives in `Autoform.Generated.<M>`.
+3. **`json.load` recursion.** Ansible's AST blew the 1000-frame default *while decoding*.
+   Third instance of that defect class here, after `render_lean.py` and `has_hole`.
+4. **`os.path.exists` where `isfile` was meant.** An AST entry with an empty `file` — a
+   module-level initialiser — joins to the source ROOT, which exists and is a directory.
+
+Restored: **38 functions compared, 133/166 agree (80%), 33 divergences.**
+
+### Why it stayed dark
+
+An oracle that *cannot run* reported identically to an oracle that *ran and abstained*.
+`lean-no-answer` was counted as INCONCLUSIVE, which is a legitimate outcome, so the
+headline read "0 divergences" — the best possible number — while nothing was being checked.
+
+The harness now prints the first line of Lean's stderr when it fails to reach the first
+case. That is the whole fix for the class: **a check with nothing to say and a check that
+cannot speak must not look the same.** Four instances now — the mutation-gate regex that
+never matched, the doc checker comparing against a stale artifact, the cross-check that
+went quiet on a fresh clone, and this.
+
+**Conformance is not in CI.** Everything that is in CI stayed green throughout. That is the
+concrete lesson: the only oracle that tests the semantics against reality rather than
+against itself is the one nothing was guarding.
+
+### The 33 divergences, diagnosed
+
+All are `lean raised TypeError` where CPython succeeds, and all have one cause.
+`LRUCache.__getitem__` calls `cache_getitem(self, key)` — passing `self` **positionally**
+to a function value. The exporter strips `self` from `params` (right for method dispatch,
+since `applyFunc` binds the receiver separately), so `Cache.__getitem__` has
+`params = ['key']` and receives two positional arguments. Surplus positional arguments now
+raise `TypeError` rather than being truncated, so the stricter rule turned a silent
+truncation into a loud wrong answer.
+
+That is progress, not regression — the old behaviour was wrong too and said nothing — but
+it is not yet right. A `Val.fn` called directly needs its first positional argument bound
+to `self` when the referent is a method. Recorded, not fixed.

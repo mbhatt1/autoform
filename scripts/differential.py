@@ -448,10 +448,13 @@ def build_lineno_index(src_root, wanted_files):
     idx = {}
     for rel in wanted_files:
         path = os.path.join(src_root, rel)
-        if not os.path.exists(path): continue
+        # `isfile`, not `exists`: an AST entry with an empty `file` (a module-level
+        # initialiser) joins to the source ROOT, which exists and is a directory. Opening
+        # it raised IsADirectoryError and killed the run before any case was compared.
+        if not os.path.isfile(path): continue
         try:
             tree = pyast.parse(open(path, encoding="utf-8").read(), path)
-        except SyntaxError:
+        except (SyntaxError, OSError, UnicodeDecodeError):
             continue
         stack = []
 
@@ -1758,7 +1761,14 @@ def main():
         isolated = False
 
     header = ["import Autoform.Generated.%s" % lean_mod,
-              "open Autoform.Core Autoform.Generated", "",
+              # Each corpus owns its namespace (`Autoform.Generated.Cachetools.program`,
+              # ...) so that proofs about two codebases can share an import graph. Opening
+              # the parent only was silently fatal here: `program` did not resolve, the
+              # generated harness failed to compile, and EVERY case came back
+              # `lean-no-answer` -- 534 of 534 on cachetools, reported as INCONCLUSIVE
+              # rather than as a broken harness. Conformance is not in CI, so nothing
+              # caught it.
+              "open Autoform.Core Autoform.Generated Autoform.Generated.%s" % lean_mod, "",
               "private def gp : Heap × Ref := initGlobals program %d %s" % (FUEL, inits),
               "private def h0 : Heap := gp.1",
               "private def gref : Ref := gp.2",
@@ -1785,7 +1795,13 @@ def main():
               "  else",
               "    match dctx.resolve c.fn with",
               '    | none    => .hole s!"entry:{c.fn}"',
-              "    | some fn => (applyFunc dctx %d h fn c.slf c.args).2" % FUEL, ""]
+              # `applyFunc` gained a `kws` parameter when Python's calling convention was
+              # modelled. This call site kept five arguments, so `drun` failed to elaborate
+              # -- but the `@@meta@@` line above it only mentions `base`/`gref` and still
+              # printed, so the harness saw a live Lean process and reported every case as
+              # `lean-no-answer`. An arity change silently disabled the only oracle that
+              # compares the semantics to a real runtime.
+              "    | some fn => (applyFunc dctx %d h fn c.slf c.args []).2" % FUEL, ""]
     footer = ["]", "",
               '#eval IO.println ("@@meta@@" ++ toString base ++ " " ++ toString gref)',
               '#eval cases.forM (fun c => IO.println ("@@" ++ toString c.idx ++ "@@" '
@@ -1827,6 +1843,16 @@ def main():
                 continue
             m = re.match(r'@@(\d+)@@(.*)', l)
             if m and int(m.group(1)) in idxs: got[int(m.group(1))] = m.group(2)
+        if not saw_meta:
+            # PRINT THE REASON. Without this the whole oracle fails as "534 INCONCLUSIVE
+            # (lean-no-answer)", which is indistinguishable from "the semantics could not
+            # decide" -- an oracle that cannot run looks exactly like an oracle that ran
+            # and abstained. That is how a namespace change disabled conformance entirely
+            # while every other gate stayed green.
+            first = (out.stderr or out.stdout or "").strip().splitlines()
+            if first:
+                print("  lean did not reach the first case (rc=%s): %s"
+                      % (out.returncode, first[0][:200]))
         if not saw_meta and not retried:
             # No `@@meta@@` line: the file never reached the first case, so this is a
             # compile or environment failure, not a bad case. That happens for real —
@@ -2078,5 +2104,45 @@ def main():
     return 1 if diverge else 0
 
 
+def _run_on_a_big_stack(fn):
+    """Run `fn` on a thread with a large stack and a raised recursion limit.
+
+    `json.load` is recursive, and the neutral AST nests as deeply as the source does.
+    Ansible's AST blew Python's 1000-frame default *while decoding*, so conformance could
+    not run on the largest Python corpus at all -- and the traceback pointed at the JSON
+    decoder, which reads as "the file is corrupt" rather than "this program is deeply
+    nested".
+
+    This is the third instance of the same defect in this repository: `render_lean.py`
+    never set a limit and died at 247 consecutive statements, `has_hole` was recursive and
+    raised before any backend ran, and now the decoder itself. Raising the limit alone is
+    not enough -- the limit guards the C stack, so lifting it without a bigger stack turns
+    a clean exception into a segfault.
+    """
+    import threading
+    sys.setrecursionlimit(300_000)
+    try:
+        threading.stack_size(512 * 1024 * 1024)
+    except (ValueError, RuntimeError):
+        try:
+            threading.stack_size(64 * 1024 * 1024)
+        except (ValueError, RuntimeError):
+            pass
+    box = {}
+
+    def go():
+        try:
+            box["rc"] = fn()
+        except BaseException as e:          # noqa: BLE001 - re-raised on the caller
+            box["exc"] = e
+
+    t = threading.Thread(target=go)
+    t.start()
+    t.join()
+    if "exc" in box:
+        raise box["exc"]
+    return box.get("rc", 0)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_run_on_a_big_stack(main))
