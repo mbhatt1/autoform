@@ -2547,3 +2547,50 @@ truncation into a loud wrong answer.
 That is progress, not regression — the old behaviour was wrong too and said nothing — but
 it is not yet right. A `Val.fn` called directly needs its first positional argument bound
 to `self` when the referent is a method. Recorded, not fixed.
+
+## §45 — The oracle needed four fixes before it could see one bug
+
+§44 restored conformance from 534/534 `lean-no-answer` to 38 compared. Pushing further
+found three more faults, all the same kind: **Core was fixed, and the harness that checks
+Core was not told.**
+
+* `Val.bobj cls payload` takes two arguments — the only `Val` constructor that does.
+  Parsed as one-argument, it consumed the class name and left the payload dangling, so
+  every `_HashedTuple` result was "unparsable" and counted INCONCLUSIVE.
+* The harness built `Ctx` as `{ dialect, table, globals }` and never carried
+  `builtinBases`, so `Expr.alloc` could not know the class had a builtin base and produced
+  a plain `Val.ref`. The oracle then reported `representation:value-vs-object` — refusing
+  to look at a value it had itself prevented Core from producing.
+* `same`/`shape_clash` had no `bobj` case.
+
+    compared      38 -> 40 functions, 166 -> 186 cases
+    agree        133 -> 138
+    divergences   33 -> 48        rate 80% -> 74%
+
+**The rate fell and that is the honest direction.** The newly comparable cases contain real
+disagreements that were previously hidden behind "unparsable". A rate that improved here
+would have meant the oracle was still refusing the hard cases.
+
+### The remaining divergences, both diagnosed
+
+**27 are the `self`-positional bug** (§44): a `Val.fn` called directly needs its first
+positional argument bound to `self` when the referent is a method.
+
+**15 are a double pack, and the fault is in the harness.** Core answers
+`bobj "_HashedTuple" (tuple [tuple [int 0], dict []])` where CPython answers `(0,)`. The
+harness records its cases by tracing CPython, and what it captures is the *frame's*
+`args`/`kwargs` — for `hashkey(*args, **kwargs)` called as `hashkey(0)` that is
+`args = (0,)`, `kwargs = {}`. It then passes those two packed values as positional
+arguments to a function that packs again.
+
+This was invisible before varargs were modelled, because `vararg` did not exist and the
+packed tuple was simply bound to the first parameter — the same wrong answer, arrived at
+by a different route, and reported as agreement. The fix is to spread the recorded packed
+values back into positionals when the callee has a `vararg`/`kwarg`.
+
+### The pattern
+
+Every one of these four faults reported as INCONCLUSIVE or as a divergence in Core, never
+as a fault in the checker. **An oracle reports its own defects in the vocabulary of the
+thing it is checking**, which is why they survived: each one looked like a limitation of
+the semantics, and the semantics was innocent in all four cases.
