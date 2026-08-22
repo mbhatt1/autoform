@@ -293,6 +293,31 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         cases hres2 : Ctx.resolve ctx g with
                         | some fn2 => rw [hres2] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
                         | none => rw [hres2] at hy; exact hy
+                    case ref addr =>
+                        -- A boxed function object (section 47) dispatches to what it
+                        -- carries, so this case now recurses where it used to be inert.
+                        rw [hg] at hy
+                        dsimp only at hy ⊢
+                        cases hub : unboxFn h₁ addr with
+                        | none => rw [hub] at hy; exact hy
+                        | some fv =>
+                            rw [hub] at hy
+                            cases fv
+                            case fn g2 =>
+                                dsimp only at hy ⊢
+                                cases hr3 : Ctx.resolve ctx g2 with
+                                | some fn3 =>
+                                    rw [hr3] at hy
+                                    exact ihF _ hctx _ _ (hctx.1 _ _ hr3) _ _ _ _ _ hy hne
+                                | none => rw [hr3] at hy; exact hy
+                            case clos g2 cap2 =>
+                                dsimp only at hy ⊢
+                                cases hr3 : Ctx.resolve ctx g2 with
+                                | some fn3 =>
+                                    rw [hr3] at hy
+                                    exact ihC _ hctx _ _ (hctx.1 _ _ hr3) _ _ _ _ _ hy hne
+                                | none => rw [hr3] at hy; exact hy
+                            all_goals (dsimp only at hy ⊢; exact hy)
                     all_goals (rw [hg] at hy; exact hy)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
@@ -672,6 +697,32 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     cases r₂ <;> first
                       | (cases hy; exact absurd rfl hne)
                       | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                case fn g =>
+                    -- Boxing evaluates the right-hand side IN THE POST-ALLOCATION HEAP,
+                    -- so the recursion is at `(boxFn h₁ _).1`, not at `h₁`.
+                    cases re <;> dsimp only [isFnVal] at hy ⊢ <;>
+                      first
+                        | exact hy
+                        | (generalize hbx : boxFn h₁ (Val.fn g) = bx at hy ⊢
+                           obtain ⟨hb, addr⟩ := bx
+                           rcases hB : evalExpr ctx k hb ρ ve with ⟨h₂, r₂⟩
+                           rw [hB] at hy
+                           cases r₂ <;> first
+                             | (cases hy; exact absurd rfl hne)
+                             | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy))
+                case clos g cap =>
+                    -- Boxing evaluates the right-hand side IN THE POST-ALLOCATION HEAP,
+                    -- so the recursion is at `(boxFn h₁ _).1`, not at `h₁`.
+                    cases re <;> dsimp only [isFnVal] at hy ⊢ <;>
+                      first
+                        | exact hy
+                        | (generalize hbx : boxFn h₁ (Val.clos g cap) = bx at hy ⊢
+                           obtain ⟨hb, addr⟩ := bx
+                           rcases hB : evalExpr ctx k hb ρ ve with ⟨h₂, r₂⟩
+                           rw [hB] at hy
+                           cases r₂ <;> first
+                             | (cases hy; exact absurd rfl hne)
+                             | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy))
                 all_goals (dsimp only at hy ⊢; exact hy)
         | seq a b =>
             simp only [tfFreeS, Bool.and_eq_true] at hfree

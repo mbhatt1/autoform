@@ -654,6 +654,37 @@ def Ctx.builtinBase (ctx : Ctx) (cls : String) : Option BuiltinBase :=
   | some (_, b) => some b
   | none        => none
 
+/-! ### Function objects
+
+A Python function is a heap object with a `__dict__`, which is why `wrapper.cache_clear = f`
+is an ordinary attribute write and not a special form. `Val.fn` is a bare name with no
+identity, so that write used to hole as `setField:<f>:non-object` -- the largest single block
+of INCONCLUSIVE cases in the conformance run. `Val.ref` already carries the identity `is`
+compares, so the heap needs nothing new: a function that has been written to becomes an
+object of the reserved class below, carrying the function it was. -/
+
+/-- Reserved class of a boxed function object. Not a name any source language can produce. -/
+def funcObjCls : String := "<function>"
+
+/-- Reserved field holding the boxed function. -/
+def funcObjField : String := "__fn__"
+
+/-- Whether a value is callable-as-a-function, and so may be boxed on attribute write. -/
+def isFnVal : Val → Bool
+  | .fn _     => true
+  | .clos _ _ => true
+  | _         => false
+
+/-- Box a function value into a heap object so it can carry attributes. -/
+def boxFn (h : Heap) (fv : Val) : Heap × Ref :=
+  h.alloc { cls := funcObjCls, fields := [(funcObjField, fv)] }
+
+/-- The function a boxed function object carries, if it is one. -/
+def unboxFn (h : Heap) (addr : Ref) : Option Val :=
+  match h.get addr with
+  | some o => if o.cls == funcObjCls then o.fields.lookup funcObjField else none
+  | none   => none
+
 /-- Construct an instance of a class whose base is a builtin type: `X(iterable)` for
 `class X(tuple)` / `class X(list)`, `X(d)` for `class X(dict)`, `X(s)` for
 `class X(str)`, and `X()` for the empty instance.
@@ -883,6 +914,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs kws
                           | none    => (h₁, .hole s!"call:{g}")
+          | .ref addr  =>
+            -- A function that has had an attribute written to it is now a boxed function
+            -- object. Calling it calls what it carries; anything else on the heap is not
+            -- callable and says so rather than guessing.
+            match unboxFn h₁ addr with
+            | some (.fn g)      => match ctx.resolve g with
+                                   | some fn => applyFunc ctx n h₁ fn none vs kws
+                                   | none    => (h₁, .hole s!"call:{g}")
+            | some (.clos g cap) => match ctx.resolve g with
+                                    | some fn => applyClosure ctx n h₁ fn cap vs kws
+                                    | none    => (h₁, .hole s!"call:{g}")
+            | _ => (h₁, .hole s!"call:{f}:not-callable")
           | _          =>
             -- Modelled stdlib is consulted LAST, so a user function of the same name
             -- always wins. `builtin` returns `none` for anything it cannot model
@@ -1152,7 +1195,23 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
         | (h₂, .exn e)     => (h₂, .exn e)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
-      | (h₁, .val _) => (h₁, .hole s!"setField:{f}:non-object")
+      | (h₁, .val fv) =>
+        -- A function is a heap object in Python, so an attribute write to one is legal.
+        -- It is only expressible here when the receiver is a NAME: boxing rebinds that
+        -- name to the new object, and a function value reached any other way has nowhere
+        -- to rebind, so it keeps holing. That is correct rather than convenient -- the
+        -- alternative silently drops the mutation.
+        match r with
+        | .name x =>
+          if isFnVal fv then
+            let (h₂, addr) := boxFn h₁ fv
+            match evalExpr ctx n h₂ ρ v with
+            | (h₃, .val vv)    => (h₃.setField addr f vv, .normal (Env.set ρ x (.ref addr)))
+            | (h₃, .exn e)     => (h₃, .exn e)
+            | (h₃, .hole l)    => (h₃, .hole l)
+            | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+          else (h₁, .hole s!"setField:{f}:non-object")
+        | _ => (h₁, .hole s!"setField:{f}:non-object")
       | (h₁, .exn e) => (h₁, .exn e)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)

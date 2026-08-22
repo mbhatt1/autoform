@@ -2644,7 +2644,7 @@ Coverage remains the honest weak number: 28 of 180 hole-free functions. 250 INCO
 are runtime holes with named causes -- `call:set`, `setField:cache_clear:non-object`,
 `mcall:warn:keyword-to-builtin` -- each one unmodelled construct, not a mystery.
 
-## 47. Function objects: the next change, specified but not made
+## 47. Function objects: specified, then made
 
 The largest single block of INCONCLUSIVE cases is `setField:<f>:non-object` -- six functions
 in `cachetools/_cached.py`, thirty cases. The construct is the decorator epilogue:
@@ -2671,11 +2671,43 @@ The change, in the order it has to happen:
 
 What makes this bigger than section 46 is that section 46 was GUARDED to be a no-op
 everywhere else -- C++ has no `self`, so exactly one proof moved. This one changes what a
-function value is, on every path that handles one, in every corpus. It is the right change
-and it is specified here in full; it is not a change to make in the last twenty minutes of a
-session, because a value-model edit that builds green while being subtly wrong is the exact
-failure this project has caught six times already and would have no gate left to catch it.
+function value is, on every path that handles one, in every corpus. It was made, with the
+gates run at each step rather than at the end.
 
-Cost of NOT making it: 6 functions, 30 cases, coverage 28 -> 34 of 180 hole-free. Modelling
-`set` is worth 3 more functions and is a second, independent value-model addition.
+Two proof sites moved, both in `FuelMono` and both mechanically: the call path (boxed objects
+dispatch where the case used to be inert) and `setField` (boxing evaluates the right-hand
+side IN THE POST-ALLOCATION HEAP, so the recursion is at `(boxFn h₁ _).1` and the proof has
+to generalize over it rather than name `h₁`).
+
+### Three more faults in the oracle, not in Core
+
+Core was right after the first edit and the measurement still got worse before it got better,
+in three stages -- worth recording, because each stage LOOKED like the change had failed:
+
+1. Coverage rose 28 -> 34 as predicted, and divergences jumped 5 -> 35. The new divergences
+   read `cpython=fn '_locked_info.<locals>.wrapper'` against `lean=ref 6`. Those are the same
+   value: CPython reports the function, Core reports the object carrying it. A shape clash.
+2. Unboxing in the harness -- reporting a boxed function as the function it carries, the same
+   move `unwrap_bobj` already makes -- sent all 30 straight back to INCONCLUSIVE. A
+   decorator's `wrapper` is a CLOSURE, so unboxing exposed `Val.clos`, which the parser had
+   never had a case for. It read as unparsable, which is indistinguishable from abstaining.
+3. With `Val.clos` parsed, the names still disagreed: CPython's `__qualname__` writes
+   `<locals>` for function scope, Joern's qualified name writes `<module>` for file scope.
+   Neither segment names anything a program can refer to. Dropping both before the
+   dotted-suffix match closed it.
+
+    compared    28 -> 34 of 180 hole-free (16% -> 19%)
+    agree       135/140 (96%) -> 165/170 (97%)
+    divergences 5 -> 5
+
+So the coverage gain cost nothing in agreement, and the three faults were all in the
+oracle -- the eighth, ninth and tenth found there this session, against one in Core. That
+ratio is itself the finding: the measuring apparatus has been consistently less correct than
+the thing it measures, and every one of those faults failed CLOSED, reporting abstention or
+disagreement rather than false agreement. That is the direction an oracle should fail, and it
+is not an accident -- it is what `shape_clash` and the liveness gate were built to force.
+
+Still open: `call:set` (3 functions) needs a `Val.set`, a second and independent value-model
+addition. `mcall:warn:keyword-to-builtin`, `expr:genExp`, `in:non-container` and
+`mcall:clear:unboxed-container` are each one construct.
 

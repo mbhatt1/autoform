@@ -312,6 +312,16 @@ class P:
             cls = self.atom()
             payload = self.atom()
             return ("bobj", cls[1] if cls[0] == "str" else "?", payload)
+        # `Val.clos name captured` also takes two arguments. Unboxing a function object
+        # (Core section 47) exposes these, because a decorator's `wrapper` is a CLOSURE --
+        # so the six `_cached.py` functions went from a shape clash straight to
+        # "unparsable" and stayed INCONCLUSIVE. A closure IS a function value for the
+        # purpose of comparing return values; the captured environment is not something
+        # CPython hands the oracle, so it is parsed and dropped rather than compared.
+        if qual == "Val.clos":
+            nm = self.atom()
+            _cap = self.atom()
+            return ("fn", nm[1] if nm[0] == "str" else "?")
         arg = self.atom()
         if qual == "Val.int":   return ("int", arg[1])
         if qual == "Val.str":   return ("str", arg[1])
@@ -376,7 +386,15 @@ def same(py, ln, base):
         # `__qualname__` (`TTLCache._Link`), Joern a fully-qualified one
         # (`pkg/mod.py:<module>.TTLCache._Link`). Core's own `Ctx.resolve` matches
         # callables by dotted suffix, so accept exactly that and nothing looser.
-        a, b = py[1].split(":")[-1], ln[1].split(":")[-1]
+        # The two sides spell nesting differently: CPython's `__qualname__` inserts
+        # `<locals>` for a function defined inside a function (`_locked_info.<locals>.
+        # wrapper`), Joern's fully-qualified name inserts `<module>` for file scope
+        # (`cachetools/_cached.py:<module>._locked_info.wrapper`). Neither segment names
+        # anything a program can refer to, so drop both before matching by dotted suffix.
+        def _qual(x):
+            x = x.split(":")[-1]
+            return ".".join(p for p in x.split(".") if p not in ("<locals>", "<module>"))
+        a, b = _qual(py[1]), _qual(ln[1])
         return a == b or a.endswith("." + b) or b.endswith("." + a)
     if t == "ref": return py[1] + base == ln[1]
     if t in ("list", "tuple"):
@@ -1859,6 +1877,19 @@ def main():
               "  slf  : Option Val",
               "  args : List Val",
               "  chk  : List (Nat × String)", "",
+              # A boxed function object (Core section 47) is REPORTED AS THE FUNCTION IT
+              # CARRIES. `wrapper.cache_clear = f` makes `wrapper` a heap object, and Core
+              # returns a `Val.ref` to it where CPython returns the function -- a shape
+              # clash, not a disagreement. This is the same move `unwrap_bobj` makes on the
+              # Python side, and it hides the same thing: object identity and the attributes
+              # written to it. Neither side's test compares those here; if one ever does,
+              # this has to compare them rather than unbox.
+              "private def unboxRes (h : Heap) (r : EResult) : EResult :=",
+              "  match r with",
+              "  | .val (.ref a) => match unboxFn h a with",
+              "                     | some fv => .val fv",
+              "                     | none    => r",
+              "  | _ => r", "",
               "private def drun (c : DCase) : EResult :=",
               "  let h := h0 ++ c.objs",
               "  -- the globals frame must survive, and each receiver must land where",
@@ -1877,7 +1908,8 @@ def main():
               # printed, so the harness saw a live Lean process and reported every case as
               # `lean-no-answer`. An arity change silently disabled the only oracle that
               # compares the semantics to a real runtime.
-              "    | some fn => (applyFunc dctx %d h fn c.slf c.args []).2" % FUEL, ""]
+              "    | some fn => let r := applyFunc dctx %d h fn c.slf c.args []" % FUEL,
+              "                 unboxRes r.1 r.2", ""]
     footer = ["]", "",
               '#eval IO.println ("@@meta@@" ++ toString base ++ " " ++ toString gref)',
               '#eval cases.forM (fun c => IO.println ("@@" ++ toString c.idx ++ "@@" '
