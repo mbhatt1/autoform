@@ -740,11 +740,34 @@ def _raw_attr(cls, name):
     return None
 
 
-def find_class(rel, clsname):
-    """Locate a class the test suite already imported, by module path and name."""
+def find_module(rel):
+    """The imported module for a corpus-relative source path, or None.
+
+    Falling back to an explicit import matters more than it looks. `import cachetools`
+    pulls in `cachetools.keys` and nothing else -- `_cached` and `_cachedmethod` are
+    imported lazily inside functions -- so tracing the suite never put them in
+    `sys.modules`, `find_class` returned None for every class they define, and 48
+    functions were reported as blocked. The cause recorded against them was
+    "constructor rejected ()/(1)/(2,1)", which was false: no constructor was ever
+    reached, because the module holding the class had never been loaded.
+
+    Importing a submodule of a package the suite already imported is not fabricating
+    state -- it is loading code the corpus ships and the AST was exported from."""
     mod = rel[:-3].replace("/", ".").replace("\\", ".")
     if mod.endswith(".__init__"): mod = mod[:-9]
     m = sys.modules.get(mod)
+    if m is not None:
+        return m
+    try:
+        import importlib
+        return importlib.import_module(mod)
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
+def find_class(rel, clsname):
+    """Locate a class the test suite already imported, by module path and name."""
+    m = find_module(rel)
     if m is None: return None
     obj = m
     for part in clsname.split("."):
@@ -774,6 +797,65 @@ def time_limit(seconds):
         signal.signal(signal.SIGALRM, old)
 
 
+def _ctor_attempts(cls, pool):
+    """Argument tuples to try for `cls(...)`, best first.
+
+    The old search was three hardcoded shapes -- `()`, `(1,)`, `(2, 1)` -- and it was the
+    single largest blocker in the whole report: 54 functions, more than were being compared,
+    failed as "no live instance". They are not blocked by the semantics. `_WrapperBase`
+    takes four arguments and `cachedmethod`'s decorator takes a callable, so no tuple of
+    small integers was ever going to construct one.
+
+    So drive the search from the constructor's own parameter names, using the SAME observed
+    -value pool the method-argument synthesis already uses, and fall back by name only for
+    the shapes a cache library obviously needs. Anything constructed here still goes through
+    the identical encode/refuse/compare path as a traced call, so this widens what the oracle
+    can reach without widening what it will accept."""
+    attempts = [(), (1,), (2, 1)]
+    try:
+        order = frame_param_order(cls.__init__.__code__)
+    except Exception:                                       # noqa: BLE001
+        return attempts
+    if any(k in ("star", "dstar", "kwonly") for _, k in order):
+        return attempts
+    names = [n for n, _ in order][1:]
+    if not names:
+        return attempts
+    synth = []
+    for n in names:
+        cand = pool.get(n) or []
+        if cand:
+            synth.append(cand[0]); continue
+        synth.append(_ctor_fallback(n))
+    attempts.insert(0, tuple(synth))
+    # ... and the same shape with the trailing optional parameters dropped, since a
+    # constructor that rejects a fabricated `lock` may still accept a shorter call.
+    for k in range(len(synth) - 1, 0, -1):
+        attempts.append(tuple(synth[:k]))
+    return attempts
+
+
+def _ctor_fallback(n):
+    """A plausible value for a constructor parameter no run ever observed. By NAME only --
+    guessing from a type annotation would be guessing about a contract the code may not
+    keep, and a wrong instance is worse than no instance."""
+    low = n.lower()
+    if low in ("func", "method", "fn", "callable", "user_function"):
+        return lambda *a, **k: None
+    if low in ("key", "getsizeof", "timer", "ttu"):
+        return lambda *a, **k: 1
+    if low in ("lock", "cond", "condition"):
+        import threading
+        return threading.RLock() if low == "lock" else threading.Condition()
+    if low in ("maxsize", "ttl", "size", "n", "count"):
+        return 1
+    if low in ("cache",):
+        return {}
+    if low in ("info",):
+        return False
+    return 1
+
+
 def constructed_cases(methods, reached, live, pool, stats, ncases):
     """Exercise hole-free methods the test suite never called.
 
@@ -794,7 +876,8 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
         insts = list(live.get(clsname.split(".")[-1], ()))
         cls = find_class(rel, clsname)
         if not insts and cls is not None:
-            for mk in ((), (1,), (2, 1)):
+            tried = _ctor_attempts(cls, pool)
+            for mk in tried:
                 try:
                     with time_limit(2.0):
                         insts = [cls(*mk)]
@@ -802,7 +885,33 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                 except Exception:                       # noqa: BLE001
                     continue
         if not insts:
-            why[qual] = "no live instance and constructor rejected ()/(1)/(2,1)"
+            # Say WHICH of these it is. The old message was "no live instance and
+            # constructor rejected ()/(1)/(2,1)" for all 54 functions in this bucket --
+            # the largest single category in the report, larger than COMPARED -- and for
+            # 50 of them it was FALSE: there is no class and no constructor was ever
+            # tried. `_condition.wrapper` and `_locked_info.cache_info` are nested
+            # FUNCTIONS, closures returned by a factory, which the caller-side split on
+            # the last dot had classified as `Class.method`. A wrong cause is worse than
+            # a coarse one: it sends the next person to widen a constructor search that
+            # was never reached.
+            if cls is None:
+                # `rel` is a corpus-relative PATH, not a module -- resolve it before
+                # asking what the parent name is, or every lookup silently returns None
+                # and every cause comes out "class not found".
+                m = find_module(rel)
+                parent = clsname.rsplit(".", 1)[-1]
+                pobj = getattr(m, parent, None) if m is not None else None
+                if m is None:
+                    why[qual] = "module for %s not imported by the suite" % rel
+                    continue
+                if pobj is not None and inspect.isroutine(pobj):
+                    why[qual] = ("nested function, not a method: needs %s(...) called and "
+                                 "its result captured" % parent)
+                else:
+                    why[qual] = "class %s not found in the module" % clsname
+            else:
+                why[qual] = ("no live instance; constructor rejected %d argument shapes"
+                             % len(tried))
             continue
         raw = _raw_attr(type(insts[0]), attr) if not cls else \
             (_raw_attr(cls, attr) or _raw_attr(type(insts[0]), attr))

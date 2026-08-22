@@ -2711,3 +2711,47 @@ Still open: `call:set` (3 functions) needs a `Val.set`, a second and independent
 addition. `mcall:warn:keyword-to-builtin`, `expr:genExp`, `in:non-container` and
 `mcall:clear:unboxed-container` are each one construct.
 
+## 48. The largest blocker was not a semantics gap, and its stated cause was false
+
+Ranking the report by what blocks each function put `set` seventh. First, at 54 functions --
+MORE THAN WERE BEING COMPARED -- was:
+
+    no live instance and constructor rejected ()/(1)/(2,1)
+
+That cause was false for 48 of them. Three things were wrong, each hidden by the one above it:
+
+1. **The constructor search never ran.** `find_class` returned `None`, so no argument shape
+   was ever tried. The message named three shapes anyway.
+2. **The class lookup could not have worked.** `import cachetools` loads `cachetools.keys`
+   and nothing else -- `_cached` and `_cachedmethod` are imported lazily inside functions --
+   so tracing the suite never put them in `sys.modules`. Importing a submodule of a package
+   the suite already imported is not fabricating state; it is loading code the corpus ships
+   and the AST was exported from.
+3. **Some of those names are not classes at all.** `_condition.wrapper` and
+   `_locked_info.cache_info` are nested FUNCTIONS -- closures returned by a factory -- which
+   a split on the last dot had classified as `Class.method`. They need their factory called
+   and its result captured, which is a different piece of work from constructing an instance.
+
+After fixing all three the bucket is gone and the causes are true: 9 `unencodable
+receiver/arguments: callable`, 6 varargs, 5 nested-function-needs-factory. `COMPARED` moved
+only 34 -> 35, and that is the honest outcome: the win here is not coverage, it is that the
+largest category in the report stopped lying about why it was blocked. A wrong cause is worse
+than a coarse one -- it sends the next person to widen a constructor search that was never
+reached.
+
+The remaining 9 are self-inflicted and recorded as such: the widened search fabricates a
+`lambda` for parameters named `func`/`key`, and a fabricated lambda has no counterpart in the
+AST, so the encoder correctly refuses it. Drawing those from corpus functions instead
+(`cachetools.keys.hashkey` for `key`) is the next step.
+
+### Why `set` is not next
+
+`Val.set` looked like the biggest remaining item at 9 functions. It is not worth doing yet.
+LFUCache builds a set and then MUTATES it (`link.keys.add(key)`, `.remove(key)`), and Core's
+containers are value-semantics, so mutation has to hole exactly as `setIndex` already does.
+Adding the constructor would move those 9 functions from `blocked (value model): set` to
+`runtime holes mcall` and compare nothing new, while obliging an audit of every catch-all
+`match` on `Val` -- the risk the `bobj` note in `Syntax.lean` already spells out. The real
+blocker underneath is mutable containers on the heap, which is also what
+`mcall:clear:unboxed-container` and `setIndex:immutable-containers` are.
+
