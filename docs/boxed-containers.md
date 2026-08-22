@@ -1,7 +1,21 @@
 # Boxed containers for Core
 
-**Status: step 1 landed, step 2 half landed, steps 3-5 unimplemented.** Read this before
-changing `Syntax.lean` or `Semantics.lean`.
+**Status: steps 1 and 2 landed; steps 3-5 unimplemented.** Read this before changing
+`Syntax.lean` or `Semantics.lean`.
+
+Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
+wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
+`evalSimp` lemmas and every `decide`-based generated theorem depend on. `Val.eqPy` is instead
+diverted to at the ONE `evalExpr` call site where a ref can appear, behind a named guard
+`binopNeedsHeap`. Twelve proofs needed repair rather than a hundred, and `applyBinop` keeps
+its heap-free signature. Section 5 below should be read with that substitution in mind.
+
+One correction to section 5 that matters for step 3: the comparison's fuel must NOT come from
+the evaluator's fuel. Threading `evalExpr`'s fuel into `Val.eqPy` makes a `binop`'s value
+depend on the fuel budget, which breaks `evalExpr_pure_fuel_indep` outright -- the pure
+fragment includes `binop`. `Val.eqFuel h = h.length + 64` is derived from the heap, which is
+equal across two runs differing only in evaluator fuel because the pure fragment is
+heap-inert.
 
 Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
 section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`

@@ -201,6 +201,23 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "**" => .hole "float:pow"
   | _    => .hole s!"binop:{op}"
 
+/-- Whether `==`/`!=` on these operands has to consult the heap.
+
+Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
+no structural compare of two refs can see that. Everything else stays on `applyBinop`, which
+is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
+inlined so proofs can discharge it by `simp` on concrete operands. -/
+def binopNeedsHeap (op : String) (x y : Val) : Bool :=
+  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+
+@[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
+    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+  simp [binopNeedsHeap, Val.kind]
+
+@[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
+    (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
+  simp [binopNeedsHeap, beq_iff_eq, h, h2]
+
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
@@ -784,7 +801,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
         else
           match evalExpr ctx n h₁ ρ b with
-          | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
+          | (h₂, .val y) =>
+            -- `==`/`!=` on a REFERENCE has to go through the heap: two distinct objects
+            -- with equal contents are `==` in Python, and no structural compare of two
+            -- refs can see that. Everything else keeps the heap-free path, which is the
+            -- one `Refine.lean` needs reducible -- diverting here costs one call site
+            -- instead of re-typing `applyBinop` and its 155 references.
+            if binopNeedsHeap op x y then
+              match Val.eqPy h₂ (Val.eqFuel h₂) x y with
+              | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
+              | none   => (h₂, .outOfFuel)
+            else (h₂, applyBinop ctx.dialect op x y)
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>

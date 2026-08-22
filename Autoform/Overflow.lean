@@ -431,7 +431,9 @@ theorem exact_sound (ctx : Ctx) (h : Heap) (ρ : Env) :
             rintro rfl; exact absurd hex (by simp [binExact])
           have hne2 : ¬ (op = "||") := by
             rintro rfl; exact absurd hex (by simp [binExact])
-          simp [evalExpr, hea, heb, hne1, hne2, hop]
+          -- operands are `.int` here (`hxa`/`hxb`), so `binopNeedsHeap` is `false` and
+          -- the heap-free path is taken -- `simp` needs the definitions to see it.
+          simp [evalExpr, hea, heb, hne1, hne2, hop, binopNeedsHeap, Val.kind]
         · exact absurd hex (by simp)
     | .call _ _ | .index _ _ | .field _ _ | .mcall _ _ _ | .alloc _ _
     | .fnref _ | .closure _ | .classClosure _ | .listE _ | .tupleE _

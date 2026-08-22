@@ -284,10 +284,11 @@ those two operators the right operand may never be evaluated at all and this equ
 false. See `evalExpr_and_short` / `evalExpr_or_short`. -/
 theorem evalExpr_binop_val {a b : Expr} {h₁ h₂ : Heap} {x y : Val} (op : String)
     (hand : op ≠ "&&") (hor : op ≠ "||")
+    (hheap : binopNeedsHeap op x y = false)
     (ha : evalExpr ctx k h ρ a = (h₁, .val x))
     (hb : evalExpr ctx k h₁ ρ b = (h₂, .val y)) :
     evalExpr ctx (k+1) h ρ (.binop op a b) = (h₂, applyBinop ctx.dialect op x y) := by
-  simp [evalExpr, ha, hb, hand, hor]
+  simp [evalExpr, ha, hb, hand, hor, hheap]
 
 /-- `&&` does not evaluate its right operand once the left is falsy, and yields the
 **left operand itself** under Python value semantics (`0 and 5` is `0`, not `False`).
@@ -620,7 +621,13 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           · by_cases hs2 : (op == "||" && x.truthy) = true
             · simp [hs1, hs2]
             · simp only [hs1, hs2, Bool.false_eq_true, if_false]
-              cases rB <;> rfl
+              -- `==`/`!=` on a ref now branches through `Val.eqPy`. BOTH branches leave the
+              -- heap alone, so heap-inertness still holds; the branch just has to be taken.
+              -- `==`/`!=` on a ref branches through `Val.eqPy`. Both branches leave the
+              -- heap alone, so inertness still holds -- but `split` introduces the heap as
+              -- a fresh variable equated to `hB'` by a pair equation, so the branch has to
+              -- be taken AND that equation consumed.
+              cases rB <;> ((repeat' split) <;> (first | rfl | simp_all))
         | _ => simp only [evalExpr, hA]
   | cond _ _ _ ihc iht ihe =>
       intro k h ρ; cases k with
@@ -1197,9 +1204,9 @@ theorem cdiv_refines :
   by_cases hb : b = 0
   · subst hb
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
-          CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
+          CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
   · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
-          CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
+          CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_c_div hb hdom, hb]
 
 /-! ### Python: `add` from `lib.py`
@@ -1276,9 +1283,9 @@ theorem fmod_refines :
   by_cases hb : b = 0
   · subst hb
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
-          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
+          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
   · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
-          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
+          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_mod a b hb, hb]
 
 /-! ### Python: `fdiv` — regenerated, and now refinable
@@ -1301,9 +1308,9 @@ theorem fdiv_refines :
   by_cases hb : b = 0
   · subst hb
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
-          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq]
+          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
   · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
-          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
+          StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_div a b hb, hb]
 
 /-! ### The hole negative result: untranslated constructs are not refinable
@@ -1451,7 +1458,7 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 4 := ⟨k - 4, by omega⟩
   have hcond : evalExpr ctxC (k1+4) [] ρ (.binop "<=" (.name "i") (.name "n"))
       = ([], .val (.bool (decide ((d:Int) ≤ n)))) := by
-    rw [evalExpr_binop_val ctxC (k1+3) [] ρ "<=" (by decide) (by decide)
+    rw [evalExpr_binop_val ctxC (k1+3) [] ρ "<=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxC (k1+2) [] ρ "i" hiv) (evalExpr_name ctxC (k1+2) [] ρ "n" hnv)]
     rfl
   refine ⟨[], .bool (decide ((d:Int) ≤ n)), hcond, ?_, ?_⟩
@@ -1467,7 +1474,7 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     have hf2 : Fits32 ((d:Int) + 1) := fits32_small (by omega) (by omega)
     have e1 : evalExpr ctxC (k1+2) [] ρ (.binop "+" (.name "acc") (.name "i"))
         = ([], .val (.int (triN d + (d:Int)))) := by
-      rw [evalExpr_binop_val ctxC (k1+1) [] ρ "+" (by decide) (by decide)
+      rw [evalExpr_binop_val ctxC (k1+1) [] ρ "+" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
             (evalExpr_name ctxC k1 [] ρ "acc" haccv) (evalExpr_name ctxC k1 [] ρ "i" hiv)]
       simp [applyBinop_c_add hf1, ctxC, ctxOf, CMathProgram]
     have hgA : (ρ.get ("<glob>" ++ "acc")).truthy = false := by
@@ -1479,7 +1486,7 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
       simp [Env.set, hiv]
     have e2 : evalExpr ctxC (k1+2) [] (ρ.set "acc" (.int (triN d + (d:Int)))) (.binop "+" (.name "i") (.lit (.int 1)))
         = ([], .val (.int ((d:Int) + 1))) := by
-      rw [evalExpr_binop_val ctxC (k1+1) [] (ρ.set "acc" (.int (triN d + (d:Int)))) "+" (by decide) (by decide)
+      rw [evalExpr_binop_val ctxC (k1+1) [] (ρ.set "acc" (.int (triN d + (d:Int)))) "+" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
             (evalExpr_name ctxC k1 [] (ρ.set "acc" (.int (triN d + (d:Int)))) "i" hiv1) (evalExpr_lit_int ctxC k1 [] (ρ.set "acc" (.int (triN d + (d:Int)))) 1)]
       simp [applyBinop_c_add hf2, ctxC, ctxOf, CMathProgram]
     have hgI : ((ρ.set "acc" (.int (triN d + (d:Int)))).get ("<glob>" ++ "i")).truthy = false := by
@@ -1608,7 +1615,7 @@ theorem gcdish_step (g : Nat) :
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 5 := ⟨k - 5, by omega⟩
   have hcond : evalExpr ctxS (k1+5) [] ρ (.binop "!=" (.name "b") (.lit (.int 0)))
       = ([], .val (.bool (!(y == 0)))) := by
-    rw [evalExpr_binop_val ctxS (k1+4) [] ρ "!=" (by decide) (by decide)
+    rw [evalExpr_binop_val ctxS (k1+4) [] ρ "!=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxS (k1+3) [] ρ "b" hbv) (evalExpr_lit_int ctxS (k1+3) [] ρ 0)]
     rfl
   refine ⟨[], .bool (!(y == 0)), hcond, ?_, ?_⟩
@@ -1627,7 +1634,7 @@ theorem gcdish_step (g : Nat) :
       simp [Env.set, hbv]
     have e2 : evalExpr ctxS (k1+2) [] (ρ.set "t" (.int y)) (.binop "%" (.name "a") (.name "b"))
         = ([], .val (.int (x % y))) := by
-      rw [evalExpr_binop_val ctxS (k1+1) [] _ "%" (by decide) (by decide)
+      rw [evalExpr_binop_val ctxS (k1+1) [] _ "%" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
             (evalExpr_name ctxS k1 [] _ "a" hav1) (evalExpr_name ctxS k1 [] _ "b" hbv1)]
       simp [ctxS, ctxOf, StressProgram, applyBinop_py_mod x y hy0,
             Int.fmod_eq_emod_of_nonneg x (Int.le_of_lt hypos)]
@@ -1852,7 +1859,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
   have hplus : evalExpr ctxT (j+3) h [("k", Val.int iv), ("self", Val.ref r)]
         (.binop "+" ((Expr.name "self").field "n") (.name "k"))
       = (h, .val (.int (acc + iv))) := by
-    rw [evalExpr_binop_val ctxT (j+2) h _ "+" (by decide) (by decide)
+    rw [evalExpr_binop_val ctxT (j+2) h _ "+" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           hfield (evalExpr_name ctxT (j+1) h _ "k" hkk)]
     simp [ctxT, ctxOf, CounterProgram]
   have hsf : execStmt ctxT (j+4) h [("k", Val.int iv), ("self", Val.ref r)]

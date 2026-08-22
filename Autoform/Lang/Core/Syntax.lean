@@ -693,6 +693,108 @@ def Val.beqP : List (Val × Val) → List (Val × Val) → Bool
   | _,           _             => false
 end
 
+/-! ### `==` through the heap
+
+`Val.beq` is structural and heap-free, which is right for scalars and is what makes the
+scalar path reducible by `rfl`/`decide` -- `Refine.lean` depends on that. It is NOT right
+for containers once they live on the heap: two list objects with equal contents have
+different refs, so a structural compare answers `False` where Python answers `True`.
+
+`Val.eqPy` is the heap-aware relation. It is `Option`-valued because it is fuel-indexed:
+containers can be cyclic (`a = []; a.append(a)`), and running out of fuel is IGNORANCE, so
+it must be `none` and become `outOfFuel`, never `false` -- a `false` there would be a
+manufactured divergence on deeply nested values.
+
+**At this step it agrees with `Val.beq` everywhere**, because every payload is `.none`, so
+two distinct refs are two distinct plain objects and compare `false` exactly as before. The
+ref case is written out now so that step 3 of `docs/boxed-containers.md` -- container
+literals allocating -- needs no change here.
+
+Note this does NOT re-type `applyBinop`. The design note proposed threading a heap through
+it, which is 155 call sites and every reducible scalar lemma in `Refine.lean`. Diverting at
+the one call site where a ref can appear costs nothing and leaves that path intact. -/
+/-- Fuel for `==`, derived from the HEAP and never from the evaluator's fuel.
+
+This is not a detail. Threading `evalExpr`'s fuel into the comparison makes the value of a
+`binop` depend on how much fuel the evaluator had, which breaks `evalExpr_pure_fuel_indep`
+outright -- the pure fragment includes `binop`. Deriving it from the heap keeps the
+comparison fuel equal across two runs that differ only in evaluator fuel, because the pure
+fragment is heap-inert.
+
+`h.length` bounds how far reference-chasing can go before repeating an object; the constant
+covers nesting inside VALUE containers, which the heap does not bound. Exceeding it yields
+`none`, hence `outOfFuel` -- ignorance, never `false`. -/
+def Val.eqFuel (h : Heap) : Nat := h.length + 64
+
+mutual
+
+def Val.eqPy (h : Heap) : Nat → Val → Val → Option Bool
+  | 0,   _, _ => none
+  | n+1, x, y =>
+    match x, y with
+    -- Reference identity short-circuits FIRST. That is CPython's fast path, and it is what
+    -- makes `a == a` terminate for a cyclic container.
+    | .ref a, .ref b =>
+        if a == b then some true
+        else
+          match h.payload a, h.payload b with
+          | .list u,  .list v  => Val.eqPyL h n u v
+          | .tuple u, .tuple v => Val.eqPyL h n u v
+          | .dict u,  .dict v  => Val.eqPyP h n u v
+          | _, _ => some false
+    | .list u,  .list v  => Val.eqPyL h n u v
+    | .tuple u, .tuple v => Val.eqPyL h n u v
+    | .dict u,  .dict v  => Val.eqPyP h n u v
+    | .bobj _ (.tuple u), .bobj _ (.tuple v) => Val.eqPyL h n u v
+    | .bobj _ (.list u),  .bobj _ (.list v)  => Val.eqPyL h n u v
+    | .bobj _ (.dict u),  .bobj _ (.dict v)  => Val.eqPyP h n u v
+    | .bobj _ (.tuple u), .tuple v => Val.eqPyL h n u v
+    | .bobj _ (.list u),  .list v  => Val.eqPyL h n u v
+    | .bobj _ (.dict u),  .dict v  => Val.eqPyP h n u v
+    | .tuple u, .bobj _ (.tuple v) => Val.eqPyL h n u v
+    | .list u,  .bobj _ (.list v)  => Val.eqPyL h n u v
+    | .dict u,  .bobj _ (.dict v)  => Val.eqPyP h n u v
+    -- Scalars, functions, and mismatched shapes: `Val.beq` is already correct and needs
+    -- no heap, so there is one definition of scalar equality rather than two that can drift.
+    | a, b => some (Val.beq a b)
+
+def Val.eqPyL (h : Heap) : Nat → List Val → List Val → Option Bool
+  | _,   [],      []      => some true
+  | 0,   _,       _       => none
+  | n+1, a :: as, b :: bs =>
+      match Val.eqPy h n a b with
+      | some true  => Val.eqPyL h n as bs
+      | some false => some false
+      | none       => none
+  | _,   _,       _       => some false
+
+def Val.eqPyP (h : Heap) : Nat → List (Val × Val) → List (Val × Val) → Option Bool
+  | _,   [],      []      => some true
+  | 0,   _,       _       => none
+  | n+1, a :: as, b :: bs =>
+      match Val.eqPy h n a.1 b.1 with
+      | some true  =>
+          match Val.eqPy h n a.2 b.2 with
+          | some true  => Val.eqPyP h n as bs
+          | some false => some false
+          | none       => none
+      | some false => some false
+      | none       => none
+  | _,   _,       _       => some false
+
+end
+
+/-- At this step every payload is `.none`, so the heap-aware relation and the structural one
+agree on everything Core can currently build. Stated as a theorem so that step 3 has to
+break it deliberately rather than silently: when container literals start allocating, this
+becomes false for two equal lists, and that is the intended change. -/
+theorem eqPy_agrees_with_beq_on_scalars (h : Heap) (n : Nat) (a b : Val)
+    (ha : a.kind ≠ 5 ∧ a.kind ≠ 6 ∧ a.kind ≠ 7 ∧ a.kind ≠ 8 ∧ a.kind ≠ 12)
+    (hb : b.kind ≠ 5 ∧ b.kind ≠ 6 ∧ b.kind ≠ 7 ∧ b.kind ≠ 8 ∧ b.kind ≠ 12) :
+    Val.eqPy h (n+1) a b = some (Val.beq a b) := by
+  cases a <;> cases b <;> simp_all [Val.eqPy, Val.kind]
+
+
 instance : BEq Val := ⟨Val.beq⟩
 
 /-- Strip one layer of builtin-base wrapping: the underlying `tuple`/`list`/`dict`/`str`
