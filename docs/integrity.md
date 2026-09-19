@@ -187,6 +187,32 @@ headline rate fell from 100% to 64%. Quoting the rate alone would have read as a
 regression when it was a large improvement. `conformance.json` now records
 `measurement_basis`, and rates from different bases must not be compared.
 
+## The tracked ASTs predate the character-literal fix
+
+`check_render` asks whether a committed module is the render of its committed AST.
+Nothing asks whether the committed **AST** is what today's exporter would produce —
+and there is a case in the tree where it is not.
+
+`cartographer/export_ast.sc` used to parse `'0'` as the integer `0` rather than the
+codepoint `48` (docs/languages.md item 8, found by the differential oracle against the
+JVM). Every `ast-*.json` in this repository was exported before that fix, so any of
+them containing a digit character literal encodes the old, wrong value. The renders,
+recorded hashes and generated specs are all consistent *with those ASTs*, so every
+gate stays green: the artifacts agree with each other, and the thing they agree on is
+stale. That is the failure mode this file exists for, one level up from where the
+checks currently look.
+
+Re-exporting is not a local change. The large corpora's ASTs are deliberately not in
+git (their sources and CPGs are not either), so a re-export has to be done from the
+original corpora and landed together with fresh renders, re-recorded manifest hashes
+and regenerated specs — and any spec whose truth depended on the old literal value
+will legitimately change. Until then, treat a tracked AST as evidence about the
+exporter that produced it, not about the exporter in the tree.
+
+A cheap partial guard would be to record the exporter's own content hash alongside
+`joern_version` in `scripts/provenance.py`, so an AST at least *says* which exporter
+made it. That does not exist yet.
+
 ## Two failure shapes worth naming
 
 **A true fact adjacent to the failure is the most convincing wrong explanation
