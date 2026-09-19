@@ -53,8 +53,18 @@ def resolve_source(value, workspace, module, *, ref=None, subdir=None):
         manifest.write_text(json.dumps(record, indent=2) + '\n')
 
     def git(*args, cwd=None):
+        # Without this, a machine with no Git reports the raw errno from Popen --
+        # "autoform: [Errno 2] No such file or directory: 'git'" -- which names the
+        # failing syscall rather than the thing the user has to install.
+        if shutil.which('git') is None:
+            raise ValueError('git is not installed or not on PATH; '
+                             'install Git to analyze a repository URL')
         command = ['git', '-c', 'core.hooksPath=/dev/null', *map(str, args)]
-        env = dict(os.environ, GIT_TERMINAL_PROMPT='0')
+        # GIT_TERMINAL_PROMPT stops an HTTPS credential prompt from hanging the run;
+        # BatchMode does the same for an ssh:// URL needing a passphrase or host-key
+        # confirmation, which otherwise blocks until the checkout timeout.
+        env = dict(os.environ, GIT_TERMINAL_PROMPT='0',
+                   GIT_SSH_COMMAND=os.environ.get('GIT_SSH_COMMAND', 'ssh -oBatchMode=yes'))
         try:
             result = subprocess.run(command, cwd=cwd, env=env, text=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
@@ -105,7 +115,11 @@ def resolve_source(value, workspace, module, *, ref=None, subdir=None):
                 raise ValueError('--ref requires a Git URL; local directories are used as they are')
             checkout = Path(value).resolve()
             if not checkout.is_dir():
-                raise ValueError('source directory does not exist: ' + str(checkout))
+                # Reporting "does not exist" for a path that plainly does exist sends
+                # the user looking for a typo that is not there.
+                raise ValueError(
+                    ('source path is a file, not a directory: ' if checkout.exists()
+                     else 'source directory does not exist: ') + str(checkout))
             record.update(kind='local', checkout=str(checkout))
         source = (checkout / (subdir or '.')).resolve()
         if not source.is_relative_to(checkout.resolve()) or not source.is_dir():

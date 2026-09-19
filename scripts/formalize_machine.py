@@ -415,7 +415,8 @@ def main(argv=None) -> int:
     except (ImportError, ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
         message = str(exc)
         if isinstance(exc, ImportError):
-            message += "\nInstall optional dependencies: python -m pip install -r requirements-machine.txt"
+            message += ("\nInstall optional dependencies: python -m pip install 'autoform-lean[machine]'"
+                        "\n(from a checkout: python -m pip install -r requirements-machine.txt)")
         if report is not None and out is not None:
             report.update(status="FAILED", error=message)
             (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")

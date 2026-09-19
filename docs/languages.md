@@ -254,7 +254,51 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
 * Go integer overflow is *defined* to wrap; Core wraps, but at the wrong width (item 5).
 * JS `<<` coerces to int32 first; Core holes it. **hole**.
 
-### 8. Predicted, unverified
+### 8. A call on a static field loses the method name — the AST is *wrong*, not merely incomplete
+
+Measured on a live Apache Spark export. `common/unsafe/.../Platform.java:198` reads:
+
+```java
+public static long allocateMemory(long size) {
+  return _UNSAFE.allocateMemory(size);
+}
+```
+
+`_UNSAFE` is a `private static final Unsafe` field. The exported AST is:
+
+```json
+{"k":"mcall","recv":{"k":"fnref","v":"org.apache.spark.unsafe.Platform"},
+ "m":"_UNSAFE","args":[{"k":"name","v":"size"}]}
+```
+
+The receiver is the *class*, the method slot holds the *field* name, and the method
+actually being called — `allocateMemory` — is gone. Joern gives the call a field-access
+callee (`Platform._UNSAFE`) whose name the exporter takes as the method
+(`cartographer/export_ast.sc`, the `callee.flatMap(asField)` branch of the `mcall`
+lowering); for Python `obj.method(x)` the field name and the call name coincide, which
+is why the shape survived. When they differ — a method invoked on a field — the call
+name is the one that matters and it is discarded.
+
+This is a different and worse category than the rest of this file: every other entry is
+a hole or a documented approximation, whereas here the AST **states something false**
+about the program. It is currently masked, because `Semantics.lean` cannot find a class
+method named `_UNSAFE` and emits `mcall:Platform._UNSAFE:not-a-class-method`, so the
+wrong name fails closed rather than calling the wrong thing. It would stop being masked
+the moment a class did define a member with the field's name.
+
+Blast radius on Spark: **183 of 5020 hole-free functions** perform an `mcall` on an
+`fnref`. Related and separate: **280** read a static field (`field` over `fnref`), which
+holes as `field:<name>:non-object` because Java static initializers (`static { }`
+blocks, static field initializers) are never exported — `render_lean.py` builds
+`moduleInits` only from `:<module>`/`:<global>` suffixes, the Python and C conventions,
+and a Spark export contains zero of either and zero `<clinit>`.
+
+Not fixed here: correcting the lowering changes every Java AST, and the ASTs are the
+tracked source of truth that renders, recorded hashes and generated specs are all
+pinned to, so it needs a re-export and re-record of the Java corpora together with the
+change. Recorded as a known defect rather than silently carried.
+
+### 9. Predicted, unverified
 
 * Java boxed `Integer` comparison: `Integer a=1000, b=1000; a==b` is `false` in Java
   (reference equality) but Core's `Val.beq` on two `.int`s gives `true`. Core has no

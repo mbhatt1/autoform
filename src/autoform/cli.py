@@ -139,7 +139,7 @@ def environment():
     return env
 
 
-def _run_command(command, *, env, cleanup_timeout=10):
+def _run_command(command, *, env, cleanup_timeout=10, timeout=None):
     """Keep the caller's run lock until cancellation cleanup has finished."""
     process, cancellation, deadline, forwarded = None, None, None, False
 
@@ -160,6 +160,10 @@ def _run_command(command, *, env, cleanup_timeout=10):
             forward()
 
     previous = {signum: signal.signal(signum, cancel) for signum in (signal.SIGINT, signal.SIGTERM)}
+    # `autoform.sh` has no deadline of its own on joern-parse, the Joern script or
+    # `lake build`, so without this an arbitrary large repository can hang the run
+    # indefinitely with no way to bound it. Expiry takes the same path as a Ctrl-C.
+    limit = None if timeout is None else time.monotonic() + timeout
     try:
         process = subprocess.Popen(command, env=env, start_new_session=True)
         forward()  # Cancellation may have arrived while starting the child.
@@ -168,6 +172,10 @@ def _run_command(command, *, env, cleanup_timeout=10):
                 code = process.wait(timeout=0.1)
                 return 128 + cancellation if cancellation is not None else code
             except subprocess.TimeoutExpired:
+                if limit is not None and cancellation is None and time.monotonic() >= limit:
+                    print(f'autoform: run exceeded --timeout of {timeout:g}s; stopping',
+                          file=sys.stderr)
+                    cancel(signal.SIGTERM, None)
                 if deadline is not None and time.monotonic() >= deadline:
                     return 128 + cancellation  # The finally block enforces the bound.
     finally:
@@ -368,6 +376,11 @@ def main(argv=None):
         command.add_argument("--keep-checkout", action="store_true",
                              help="keep the cloned source tree under <workspace>/sources "
                                   "after the run instead of deleting it")
+        if name == "source":
+            command.add_argument("--timeout", type=float,
+                                 help="overall wall-clock limit in seconds for the whole run "
+                                      "(default: no limit). `source` runs autoform.sh, which "
+                                      "has no per-stage deadline of its own.")
         if name == "assure":
             command.add_argument("--stage-timeout", type=float, default=7200,
                                  help="maximum seconds for each assurance stage (default: 7200)")
@@ -395,6 +408,9 @@ def main(argv=None):
         parser.error("unrecognized arguments: " + " ".join(unknown))
     if args.command == 'assure' and (not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0):
         parser.error('--stage-timeout must be a finite positive number')
+    if args.command == 'source' and args.timeout is not None and (
+            not math.isfinite(args.timeout) or args.timeout <= 0):
+        parser.error('--timeout must be a finite positive number')
     env = environment()
     if args.command == "doctor":
         try:
@@ -485,7 +501,7 @@ def main(argv=None):
             if args.command == "assure":
                 command += ['--stage-timeout', str(args.stage_timeout)]
         try:
-            return _run_command(command, env=env)
+            return _run_command(command, env=env, timeout=getattr(args, 'timeout', None))
         finally:
             discard_checkout(repository, keep=getattr(args, 'keep_checkout', False))
     except (ValueError, OSError, RuntimeError, zipfile.BadZipFile) as exc:
