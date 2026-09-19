@@ -190,6 +190,27 @@ cp "$WORK/ast.json" "$ROOT/ast-$MOD.json"
 cp "$WORK/ast.json" "$REPORT/ast-$MOD.json"
 if [ -f "$WORK/ast.json.meta.json" ]; then cp "$WORK/ast.json.meta.json" "$REPORT/frontend.json"; fi
 
+# Attribute the AST to the frontend and exporter that produced it. Until this ran,
+# every AST this pipeline emitted was unattributed -- `provenance/` held a single
+# `unattributed.json` -- even though `provenance.py record` already captured exactly
+# the two fields that matter: `joern_version` (the neutral AST is a function of the
+# frontend build) and `exporter_sha256` (an exporter change silently alters the AST
+# for reasons unrelated to the source; the `'0'`-is-48 fix is a live example).
+# docs/architecture.md has prescribed this call since the provenance work landed.
+#
+# Deliberately NOT fatal, and deliberately not `joern-version --check`: an analysis
+# run must not be refused because the installed Joern differs from the pin. The pin
+# is enforced where a user asks for a verdict -- `autoform doctor` returns 1 on a
+# mismatch -- while here a mismatch is recorded and announced, so the artifact still
+# says which frontend made it.
+if ! "$PYTHON" "$ROOT/scripts/provenance.py" record \
+      --artifact "$ROOT/ast-$MOD.json" --source "$SRC" \
+      --exporter cartographer/export_ast.sc \
+      --command "autoform.sh $MOD" >"$REPORT/provenance.log" 2>&1; then
+  echo "==> [3/8] WARNING: AST is unattributed (see $REPORT/provenance.log)" >&2
+  sed -n '1,3p' "$REPORT/provenance.log" >&2 || true
+fi
+
 STAGE=render
 echo "==> [4/8] rendering Lean"
 "$PYTHON" "$ROOT/cartographer/render_lean.py" "$WORK/ast.json" \

@@ -209,16 +209,17 @@ and regenerated specs — and any spec whose truth depended on the old literal v
 will legitimately change. Until then, treat a tracked AST as evidence about the
 exporter that produced it, not about the exporter in the tree.
 
-The guard for exactly this already exists and is not switched on.
-`scripts/provenance.py record` writes `exporter_sha256` (the hash of the `.sc` that
-produced an AST) next to `joern_version`, and its own docstring calls that field the
-one that "earns its keep without any CPG at all". But nothing invokes it:
-`autoform.sh` never calls `provenance.py` (docs/architecture.md says stage 1 should),
-`scripts/check_provenance.py` is in no workflow, and `provenance/` contains a single
-`unattributed.json`. So every AST in the tree is unattributed, and the field that
-would have flagged this exporter change as a reason to re-export was never written.
-Wiring the record step into `autoform.sh` and the check into CI is the actual fix;
-the code for both is already here.
+The guard for exactly this existed and was switched off. `scripts/provenance.py
+record` writes `exporter_sha256` (the hash of the `.sc` that produced an AST) next to
+`joern_version`, and its docstring calls that the field that "earns its keep without
+any CPG at all" — but nothing invoked it, so `provenance/` held one
+`unattributed.json` and every AST in the tree was unattributed. The field that would
+have flagged this exporter change as a reason to re-export was never written.
+
+`autoform.sh` stage 3 now records it, so ASTs produced from here on are attributed.
+That does **not** retroactively attribute the ones already committed: they remain
+unattributed, which is now itself the signal that they predate the fix.
+`scripts/check_provenance.py` is still in no workflow.
 
 ## Two failure shapes worth naming
 

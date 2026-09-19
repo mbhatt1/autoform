@@ -191,15 +191,20 @@ representation postdate them), which is recorded as the finding it is.
 
 ### Merge-phase changes this asks for elsewhere
 
-Neither is made here — `cartographer/export_ast.sc` and `autoform.sh` are owned elsewhere
-this round — and until they are, an AST produced by `./autoform.sh` is unattributed and
-the checker says so by name. Use `scripts/export_with_provenance.sh` to produce an
-attributed one.
+1. **`autoform.sh`** — **done, in part.** Stage 3 now calls `provenance.py record`
+   after writing `ast-$MOD.json`, so a run of `./autoform.sh` produces an attributed
+   AST carrying `joern_version`, `exporter_sha256`, the artifact digest and the source
+   revision. `scripts/export_with_provenance.sh` is no longer the only way to get one.
 
-1. **`autoform.sh`**: call `python3 scripts/provenance.py joern-version --check` before
-   stage 1, and `python3 scripts/provenance.py record --artifact ast-$MOD.json --source
-   "$SRC" --exporter cartographer/export_ast.sc --command "…"` after stage 3.
-2. **`cartographer/export_ast.sc`**: emit `joern.metaData.version` and the CPG root into
+   The `joern-version --check` half is deliberately **not** wired in, and is not
+   pending either. Refusing to analyze a repository because the installed Joern differs
+   from the pin is the wrong place for that verdict: the pipeline records the mismatch
+   and announces it, while `autoform doctor` returns `1` on it, so the strict gate is
+   the command you run to ask "is this machine right?" rather than a trap inside an
+   analysis run. Recording is also non-fatal — an unattributed AST warns, it does not
+   fail the run, because a missing attribution is a weaker problem than a missing
+   analysis.
+2. **`cartographer/export_ast.sc`** — still open. Emit `joern.metaData.version` and the CPG root into
    the artifact itself, so provenance survives a file copied out of the repository. This
    requires changing the top-level JSON from an array to
    `{"provenance": {...}, "functions": [...]}` and updating the three readers; the sidecar
