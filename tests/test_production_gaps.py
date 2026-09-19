@@ -189,3 +189,83 @@ def test_failed_clone_leaves_no_temporary_tree(tmp_path):
             'file://' + str(tmp_path / 'absent.git'), workspace, 'Check')
     sources = workspace / 'sources'
     assert not sources.exists() or list(sources.iterdir()) == []
+
+
+# --------------------------------------------------------------------------- #
+# Character literals were parsed as integers.
+#
+# `parseIntLiteral` stripped every `'` to support C++14 digit separators
+# (1'000'000), so the character literal `'0'` became the string "0" and parsed as
+# the integer 0 -- the digit's VALUE instead of its codepoint 48. `'A'` was
+# unaffected, because "A" is not all digits, so it fell through to the
+# character-literal branch and correctly produced 65. That asymmetry is why it
+# survived: a corpus had to compare both to see it.
+#
+# Found by the differential oracle on org.json's JSONTokener.dehexchar, which
+# diverged from the JVM on 3 of 5 cases. `c >= '0' && c <= '9'` is the most common
+# character-range idiom in any parser.
+# --------------------------------------------------------------------------- #
+
+EXPORTER = ROOT / 'cartographer' / 'export_ast.sc'
+
+
+def test_quoted_character_literal_is_not_an_integer_literal():
+    source = EXPORTER.read_text()
+    assert "if (trimmed.length >= 3 && trimmed.head == '\\'' && trimmed.last == '\\'') return None" in source, (
+        "parseIntLiteral must refuse a quoted character literal so the character-literal "
+        "branch can resolve its codepoint; without this, '0' parses as the integer 0.")
+
+
+def test_digit_separators_are_only_stripped_between_digits():
+    source = EXPORTER.read_text()
+    assert 'replaceAll("(?<=[0-9a-fA-F])\'(?=[0-9a-fA-F])", "")' in source, (
+        "a C++14 digit separator only separates DIGITS; stripping every quote is what "
+        "consumed the character literal's quotes in the first place")
+    assert 'raw.trim.replace("\'", "")' not in source, "the unconditional quote strip is back"
+
+
+@pytest.mark.skipif(not os.environ.get('AUTOFORM_TEST_JOERN'),
+                    reason='set AUTOFORM_TEST_JOERN=1 to parse/export with Joern')
+def test_exported_char_literal_is_its_codepoint(tmp_path):
+    """End to end through the real exporter: '0' must be 48, not 0."""
+    joern = Path(os.environ.get('JOERN_HOME', Path.home() / 'joern'))
+    if (joern / 'joern-cli').is_dir():
+        joern /= 'joern-cli'
+    if not (joern / 'joern').is_file():
+        pytest.skip('set JOERN_HOME to a joern-cli directory')
+    env = dict(os.environ)
+    env['PATH'] = str(Path.home() / '.elan/bin') + os.pathsep + env.get('PATH', '')
+    src = tmp_path / 'src'
+    src.mkdir()
+    (src / 'Chars.java').write_text(
+        'public class Chars {\n'
+        '  public static int digit(char c) { return c >= \'0\' && c <= \'9\' ? c - \'0\' : -1; }\n'
+        '}\n')
+    subprocess.run([str(joern / 'joern-parse'), str(src), '--language', 'JAVASRC',
+                    '--output', 'cpg.bin'], cwd=tmp_path, env=env, check=True,
+                   capture_output=True, timeout=900)
+    subprocess.run([str(joern / 'joern'), '--script', str(EXPORTER),
+                    '--param', 'cpgPath=cpg.bin', '--param', 'out=ast.json'],
+                   cwd=tmp_path, env=env, check=True, capture_output=True, timeout=900)
+    blob = json.loads((tmp_path / 'ast.json').read_text())
+    functions = blob['functions'] if isinstance(blob, dict) else blob
+    digit = [f for f in functions if 'digit' in f['name']]
+    assert digit, 'exporter produced no `digit` function'
+
+    def int_literals(node):
+        # `v` is emitted as a string for int literals; compare numerically.
+        if isinstance(node, dict):
+            if node.get('k') == 'int':
+                yield int(node['v'])
+            for value in node.values():
+                yield from int_literals(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from int_literals(value)
+
+    literals = set(int_literals(digit[0]['body']))
+    assert 48 in literals and 57 in literals, (
+        "'0' and '9' must export as codepoints 48 and 57, not the digits 0 and 9; "
+        f"got {sorted(literals)}")
+    assert 0 not in literals and 9 not in literals, (
+        f"a digit character literal still exported as its value: {sorted(literals)}")

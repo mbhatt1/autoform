@@ -5445,7 +5445,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * class of quiet corruption this project keeps finding.
     */
   def parseIntLiteral(raw: String): Option[BigInt] = {
-    var t = raw.trim.replace("'", "")            // C++14 digit separators
+    val trimmed = raw.trim
+    // A quoted CHARACTER literal is not an integer literal, and must not be mistaken
+    // for one here: stripping every `'` turned `'0'` into `"0"` and returned 0, the
+    // digit's VALUE instead of its codepoint 48. `'A'` escaped only because `"A"` is
+    // not all digits, so it fell through to the character-literal branch and got 65 --
+    // which is why the bug was invisible until a corpus compared both. Live-confirmed
+    // on org.json's `JSONTokener.dehexchar` (3 divergences vs the JVM: `c >= '0' && c
+    // <= '9'` answered on 0..9 instead of 48..57). `c >= '0' && c <= '9'` is the most
+    // common character-range idiom there is, and this made it silently wrong in every
+    // C, C++, Java, Kotlin and Go program. Return None and let the character-literal
+    // branch below resolve the codepoint.
+    if (trimmed.length >= 3 && trimmed.head == '\'' && trimmed.last == '\'') return None
+    // C++14 digit separators, by the actual rule: a `'` only separates digits when it
+    // sits BETWEEN two of them (`1'000'000`, `0xDE'AD'BE'EF`). Anywhere else it is
+    // quoting, not separating.
+    var t = trimmed.replaceAll("(?<=[0-9a-fA-F])'(?=[0-9a-fA-F])", "")
     if (t.isEmpty) return None
     var neg = false
     if (t.startsWith("-")) { neg = true; t = t.drop(1) }

@@ -329,6 +329,12 @@ def source_sweep() -> dict:
         # itself is noise, and noise is what a real finding hides in.
         if rel.startswith(".claude/") or "/.claude/" in rel:
             continue
+        # Same reasoning, same failure: `artifacts/` holds evidence from trial runs,
+        # including whole checkouts of this repository (artifacts/spark-url/... has
+        # several). The sweep was reporting `partial def` findings against
+        # `artifacts/.../Autoform/Tactics/Portfolio.lean` -- a copy, not the project.
+        if rel.startswith("artifacts/") or "/artifacts/" in rel:
+            continue
         scanned += 1
         try:
             raw = path.read_text(encoding="utf-8", errors="replace")
