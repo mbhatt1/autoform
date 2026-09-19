@@ -18,6 +18,7 @@ Exit:   0 all figures current; 1 at least one stale; 2 an artifact is missing.
 """
 from __future__ import annotations
 import argparse, json, os, re, sys
+import deep_json
 
 # (doc, regex with ONE capturing group, artifact, key, transform)
 CHECKS = [
@@ -76,7 +77,7 @@ def ast_hole_count(path):
 
 
 def ast_function_count(path):
-    d = json.load(open(path))
+    d = deep_json.load(path)
     return len(d) if isinstance(d, list) else len(d.get("functions", []))
 
 

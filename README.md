@@ -1,20 +1,78 @@
 # autoform
 
-Turn an arbitrary codebase into autoformalized Lean 4 by mapping it onto a formal
-interpreter written in Lean. See `STRATEGY.md` for the design and the build/buy audit.
+Build executable Lean 4 models of source and machine code using formal interpreters.
+Coverage is incomplete and unsupported behavior is recorded explicitly. See
+`STRATEGY.md` for the design and the build/buy audit.
+
+Open-source CLI with paid engineering support. Original Autoform code uses
+[Apache-2.0](LICENSE); bundled third-party material retains its
+[own notices](THIRD_PARTY.md). The current package is an alpha. See
+[support scope](SUPPORT.md) and [release acceptance](docs/releasing.md).
 
 **Approach:** formalize the *language* rather than the program. The program becomes data,
 and every property is a theorem about `eval` applied to it.
 
-**Generalization:** Joern's code property graph is a universal AST. C, C++, Java,
-JavaScript, Python, Kotlin and binaries normalize to one node vocabulary, so one semantics
-and one exporter cover all of them. There is no per-language transpiler.
+**Language coverage:** source code uses Joern frontends and a shared Core interpreter,
+with language-specific gaps. A separate machine-code path uses SLEIGH raw p-code and
+fixed-width Lean semantics for compiled code and assembly. Neither path currently
+formalizes every language or instruction set faithfully. See
+[machine-code support and remaining gaps](docs/machine-code.md).
 
 ## Use
 
+Install from a checkout with Python 3.10+:
+
 ```sh
-./autoform.sh <source-dir> [ModuleName]   # translate + type-check + conformance + ledger
+python -m pip install '.[machine]'  # omit [machine] for source code only
+autoform doctor
+autoform https://github.com/OWNER/REPOSITORY.git
+autoform --workspace ./proofs source /path/to/source MyProject
+autoform --workspace ./proofs machine /path/to/executable MyBinary
+```
+
+The package bundles the Lean library, Joern exporter, proof tools and examples.
+Git, Lean/elan, Joern and the source language's runtime are external prerequisites.
+Each workspace holds its own build cache and evidence; installed package files stay
+read-only. See [pip installation and CI releases](docs/packaging.md).
+`doctor` checks tool availability and validates Lean and Joern against the versions
+pinned in this package, returning `1` if a required tool is missing or mismatched.
+It does not run the release checks.
+
+A Git URL inventories the repository and runs supported source languages through
+translation, native comparisons, proof generation, mutation checks and independent
+proof replay. Mixed-language repositories receive separate language results and a
+combined report. Unsupported and unparsed files remain visible in the file inventory;
+an unsupported-only repository receives a gap report with no proof claims.
+Use `--ref <commit-or-tag>` to select a revision and `--subdir <path>` to select
+part of a repository. The exact checkout commit is recorded automatically.
+A repository cloned from a URL is deleted when the run ends; the recorded commit, not
+the temporary path, is what makes the result reproducible. Pass `--keep-checkout` to
+retain it under `<workspace>/sources/` for inspection. A source directory you supply
+yourself is never deleted.
+Each assurance stage has a two-hour deadline; `--stage-timeout SECONDS` changes it.
+Timed-out stages retain their logs and withhold verification.
+`.autoform-work/artifacts/pipeline/Translated/guarantee.json` states the proved properties, recorded
+input cases, assumptions, and evidence hashes. It does not guarantee that arbitrary
+software is bug-free; failed or unsupported checks produce an explicit gap report.
+The assurance command returns `1` for unresolved gaps. Inspect `run.json` alongside
+the scoped certificate: a certificate can verify particular properties while the
+broader assurance case still has gaps.
+See [repository analysis and language routing](docs/repository-analysis.md) for the
+inventory, per-language evidence, source stability and remaining capability limits.
+
+Supply independent security requirements in `autoform.properties.json` at the root
+of the selected source directory, or override them with `--properties properties.json`.
+The tool attempts those Lean propositions, checks their dependence on the selected
+functions, runs mutation checks and independently replays the proofs. Quantified
+claims retain their stated domain; failed proof attempts remain open obligations.
+See [security properties and the runnable ownership example](docs/security.md).
+
+From a checkout, the original entry points remain available:
+
+```sh
+./autoform.sh <source-dir> [ModuleName]   # translate + native conformance + kernel proofs
 ./assure.sh   <source-dir> <ModuleName>   # the above, plus audit, mutation gate, SACM case
+./autoform.sh --machine <binary> <ModuleName> # machine semantics + coverage report
 ```
 
 ```
@@ -22,6 +80,19 @@ source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core p
                    │                                   │
                    └─▶ formalization graph             └─▶ differential vs real runtime
 ```
+
+For assembly and concrete kernel-checked assertions, start with:
+
+```sh
+python3.11 -m venv .venv   # machine dependencies require Python 3.10+
+.venv/bin/python -m pip install -r requirements-machine.txt
+./autoform.sh --machine examples/machine/add_aarch64.s Add \
+  --assemble aarch64-unknown-linux-gnu --entry 0 \
+  --register x0=3 --register x1=4 --stop 4 --expect x0=7
+```
+
+This proves the specified observation of the generated model. It does not prove
+the compiler/lifter correct or infer a specification for all inputs.
 
 > **Numbers in this file go stale.** A dozen artifacts describe the same metrics and they
 > drift apart. Regenerate rather than trust:
@@ -38,8 +109,9 @@ source ──Joern──▶ CPG ──▶ neutral JSON AST ──▶ Lean Core p
 | ctest | C | 5 | 5 (100%) | **25/25 (100%)** vs `cc` |
 | shortcircuit | Python | 1 | 1 (100%) | **6/6 (100%)** vs CPython |
 
-All generated Lean type-checks. The "verifiable core" is the set of **hole-free**
-functions — the only ones that can be verified unconditionally.
+The generated Lean in these runs type-checks. Hole-free functions are candidates for
+verification; that classification alone proves neither source equivalence nor correctness
+for all inputs. The generated theorem statements and guarantee reports define the scope.
 
 Three figures are reported, because one number would mislead (`STRATEGY.md` §17):
 **hole-free** (no static holes) is an upper bound; **call-closed** additionally requires
@@ -76,7 +148,7 @@ not match the runtime — caught automatically rather than by inspection.
 | `Autoform/Ledger.lean` | 6 | Coverage, holes-by-cause, verifiable core; JSON evidence for the assurance case. |
 | `Autoform/Tactics/Portfolio.lean` | 5 | Tiered proof portfolio; records open obligations instead of admitting them. |
 | `scripts/audit_all.py` | 6 | Axiom sweep over every declaration + source sweep for escape hatches. |
-| `scripts/mutate.py` | 4 | Source-level mutation gate — the *sufficient* anti-vacuity test. |
+| `scripts/mutate.py` | 4 | Mutation gate — tests whether selected changes to the translated subject invalidate its specifications. |
 | `scripts/sacm.py` | 6 | SACM assurance case + in-toto attestation. |
 | `scripts/fvspec.py` | 4 | Vacuity screen over the FVSpec benchmark. |
 | `Autoform/Harness/Audit.lean` | 6 | `#audit_axioms`, `#audit_depends`, `#audit_ledger` — Lean metaprogramming. |
@@ -182,13 +254,14 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-Boxed mutable containers (`Stmt.setIndex` is still a hole — design in
-`docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
-contracts at holes, so partially-translated functions can be reasoned about under stated
-assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
-is **not yet wired into the semantics**, so floats still hole). `op:starredUnpack` is
-**closed** (STRATEGY.md §35) — Core now has a variadic calling convention; what is left of
-it is default parameter values, keyword-only parameters, and starred *destructuring*.
+Source coverage still has gaps in mutable containers, cross-scope writes, calling
+conventions, and language-specific numeric behavior. `Val.float` is now wired into
+Core semantics; that does not establish coverage of all source float operations or
+machine floating-point instructions. Boundary contracts exist, but partially
+translated programs still need explicit assumptions and satisfiability evidence.
+See [the source-language measurements](docs/languages.md) and
+[the machine-code gap list](docs/machine-code.md#remaining-work-toward-arbitrary-codebases)
+for the scope of the remaining work.
 
 ## Dependencies
 

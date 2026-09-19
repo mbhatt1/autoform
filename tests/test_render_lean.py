@@ -116,6 +116,37 @@ class TestParenthesisation:
 # ---------------------------------------------------------------------------
 
 class TestRendererRefuses:
+    @pytest.mark.parametrize("signature", [
+        None, {}, {"positionalOnly": [], "keywordOnly": [], "required": [], "extra": []},
+        {"positionalOnly": ["a"], "keywordOnly": ["a"], "required": ["a"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["missing"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["rest"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": ["a", "a"]},
+        {"positionalOnly": [], "keywordOnly": [], "required": "a"},
+        {"positionalOnly": [], "keywordOnly": [], "required": [None]},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": 1},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": "false"},
+        {"positionalOnly": [], "keywordOnly": [], "required": [], "isMethod": None},
+    ])
+    def test_invalid_python_signature_is_refused(self, render_lean, signature):
+        with pytest.raises(ValueError, match="Python"):
+            render_lean.render_func(fn(params=["a", "rest"], vararg="rest",
+                                      pythonSignature=signature), "f")
+
+    def test_python_signature_is_deterministic(self, render_lean):
+        signature = dict(positionalOnly=["a"], keywordOnly=["b"], required=["a", "b"])
+        first = render_lean.render_func(fn(params=["a", "b"], pythonSignature=signature), "f")
+        second = render_lean.render_func(fn(params=["a", "b"], pythonSignature=dict(
+            reversed(list(signature.items())))), "f")
+        assert first == second
+        assert 'pythonSignature := some { positionalOnly := ["a"], keywordOnly := ["b"], required := ["a", "b"] }' in '\n'.join(first)
+
+    @pytest.mark.parametrize('method', [False, True])
+    def test_explicit_python_method_classification(self, render_lean, method):
+        signature = dict(positionalOnly=[], keywordOnly=[], required=['a'], isMethod=method)
+        output = render_lean.render_func(fn(params=['a'], pythonSignature=signature), 'f')
+        assert 'isMethod := some ' + str(method).lower() in '\n'.join(output)
+
     def test_unknown_expr_kind(self, render_lean):
         with pytest.raises(ValueError, match="unknown expr node kind"):
             render_lean.expr({"k": "quasiquote"})
@@ -136,22 +167,28 @@ class TestRendererRefuses:
         """Defaulting to Python's floored division for a `.tsx` file gave `-7 % 3 = 2`
         where TypeScript gives -1. An unknown extension is an error."""
         ast = str(tmp_path / "ast-X.json")
-        write_ast(ast, [fn(file="a.tsx")])
+        write_ast(ast, [fn(file="a.unknown")])
         rc, log = run_script(RENDER, ast, str(tmp_path / "X.lean"), "X")
         assert rc != 0
         assert "cannot infer dialect" in log
-        assert ".tsx" in log
+        assert ".unknown" in log
 
     @pytest.mark.parametrize("ext,dialect", [
         (".py", ".python"), (".c", ".cLike"), (".cpp", ".cLike"),
-        (".java", ".cLike"), (".ts", ".cLike"), (".go", ".cLike"),
+        (".java", ".cLike"), (".ts", ".javascript"), (".go", ".cLike"),
+        (".tsx", ".javascript"), (".jsx", ".javascript"),
     ])
     def test_dialect_inference(self, render_lean, ext, dialect):
         assert render_lean.infer_dialect([fn(file="a" + ext)]) == dialect
 
-    def test_dialect_is_a_majority_vote_not_a_first_hit(self, render_lean):
+    def test_mixed_dialects_cannot_be_decided_by_majority(self, render_lean):
         funcs = [fn(file="a.c")] * 3 + [fn(file="b.py")]
-        assert render_lean.infer_dialect(funcs) == ".cLike"
+        with pytest.raises(SystemExit, match="mixed source dialects"):
+            render_lean.infer_dialect(funcs)
+
+    def test_known_extension_does_not_hide_unknown_language(self, render_lean):
+        with pytest.raises(SystemExit, match="unrecognized extensions"):
+            render_lean.infer_dialect([fn(file="a.c"), fn(file="b.unknown")])
 
     def test_unmodelled_builtin_base_is_refused(self, tmp_path):
         ast = str(tmp_path / "ast-B.json")

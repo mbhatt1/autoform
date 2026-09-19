@@ -23,6 +23,11 @@ CARTO = os.path.join(ROOT, "cartographer")
 
 def load(path: str, name: str) -> types.ModuleType:
     """Import a script by path, without requiring it to be a package."""
+    # Executing a script normally adds its own directory to sys.path. Reproduce
+    # that environment for sibling helper imports when loading it by file path.
+    directory = os.path.dirname(os.path.abspath(path))
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader, path
     mod = importlib.util.module_from_spec(spec)
@@ -123,7 +128,7 @@ def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None,
     os.makedirs(os.path.join(d, "scripts"), exist_ok=True)
     os.makedirs(os.path.join(d, "cartographer"), exist_ok=True)
     os.makedirs(os.path.join(d, "Autoform", "Generated"), exist_ok=True)
-    for s in ("check_render.py", "check_docs.py"):
+    for s in ("check_render.py", "check_docs.py", "deep_json.py"):
         shutil.copy(os.path.join(SCRIPTS, s), os.path.join(d, "scripts", s))
     shutil.copy(os.path.join(CARTO, "render_lean.py"),
                 os.path.join(d, "cartographer", "render_lean.py"))

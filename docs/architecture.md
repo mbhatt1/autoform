@@ -3,6 +3,12 @@
 How the pieces fit together. `STRATEGY.md` holds the full design record; this document is
 the map.
 
+The source pipeline below now has a separate machine-level companion:
+binary/assembled bytes → SLEIGH raw p-code → `Autoform.PCode.Program` → a total Lean
+interpreter. This path keeps machine widths, address spaces, registers, and control
+flow instead of assigning a source dialect to disassembly. See
+[machine-code.md](machine-code.md) for its interface, trust boundary, and gaps.
+
 ## The approach
 
 Programs are not translated into Lean definitions with theorems then guessed about them.

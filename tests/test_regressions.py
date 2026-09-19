@@ -241,6 +241,10 @@ OLD_MAIN_DRIVER = textwrap.dedent("""
     sys.setrecursionlimit(1000)
     sys.argv = ["render_lean.py"] + sys.argv[2:]
     try:
+        # Reconstruct the old full-subtree flatten. The current printer's iterative
+        # seq renderer no longer overflows here, even with the old recursion limit.
+        # Testing _run_main alone therefore stopped reconstructing the regression.
+        rl.flat_capped = lambda node, kind, cap: rl.flat(node, kind)
         rl._run_main()
     except RecursionError:
         print("RECURSION_ERROR")
@@ -313,8 +317,11 @@ PY_EXTS = (".py",)
 
 
 def _ast_files():
-    return sorted(f for f in os.listdir(ROOT)
-                  if f.startswith("ast-") and f.endswith(".json"))
+    # This contract is for committed fixtures, not arbitrary large local corpus
+    # outputs. The latter also made this test depend on another test raising the
+    # interpreter's JSON recursion limit first.
+    return subprocess.check_output(['git','ls-files','ast-*.json'], cwd=ROOT,
+                                   text=True).splitlines()
 
 
 class TestVarargContract:

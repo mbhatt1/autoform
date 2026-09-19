@@ -35,6 +35,7 @@ produces, so the merged field survives a normal `load_ledger(...)` call with no 
 step.
 """
 import json
+import deep_json
 import sys
 
 
@@ -90,7 +91,7 @@ def main(argv):
     if "--merge-into" in argv:
         merge_into = argv[argv.index("--merge-into") + 1]
 
-    ast = json.load(open(ast_path))
+    ast = deep_json.load(ast_path)
     counts = label_function_counts(ast)
 
     ranked = sorted(counts.items(), key=lambda kv: -kv[1]["onlyFunctions"])

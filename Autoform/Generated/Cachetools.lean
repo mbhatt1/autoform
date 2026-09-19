@@ -14,6 +14,23 @@ import Autoform.Lang.Core.Semantics
 -- not with how deep its code happens to be.
 set_option maxRecDepth 9672
 
+-- Lean's default `maxHeartbeats` (200000) budgets ONE declaration's own
+-- elaboration cost, separately from `maxRecDepth` above (which bounds nesting
+-- depth, not total work). A single source file whose top-level declarations
+-- carry a large static table -- SQLite's `test_vdbecov.c`, whose `<global>`
+-- initializer alone is ~5.3M characters of generated Lean -- blows through the
+-- default budget on that ONE declaration and fails with a `(deterministic)
+-- timeout at isDefEq` error, unrelated to whether the translation is correct.
+-- Unlike `maxRecDepth`, this does not scale with function COUNT (Ansible-style
+-- corpora with thousands of small functions never hit it); it is one
+-- pathologically large declaration, which no per-function-count formula would
+-- predict, so this disables the budget outright rather than guessing a bigger
+-- number that the next large static table would just exceed again. Scoped to
+-- THIS generated file only (`set_option` here does not touch hand-written proof
+-- files elsewhere in the project, which keep the default as a real safety net
+-- against a genuine runaway elaboration bug while someone is editing them).
+set_option maxHeartbeats 0
+
 /-!
 # Cachetools — machine-generated
 

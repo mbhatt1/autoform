@@ -9,10 +9,9 @@ percentage, the inferred dialect, and holes broken down by cause.
 Why this exists separately from `Autoform/Ledger.lean`:
 
 * The ledger runs *after* `render_lean.py`, so it can only report on corpora that
-  rendered. Real JavaScript (lodash, 693 functions) does not: `json.load` in
-  `render_lean.py` hits `RecursionError` on the nesting depth jssrc2cpg produces. This
-  script raises the recursion limit and walks the AST iteratively, so a corpus that
-  cannot be rendered can still be measured. A pipeline stage that fails is a result, and
+  rendered. Deep JavaScript ASTs once failed during JSON decoding before the ledger
+  could run. This script reads containers and walks the AST iteratively, so a corpus
+  that cannot be rendered can still be measured. A pipeline stage that fails is a result, and
   the result should be quantified rather than left blank.
 * Holes-by-cause is the interesting per-language signal: it names exactly which CPG node
   kinds the exporter does not map, and those differ sharply by frontend.
@@ -22,8 +21,7 @@ Usage:
     python3 scripts/lang_matrix.py            # every ast-*.json in the repo root
 """
 import json, sys, os, glob, collections
-
-sys.setrecursionlimit(100000)
+import deep_json
 
 # Same extension -> dialect table as `cartographer/render_lean.py`. Duplicated
 # deliberately: this script measures the pipeline, so it must not import from it and
@@ -56,8 +54,7 @@ def func_stats(f):
     return nodes, holes, causes
 
 def analyse(path):
-    with open(path) as fh:
-        funcs = json.load(fh)
+    funcs = deep_json.load(path)
     exts = collections.Counter(os.path.splitext(f.get("file", ""))[1] for f in funcs)
     votes = collections.Counter(DIALECT[e] for e in exts.elements() if e in DIALECT)
     dialect = votes.most_common(1)[0][0] if votes else "python (defaulted)"

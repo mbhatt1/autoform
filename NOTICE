@@ -1,0 +1,14 @@
+Autoform
+Copyright 2026 Autoform contributors
+
+Original Autoform code is licensed under the Apache License, Version 2.0.
+Third-party code and translated corpora retain their original licenses.
+This notice does not change those licenses.
+
+The CLI distribution contains a generated Lean translation of cachetools:
+Copyright (c) 2014-2026 Thomas Kemmer
+Licensed under the MIT License; see licenses/cachetools-MIT.txt.
+See THIRD_PARTY.md for the bundled paths and external dependency inventory.
+
+Paid support is provided under a separate agreement with the support provider.
+It does not change the open-source license or the scope of any proof.

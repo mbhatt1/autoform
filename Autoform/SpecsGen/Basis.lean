@@ -122,6 +122,18 @@ agreeing with itself. -/
 def lawConform (ctx : Ctx) (fuel : Nat) (fn : Func) (o : Obs) : Bool :=
   EResult.beq (runCase ctx fuel fn o.case).2 o.expected
 
+/-- Check execution before structural comparison. Keeping the interpreter outside
+`Val.beq`'s nested recursor avoids costly kernel reductions of unused shift branches.
+The expected outcome still comes from the native runtime, and both premises are
+kernel checked. The second premise is explicit because NaN is not equal to itself. -/
+theorem lawConform_of_result {ctx : Ctx} {fuel : Nat} {fn : Func} {o : Obs}
+    (hrun : (runCase ctx fuel fn o.case).2 = o.expected)
+    (heq : EResult.beq o.expected o.expected = true) :
+    lawConform ctx fuel fn o = true := by
+  unfold lawConform
+  rw [hrun]
+  exact heq
+
 /-- **Totality / no-hole / termination.** The three-in-one structural spec of §4 source 2:
 within `fuel`, the function neither reaches an untranslated construct nor runs out. -/
 def lawRuns (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
@@ -302,15 +314,22 @@ quantified over *arbitrary* `args` and was true only because surplus arguments w
 silently dropped; it is now false for `args ≠ []`, and stating the domain is the honest
 repair. Nothing in the generated corpora loses a theorem: a projection method is called
 with no arguments.
+
+Signature-aware calls additionally require `signatureRejected fn args [] = false`.
+The generated proof establishes this by kernel reduction; it cannot infer call
+validity merely from the body shape.
 -/
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    (hsig : signatureRejected fn args [] = false := by rfl) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
+  have hbind (base : Env) : bindParams fn base args [] = base := by
+    simp [bindParams, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -332,10 +351,13 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hb : fn.body = .seq (.expr (.lit (.str doc))) (.ret (.field (.name "self") fld)))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
-    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) :
+    (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    (hsig : signatureRejected fn args [] = false := by rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
+  have hbind (base : Env) : bindParams fn base args [] = base := by
+    simp [bindParams, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, bindParams_plain _ _ hv hkw, hp, kwargsRejected_nil, hpos,
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -350,16 +372,17 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
 Every mined law is checked, and proved, at one concrete fuel budget. That is a weaker
 statement than it looks: `FUEL` is an arbitrary constant, and a reader is entitled to ask
 whether the law is a fact about the program or an artefact of the budget. `Autoform/FuelMono.lean`
-answers it in general — for a `tryFinally`-free context, raising the budget cannot change a
+answers it in general — including finalizers, raising the budget cannot change a
 result that did not run out of fuel — and this section lifts that from `applyFunc` to the
 laws, so a generated theorem can quantify over *every* budget at or above the one it was
 checked at.
 
-Two things are load-bearing and neither is decoration:
+The following boundaries are explicit:
 
-* **`tryFinally` is genuinely excluded.** `FuelMono.tryFinally_breaks_fuel_mono` exhibits a
-  program that returns `1` at fuel 4 and `2` at fuel 5. A law about a subject whose body
-  contains `tryFinally` therefore stays an open obligation; it is not routed around.
+* **Finalizers cannot hide interpreter failures.** Holes and exhausted fuel propagate;
+  finalizers run on language exits after preserving the current local environment.
+  The `_all` transport lemmas have no `tryFinally` exclusion. Older entry points keep
+  their syntactic premises for existing generated modules.
 * **The `≠ outOfFuel` side condition is checked, not assumed.** Some laws force it
   (`lawRuns` rejects `outOfFuel` by construction); others do *not*. `lawCommutes` is
   `EResult.beq r₁ r₂`, which is `true` when both sides are `outOfFuel` — precisely the
@@ -377,15 +400,21 @@ def defined (r : EResult) : Bool :=
   | _          => true
 
 /-- **Fuel monotonicity, at the level of a `Case`.** -/
-theorem runCase_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem runCase_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hd : defined (runCase ctx k fn c).2 = true) :
     runCase ctx k' fn c = runCase ctx k fn c := by
   have hne : (runCase ctx k fn c).2 ≠ .outOfFuel := by
     intro hEq; rw [hEq] at hd; simp [defined] at hd
   have he : applyFunc ctx k c.heap fn c.self c.args []
       = ((runCase ctx k fn c).1, (runCase ctx k fn c).2) := rfl
-  simpa [runCase] using applyFunc_fuel_mono hctx hfn hk he hne
+  simpa [runCase] using applyFunc_fuel_mono_all hk he hne
+
+theorem runCase_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hd : defined (runCase ctx k fn c).2 = true) :
+    runCase ctx k' fn c = runCase ctx k fn c  := by
+  exact runCase_fuel_mono_all hk hd
 
 /-- Lift a per-element implication over a list, with a guard that also has to hold.
 
@@ -439,71 +468,71 @@ def gComm (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
 
 /-! ### Step lemmas -/
 
-theorem lawConform_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {o : Obs}
+theorem lawConform_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {o : Obs}
     (hg : gRunObs ctx k fn o = true) (h : lawConform ctx k fn o = true) :
     lawConform ctx k' fn o = true := by
   unfold lawConform at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawRuns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawRuns_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawRuns ctx k fn c = true) :
     lawRuns ctx k' fn c = true := by
   unfold lawRuns at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawReturns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawReturns_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawReturns ctx k fn c = true) :
     lawReturns ctx k' fn c = true := by
   unfold lawReturns at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawHeapPreserved_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawHeapPreserved_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawHeapPreserved ctx k fn c = true) :
     lawHeapPreserved ctx k' fn c = true := by
   unfold lawHeapPreserved at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawConst_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+theorem lawConst_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawConst ctx k fn v c = true) :
     lawConst ctx k' fn v c = true := by
   unfold lawConst at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawProjects_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
+theorem lawProjects_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawProjects ctx k fn fld c = true) :
     lawProjects ctx k' fn fld c = true := by
   unfold lawProjects at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawIdentity_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawIdentity_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawIdentity ctx k fn c = true) :
     lawIdentity ctx k' fn c = true := by
   unfold lawIdentity at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawNonneg_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawNonneg_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawNonneg ctx k fn c = true) :
     lawNonneg ctx k' fn c = true := by
   unfold lawNonneg at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawRaises_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+theorem lawRaises_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
     (hg : gRun ctx k fn c = true) (h : lawRaises ctx k fn v c = true) :
     lawRaises ctx k' fn v c = true := by
   unfold lawRaises at h ⊢
-  rw [runCase_fuel_mono hctx hfn hk hg]; exact h
+  rw [runCase_fuel_mono_all hk hg]; exact h
 
-theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawIdempotent_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gIdem ctx k fn c = true) (h : lawIdempotent ctx k fn c = true) :
     lawIdempotent ctx k' fn c = true := by
   unfold gIdem at hg
@@ -513,16 +542,16 @@ theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
   cases r with
   | val v =>
       have hd1 : defined (runCase ctx k fn c).2 = true := by rw [hr]; rfl
-      rw [runCase_fuel_mono hctx hfn hk hd1]
+      rw [runCase_fuel_mono_all hk hd1]
       simp only [hr]
-      rw [runCase_fuel_mono hctx hfn hk hg]
+      rw [runCase_fuel_mono_all hk hg]
       exact h
   | exn v => simp at hg
   | hole l => simp at hg
   | outOfFuel => simp at hg
 
-theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawInvolutive_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gInvol ctx k fn c = true) (h : lawInvolutive ctx k fn c = true) :
     lawInvolutive ctx k' fn c = true := by
   unfold gInvol at hg
@@ -534,16 +563,16 @@ theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
     cases r with
     | val v =>
         have hd1 : defined (runCase ctx k fn c).2 = true := by rw [hr]; rfl
-        rw [runCase_fuel_mono hctx hfn hk hd1]
+        rw [runCase_fuel_mono_all hk hd1]
         simp only [hr]
-        rw [runCase_fuel_mono hctx hfn hk hg]
+        rw [runCase_fuel_mono_all hk hg]
         exact h
     | exn v => simp at hg
     | hole l => simp at hg
     | outOfFuel => simp at hg
 
-theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
-    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+theorem lawCommutes_fuel_mono_all {ctx : Ctx} {fn : Func}
+    {k k' : Nat} (hk : k ≤ k') {c : Case}
     (hg : gComm ctx k fn c = true) (h : lawCommutes ctx k fn c = true) :
     lawCommutes ctx k' fn c = true := by
   unfold gComm at hg
@@ -555,8 +584,82 @@ theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
     · simp only [ha, has] at hg h
       obtain ⟨hg1, hg2⟩ := Bool.and_eq_true .. |>.mp hg
       dsimp only
-      rw [runCase_fuel_mono hctx hfn hk hg1, runCase_fuel_mono hctx hfn hk hg2]
+      rw [runCase_fuel_mono_all hk hg1, runCase_fuel_mono_all hk hg2]
       exact h
+
+/-! Compatibility entry points for previously generated proof modules. -/
+
+theorem lawConform_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {o : Obs}
+    (hg : gRunObs ctx k fn o = true) (h : lawConform ctx k fn o = true) :
+    lawConform ctx k' fn o = true  := by
+  exact lawConform_fuel_mono_all hk hg h
+
+theorem lawRuns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawRuns ctx k fn c = true) :
+    lawRuns ctx k' fn c = true  := by
+  exact lawRuns_fuel_mono_all hk hg h
+
+theorem lawReturns_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawReturns ctx k fn c = true) :
+    lawReturns ctx k' fn c = true  := by
+  exact lawReturns_fuel_mono_all hk hg h
+
+theorem lawHeapPreserved_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawHeapPreserved ctx k fn c = true) :
+    lawHeapPreserved ctx k' fn c = true  := by
+  exact lawHeapPreserved_fuel_mono_all hk hg h
+
+theorem lawConst_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawConst ctx k fn v c = true) :
+    lawConst ctx k' fn v c = true  := by
+  exact lawConst_fuel_mono_all hk hg h
+
+theorem lawProjects_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {fld : String} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawProjects ctx k fn fld c = true) :
+    lawProjects ctx k' fn fld c = true  := by
+  exact lawProjects_fuel_mono_all hk hg h
+
+theorem lawIdentity_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawIdentity ctx k fn c = true) :
+    lawIdentity ctx k' fn c = true  := by
+  exact lawIdentity_fuel_mono_all hk hg h
+
+theorem lawNonneg_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawNonneg ctx k fn c = true) :
+    lawNonneg ctx k' fn c = true  := by
+  exact lawNonneg_fuel_mono_all hk hg h
+
+theorem lawRaises_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {v : Val} {c : Case}
+    (hg : gRun ctx k fn c = true) (h : lawRaises ctx k fn v c = true) :
+    lawRaises ctx k' fn v c = true  := by
+  exact lawRaises_fuel_mono_all hk hg h
+
+theorem lawIdempotent_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gIdem ctx k fn c = true) (h : lawIdempotent ctx k fn c = true) :
+    lawIdempotent ctx k' fn c = true  := by
+  exact lawIdempotent_fuel_mono_all hk hg h
+
+theorem lawInvolutive_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gInvol ctx k fn c = true) (h : lawInvolutive ctx k fn c = true) :
+    lawInvolutive ctx k' fn c = true  := by
+  exact lawInvolutive_fuel_mono_all hk hg h
+
+theorem lawCommutes_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {fn : Func}
+    (hfn : tfFreeS fn.body = true) {k k' : Nat} (hk : k ≤ k') {c : Case}
+    (hg : gComm ctx k fn c = true) (h : lawCommutes ctx k fn c = true) :
+    lawCommutes ctx k' fn c = true  := by
+  exact lawCommutes_fuel_mono_all hk hg h
 
 /-! ## 4. Open obligations
 

@@ -17,6 +17,8 @@ Usage: render_lean.py ast.json Out.lean [ModuleName]
 """
 import json
 import threading, sys, re, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
+import deep_json
 
 # Break a term across lines once its flat form would push past this column. Purely
 # cosmetic: the layout below is whitespace-insensitive because every term is
@@ -525,6 +527,11 @@ def infer_dialect(funcs) -> str:
     extension is an error, not an assumption.
     """
     exts = [os.path.splitext(f.get("file", ""))[1] for f in funcs]
+    unknown = sorted({e for e in exts if e and e not in DIALECT})
+    if unknown:
+        raise SystemExit("render_lean: cannot infer dialect — unrecognized extensions: %s. "
+                         "Use a supported source frontend or formalize the compiled binary "
+                         "with autoform.sh --machine." % unknown)
     votes = [DIALECT[e] for e in exts if e in DIALECT]
     if not votes:
         seen = sorted({e for e in exts if e})
@@ -534,7 +541,13 @@ def infer_dialect(funcs) -> str:
             "  Add the extension to DIALECT (with its real integer-division and\n"
             "  string semantics) rather than letting it default." % (seen or "[]",
                                                                     sorted(DIALECT)))
-    return max(set(votes), key=votes.count)
+    dialects = sorted(set(votes))
+    if len(dialects) != 1:
+        raise SystemExit("render_lean: mixed source dialects %s cannot share one Core program. "
+                         "Translate each dialect separately, or formalize the linked binary "
+                         "with autoform.sh --machine; majority voting changes program semantics."
+                         % dialects)
+    return dialects[0]
 
 def render_func(f, nm) -> list:
     params = ", ".join(lean_str(p) for p in f.get("params", []))
@@ -547,6 +560,27 @@ def render_func(f, nm) -> list:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
         variadic.append(f"  , kwarg := some {lean_str(f['kwarg'])}")
+    if 'pythonSignature' in f:
+        signature = f['pythonSignature']
+        keys = ('positionalOnly', 'keywordOnly', 'required')
+        if (not isinstance(signature, dict) or not set(keys) <= set(signature)
+                or set(signature) - set(keys) - {'isMethod'}):
+            raise ValueError('invalid Python signature fields')
+        if 'isMethod' in signature and type(signature['isMethod']) is not bool:
+            raise ValueError('invalid Python method classification')
+        ordinary = set(f.get('params', [])) - {f.get('vararg'), f.get('kwarg')}
+        for key in keys:
+            values = signature[key]
+            if (not isinstance(values, list) or not all(isinstance(x, str) for x in values)
+                    or len(set(values)) != len(values) or not set(values) <= ordinary):
+                raise ValueError('invalid Python signature parameters: ' + key)
+        if set(signature['positionalOnly']) & set(signature['keywordOnly']):
+            raise ValueError('overlapping Python parameter kinds')
+        fields = ', '.join(key + ' := [' + ', '.join(map(lean_str, signature[key])) + ']'
+                           for key in keys)
+        if 'isMethod' in signature:
+            fields += ', isMethod := some ' + str(signature['isMethod']).lower()
+        variadic.append('  , pythonSignature := some { ' + fields + ' }')
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
         f"def {nm} : Func :=",
@@ -560,8 +594,7 @@ def render_func(f, nm) -> list:
 def _run_main():
     src, dst = sys.argv[1], sys.argv[2]
     module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
-    with open(src) as fh:
-        funcs = json.load(fh)
+    funcs = deep_json.load(src)
     dialect = infer_dialect(funcs)
 
     out = [

@@ -27,6 +27,16 @@ import scala.annotation.tailrec
                dataModel: String = "lp64") = {
   importCpg(cpgPath)
 
+  // Frontends use both <operator> and <operators> for the same built-in
+  // operations (C compound bitwise/modulo assignments and JavaScript shifts).
+  // Normalize reads at one boundary so type recovery, effect analysis and
+  // expression/statement lowering agree. The CPG itself remains unchanged.
+  def canonicalOperatorName(name: String): String =
+    if (name.startsWith("<operators>.")) "<operator>." + name.stripPrefix("<operators>.")
+    else name
+
+  def callName(c: Call): String = canonicalOperatorName(c.methodFullName)
+
   // `seqOf` and `moduleObjectsInit` (below) both fold a flat statement list into a
   // right-nested `"seq"` chain; `maxSeqChainLen` tracks the longest one either producer
   // has built so far. Declared here (rather than next to `writeJson`, which uses it) so
@@ -57,7 +67,7 @@ import scala.annotation.tailrec
   val binops = Map(
     "<operator>.addition" -> "+", "<operator>.subtraction" -> "-",
     "<operator>.multiplication" -> "*", "<operator>.division" -> "/",
-    "<operator>.floorDiv" -> "/",
+    "<operator>.floorDiv" -> "//",
     "<operator>.modulo" -> "%", "<operator>.lessThan" -> "<",
     "<operator>.lessEqualsThan" -> "<=", "<operator>.greaterThan" -> ">",
     "<operator>.greaterEqualsThan" -> ">=", "<operator>.equals" -> "==",
@@ -65,39 +75,11 @@ import scala.annotation.tailrec
     "<operator>.logicalOr" -> "||",
     // Bitwise. See the note above: these are not `&&`/`||`.
     "<operator>.and" -> "&", "<operator>.or" -> "|", "<operator>.xor" -> "^",
-    "<operator>.shiftLeft" -> "<<",
-    // Java's `>>>`: zero-filling, whatever the operand's sign. C has no such spelling.
-    "<operator>.logicalShiftRight" -> ">>>"
+    "<operator>.shiftLeft" -> "<<"
   )
-
-  /** `a >> b`, which is **two** operators.
-    *
-    * C's `>>` on a *signed* negative value is arithmetic (sign-extending); on an
-    * *unsigned* value it is logical (zero-filling), and `0x80000000u >> 31` is `1` while
-    * `((int)0x80000000) >> 31` is `-1`. Joern spells both `<operator>.arithmeticShiftRight`
-    * — the name records the token, not the semantics — so the choice has to be made from
-    * the left operand's static type, which is the only place the signedness survives.
-    *
-    * A `Val.int` carries no type, so this cannot be deferred to the interpreter: if the
-    * exporter cannot tell, nobody downstream can, and the honest answer is a hole that
-    * says which piece of information was missing.
-    *
-    * Outside the C family the token is unambiguous (Java/Kotlin `>>` is arithmetic and
-    * `>>>` is the logical one; Python and JS have only the arithmetic form), so no type is
-    * consulted there. */
-  val unsignedTypeNames = Set(
-    "uint8_t", "unsignedchar", "uint16_t", "unsignedshort", "uint32_t", "unsignedint",
-    "unsigned", "uint64_t", "unsignedlonglong", "unsignedlong", "longunsigned",
-    "size_t", "uintptr_t", "u8", "u16", "u32", "u64", "__u8", "__u16", "__u32", "__u64",
-    "__be16", "__be32", "__be64", "__le16", "__le32", "__le64", "gfp_t", "dev_t",
-    "sector_t", "phys_addr_t", "dma_addr_t", "resource_size_t", "uid_t", "gid_t"
-  )
-  val signedTypeNames = Set(
-    "int8_t", "signedchar", "int16_t", "short", "shortint", "int32_t", "int", "signedint",
-    "long", "signedlong", "int64_t", "longlong", "ptrdiff_t", "s8", "s16", "s32", "s64",
-    "__s8", "__s16", "__s32", "__s64", "ssize_t", "loff_t", "off_t", "pid_t", "cycles_t",
-    "ktime_t", "intptr_t"
-  )
+  val rightShiftOps = Set("<operator>.arithmeticShiftRight", "<operator>.logicalShiftRight")
+  val assignRightShiftOps = Set("<operator>.assignmentArithmeticShiftRight",
+                                "<operator>.assignmentLogicalShiftRight")
 
   /** Augmented assignment operators, `x op= e`, mapped to the binary operator they
     * expand to. `>>=` is absent for the reason `>>` is: it needs the target's type, and
@@ -105,10 +87,10 @@ import scala.annotation.tailrec
   val augOps = Map(
     "<operator>.assignmentPlus" -> "+", "<operator>.assignmentMinus" -> "-",
     "<operator>.assignmentMultiplication" -> "*", "<operator>.assignmentDivision" -> "/",
+    "<operator>.assignmentFloorDiv" -> "//",
     "<operator>.assignmentModulo" -> "%",
     "<operator>.assignmentAnd" -> "&", "<operator>.assignmentOr" -> "|",
-    "<operator>.assignmentXor" -> "^", "<operator>.assignmentShiftLeft" -> "<<",
-    "<operator>.assignmentLogicalShiftRight" -> ">>>"
+    "<operator>.assignmentXor" -> "^", "<operator>.assignmentShiftLeft" -> "<<"
   )
 
   // Operators whose Core meaning is wrong when an operand is a C `char*`. `+`/`-` are
@@ -134,7 +116,8 @@ import scala.annotation.tailrec
   // `flags & ~MASK` into `flags && false`. That is the same mistake as `<operator>.and`
   // in its unary form, and it was live on every corpus, Python included.
   val unops = Map(
-    "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "~"
+    "<operator>.minus" -> "-", "<operator>.logicalNot" -> "!", "<operator>.not" -> "~",
+    "<operator>.bitNot" -> "~"
   )
 
   // ---- parameter star-ness ---------------------------------------------------
@@ -155,6 +138,178 @@ import scala.annotation.tailrec
     val cands = List(os.Path(srcRoot, os.pwd) / os.RelPath(fn), os.Path(fn, os.pwd))
     cands.find(p => os.exists(p) && os.isFile(p)).map(os.read(_))
   })
+
+  // pysrc2cpg omits except headers, including their types, aliases and source
+  // positions. Recover them with Python's parser, never by guessing from CATCH's
+  // body text. This isolated process parses source as data; it does not import or
+  // execute the target. Keep it embedded so direct Joern invocations and installed
+  // workspaces use exactly the same decoder without a working-directory dependency.
+  val pythonHandlerDecoder = """
+import ast, builtins, json, symtable, sys
+source = sys.stdin.read()
+tree = ast.parse(source)
+symbols = symtable.symtable(source, '<source>', 'exec')
+exceptions = {name: value for name, value in vars(builtins).items()
+              if isinstance(value, type) and issubclass(value, BaseException)}
+# These are Stdlib.excNames, the exception constructors represented by Core. Keep
+# emitted dispatch stable across Python releases which add other builtin classes.
+# The actual inheritance relation comes from the parser runtime's builtin classes.
+represented = '''Exception BaseException ArithmeticError AssertionError AttributeError
+EOFError FloatingPointError ImportError IndentationError IndexError KeyError
+KeyboardInterrupt LookupError MemoryError NameError NotImplementedError OverflowError
+RecursionError ReferenceError RuntimeError StopIteration StopAsyncIteration SyntaxError
+SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'''.split()
+tries, raises, class_refs, signatures = {}, {}, {}, {}
+
+def builtin_name(name, scopes):
+    # A local assignment anywhere in a function hides the builtin. Global and
+    # nonlocal resolution, enclosing closures and class scopes follow symtable,
+    # rather than a file-wide name scan which would confuse unrelated functions.
+    for scope in reversed(scopes):
+        if scope.get_type() == 'class' and scope is not scopes[-1]:
+            continue
+        try:
+            symbol = scope.lookup(name)
+        except KeyError:
+            continue
+        if symbol.is_local() or symbol.is_parameter() or symbol.is_imported():
+            return False
+        if symbol.is_global() and scope is not scopes[0]:
+            break
+    try:
+        symbol = scopes[0].lookup(name)
+        if symbol.is_assigned() or symbol.is_imported() or symbol.is_namespace():
+            return False
+    except KeyError:
+        pass
+    return not any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names)
+                   for n in ast.walk(tree))
+
+def handler(node, scopes):
+    result = {'binding': node.name}
+    if node.type is None:
+        return dict(result, kind='bare')
+    types = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
+    if not all(isinstance(t, ast.Name) and t.id in exceptions for t in types):
+        return dict(result, kind='hole', label='control:TRY-handler-type')
+    if not all(builtin_name(t.id, scopes) for t in types):
+        return dict(result, kind='hole', label='control:TRY-handler-shadowed')
+    accepted = sorted({name for name in represented
+                       if any(issubclass(exceptions[name], exceptions[t.id]) for t in types)})
+    return dict(result, kind='typed', accepted=accepted)
+
+def inner_scope(node, name, scopes):
+    children = [s for s in scopes[-1].get_children()
+                if s.get_name() == name and s.get_lineno() == node.lineno]
+    if len(children) != 1:
+        raise ValueError('ambiguous Python lexical scope')
+    return scopes + children
+
+def visit(node, scopes):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        parameters = [a.arg for a in [*node.args.posonlyargs, *node.args.args,
+            *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
+            *([node.args.kwarg] if node.args.kwarg else [])]]
+        class_scopes = [scope for scope in scopes if scope.get_type() == 'class']
+        signatures[f'{node.lineno}:{node.col_offset + 1}'] = {
+            'name': 'lambda' if isinstance(node, ast.Lambda) else node.name,
+            'defaults': bool(node.args.defaults or any(v is not None for v in node.args.kw_defaults)),
+            'positional_only': bool(node.args.posonlyargs),
+            'keyword_only': bool(node.args.kwonlyargs),
+            'firstPositional': next((a.arg for a in [*node.args.posonlyargs, *node.args.args]), None),
+            'decorated': bool(getattr(node, 'decorator_list', [])),
+            'isMethod': scopes[-1].get_type() == 'class',
+            'privateParameters': bool(class_scopes and class_scopes[-1].get_name().lstrip('_')
+                and any(name.startswith('__') and not name.endswith('__') for name in parameters)),
+            'parameters': parameters,
+            'positionalOnly': [a.arg for a in node.args.posonlyargs],
+            'keywordOnly': [a.arg for a in node.args.kwonlyargs],
+            'required': [a.arg for a in [*node.args.posonlyargs, *node.args.args]
+                [:len(node.args.posonlyargs) + len(node.args.args) - len(node.args.defaults)]] +
+                [a.arg for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults) if v is None]}
+        # Defaults and decorators belong to the defining scope. The function's
+        # parameters and local assignments only shadow names inside its body.
+        for value in [*node.args.defaults, *node.args.kw_defaults,
+                      *getattr(node, 'decorator_list', [])]:
+            if value is not None:
+                visit(value, scopes)
+        for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs,
+                    node.args.vararg, node.args.kwarg]:
+            if arg is not None and arg.annotation is not None:
+                visit(arg.annotation, scopes)
+        if getattr(node, 'returns', None) is not None:
+            visit(node.returns, scopes)
+        nested = inner_scope(node, 'lambda' if isinstance(node, ast.Lambda) else node.name, scopes)
+        for child in [node.body] if isinstance(node, ast.Lambda) else node.body:
+            visit(child, nested)
+        return
+    if isinstance(node, ast.ClassDef):
+        for value in [*node.bases, *node.decorator_list, *(k.value for k in node.keywords)]:
+            visit(value, scopes)
+        nested = inner_scope(node, node.name, scopes)
+        for child in node.body:
+            visit(child, nested)
+        return
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        # Only the outermost iterable is evaluated outside the comprehension.
+        visit(node.generators[0].iter, scopes)
+        kind = {ast.ListComp: 'listcomp', ast.SetComp: 'setcomp',
+                ast.DictComp: 'dictcomp', ast.GeneratorExp: 'genexpr'}[type(node)]
+        nested = inner_scope(node, kind, scopes)
+        for index, generator in enumerate(node.generators):
+            if index:
+                visit(generator.iter, nested)
+            visit(generator.target, nested)
+            for condition in generator.ifs:
+                visit(condition, nested)
+        for value in [node.key, node.value] if isinstance(node, ast.DictComp) else [node.elt]:
+            visit(value, nested)
+        return
+    if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+            and node.id in represented and builtin_name(node.id, scopes)):
+        class_refs[f'{node.lineno}:{node.col_offset + 1}'] = node.id
+    if isinstance(node, ast.Raise):
+        value = node.exc
+        if node.cause is not None:
+            info = {'kind': 'hole', 'label': 'op:raise-cause'}
+        elif value is None:
+            info = {'kind': 'hole', 'label': 'op:raise-bare'}
+        elif (isinstance(value, ast.Name) and value.id in represented
+              and builtin_name(value.id, scopes)):
+            info = {'kind': 'class', 'name': value.id}
+        elif (isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+              and value.func.id in represented and builtin_name(value.func.id, scopes)):
+            info = {'kind': 'constructor', 'name': value.func.id}
+        elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict, ast.Set, ast.JoinedStr)):
+            info = {'kind': 'invalid-value'}
+        else:
+            info = {'kind': 'dynamic'}
+        raises[f'{node.lineno}:{node.col_offset + 1}'] = info
+    if isinstance(node, (ast.Try, getattr(ast, 'TryStar', ast.Try))):
+        tries[f'{node.lineno}:{node.col_offset + 1}'] = {
+            'star': type(node).__name__ == 'TryStar',
+            'handlers': [handler(h, scopes) for h in node.handlers],
+            'else': bool(node.orelse), 'finally': bool(node.finalbody)}
+    for child in ast.iter_child_nodes(node):
+        visit(child, scopes)
+
+visit(tree, [symbols])
+print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
+                  'signatures': signatures,
+                  'exceptions': sorted(represented)}, sort_keys=True))
+"""
+  val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
+  def pythonHandlers(file: String): Option[ujson.Value] =
+    pythonHandlerCache.getOrElseUpdate(file, fileText(file).flatMap { source =>
+      try {
+        val python = sys.env.getOrElse("AUTOFORM_PYTHON", "python3")
+        val output = os.proc(python, "-I", "-S", "-c", pythonHandlerDecoder)
+          .call(stdin = source, timeout = 30000, stderr = os.Pipe).out.text()
+        Some(ujson.read(output))
+      } catch {
+        case scala.util.control.NonFatal(_) => None
+      }
+    })
 
   /** How many `*`s immediately precede this parameter's name in the source.
     *
@@ -195,30 +350,9 @@ import scala.annotation.tailrec
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
   val skip = ujson.Obj("k" -> "skip")
 
-  /** Kernel synchronisation primitives, which a SEQUENTIAL semantics cannot observe.
-    *
-    * Core is a single-threaded interpreter: no threads, no scheduler, no interleaving.
-    * In that semantics `spin_lock(&l)` acquires an uncontended lock and `spin_unlock(&l)`
-    * releases it, and neither changes any value the program can read. Eliding them is not
-    * an approximation of concurrent behaviour -- it is the exact behaviour of the
-    * semantics Core defines, and the assumption it rests on ("execution is sequential") is
-    * one Core makes globally, not a new one introduced here.
-    *
-    * This matters because these calls dominate the C hole count: 2,577 of the 2,867
-    * `op:addressOf:local` sites across Linux `lib/` and `crypto/` -- 90% -- are `&lock`
-    * passed to one of these. They were holes for a reason that has nothing to do with
-    * pointers: `&l` cannot be represented, so the call could not be translated, so a
-    * `mutex_lock` made its whole function unanalysable.
-    *
-    * WHAT IS GIVEN UP, stated plainly: Core will run a program whose locking is wrong
-    * exactly as it runs one whose locking is right, so no data race, deadlock or missing
-    * critical section is detectable here. That was already true -- Core has no threads to
-    * race -- and it is now true without also losing the surrounding code.
-    *
-    * Kept deliberately narrow: acquire/release pairs for the standard lock families only.
-    * A primitive that RETURNS something (`spin_trylock`, `down_read_trylock`) is NOT here,
-    * because its result is a value the program branches on. */
-  var syncElided: Int = 0
+  /** Kernel synchronization names are explicit effect holes. Sequential execution
+    * does not establish their effects, ordering or argument evaluation. In particular
+    * local_irq_save writes caller state. Never erase these operations as no-ops. */
   var metaElided: Int = 0
   var useElided: Int = 0
   // `006-reduce-remaining-holes`, Story 3: counter for `freshExprVTemp`'s
@@ -310,9 +444,9 @@ import scala.annotation.tailrec
         .filter(_.size == 1)
         .map(cs => unwrapMacro(cs.head))
         .getOrElse(n)
-    case c: Call if c.methodFullName == "<operator>.indirection" =>
+    case c: Call if callName(c) == "<operator>.indirection" =>
       c.astChildren.collect { case a: AstNode => a }.l match {
-        case List(ao: Call) if ao.methodFullName == "<operator>.addressOf" =>
+        case List(ao: Call) if callName(ao) == "<operator>.addressOf" =>
           ao.astChildren.collect { case a: AstNode => a }.l match {
             case List(inner) => unwrapMacro(inner)
             case _            => n
@@ -343,7 +477,7 @@ import scala.annotation.tailrec
   }
 
   def isOp(n: AstNode, op: String): Boolean = n match {
-    case c: Call => c.methodFullName == op
+    case c: Call => callName(c) == canonicalOperatorName(op)
     case _       => false
   }
 
@@ -424,7 +558,7 @@ import scala.annotation.tailrec
     * frontend has *resolved* the attribute it prepends the resolved METHOD_REF/TYPE_REF,
     * giving [METHOD_REF, receiver, FIELD_IDENTIFIER]. */
   def asField(n: AstNode): Option[(AstNode, String)] = n match {
-    case c: Call if fieldOps.contains(c.methodFullName) =>
+    case c: Call if fieldOps.contains(callName(c)) =>
       val k = kidsOf(c)
       k.lastOption match {
         // The attribute name is mangled here, once, so every consumer — `field`,
@@ -439,7 +573,7 @@ import scala.annotation.tailrec
 
   /** A resolved attribute reference: `Cls.meth` where Joern already knows the target. */
   def resolvedRef(n: AstNode): Option[AstNode] = n match {
-    case c: Call if fieldOps.contains(c.methodFullName) =>
+    case c: Call if fieldOps.contains(callName(c)) =>
       kidsOf(c) match {
         case (m: MethodRef) :: _ :: _ :: Nil => Some(m)
         case (t: TypeRef) :: _ :: _ :: Nil   => Some(t)
@@ -450,7 +584,7 @@ import scala.annotation.tailrec
 
   /** `e[i]`. */
   def asIndex(n: AstNode): Option[(AstNode, AstNode)] = n match {
-    case c: Call if indexOps.contains(c.methodFullName) =>
+    case c: Call if indexOps.contains(callName(c)) =>
       kidsOf(c) match {
         case a :: b :: Nil => Some((a, b))
         case _             => None
@@ -463,9 +597,9 @@ import scala.annotation.tailrec
     * evaluating it twice is the same as evaluating it once. */
   def pureNode(n: AstNode): Boolean = n match {
     case _: Identifier | _: Literal | _: MethodParameterIn | _: TypeRef | _: MethodRef => true
-    case c: Call if fieldOps.contains(c.methodFullName) =>
+    case c: Call if fieldOps.contains(callName(c)) =>
       asField(c).exists(p => pureNode(p._1))
-    case c: Call if indexOps.contains(c.methodFullName) =>
+    case c: Call if indexOps.contains(callName(c)) =>
       asIndex(c).exists(p => pureNode(p._1) && pureNode(p._2))
     case _ => false
   }
@@ -475,9 +609,9 @@ import scala.annotation.tailrec
     * nothing observable and re-evaluating `{}` is indistinguishable from evaluating it
     * once. This is what makes the frontend's `tmp0 = {}; tmp0` blocks removable. */
   def pureExpr(n: AstNode): Boolean = pureNode(n) || (n match {
-    case c: Call if c.methodFullName == "<operator>.listLiteral" ||
-                    c.methodFullName == "<operator>.tupleLiteral" ||
-                    c.methodFullName == "<operator>.dictLiteral" => kidsOf(c).forall(pureExpr)
+    case c: Call if callName(c) == "<operator>.listLiteral" ||
+                    callName(c) == "<operator>.tupleLiteral" ||
+                    callName(c) == "<operator>.dictLiteral" => kidsOf(c).forall(pureExpr)
     case _ => false
   })
 
@@ -582,7 +716,7 @@ import scala.annotation.tailrec
     * declaration, not a binding, so trusting it reports that nothing ever captures. */
   val boundOf: Map[String, Set[String]] = allMethods.map { m =>
     val assigned = m.body.ast.isCall
-      .filter(c => c.methodFullName.startsWith("<operator>.assignment"))
+      .filter(c => callName(c).startsWith("<operator>.assignment"))
       .l.flatMap(c => kidsOf(c).headOption).collect { case i: Identifier => i.name }.toSet
     val unlocalised = m.body.ast.collect {
       case u: Unknown if u.code.trim.startsWith("global ") || u.code.trim.startsWith("nonlocal ") =>
@@ -809,7 +943,7 @@ import scala.annotation.tailrec
     mod => cache.getOrElseUpdate(mod, methodByName.get(mod) match {
       case None => Nil
       case Some(m) =>
-        val pairs = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        val pairs = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
           .flatMap(a => kidsOf(a) match {
             case (t: Identifier) :: (r: Identifier) :: Nil => Some(t.name -> r.name)
             case _                                         => None
@@ -976,9 +1110,47 @@ import scala.annotation.tailrec
   var charLiteralIsNumeric = false
   // The source file of the method being translated. `import` is resolved relative to it.
   var currentFile     = ""
-  // Serial number for the flag variable `try/except/else` needs; nested `try`s in one
-  // function must not share it, or the inner one's flag would drive the outer's `else`.
-  var elseFlagSeq     = 0
+  def pythonSourceInfo(node: AstNode, table: String): Option[ujson.Value] = for {
+    info <- pythonHandlers(currentFile)
+    line <- node.lineNumber
+    column <- node.columnNumber
+    value <- info(table).obj.get(s"$line:$column")
+  } yield value
+
+  // Defaults require function-object state which Core does not yet represent.
+  // Other parameter kinds and required arguments are carried into Func below.
+  // Source metadata is authoritative; missing or ambiguous metadata cannot mean
+  // an ordinary signature. Synthetic frontend methods have no source signature.
+  def pythonSignatureInfo(m: Method): Option[ujson.Value] = for {
+    source <- pythonHandlers(m.filename)
+    line <- m.lineNumber
+    column <- m.columnNumber
+    signature <- source("signatures").obj.get(s"$line:$column")
+    if signature("name").str == (if (m.name.startsWith("<lambda>")) "lambda" else m.name)
+  } yield signature
+
+  def pythonSignatureGap(m: Method): Option[String] = {
+    if (!m.filename.toLowerCase.endsWith(".py") ||
+        (m.name.startsWith("<") && !m.name.startsWith("<lambda>"))) None
+    else {
+      pythonSignatureInfo(m) match {
+        case None => Some("call:python-signature-metadata")
+        case Some(s) if s("defaults").bool => Some("call:python-defaults")
+        case _ => None
+      }
+    }
+  }
+
+  // Defaults run when a function value is CREATED, even when it is never called.
+  // Refusing only the callee body would silently skip default effects/exceptions.
+  def pythonDefinitionGap(m: MethodRef): Option[String] =
+    methodByName.get(m.methodFullName).flatMap(pythonSignatureGap).flatMap {
+      case "call:python-defaults" => Some("function:python-default-evaluation")
+      case "call:python-signature-metadata" => Some("function:python-signature-metadata")
+      case _ => None
+    }
+
+  var currentReturnType = ""
   /** `t -> (receiver, method)` for every `t = r.m` in the method being translated, where
     * `r` is a plain identifier. The Python frontend's `with` lowering binds the context
     * manager's `__enter__`/`__exit__` this way and then calls the *temporary*, which
@@ -1002,6 +1174,9 @@ import scala.annotation.tailrec
 
   /** Declared types of the locals and parameters of the method being translated. */
   var localTypes = Map.empty[String, String]
+  // c2cpg can omit the TypeDecl members for a struct defined inside a method.
+  // Keep recovered fields on the declaring variable, never on a global tag name.
+  var inlineStructFields = Map.empty[String, List[(String, String)]]
 
   /** `009-reduce-remaining-holes-4`: names of the method's OWN genuine locals and
     * parameters -- unlike `localTypes` (immediately above), this deliberately
@@ -1376,15 +1551,19 @@ import scala.annotation.tailrec
     if (direct.nonEmpty && direct != "ANY") direct
     else x match {
       case i: Identifier => localTypes.getOrElse(i.name, globalTypes.getOrElse(i.name, direct))
-      case c: Call if fieldOps.contains(c.methodFullName) =>
+      case c: Call if fieldOps.contains(callName(c)) =>
         asField(c).flatMap { case (r, f) =>
           // `p->f` and `o.f` are one node kind here, so strip any pointer depth off the
           // receiver's type before looking the member up on the owning declaration.
           val owner = bareType(staticTypeOf(r)).reverse.dropWhile(_ == '*').reverse
-          memberTypes.get((owner, f))
+          r match {
+            case i: Identifier if inlineStructFields.contains(i.name) =>
+              inlineStructFields(i.name).find(_._1 == f).map(_._2)
+            case _ => memberTypes.get((owner, f))
+          }
         }.getOrElse(direct)
       // `*p` has the type `p` points to.
-      case c: Call if c.methodFullName == "<operator>.indirection" =>
+      case c: Call if callName(c) == "<operator>.indirection" =>
         kidsOf(c) match {
           case k :: Nil =>
             val t = bareType(staticTypeOf(k))
@@ -1398,7 +1577,7 @@ import scala.annotation.tailrec
       // index EXPRESSION's own type left unresolved), so it is derived here from the
       // receiver the same way `<operator>.indirection` above derives `*p`'s type from
       // `p`'s: strip one level of `*`, or one `[N]`/`[]` array dimension.
-      case c: Call if indexOps.contains(c.methodFullName) =>
+      case c: Call if indexOps.contains(callName(c)) =>
         asIndex(c) match {
           case Some((r, _)) =>
             val t = bareType(staticTypeOf(r))
@@ -1484,19 +1663,19 @@ import scala.annotation.tailrec
       // well below this one in the file's top-level body.
       def identNameThroughCast(n: AstNode): Option[String] = n match {
         case i: Identifier => Some(i.name)
-        case cst: Call if cst.methodFullName == "<operator>.cast" && kidsOf(cst).size == 2 =>
+        case cst: Call if callName(cst) == "<operator>.cast" && kidsOf(cst).size == 2 =>
           identNameThroughCast(kidsOf(cst)(1))
         case _ => None
       }
-      val reads = m.body.ast.isCall.filter(_.methodFullName == "<operator>.indirection").l
+      val reads = m.body.ast.isCall.filter(c => callName(c) == "<operator>.indirection").l
         .count(c => kidsOf(c) match { case List(inner) => identNameThroughCast(inner).contains(paramName); case _ => false })
-      val incrs = m.body.ast.isCall.filter(c => incrOps.contains(c.methodFullName)).l
+      val incrs = m.body.ast.isCall.filter(c => incrOps.contains(callName(c))).l
         .count(c => kidsOf(c) match { case List(i: Identifier) => i.name == paramName; case _ => false })
-      val advances = m.body.ast.isCall.filter(c => c.methodFullName == "<operator>.assignmentPlus" ||
-                                                    c.methodFullName == "<operator>.assignmentMinus").l
+      val advances = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignmentPlus" ||
+                                                    callName(c) == "<operator>.assignmentMinus").l
         .count(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == paramName; case _ => false })
-      val nullChecks = m.body.ast.isCall.filter(c => c.methodFullName == "<operator>.equals" ||
-                                                      c.methodFullName == "<operator>.notEquals").l
+      val nullChecks = m.body.ast.isCall.filter(c => callName(c) == "<operator>.equals" ||
+                                                      callName(c) == "<operator>.notEquals").l
         .count(c => kidsOf(c).exists { case i: Identifier => i.name == paramName; case _ => false })
       // `010-reach-90pct-hole-free` US4: `p < end` / `p <= end` / ... -- the four
       // ORDERING comparisons had no bucket at all (only `==`/`!=`, named
@@ -1508,13 +1687,13 @@ import scala.annotation.tailrec
       // way `nullChecks` counts its own two operators, so translation
       // (`expr`'s new same-base-cursor-comparison case) and eligibility agree on
       // exactly which occurrences are accounted for. */
-      val orderComparisons = m.body.ast.isCall.filter(c => c.methodFullName == "<operator>.lessThan" ||
-                                                            c.methodFullName == "<operator>.lessEqualsThan" ||
-                                                            c.methodFullName == "<operator>.greaterThan" ||
-                                                            c.methodFullName == "<operator>.greaterEqualsThan").l
+      val orderComparisons = m.body.ast.isCall.filter(c => callName(c) == "<operator>.lessThan" ||
+                                                            callName(c) == "<operator>.lessEqualsThan" ||
+                                                            callName(c) == "<operator>.greaterThan" ||
+                                                            callName(c) == "<operator>.greaterEqualsThan").l
         .count(c => kidsOf(c).exists { case i: Identifier => i.name == paramName; case _ => false })
-      val callArgs = m.body.ast.isCall.filter(c => !c.methodFullName.startsWith("<operator>") &&
-                                                    c.methodFullName != "<unknownFullName>").l
+      val callArgs = m.body.ast.isCall.filter(c => !callName(c).startsWith("<operator>") &&
+                                                    callName(c) != "<unknownFullName>").l
         .map(c => kidsOf(c).count { k => aidx(k) >= 1 && (k match {
           case i: Identifier => i.name == paramName; case _ => false }) })
         .sum
@@ -1522,26 +1701,26 @@ import scala.annotation.tailrec
       // to `z`'s CURRENT offset (`expr()`'s matching `indexOps` case does exactly
       // this). Only the RECEIVER position counts here; the index expression itself
       // is translated normally and is not expected to name `paramName` again.
-      val indexReads = m.body.ast.isCall.filter(c => indexOps.contains(c.methodFullName)).l
+      val indexReads = m.body.ast.isCall.filter(c => indexOps.contains(callName(c))).l
         .count(c => kidsOf(c) match {
           case List(base, _) => base match { case i: Identifier => i.name == paramName; case _ => false }
           case _ => false
         })
       val defAssigns =
         if (!allowDefiningAssign) 0
-        else m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        else m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
           .count(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == paramName; case _ => false })
       // `009-reduce-remaining-holes-4`: `z + n`/`n + z`/`z - n` -- see the doc
       // comment above for why this must match `callExpr`'s/`cursorBaseAndOffset`'s
       // own translation case exactly, operand-for-operand.
-      val arithOperands = m.body.ast.isCall.filter(c => c.methodFullName == "<operator>.addition" ||
-                                                          c.methodFullName == "<operator>.subtraction").l
+      val arithOperands = m.body.ast.isCall.filter(c => callName(c) == "<operator>.addition" ||
+                                                          callName(c) == "<operator>.subtraction").l
         .count(c => kidsOf(c) match {
           case List(a, b) =>
             val leftIsParam = a match { case i: Identifier => i.name == paramName; case _ => false }
             val rightIsParam = b match { case i: Identifier => i.name == paramName; case _ => false }
             (leftIsParam && !isCString(b)) ||
-            (c.methodFullName == "<operator>.addition" && rightIsParam && !isCString(a))
+            (callName(c) == "<operator>.addition" && rightIsParam && !isCString(a))
           case _ => false
         })
       // `010-reach-90pct-hole-free`: `z1 - z2`, the OTHER operand ALSO
@@ -1565,7 +1744,7 @@ import scala.annotation.tailrec
       // SITE (unchanged) is the real guard against subtracting two UNRELATED
       // cursors -- this bucket, like `orderComparisons` above, only needs to
       // acknowledge the occurrence exists.
-      val cursorMinusCursor = m.body.ast.isCall.filter(_.methodFullName == "<operator>.subtraction").l
+      val cursorMinusCursor = m.body.ast.isCall.filter(c => callName(c) == "<operator>.subtraction").l
         .count(c => kidsOf(c) match {
           case List(a, b) =>
             val leftIsParam = a match { case i: Identifier => i.name == paramName; case _ => false }
@@ -1597,7 +1776,7 @@ import scala.annotation.tailrec
       // another bare local -- the bare-identifier-LHS restriction here was
       // narrower than what the translation itself already supports, for no
       // safety reason specific to the LHS shape. */
-      val assignRhsReads = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val assignRhsReads = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
         .count(c => kidsOf(c) match {
           case List(lhs, rhs: Identifier) =>
             rhs.name == paramName && (lhs match { case i: Identifier => i.name != paramName; case _ => true })
@@ -1652,17 +1831,17 @@ import scala.annotation.tailrec
       // `*(u8*)(z++) = ...` and `*(++z) = ...` are caught the same way. */
       def derefWriteBase(n: AstNode): Option[String] = n match {
         case i: Identifier => Some(i.name)
-        case c: Call if incrOps.contains(c.methodFullName) =>
+        case c: Call if incrOps.contains(callName(c)) =>
           kidsOf(c) match { case List(i: Identifier) => Some(i.name); case _ => None }
-        case c: Call if c.methodFullName == "<operator>.cast" && kidsOf(c).size == 2 =>
+        case c: Call if callName(c) == "<operator>.cast" && kidsOf(c).size == 2 =>
           derefWriteBase(kidsOf(c)(1))
         case _ => None
       }
-      val derefWriteTarget = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val derefWriteTarget = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
         .exists(a => kidsOf(a) match {
           case List(lhs, _) =>
             lhs match {
-              case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+              case ind: Call if callName(ind) == "<operator>.indirection" =>
                 kidsOf(ind) match {
                   case List(inner) => derefWriteBase(inner).contains(paramName)
                   case _ => false
@@ -1687,9 +1866,9 @@ import scala.annotation.tailrec
       // assignment's RHS at all: a plain `x = y = expr;` chain always makes `x`
       // and `y` the SAME pointer value, so `y` alone can never be soundly judged
       // a read-only cursor without knowing what happens to `x` too. */
-      val isChainedAssignRhs = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val isChainedAssignRhs = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
         .exists(outer => kidsOf(outer) match {
-          case List(_, rhs: Call) if rhs.methodFullName == "<operator>.assignment" =>
+          case List(_, rhs: Call) if callName(rhs) == "<operator>.assignment" =>
             kidsOf(rhs) match { case List(innerLhs: Identifier, _) => innerLhs.name == paramName; case _ => false }
           case _ => false
         })
@@ -2387,7 +2566,7 @@ import scala.annotation.tailrec
     "Tcl_GetHashValue", "Tcl_GetHashKey"
   )
   def isKnownPointerReturningCall(n: AstNode): Boolean = n match {
-    case call: Call => knownPointerReturningExternalCalls.contains(call.methodFullName)
+    case call: Call => knownPointerReturningExternalCalls.contains(callName(call))
     case _ => false
   }
 
@@ -2410,7 +2589,7 @@ import scala.annotation.tailrec
     * itself does not allow pointer+pointer, so if either operand already is
     * one, the other is necessarily the integer offset. */
   def arithOperandIsPointerShaped(n: AstNode): Boolean = n match {
-    case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
+    case c: Call if callName(c) == "<operator>.addition" || callName(c) == "<operator>.subtraction" =>
       kidsOf(c) match {
         case List(a, b) => castOperandIsPointerShaped(a) || castOperandIsPointerShaped(b)
         case _ => false
@@ -2441,7 +2620,7 @@ import scala.annotation.tailrec
     * Scoping the fix to exactly this one predicate keeps the blast radius to
     * the cast-operand question it was diagnosed for. */
   def castOperandIsItselfPointerCast(operand: AstNode): Boolean = operand match {
-    case c: Call if c.methodFullName == "<operator>.cast" =>
+    case c: Call if callName(c) == "<operator>.cast" =>
       kidsOf(c) match {
         case List(tref, _) => castTargetIsPointer(tref, staticTypeOf(tref))
         case _ => false
@@ -2468,7 +2647,7 @@ import scala.annotation.tailrec
     * forwarding, every caller that forwards it onward too) over a detail
     * with no bearing on the argument's actual runtime shape. */
   def unwrapCastLayers(n: AstNode): AstNode = n match {
-    case c: Call if c.methodFullName == "<operator>.cast" =>
+    case c: Call if callName(c) == "<operator>.cast" =>
       kidsOf(c) match {
         case List(_, operand) => unwrapCastLayers(operand)
         case _ => n
@@ -2528,7 +2707,7 @@ import scala.annotation.tailrec
     * Field selection is derived from the code, not from the frontend's type recovery,
     * which is exactly why it survives where the type table does not. */
   lazy val fieldOwnerTypes: Set[String] =
-    cpg.call.l.filter(c => fieldOps.contains(c.methodFullName)).flatMap { c =>
+    cpg.call.l.filter(c => fieldOps.contains(callName(c))).flatMap { c =>
       val ks = c.astChildren.collect { case a: AstNode => a }.l
       if (ks.size < 2) None
       else {
@@ -2662,6 +2841,26 @@ import scala.annotation.tailrec
       }
     }
     result
+  }
+
+  /** Recover only complete, plain integer-field declarations from a LOCAL's
+    * own CPG source span. No layout is inferred. Bitfields, unions, attributes,
+    * nested declarations, pointers, arrays and ambiguous declarators refuse. */
+  def inlineIntegerStruct(l: Local): Option[List[(String, String)]] = {
+    val declaration = """(?s)^\s*struct(?:\s+[A-Za-z_]\w*)?\s*\{([^{}]*)\}\s*([A-Za-z_]\w*)\s*$""".r
+    val field = """^((?:(?:unsigned|signed)\s+)?(?:char|short(?:\s+int)?|int|long(?:\s+long)?(?:\s+int)?))\s+([A-Za-z_]\w*)$""".r
+    l.code match {
+      case declaration(body, name) if name == l.name && body.trim.endsWith(";") =>
+        val fields = body.split(";", -1).toList.dropRight(1).map(_.trim).map {
+          case field(ty, nm) if resolveIntType(ty).nonEmpty => Some(nm -> ty)
+          case _ => None
+        }
+        val resolved = fields.flatten
+        if (resolved.nonEmpty && resolved.size == fields.size &&
+            resolved.map(_._1).distinct.size == resolved.size) Some(resolved)
+        else None
+      case _ => None
+    }
   }
 
   /** `009-reduce-remaining-holes-4`: `structTypeDeclOf`'s own alias-chase, but
@@ -3427,8 +3626,8 @@ import scala.annotation.tailrec
     * Reporting them merged is what made `op:addressOf` look like one problem. */
   def addrShape(n: AstNode): String = n match {
     case _: Identifier | _: MethodParameterIn => "local"
-    case c: Call if fieldOps.contains(c.methodFullName) => "field"
-    case c: Call if indexOps.contains(c.methodFullName) => "element"
+    case c: Call if fieldOps.contains(callName(c)) => "field"
+    case c: Call if indexOps.contains(callName(c)) => "element"
     case _: Call => "call"
     case other   => other.label.toLowerCase
   }
@@ -3526,7 +3725,7 @@ import scala.annotation.tailrec
     * under them without separately re-verifying each is not a change to make
     * casually. Only `strCursorParams`'s own read-side checks use this. */
   def rawNameThroughCast(n: AstNode): Option[String] = n match {
-    case cst: Call if cst.methodFullName == "<operator>.cast" && kidsOf(cst).size == 2 =>
+    case cst: Call if callName(cst) == "<operator>.cast" && kidsOf(cst).size == 2 =>
       rawNameThroughCast(kidsOf(cst)(1))
     case other => rawLocalOrParamName(other)
   }
@@ -3588,8 +3787,8 @@ import scala.annotation.tailrec
     * an already-untranslated external call; closing it further is future work, not a
     * soundness gap in what ships here. */
   def addressOfFeedsExternalCall(c: Call): Boolean = parentOf(c) match {
-    case Some(p: Call) if !p.methodFullName.startsWith("<operator>") =>
-      !methodByName.contains(p.methodFullName)
+    case Some(p: Call) if !callName(p).startsWith("<operator>") =>
+      !methodByName.contains(callName(p))
     case _ => false
   }
   // `010-reach-90pct-hole-free`: `addressOfFeedsExternalCall` is no longer
@@ -3621,7 +3820,7 @@ import scala.annotation.tailrec
   def argFeedsName(k: AstNode, nm: String): Boolean = k match {
     case i: Identifier        => localName(i.name) == nm
     case p: MethodParameterIn => p.name == nm
-    case c: Call if c.methodFullName == "<operator>.addressOf" =>
+    case c: Call if callName(c) == "<operator>.addressOf" =>
       kidsOf(c) match {
         case List(x) =>
           argFeedsName(x, nm) ||
@@ -3846,9 +4045,9 @@ import scala.annotation.tailrec
     * assignment scan alone would have been a silent wrong answer for most of the
     * objects it actually applies to. */
   lazy val riskyLiteralInitTypes: Set[String] =
-    allCalls.filter(_.methodFullName == "<operator>.assignment").flatMap { a =>
+    allCalls.filter(c => callName(c) == "<operator>.assignment").flatMap { a =>
       kidsOf(a) match {
-        case lhs :: (rhs: Call) :: Nil if rhs.methodFullName == "<operator>.arrayInitializer" =>
+        case lhs :: (rhs: Call) :: Nil if callName(rhs) == "<operator>.arrayInitializer" =>
           val ty = stripDuplicateSuffix(bareType(staticTypeOf(lhs)))
           if (ty.nonEmpty && ty != "ANY") Some(ty) else None
         case (lhs: AstNode) :: (rhs: AstNode) :: Nil =>
@@ -3877,7 +4076,7 @@ import scala.annotation.tailrec
     * (`capturesEnv`) and external-function guard (`methodByName`) verbatim --
     * both apply here for exactly the same reasons. */
   lazy val fieldFnTargets: Map[(String, String), String] = {
-    val assigns = allCalls.filter(_.methodFullName == "<operator>.assignment")
+    val assigns = allCalls.filter(c => callName(c) == "<operator>.assignment")
     val targets = scala.collection.mutable.Map[(String, String), Set[String]]().withDefaultValue(Set.empty)
     val unsafe  = scala.collection.mutable.Set[(String, String)]()
 
@@ -3888,7 +4087,7 @@ import scala.annotation.tailrec
 
     for (a <- assigns) {
       kidsOf(a) match {
-        case (lhs: Call) :: rhs :: Nil if fieldOps.contains(lhs.methodFullName) =>
+        case (lhs: Call) :: rhs :: Nil if fieldOps.contains(callName(lhs)) =>
           asField(lhs).foreach { case (recv, field) =>
             val owner = stripDuplicateSuffix(
               bareType(staticTypeOf(recv)).reverse.dropWhile(_ == '*').reverse)
@@ -3896,7 +4095,7 @@ import scala.annotation.tailrec
               val key = (owner, field)
               val resolved: Option[(String, Boolean)] = rhs match {
                 case mr: MethodRef => fnTarget(mr)
-                case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+                case addr: Call if callName(addr) == "<operator>.addressOf" =>
                   kidsOf(addr) match { case List(mr: MethodRef) => fnTarget(mr); case _ => None }
                 case _ => None
               }
@@ -3951,10 +4150,10 @@ import scala.annotation.tailrec
   def closedOutParam(fn: Method, paramIndex: Int): Boolean =
     if (takenAsValueFns.contains(fn.fullName)) false
     else {
-      val callSites = allCalls.filter(_.methodFullName == fn.fullName)
+      val callSites = allCalls.filter(c => callName(c) == fn.fullName)
       callSites.nonEmpty && callSites.forall { c =>
         kidsOf(c).find(aidx(_) == paramIndex).map(unwrapCastLayers).exists {
-          case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+          case addr: Call if callName(addr) == "<operator>.addressOf" =>
             kidsOf(addr) match {
               case List(n) if addrShape(n) == "local" =>
                 val ty = staticTypeOf(n)
@@ -4027,21 +4226,21 @@ import scala.annotation.tailrec
     * nothing to guard. */
   def calleeNullGuardsParam(fn: Method, paramName: String): Boolean = {
     val derefs: List[CfgNode] =
-      (fn.ast.isCall.filter(_.methodFullName == "<operator>.indirection").l
+      (fn.ast.isCall.filter(c => callName(c) == "<operator>.indirection").l
          .filter(c => kidsOf(c) match { case List(i: Identifier) => i.name == paramName; case _ => false })
-       ++ fn.ast.isCall.filter(c => c.methodFullName == "<operator>.indirectFieldAccess" ||
-                                     c.methodFullName == "<operator>.indirectIndexAccess").l
+       ++ fn.ast.isCall.filter(c => callName(c) == "<operator>.indirectFieldAccess" ||
+                                     callName(c) == "<operator>.indirectIndexAccess").l
          .filter(c => kidsOf(c).headOption.exists { case i: Identifier => i.name == paramName; case _ => false })
       ).asInstanceOf[List[CfgNode]]
     if (derefs.isEmpty) true
     else {
       val nullChecks: List[CfgNode] =
         (fn.ast.isCall.filter(c =>
-           (c.methodFullName == "<operator>.equals" || c.methodFullName == "<operator>.notEquals") &&
+           (callName(c) == "<operator>.equals" || callName(c) == "<operator>.notEquals") &&
            kidsOf(c).exists { case i: Identifier => i.name == paramName; case _ => false } &&
            kidsOf(c).exists(isNullPointerLiteral)
          ).l
-         ++ fn.ast.isCall.filter(_.methodFullName == "<operator>.logicalNot").l
+         ++ fn.ast.isCall.filter(c => callName(c) == "<operator>.logicalNot").l
               .filter(c => kidsOf(c).exists { case i: Identifier => i.name == paramName; case _ => false })
          ++ fn.ast.isIdentifier.filter(_.name == paramName).l
         ).asInstanceOf[List[CfgNode]]
@@ -4060,7 +4259,7 @@ import scala.annotation.tailrec
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
     def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
-      case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+      case addr: Call if callName(addr) == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
             val ty = staticTypeOf(n)
@@ -4085,7 +4284,7 @@ import scala.annotation.tailrec
       case _ => Bad
     }
 
-    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(_.methodFullName)
+    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(callName)
     val candidates: List[(String, Int)] =
       methodByName.values.filterNot(m => takenAsValueFns.contains(m.fullName))
         .filter(m => callsByCallee.contains(m.fullName))
@@ -4228,7 +4427,7 @@ import scala.annotation.tailrec
     // recursion to trust, so it is strictly the cheaper, more direct proof.
     def sameBufferAtCallSite(a: AstNode, b: AstNode): Boolean = {
       def isShiftedFrom(base: AstNode, whole: AstNode): Boolean = whole match {
-        case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
+        case c: Call if callName(c) == "<operator>.addition" || callName(c) == "<operator>.subtraction" =>
           kidsOf(c) match {
             case List(l, _) => normCode(l) == normCode(base)
             case _ => false
@@ -4256,7 +4455,7 @@ import scala.annotation.tailrec
         case _ => Bad
       }
 
-    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(_.methodFullName)
+    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(callName)
     val candidates: List[(String, Int, Int)] =
       methodByName.values.filterNot(m => takenAsValueFns.contains(m.fullName))
         .filter(m => callsByCallee.contains(m.fullName))
@@ -4393,7 +4592,7 @@ import scala.annotation.tailrec
     * this parameter always receives a safe interior pointer" test without a
     * second, driftable copy. */
   def irefCallArgStructurallyOk(c: Call, rawArg: AstNode): Boolean = unwrapCastLayers(rawArg) match {
-    case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+    case addr: Call if callName(addr) == "<operator>.addressOf" =>
       kidsOf(addr) match {
         case List(x) =>
           asIndex(x).exists { case (r, _) =>
@@ -4448,7 +4647,7 @@ import scala.annotation.tailrec
   def closedIrefOutParam(fn: Method, paramIndex: Int): Boolean =
     if (takenAsValueFns.contains(fn.fullName)) false
     else {
-      val callSites = allCalls.filter(_.methodFullName == fn.fullName)
+      val callSites = allCalls.filter(c => callName(c) == fn.fullName)
       callSites.nonEmpty && callSites.forall { c =>
         kidsOf(c).find(aidx(_) == paramIndex).exists(arg => irefCallArgStructurallyOk(c, arg))
       }
@@ -4506,7 +4705,7 @@ import scala.annotation.tailrec
   def wideClosedIrefParam(fn: Method, paramIndex: Int): Boolean =
     if (takenAsValueFns.contains(fn.fullName)) false
     else {
-      val callSites = allCalls.filter(_.methodFullName == fn.fullName)
+      val callSites = allCalls.filter(c => callName(c) == fn.fullName)
       callSites.nonEmpty && callSites.forall { c =>
         kidsOf(c).find(aidx(_) == paramIndex).exists(arg => irefArgWideOk(c, arg))
       }
@@ -4528,7 +4727,7 @@ import scala.annotation.tailrec
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
     def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
-      case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+      case addr: Call if callName(addr) == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(x) =>
             val declFile = addr.file.name.headOption.getOrElse("")
@@ -4557,7 +4756,7 @@ import scala.annotation.tailrec
       case _ => Bad
     }
 
-    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(_.methodFullName)
+    val callsByCallee: Map[String, List[Call]] = allCalls.groupBy(callName)
     val candidates: List[(String, Int)] =
       methodByName.values.filterNot(m => takenAsValueFns.contains(m.fullName))
         .filter(m => callsByCallee.contains(m.fullName))
@@ -4612,7 +4811,7 @@ import scala.annotation.tailrec
       case _                    => None
     }
     kidsOf(c).find(aidx(_) == -1).flatMap {
-      case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+      case ind: Call if callName(ind) == "<operator>.indirection" =>
         kidsOf(ind) match { case List(n) => nameOf(n); case _ => None }
       case n => nameOf(n)
     }
@@ -4630,7 +4829,7 @@ import scala.annotation.tailrec
     * `pointerCallFieldDynamic` never even look at the field access underneath,
     * since their own top-level match requires the callee to BE one directly. */
   def stripCastsForPointerCall(n: AstNode): AstNode = n match {
-    case cst: Call if cst.methodFullName == "<operator>.cast" && kidsOf(cst).size == 2 =>
+    case cst: Call if callName(cst) == "<operator>.cast" && kidsOf(cst).size == 2 =>
       stripCastsForPointerCall(kidsOf(cst)(1))
     case other => other
   }
@@ -4645,7 +4844,7 @@ import scala.annotation.tailrec
     * must stay a hole exactly as it already does today. */
   def pointerCallCalleeField(c: Call): Option[(String, String)] =
     kidsOf(c).find(aidx(_) == -1).map(stripCastsForPointerCall).flatMap {
-      case fa: Call if fieldOps.contains(fa.methodFullName) =>
+      case fa: Call if fieldOps.contains(callName(fa)) =>
         asField(fa).flatMap { case (recv, field) =>
           val owner = stripDuplicateSuffix(
             bareType(staticTypeOf(recv)).reverse.dropWhile(_ == '*').reverse)
@@ -4681,7 +4880,7 @@ import scala.annotation.tailrec
     * plain `expr` has nowhere to put. */
   def pointerCallFieldDynamic(c: Call, realArgs: List[AstNode]): Option[(List[ujson.Obj], ujson.Obj)] =
     kidsOf(c).find(aidx(_) == -1).map(stripCastsForPointerCall).collect {
-      case fa: Call if fieldOps.contains(fa.methodFullName) => fa
+      case fa: Call if fieldOps.contains(callName(fa)) => fa
     }.flatMap { fa =>
       asField(fa).map { case (recv, field) =>
         val (recvPrelude, recvExpr) = exprV(recv)
@@ -4708,16 +4907,16 @@ import scala.annotation.tailrec
     * assignment. */
   lazy val vtableFieldsOf: Map[String, Set[(String, String)]] = {
     val out = scala.collection.mutable.Map[String, Set[(String, String)]]().withDefaultValue(Set.empty)
-    val assigns = allCalls.filter(_.methodFullName == "<operator>.assignment")
+    val assigns = allCalls.filter(c => callName(c) == "<operator>.assignment")
     def targetFn(n: AstNode): Option[String] = n match {
       case mr: MethodRef => Some(mr.methodFullName)
-      case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+      case addr: Call if callName(addr) == "<operator>.addressOf" =>
         kidsOf(addr) match { case List(mr: MethodRef) => Some(mr.methodFullName); case _ => None }
       case _ => None
     }
     for (a <- assigns) {
       kidsOf(a) match {
-        case List(lhs, rhs: Call) if rhs.methodFullName == "<operator>.arrayInitializer" =>
+        case List(lhs, rhs: Call) if callName(rhs) == "<operator>.arrayInitializer" =>
           val owner = stripDuplicateSuffix(bareType(staticTypeOf(lhs)))
           if (owner.nonEmpty && owner != "ANY" && !isPointerType(owner)) {
             structTypeDeclOf(owner).flatMap(structFieldOrder).foreach { fields =>
@@ -4827,7 +5026,7 @@ import scala.annotation.tailrec
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
     def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
-      case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+      case addr: Call if callName(addr) == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
             val ty = staticTypeOf(n)
@@ -4844,7 +5043,7 @@ import scala.annotation.tailrec
       case _ => Bad
     }
 
-    val pcalls = allCalls.filter(_.methodFullName == "<operator>.pointerCall")
+    val pcalls = allCalls.filter(c => callName(c) == "<operator>.pointerCall")
     val callsByField: Map[(String, String), List[Call]] =
       pcalls.flatMap(c => pointerCallCalleeField(c).map(_ -> c)).groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
@@ -4955,7 +5154,7 @@ import scala.annotation.tailrec
       case _ => if (irefArgWideOk(c, rawArg)) Ok else Bad
     }
 
-    val pcalls = allCalls.filter(_.methodFullName == "<operator>.pointerCall")
+    val pcalls = allCalls.filter(c => callName(c) == "<operator>.pointerCall")
     val callsByField: Map[(String, String), List[Call]] =
       pcalls.flatMap(c => pointerCallCalleeField(c).map(_ -> c)).groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
@@ -5200,7 +5399,7 @@ import scala.annotation.tailrec
         // verbatim would put a literal `\` and `n` into the string.
         if (l.code.contains('\\')) Left("escape")
         else Right(ujson.Obj("k" -> "str", "v" -> l.code))
-      case c: Call if c.methodFullName == "<operator>.formattedValue" => fstringField(c)
+      case c: Call if callName(c) == "<operator>.formattedValue" => fstringField(c)
       case _ => Left("shape")
     }
     parts.collectFirst { case Left(r) => r } match {
@@ -5435,12 +5634,16 @@ import scala.annotation.tailrec
     case i: Identifier if boxedArrays.contains(localName(i.name)) =>
       ujson.Obj("k" -> "irefIndex", "a" -> ujson.Obj("k" -> "name", "v" -> localName(i.name)),
                 "i" -> intLit(0))
+    case i: Identifier if pyFile && pythonSourceInfo(i, "class_refs").isDefined =>
+      // A builtin exception CLASS is not the string representing an INSTANCE.
+      // The reserved function-value name also preserves `kind = ValueError; raise kind`.
+      ujson.Obj("k" -> "fnref", "v" -> ("$pythonExceptionClass$" + pythonSourceInfo(i, "class_refs").get.str))
     case i: Identifier        => ujson.Obj("k" -> "name", "v" -> localName(i.name))
     case p: MethodParameterIn if boxedLocals.contains(p.name) => boxField(p.name)
     case p: MethodParameterIn => ujson.Obj("k" -> "name", "v" -> p.name)
     // A function/method or a class used as a value. Whether it needs to carry the
     // enclosing environment is decided by `capturesEnv`, above.
-    case m: MethodRef         => fnValue(m.methodFullName)
+    case m: MethodRef         => pythonDefinitionGap(m).map(hole).getOrElse(fnValue(m.methodFullName))
     case t: TypeRef           => typeValue(t.typeFullName)
     case c: Call              => callExpr(c)
     case b: Block             => blockExpr(b)
@@ -5520,7 +5723,7 @@ import scala.annotation.tailrec
   /** One positional argument, recognising `*e`. Outside an argument list a starred
     * unpack has no Core form and stays the hole it was. */
   def argExpr(n: AstNode): ujson.Value = n match {
-    case c: Call if c.methodFullName == "<operator>.starredUnpack" =>
+    case c: Call if callName(c) == "<operator>.starredUnpack" =>
       kidsOf(c) match {
         case one :: Nil => ujson.Obj("k" -> "starred", "a" -> expr(one))
         // A starred unpack is unary in every frontend we have seen; a different arity is
@@ -5572,7 +5775,7 @@ import scala.annotation.tailrec
     * `Expr.alloc` of either would be a heap object standing in for something that is not
     * one. */
   def ctorClassOf(c: Call): Option[String] = {
-    val segs = c.methodFullName.takeWhile(_ != ':').split('.').filter(_.nonEmpty).toList
+    val segs = callName(c).takeWhile(_ != ':').split('.').filter(_.nonEmpty).toList
     segs.reverse match {
       case n :: p :: _ if n == p && n != "ANY" && !intTypeNames.contains(bareType(n)) &&
                           !nonClassScalars.contains(n) => Some(n)
@@ -5599,7 +5802,7 @@ import scala.annotation.tailrec
     * `unit` — allocated, well-typed, and silently empty. */
   def ctorAlloc(ks: List[AstNode]): Option[ujson.Obj] = ks match {
     case (asg: Call) :: (ctor: Call) :: (last: Identifier) :: Nil
-        if asg.methodFullName == "<operator>.assignment" =>
+        if callName(asg) == "<operator>.assignment" =>
       for {
         (tgt, rhs) <- kidsOf(asg) match {
                         case (i: Identifier) :: r :: Nil => Some((i, r))
@@ -5618,7 +5821,7 @@ import scala.annotation.tailrec
     * name? Used purely to give the residual hole an accurate label. */
   def inCtorShape(alloc: Call): Boolean = {
     val asg = alloc.astParent
-    val ok = asg match { case c: Call => c.methodFullName == "<operator>.assignment"
+    val ok = asg match { case c: Call => callName(c) == "<operator>.assignment"
                          case _       => false }
     ok && (asg.astParent match {
       case b: Block => kidsOf(b).filterNot(_.isInstanceOf[Local]) match {
@@ -5653,7 +5856,7 @@ import scala.annotation.tailrec
       var subst = Map.empty[String, ujson.Value]
       var bad   = ""
       ks.init.foreach {
-        case c: Call if c.methodFullName == "<operator>.assignment" =>
+        case c: Call if callName(c) == "<operator>.assignment" =>
           kidsOf(c) match {
             case (i: Identifier) :: rhs :: Nil
                 if i.name.matches("tmp\\d+") && pureExpr(rhs) =>
@@ -5715,6 +5918,257 @@ import scala.annotation.tailrec
                       "m" -> mangleName(m, currentClass),
                       "args" -> argExprs(args.filterNot(isKeywordArg), args.filter(isKeywordArg)))
 
+  // Keep Joern's primitive types at the operation site. A program-wide cLike
+  // dialect cannot distinguish Java long, Go uint64 and C unsigned int.
+  def numericFamily: String = {
+    val f = currentFile.toLowerCase
+    if (cppFile) "c"
+    // The Kotlin source pipeline targets Kotlin/JVM, sharing JVM integer rules.
+    else if (List(".java", ".kt", ".kts").exists(f.endsWith)) "java"
+    else if (f.endsWith(".go")) "go"
+    else if (List(".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx").exists(f.endsWith)) "js"
+    else ""
+  }
+
+  def primitiveInt(ty: String): Option[String] = numericFamily match {
+    case "c" =>
+      // Enum layout needs target/compiler evidence, not a guessed int width.
+      if (ty.replace("const ", "").replace("volatile ", "").trim.startsWith("enum")) None
+      else resolveIntType(ty)
+    case "java" => Map("byte" -> "i8", "short" -> "i16", "char" -> "u16",
+                       "int" -> "i32", "long" -> "i64").get(ty.trim)
+    case "go" =>
+      val word = dataModel.toLowerCase match {
+        case "lp64" | "llp64" => Some("64")
+        case "ilp32" => Some("32")
+        case _ => None
+      }
+      Map("int8" -> "i8", "uint8" -> "u8", "byte" -> "u8", "int16" -> "i16",
+          "uint16" -> "u16", "int32" -> "i32", "rune" -> "i32", "uint32" -> "u32",
+          "int64" -> "i64", "uint64" -> "u64").get(ty.trim).orElse {
+        ty.trim match {
+          case "int" => word.map("i" + _)
+          case "uint" | "uintptr" => word.map("u" + _)
+          case _ => None
+        }
+      }
+    case _ => None
+  }
+
+  def promoteInt(t: String): String =
+    if (numericFamily != "go" && t.drop(1).toInt < 32) "i32" else t
+
+  // c2cpg reports even 2147483648 as `int`. Literal type depends on its
+  // magnitude, radix, suffix and target model (C 6.4.4.1 / C++ [lex.icon]).
+  // Stop at an unknown candidate: skipping it could choose a different rank.
+  def cIntegerLiteralType(code: String): Option[String] = {
+    val pat = "(?i)(0x[0-9a-f]+|0b[01]+|0[0-7]*|[1-9][0-9]*)(u|l|ul|lu|ll|ull|llu)?".r
+    code.trim.stripPrefix("-").stripPrefix("+").replace("'", "") match {
+      case pat(digits, suffix0) =>
+        val s = Option(suffix0).getOrElse("").toLowerCase
+        val raw = digits.toLowerCase
+        val radix = if (raw.startsWith("0x")) 16 else if (raw.startsWith("0b")) 2
+                    else if (raw.startsWith("0")) 8 else 10
+        val value = BigInt(if (radix == 16 || radix == 2) raw.drop(2) else raw, radix)
+        val i32 = Some("i32"); val u32 = Some("u32")
+        val i64 = Some("i64"); val u64 = Some("u64")
+        val lng = modelInts.get("long"); val ulng = modelInts.get("unsignedlong")
+        val candidates: List[Option[String]] = s match {
+          case "" => if (radix == 10) List(i32, lng, i64) else List(i32, u32, lng, ulng, i64, u64)
+          case "u" => List(u32, ulng, u64)
+          case "l" => if (radix == 10) List(lng, i64) else List(lng, ulng, i64, u64)
+          case "ul" | "lu" => List(ulng, u64)
+          case "ll" => if (radix == 10) List(i64) else List(i64, u64)
+          case "ull" | "llu" => List(u64)
+          case _ => Nil
+        }
+        def choose(xs: List[Option[String]]): Option[String] = xs match {
+          case Some(t) :: rest =>
+            val bits = t.drop(1).toInt - (if (t.startsWith("i")) 1 else 0)
+            if (value < (BigInt(1) << bits)) Some(t) else choose(rest)
+          case _ => None
+        }
+        choose(candidates)
+      case _ => None
+    }
+  }
+
+  def commonInt(a: String, b: String): String = {
+    val x = promoteInt(a); val y = promoteInt(b)
+    if (x == y) x
+    else if (x.drop(1).toInt > y.drop(1).toInt) x
+    else if (y.drop(1).toInt > x.drop(1).toInt) y
+    else "u" + x.drop(1) // equal width, unsigned wins (C usual arithmetic conversions)
+  }
+
+  // Go's untyped shift operand takes the type it would have without the shift.
+  // That context can be a return, assignment, conversion, or a typed sibling.
+  def goContextType(n: AstNode, depth: Int = 0): Option[String] =
+    if (depth > 64) None else parentOf(n).flatMap {
+      case _: Return => primitiveInt(currentReturnType)
+      case c: Call if callName(c) == "<operator>.assignment" && kidsOf(c).size == 2 =>
+        primitiveInt(staticTypeOf(kidsOf(c).head))
+      case c: Call if callName(c) == "<operator>.cast" => primitiveInt(c.typeFullName)
+      case c: Call if binops.contains(callName(c)) =>
+        kidsOf(c).filterNot(_.id == n.id).filterNot(_.isInstanceOf[Literal])
+          .flatMap(x => primitiveInt(staticTypeOf(x))).headOption.orElse(goContextType(c, depth + 1))
+      case _ => None
+    }
+
+  def operationInt(op: String, a: AstNode, b: AstNode, depth: Int = 0): Option[String] = {
+    val x = numericType(a, depth + 1); val y = numericType(b, depth + 1)
+    if (Set("<<", ">>", ">>>").contains(op)) {
+      if (numericFamily == "go" && a.isInstanceOf[Literal])
+        parentOf(a).flatMap(goContextType(_)).orElse(x)
+      else x.map(promoteInt)
+    }
+    else if (numericFamily == "go") {
+      // Joern labels untyped integer literals `int`; Go converts them to the
+      // other operand's type. The result type of += itself can also be `int`.
+      if (a.isInstanceOf[Literal] && b.isInstanceOf[Literal])
+        parentOf(a).flatMap(goContextType(_)).orElse(x)
+      else if (b.isInstanceOf[Literal]) x
+      else if (a.isInstanceOf[Literal]) y
+      else for (l <- x; r <- y if l == r) yield l
+    } else for (l <- x; r <- y) yield commonInt(l, r)
+  }
+
+  def numericType(n: AstNode, depth: Int = 0): Option[String] = {
+    if (depth > 64) None
+    else if (numericFamily == "c" && n.isInstanceOf[Literal] && n.code.trim.matches("[+-]?[0-9].*"))
+      cIntegerLiteralType(n.code)
+    else n match {
+      // c2cpg often leaves the result ANY while both operand types are known.
+      // Assignments yield the converted left-hand value, including in conditions
+      // and nested arithmetic. Their operation's promoted type is not the result
+      // type: `unsigned char x; x ^= y` still yields an unsigned char.
+      case c: Call if numericFamily == "c" && kidsOf(c).nonEmpty &&
+          (callName(c) == "<operator>.assignment" || augOps.contains(callName(c)) ||
+           assignRightShiftOps.contains(callName(c)) || incrOps.contains(callName(c))) =>
+        numericType(kidsOf(c).head, depth + 1)
+      case c: Call if numericFamily == "c" && callName(c) == "<operator>.conditional" && kidsOf(c).size == 3 =>
+        for (t <- numericType(kidsOf(c)(1), depth + 1); e <- numericType(kidsOf(c)(2), depth + 1))
+          yield commonInt(t, e)
+      case c: Call if binops.contains(callName(c)) && kidsOf(c).size == 2 &&
+          Set("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>>").contains(binops(callName(c))) =>
+        operationInt(binops(callName(c)), kidsOf(c)(0), kidsOf(c)(1), depth)
+      case c: Call if rightShiftOps.contains(callName(c)) && kidsOf(c).size == 2 =>
+        operationInt(">>", kidsOf(c)(0), kidsOf(c)(1), depth)
+      case c: Call if unops.get(callName(c)).exists(op => op == "-" || op == "~") && kidsOf(c).size == 1 =>
+        numericType(kidsOf(c).head, depth + 1).map(promoteInt)
+      case _ => primitiveInt(staticTypeOf(n))
+    }
+  }
+
+  def typedBinop(op: String, a: AstNode, b: AstNode, ae: ujson.Obj, be: ujson.Obj): ujson.Obj = {
+    val family = numericFamily
+    val numeric = Set("+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!=")
+    val bitwise = Set("&", "|", "^", "<<", ">>", ">>>")
+    val ty = if (family == "js" && bitwise.contains(op)) Some("i32")
+             else if (Set("c", "java", "go").contains(family) && numeric.contains(op)) operationInt(op, a, b)
+             else None
+    // Untyped constant arithmetic is arbitrary precision, including intermediates
+    // outside int64. Fold it before applying any runtime width. These are constants
+    // exported from the CPG, not numbers re-parsed from source text.
+    val constants = if (family == "go" && ae("k").str == "int" && be("k").str == "int")
+      scala.util.Try {
+        def integer(v: ujson.Value): BigInt = v match {
+          case ujson.Str(s) => BigInt(s)
+          case ujson.Num(n) => BigInt(n.toLong)
+          case _ => throw new IllegalArgumentException("not an integer literal")
+        }
+        val x = integer(ae("v")); val y = integer(be("v"))
+        op match {
+          case "+" => Some(x + y)
+          case "-" => Some(x - y)
+          case "*" => Some(x * y)
+          case "/" if y != 0 => Some(x / y)
+          case "%" if y != 0 => Some(x % y)
+          case "&" => Some(x & y)
+          case "|" => Some(x | y)
+          case "^" => Some(x ^ y)
+          case "<<" if y >= 0 && y <= 4096 => Some(x << y.toInt)
+          case ">>" if y >= 0 && y <= 4096 => Some(x >> y.toInt)
+          case _ => None
+        }
+      }.toOption.flatten else None
+    if (constants.nonEmpty) return ujson.Obj("k" -> "int", "v" -> constants.get.toString)
+    val code = if (currentFile.endsWith(".py") && op == "/") "py:/"
+               else if (family == "js" && Set("+", "-", "*", "/", "%").contains(op)) "js:" + op
+               else ty.map(t => s"num:$family:$t:$op").getOrElse(op)
+    // Leave reference/string/float operations to their existing lowering. An
+    // unresolved scalar arithmetic type must not silently become signed int32.
+    val types = List(staticTypeOf(a), staticTypeOf(b)).map(bareType)
+    val pointer = types.exists(isPointerType)
+    val nonInteger = types.exists(t => Set("float", "double", "float32", "float64",
+      "string", "java.lang.String", "java.lang.Boolean", "boolean", "bool").contains(t))
+    val referenceEquality = family != "c" && Set("==", "!=").contains(op) &&
+      types.forall(t => t.nonEmpty && t != "ANY") && numericType(a).isEmpty && numericType(b).isEmpty
+    if (Set("c", "java", "go").contains(family) && numeric.contains(op) &&
+        ty.isEmpty && !pointer && !nonInteger && !referenceEquality)
+      hole("numeric:unknown-type:" + op)
+    else ujson.Obj("k" -> "binop", "op" -> code, "a" -> ae, "b" -> be)
+  }
+
+  def typedUnop(op: String, a: AstNode, ae: ujson.Obj): ujson.Obj = {
+    val ty = if (numericFamily == "js" && op == "~") Some("i32")
+             else if (op == "~" || op == "-") numericType(a).map(promoteInt)
+             else None
+    val code = ty.map(t => s"num:$numericFamily:$t:$op").getOrElse(op)
+    if (ty.isEmpty && Set("c", "java", "go").contains(numericFamily) &&
+        Set("-", "~").contains(op) &&
+        !Set("float", "double", "float32", "float64").contains(bareType(staticTypeOf(a))))
+      hole("numeric:unknown-type:" + op)
+    else ujson.Obj("k" -> "unop", "op" -> code, "a" -> ae)
+  }
+
+  def narrowAssignment(lhs: AstNode, e: ujson.Obj): ujson.Obj =
+    numericType(lhs).map(t => ujson.Obj("k" -> "unop", "op" -> ("cast:" + t), "a" -> e)).getOrElse(e)
+
+  // C 6.5.15 converts the selected arithmetic branch to the conditional's
+  // common type before an enclosing return/cast/operator consumes it. Casting
+  // only at the return is wrong for `(choose ? signedInt : unsignedInt)`
+  // returned as uint64. Wrap the selected value, never evaluate both branches.
+  def conditionalValue(c: Call, value: ujson.Obj): ujson.Obj =
+    if (numericFamily == "c") numericType(c).map(t =>
+      ujson.Obj("k" -> "unop", "op" -> ("cast:" + t), "a" -> value)).getOrElse(value)
+    else value
+
+  // JS/Java frontends can use either right-shift CPG name for >> and >>>. Read
+  // only the token between the exact child expressions, never a substring of a
+  // nested expression or a string literal. Ambiguous source shapes stay holes.
+  def sourceRightShift(c: Call, assignment: Boolean = false): Option[String] = {
+    if (!Set("js", "java").contains(numericFamily)) shiftRightOp(kidsOf(c).head)
+    else {
+      val ks = kidsOf(c); val code = c.code.trim
+      val left = ks.head.code.trim; val right = ks(1).code.trim
+      // Frontends can omit grouping parentheses from either child's code while
+      // retaining them on the enclosing operator. Each candidate must still
+      // account for BOTH complete child expressions; a token inside a child or
+      // string literal cannot establish which operator the parent used.
+      def unwrapped(text: String): Set[String] = {
+        var t = text.trim
+        var forms = Set(t)
+        while (t.startsWith("(") && t.endsWith(")")) {
+          t = t.substring(1, t.length - 1).trim
+          forms += t
+        }
+        forms
+      }
+      val ls = unwrapped(left); val rs = unwrapped(right)
+      val tokens = if (assignment) List(">>=" -> ">>", ">>>=" -> ">>>")
+                   else List(">>" -> ">>", ">>>" -> ">>>")
+      val matches = for {
+        text <- unwrapped(code)
+        i <- text.indices
+        (token, op) <- tokens if text.startsWith(token, i)
+        if unwrapped(text.substring(0, i)).exists(ls.contains)
+        if unwrapped(text.substring(i + token.length)).exists(rs.contains)
+      } yield op
+      if (matches.size == 1) matches.headOption else None
+    }
+  }
+
   /** Which right-shift `a >> b` is, from the left operand's static type.
     *
     * `None` means the type is unrecovered (`ANY`, an opaque typedef), and then neither
@@ -5724,12 +6178,9 @@ import scala.annotation.tailrec
     *
     * A `char*` operand cannot reach here (shifting a pointer is not C). */
   def shiftRightOp(lhs: AstNode): Option[String] =
-    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, JS, Python: the token is unambiguous
+    if (!cppFile) Some(">>")
     else {
-      val b = bareType(staticTypeOf(lhs))
-      if (signedTypeNames.contains(b)) Some(">>")
-      else if (unsignedTypeNames.contains(b)) Some(">>>")
-      else None
+      numericType(lhs).map(promoteInt).map(t => if (t.startsWith("u")) ">>>" else ">>")
     }
 
   /** One element of a brace initializer, classified.
@@ -5748,12 +6199,12 @@ import scala.annotation.tailrec
     * value at the wrong place — the exact silent-wrong-answer failure mode. It gets its
     * own hole. */
   def initElement(n: AstNode): (String, Option[String], AstNode) = n match {
-    case c: Call if c.methodFullName == "<operator>.assignment" && c.code.trim.startsWith(".") =>
+    case c: Call if callName(c) == "<operator>.assignment" && c.code.trim.startsWith(".") =>
       kidsOf(c) match {
         case (i: Identifier) :: v :: Nil => ("field", Some(i.name), v)
         case _                           => ("shape", None, n)
       }
-    case c: Call if c.methodFullName == "<operator>.assignment" && c.code.trim.startsWith("[") =>
+    case c: Call if callName(c) == "<operator>.assignment" && c.code.trim.startsWith("[") =>
       ("index", None, n)
     case other => ("plain", None, other)
   }
@@ -5876,7 +6327,7 @@ import scala.annotation.tailrec
   def isIrefExpr(n: AstNode): Boolean = n match {
     case i: Identifier        => ptrIrefNames.contains(localName(i.name))
     case p: MethodParameterIn => ptrIrefNames.contains(localName(p.name))
-    case c: Call if c.methodFullName == "<operator>.addressOf" =>
+    case c: Call if callName(c) == "<operator>.addressOf" =>
       kidsOf(c) match {
         case List(operand) =>
           boxedArrayIndexOperand(operand).isDefined ||
@@ -5886,24 +6337,24 @@ import scala.annotation.tailrec
           pointerStructArrayIndexOperand(operand).isDefined
         case _ => false
       }
-    case c: Call if c.methodFullName == "<operator>.addition" =>
+    case c: Call if callName(c) == "<operator>.addition" =>
       kidsOf(c) match {
         case List(a, b) =>
           (isIrefExpr(a) && !isPointerType(staticTypeOf(b))) ||
           (isIrefExpr(b) && !isPointerType(staticTypeOf(a)))
         case _ => false
       }
-    case c: Call if c.methodFullName == "<operator>.subtraction" =>
+    case c: Call if callName(c) == "<operator>.subtraction" =>
       kidsOf(c) match {
         case List(a, b) => isIrefExpr(a) && !isPointerType(staticTypeOf(b))
         case _ => false
       }
-    case c: Call if c.methodFullName == "<operator>.conditional" =>
+    case c: Call if callName(c) == "<operator>.conditional" =>
       kidsOf(c) match {
         case List(_, t, e) => isIrefExpr(t) && isIrefExpr(e)
         case _ => false
       }
-    case c: Call if c.methodFullName == "<operator>.cast" =>
+    case c: Call if callName(c) == "<operator>.cast" =>
       kidsOf(c) match {
         case List(_, operand) => isIrefExpr(operand)
         case _ => false
@@ -5913,7 +6364,7 @@ import scala.annotation.tailrec
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
-    val mfn  = c.methodFullName
+    val mfn  = callName(c)
     // A `char*` is an address, not a string value. Core has one `Val.str` for Python's
     // `str` and C's `char*`, and its `+` concatenates while `<`/`>`/`==` compare contents
     // — all three are the wrong answer in C, where they are pointer arithmetic and
@@ -6018,15 +6469,14 @@ import scala.annotation.tailrec
         cStringUnsafe.contains(mfn) && !isNullCheck)
       hole(cStringUnsafe(mfn))
     else if (binops.contains(mfn) && kids.size == 2)
-      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
-    else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2)
-      shiftRightOp(kids(0)) match {
-        case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
-                                   "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+      typedBinop(binops(mfn), kids(0), kids(1), expr(kids(0)), expr(kids(1)))
+    else if (rightShiftOps.contains(mfn) && kids.size == 2)
+      sourceRightShift(c) match {
+        case Some(op) => typedBinop(op, kids(0), kids(1), expr(kids(0)), expr(kids(1)))
         case None     => hole("op:shiftRight:unknown-signedness")
       }
     else if (unops.contains(mfn) && kids.size == 1)
-      ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
+      typedUnop(unops(mfn), kids(0), expr(kids(0)))
     // `009-reduce-remaining-holes-4`: `z[i]`, `z` a tracked byte cursor
     // (`strCursorParams`) -- C's own `z[i]` is exactly `*(z+i)`, so this reads the
     // byte at `z`'s CURRENT offset plus `i`, not literal position `i` from the
@@ -6106,7 +6556,7 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "inOp", "neg" -> (mfn == "<operator>.notIn"),
                 "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (mfn == "<operator>.conditional" && kids.size == 3)
-      ujson.Obj("k" -> "cond", "c" -> expr(kids(0)), "t" -> expr(kids(1)), "e" -> expr(kids(2)))
+      conditionalValue(c, ujson.Obj("k" -> "cond", "c" -> expr(kids(0)), "t" -> expr(kids(1)), "e" -> expr(kids(2))))
     else if (mfn == "<operator>.listLiteral")
       ujson.Obj("k" -> "listE", "items" -> exprs(kids))
     else if (mfn == "<operator>.tupleLiteral")
@@ -6254,7 +6704,7 @@ import scala.annotation.tailrec
               expr(kids(1))
             else hole("op:cast:pointer:int-to-pointer")
           }
-          else resolveIntType(tty) match {
+          else primitiveInt(tty) match {
             case Some(w) => ujson.Obj("k" -> "unop", "op" -> ("cast:" + w),
                                       "a" -> expr(kids(1)))
             case None =>
@@ -6697,7 +7147,7 @@ import scala.annotation.tailrec
               // needs a *unique* suffix and so resolved neither.
               else if (methodByName.contains(mfn))
                 ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
-                          "args" -> argExprs(args, kwArgs))
+                          "args" -> argExprs(namedCallReceiver(c).toList ++ args, kwArgs))
               else ujson.Obj("k" -> "call", "f" -> c.name, "args" -> argExprs(args, kwArgs))
             }
           }
@@ -6861,7 +7311,7 @@ import scala.annotation.tailrec
     * there is no FOR control structure in a Python CPG. */
   def forPattern(kids: List[AstNode]): Option[ujson.Obj] = kids match {
     case (a: Call) :: (w: ControlStructure) :: Nil
-        if a.methodFullName == "<operator>.assignment" &&
+        if callName(a) == "<operator>.assignment" &&
            (w.controlStructureType == "WHILE" || w.controlStructureType == "DO") =>
       val ak = kidsOf(a)
       val wk = kidsOf(w)
@@ -6888,7 +7338,7 @@ import scala.annotation.tailrec
         bk    = kidsOf(body)
         first<- bk.headOption
         (x, ok) = first match {
-          case nx: Call if nx.methodFullName == "<operator>.assignment" =>
+          case nx: Call if callName(nx) == "<operator>.assignment" =>
             kidsOf(nx) match {
               case (i: Identifier) :: (nc: Call) :: Nil if nc.name == "__next__" =>
                 val recvOk = kidsOf(nc).find(aidx(_) == -1).flatMap(asField)
@@ -6994,33 +7444,42 @@ import scala.annotation.tailrec
     * corpus and the ledger's group-by-cause counted one "cause" per spelling. Anything
     * that is not a clean `<operator>.name` becomes `op:unnamed-operator`. */
   def opLabel(mfn: String): String = {
-    val n = mfn.stripPrefix("<operator>.")
+    val n = canonicalOperatorName(mfn).stripPrefix("<operator>.")
     if (n.isEmpty || n.contains("<") || n.contains("(")) "unnamed-operator" else n
   }
 
-  def pushDoTest(v: ujson.Value, cond: ujson.Value): ujson.Value = v match {
+  def pushDoTest(v: ujson.Value, cond: ujson.Value, prelude: List[ujson.Obj] = Nil): ujson.Value = v match {
     case o: ujson.Obj =>
       o.value.get("k").map(_.str) match {
         case Some("cont") =>
-          ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
-                    "e" -> ujson.Obj("k" -> "brk"))
+          seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
+                    "e" -> ujson.Obj("k" -> "brk")))
         case Some("loop") | Some("forIn") => o
         case _ =>
-          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond)) })
+          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond, prelude)) })
       }
-    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond)))
+    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond, prelude)))
     case other        => other
   }
+
+  // The test's effects run on every check, including the final false check.
+  // A continue in the body returns to these effects; a break bypasses them.
+  def conditionedLoop(prelude: List[ujson.Obj], cond: ujson.Obj, body: ujson.Value): ujson.Obj =
+    if (prelude.isEmpty) ujson.Obj("k" -> "loop", "c" -> cond, "body" -> body)
+    else ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+      "body" -> seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> cond,
+        "t" -> body, "e" -> ujson.Obj("k" -> "brk"))))
 
   def forStmt(cs: ControlStructure): ujson.Obj = {
     val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
     if (ks.size != 4) holeS("control:FOR:elided-clause")
     else outsideLoopScope {
+      val (condPrelude, cond) = exprV(ks(1))
       val step = stmt(ks(2))
       val body = pushStep(stmt(ks(3)), step)
       seqOf(List(stmt(ks(0)),
-                 ujson.Obj("k" -> "loop", "c" -> expr(ks(1)),
-                           "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
+                 conditionedLoop(condPrelude, cond,
+                   ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
     }
   }
 
@@ -7062,7 +7521,7 @@ import scala.annotation.tailrec
     * `assignTo`'s own matching case (which calls `.get` on the exact same input,
     * guaranteed non-empty by that population-time guard already having run). */
   def cursorBaseAndOffset(n: AstNode): Option[(ujson.Obj, ujson.Obj)] = n match {
-    case cst: Call if cst.methodFullName == "<operator>.cast" && kidsOf(cst).size == 2 =>
+    case cst: Call if callName(cst) == "<operator>.cast" && kidsOf(cst).size == 2 =>
       cursorBaseAndOffset(kidsOf(cst)(1))
     // `010-reach-90pct-hole-free`: `pResult = p = sqlite3_malloc64(...);` -- a C
     // chained assignment, which Joern parses as `pResult = (p = sqlite3_malloc64(...))`,
@@ -7083,7 +7542,7 @@ import scala.annotation.tailrec
     // this) is affected -- that guard's own INNER-name exclusion is a property of
     // the INNER name's occurrences elsewhere in the function, orthogonal to
     // whether the OUTER name can resolve a base at all. */
-    case asn: Call if asn.methodFullName == "<operator>.assignment" && kidsOf(asn).size == 2 =>
+    case asn: Call if callName(asn) == "<operator>.assignment" && kidsOf(asn).size == 2 =>
       cursorBaseAndOffset(kidsOf(asn)(1))
     // `010-reach-90pct-hole-free`: `&q[n]`, `q` an ALREADY-tracked cursor --
     // identical in meaning to `q + n` (C's own `&q[n]` IS `q + n`), just
@@ -7096,7 +7555,7 @@ import scala.annotation.tailrec
     // idiom (`btreeParseCellPtr` and siblings) left `pEnd` unseedable, so
     // its later `pIter < pEnd` comparison could never use the same-base
     // mechanism even once `pIter` itself became a tracked cursor.
-    case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+    case addr: Call if callName(addr) == "<operator>.addressOf" =>
       kidsOf(addr) match {
         case List(idx) =>
           asIndex(idx).flatMap { case (recv, i) =>
@@ -7108,16 +7567,16 @@ import scala.annotation.tailrec
           }
         case _ => None
       }
-    case c: Call if (c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction") &&
+    case c: Call if (callName(c) == "<operator>.addition" || callName(c) == "<operator>.subtraction") &&
                      kidsOf(c).size == 2 &&
                      rawLocalOrParamName(kidsOf(c)(0)).map(localName).exists(strCursorParams.contains) &&
                      !isCString(kidsOf(c)(1)) =>
       val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
-      val op = if (c.methodFullName == "<operator>.addition") "+" else "-"
+      val op = if (callName(c) == "<operator>.addition") "+" else "-"
       Some((ujson.Obj("k" -> "name", "v" -> nm),
             ujson.Obj("k" -> "binop", "op" -> op,
                       "a" -> ujson.Obj("k" -> "name", "v" -> (nm + "$off")), "b" -> expr(kidsOf(c)(1)))))
-    case c: Call if c.methodFullName == "<operator>.addition" && kidsOf(c).size == 2 &&
+    case c: Call if callName(c) == "<operator>.addition" && kidsOf(c).size == 2 &&
                      rawLocalOrParamName(kidsOf(c)(1)).map(localName).exists(strCursorParams.contains) &&
                      !isCString(kidsOf(c)(0)) =>
       val nm = rawLocalOrParamName(kidsOf(c)(1)).map(localName).get
@@ -7135,16 +7594,16 @@ import scala.annotation.tailrec
     // Symmetric with the bare-identifier case just below (same "not itself a
     // tracked cursor" guard), just for the `ident +/- int` SHAPE rather than a
     // bare identifier alone.
-    case c: Call if (c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction") &&
+    case c: Call if (callName(c) == "<operator>.addition" || callName(c) == "<operator>.subtraction") &&
                      kidsOf(c).size == 2 &&
                      rawLocalOrParamName(kidsOf(c)(0)).map(localName).exists(nm => !strCursorParams.contains(nm)) &&
                      !isCString(kidsOf(c)(1)) =>
       val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
-      val op = if (c.methodFullName == "<operator>.addition") "+" else "-"
+      val op = if (callName(c) == "<operator>.addition") "+" else "-"
       Some((ujson.Obj("k" -> "name", "v" -> nm),
             ujson.Obj("k" -> "binop", "op" -> op,
                       "a" -> ujson.Obj("k" -> "int", "v" -> 0), "b" -> expr(kidsOf(c)(1)))))
-    case c: Call if c.methodFullName == "<operator>.addition" && kidsOf(c).size == 2 &&
+    case c: Call if callName(c) == "<operator>.addition" && kidsOf(c).size == 2 &&
                      rawLocalOrParamName(kidsOf(c)(1)).map(localName).exists(nm => !strCursorParams.contains(nm)) &&
                      !isCString(kidsOf(c)(0)) =>
       val nm = rawLocalOrParamName(kidsOf(c)(1)).map(localName).get
@@ -7203,13 +7662,28 @@ import scala.annotation.tailrec
     // arithmetic over a value that was never a string in the first place --
     // confirmed live via a full corpus re-export before this restriction
     // was added, not a hypothetical.
-    case call: Call if !call.methodFullName.startsWith("<operator>") =>
+    case call: Call if !callName(call).startsWith("<operator>") =>
       Some((expr(call), ujson.Obj("k" -> "int", "v" -> 0)))
     case _ => None
   }
 
   def assignTo(lhs: AstNode, rhs: AstNode, aug: Option[String]): ujson.Obj = {
-    val (prelude, rhsE) = valueOf(rhs)
+    val (prelude, rhsValue) = valueOf(rhs)
+    val targetBeforeRhs = Set("java", "js").contains(numericFamily) || (pyFile && aug.isDefined)
+    var targetPrelude = List.empty[ujson.Obj]
+    def beforeRhs(e: ujson.Obj): ujson.Obj = {
+      if (!targetBeforeRhs || prelude.isEmpty) e
+      else {
+        val tmp = freshExprVTemp()
+        targetPrelude = targetPrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> e)
+        ujson.Obj("k" -> "name", "v" -> tmp)
+      }
+    }
+    // An ordinary store converts to the destination type before later reads
+    // observe it, including stores through a field/index/reference. Compound
+    // assignments first compute with the promoted operands and narrow the final
+    // result in combine; narrowing their RHS early changes division and shifts.
+    val rhsE = if (aug.isEmpty) narrowAssignment(lhs, rhsValue) else rhsValue
     // `009-reduce-remaining-holes-4`: a PLAIN (non-augmented) `asIndex` target whose
     // index (or receiver) itself carries a value-producing side effect -- `arr[i++]
     // = v`, SQLite's own extremely common "append and advance" idiom (`z[iOut++] =
@@ -7224,14 +7698,16 @@ import scala.annotation.tailrec
     var indexPrelude = List.empty[ujson.Obj]
     def combine(cur: => ujson.Obj): ujson.Obj = aug match {
       case None     => rhsE
-      case Some(op) => ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> rhsE)
+      // A compound assignment reads its old value before evaluating the RHS.
+      // Preserve that value across lifted RHS assignments such as a += (a = b).
+      case Some(op) => narrowAssignment(lhs, typedBinop(op, lhs, rhs, beforeRhs(cur), rhsE))
     }
     // `010-reach-90pct-hole-free`: is `r` a nested `<operator>.assignment` Call
     // (a C chained assignment's inner half) whose OWN LHS name is a
     // `ptrIrefAllocNames` candidate -- see the matching `assignTo` case's own
     // doc comment for the full reasoning. Returns that inner name.
     def chainedAllocInnerName(r: AstNode): Option[String] = r match {
-      case inner: Call if inner.methodFullName == "<operator>.assignment" =>
+      case inner: Call if callName(inner) == "<operator>.assignment" =>
         kidsOf(inner) match {
           case List(innerLhs: Identifier, _) => Some(localName(innerLhs.name)).filter(ptrIrefAllocNames.contains)
           case _ => None
@@ -7247,11 +7723,11 @@ import scala.annotation.tailrec
     // target name, the arithmetic op (`incrOps`), and whether it is POST (use
     // then advance) or PRE (advance then use).
     def ptrIrefIncrWriteTarget(n: AstNode): Option[(String, String, Boolean)] = n match {
-      case inc: Call if incrOps.contains(inc.methodFullName) =>
+      case inc: Call if incrOps.contains(callName(inc)) =>
         kidsOf(inc) match {
           case List(id) =>
             rawLocalOrParamName(id).map(localName).filter(ptrIrefNames.contains).map { nm =>
-              (nm, incrOps(inc.methodFullName), inc.methodFullName.startsWith("<operator>.post"))
+              (nm, incrOps(callName(inc)), callName(inc).startsWith("<operator>.post"))
             }
           case _ => None
         }
@@ -7270,7 +7746,7 @@ import scala.annotation.tailrec
       // -- `*(z++) += v` has no evidence of occurring in the real corpus and is
       // not attempted; the generic catch-all below still holes it honestly if
       // it ever does, exactly as before this case existed.
-      case c: Call if aug.isEmpty && c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+      case c: Call if aug.isEmpty && callName(c) == "<operator>.indirection" && kidsOf(c).size == 1 &&
                        ptrIrefIncrWriteTarget(kidsOf(c)(0)).isDefined =>
         val (nm, op, isPost) = ptrIrefIncrWriteTarget(kidsOf(c)(0)).get
         val pRef = ujson.Obj("k" -> "name", "v" -> nm)
@@ -7420,13 +7896,13 @@ import scala.annotation.tailrec
       // double-evaluated -- matching this file's own established discipline
       // for exactly this hazard elsewhere (`assign:aug-impure-target`/
       // `-receiver`).
-      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+      case c: Call if callName(c) == "<operator>.indirection" && kidsOf(c).size == 1 &&
                        isIrefExpr(kidsOf(c)(0)) &&
                        (aug.isEmpty || pureNode(kidsOf(c)(0))) =>
         val pRef = expr(kidsOf(c)(0))
         ujson.Obj("k" -> "setDerefIref", "p" -> pRef,
                   "v" -> combine(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
-      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+      case c: Call if callName(c) == "<operator>.indirection" && kidsOf(c).size == 1 &&
                        rawLocalOrParamName(kidsOf(c)(0)).map(localName)
                          .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
         val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
@@ -7436,8 +7912,11 @@ import scala.annotation.tailrec
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (aug.isDefined && !pureNode(r)) holeS("assign:aug-impure-receiver")
-        else ujson.Obj("k" -> "setField", "r" -> expr(r), "f" -> f,
-                       "v" -> combine(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)))
+        else {
+          val re = beforeRhs(expr(r))
+          ujson.Obj("k" -> "setField", "r" -> re, "f" -> f,
+                    "v" -> combine(ujson.Obj("k" -> "field", "a" -> re, "f" -> f)))
+        }
       // `009-reduce-remaining-holes-4`: `p[i] = v`, `p` a `ptrIrefNames`-tracked
       // plain pointer -- write-side counterpart of `callExpr`'s matching read
       // case (this same push; see its own doc comment for the cross-session bug
@@ -7517,8 +7996,11 @@ import scala.annotation.tailrec
       case ia if asIndex(ia).isDefined && aug.isDefined =>
         val (a, b) = asIndex(ia).get
         if (!(pureNode(a) && pureNode(b))) holeS("assign:aug-impure-target")
-        else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
-                       "v" -> combine(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
+        else {
+          val ae = beforeRhs(expr(a)); val be = beforeRhs(expr(b))
+          ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be,
+                    "v" -> combine(ujson.Obj("k" -> "index", "a" -> ae, "b" -> be)))
+        }
       // Plain (non-augmented) form of the case just above: no double-evaluation
       // risk (`combine` never forces its lazy argument when `aug` is `None`, so
       // `a`/`b` are each read exactly once either way), so this is free to thread
@@ -7531,11 +8013,11 @@ import scala.annotation.tailrec
         val (pb, be) = exprV(b)
         indexPrelude = pa ++ pb
         ujson.Obj("k" -> "setIndex", "r" -> ae, "i" -> be, "v" -> rhsE)
-      case c: Call if c.methodFullName.startsWith("<operator>") =>
-        holeS("assign:lhs:" + c.methodFullName.stripPrefix("<operator>."))
+      case c: Call if callName(c).startsWith("<operator>") =>
+        holeS("assign:lhs:" + callName(c).stripPrefix("<operator>."))
       case other => holeS("assign:lhs:" + other.label)
     }
-    seqOf(prelude ++ indexPrelude :+ core)
+    seqOf(targetPrelude ++ prelude ++ indexPrelude :+ core)
   }
 
   /** `global a, b` — the names it rebinds. */
@@ -7557,7 +8039,7 @@ import scala.annotation.tailrec
   def incrStmt(tgt: AstNode, op: String, opName: String): ujson.Obj = {
     val one = ujson.Obj("k" -> "int", "v" -> ujson.Num(1.0))
     def bump(cur: ujson.Obj): ujson.Obj =
-      ujson.Obj("k" -> "binop", "op" -> op, "a" -> cur, "b" -> one)
+      narrowAssignment(tgt, typedBinop(op, tgt, tgt, cur, one))
     // `006-reduce-remaining-holes`, Story 5: `p++`/`p--`, `p` PROVABLY holding an
     // interior pointer VALUE for its whole lifetime (`ptrIrefNames`) -- checked
     // BEFORE the general pointer-target guard just below, which exists precisely
@@ -7680,7 +8162,7 @@ import scala.annotation.tailrec
     // exactly -- same precedence (`ptrIrefNames` first, since `p` there reads
     // straight through its own binding; `ptrAliases`/`closedOutParams` after,
     // via `boxField`), reused rather than duplicated.
-    case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 =>
+    case c: Call if callName(c) == "<operator>.indirection" && kidsOf(c).size == 1 =>
       if (isIrefExpr(kidsOf(c)(0)))
         Some(ujson.Obj("k" -> "derefIref", "p" -> expr(kidsOf(c)(0))))
       else {
@@ -7694,6 +8176,16 @@ import scala.annotation.tailrec
     * used only to carry a postfix increment/decrement's PRE-bump value across the
     * bump statement (`Env.set` binds any name; no prior declaration is needed). */
   def freshExprVTemp(): String = { val n = "$exprV$" + exprVTempCounter; exprVTempCounter += 1; n }
+
+  // jssrc2cpg retains the implicit `this` parameter on ordinary functions and
+  // provides its argument at index 0. Keep that slot at resolved named calls;
+  // dropping it shifts every explicit argument into the preceding parameter.
+  // Method/constructor calls retain their separate receiver convention.
+  def namedCallReceiver(c: Call): Option[AstNode] =
+    if (numericFamily == "js" && methodByName.get(c.methodFullName).exists(
+          _.parameter.exists(p => p.index == 0 && p.name == "this")))
+      kidsOf(c).find(aidx(_) == 0)
+    else None
 
   /** FR-005/FR-008: an assignment (plain or augmented) reached in expression
     * position. On a provably pure target, the write is `assignTo` verbatim and the
@@ -7747,7 +8239,7 @@ import scala.annotation.tailrec
       // for this one shape. Gated on purity of `p` itself (a bare name/parameter
       // read, so always pure in practice), matching the SAME impure-receiver
       // discipline the `asField`/`asIndex` cases just above already apply.
-      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 =>
+      case c: Call if callName(c) == "<operator>.indirection" && kidsOf(c).size == 1 =>
         if (pureNode(kidsOf(c).head)) proceed() else (Nil, hole("assign:aug-impure-target"))
       case _ => (Nil, hole(genericLabel))
     }
@@ -7795,29 +8287,64 @@ import scala.annotation.tailrec
     }
   }
 
+  // Preserve operand values across a later operand's lifted effects. Merely
+  // concatenating preludes makes `a + (a = b)` read the new a twice in JS.
+  // Logical operators also have to keep the RHS prelude on its selected path.
+  def binopValue(op: String, a: AstNode, b: AstNode): (List[ujson.Obj], ujson.Obj) = {
+    val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+    if (pb.isEmpty) (pa, typedBinop(op, a, b, ae, be))
+    else {
+      val saved = freshExprVTemp()
+      val left = ujson.Obj("k" -> "name", "v" -> saved)
+      val prefix = pa :+ ujson.Obj("k" -> "assign", "x" -> saved, "e" -> ae)
+      if (op == "&&" || op == "||") {
+        val result = freshExprVTemp()
+        def assign(e: ujson.Obj) = ujson.Obj("k" -> "assign", "x" -> result, "e" -> e)
+        // Core already owns boolean-vs-operand return semantics for each dialect.
+        // A known boolean on the evaluated path avoids testing the old operand's
+        // truthiness again after RHS effects might have changed its object.
+        val evaluated = seqOf(pb :+ assign(typedBinop(op, a, b,
+          ujson.Obj("k" -> "bool", "v" -> (op == "&&")), be)))
+        val skipped = assign(typedBinop(op, a, b, left, ujson.Obj("k" -> "unit")))
+        val branch = ujson.Obj("k" -> "ifte", "c" -> left,
+          "t" -> (if (op == "&&") evaluated else skipped),
+          "e" -> (if (op == "&&") skipped else evaluated))
+        (prefix :+ branch, ujson.Obj("k" -> "name", "v" -> result))
+      } else (prefix ++ pb, typedBinop(op, a, b, left, be))
+    }
+  }
+
   /** `expr()`'s prelude-threading counterpart (research.md §3): for a node that may
     * itself carry an assignment/increment used as a VALUE, returns the statements
     * that must run first plus the resulting value expression, in source evaluation
     * order. Every node shape that cannot itself contain such a construct -- the
     * overwhelming majority -- is the unchanged base case, `(Nil, expr(n))`. */
   def exprV(n: AstNode): (List[ujson.Obj], ujson.Obj) = unwrapMacro(n) match {
-    case c: Call if c.methodFullName == "<operator>.assignment" =>
+    case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
         case lhs :: rhs :: Nil => assignAsValue(lhs, rhs, None, "op:assignment")
         case _                 => (Nil, hole("assign:arity"))
       }
-    case c: Call if augOps.contains(c.methodFullName) =>
+    case c: Call if assignRightShiftOps.contains(callName(c)) =>
       kidsOf(c) match {
-        case lhs :: rhs :: Nil =>
-          assignAsValue(lhs, rhs, Some(augOps(c.methodFullName)), "op:" + opLabel(c.methodFullName))
+        case lhs :: rhs :: Nil => sourceRightShift(c, assignment = true) match {
+          case Some(op) => assignAsValue(lhs, rhs, Some(op), "op:" + opLabel(callName(c)))
+          case None => (Nil, hole("op:shiftRight:unknown-signedness"))
+        }
         case _ => (Nil, hole("assign:arity"))
       }
-    case c: Call if incrOps.contains(c.methodFullName) =>
+    case c: Call if augOps.contains(callName(c)) =>
+      kidsOf(c) match {
+        case lhs :: rhs :: Nil =>
+          assignAsValue(lhs, rhs, Some(augOps(callName(c))), "op:" + opLabel(callName(c)))
+        case _ => (Nil, hole("assign:arity"))
+      }
+    case c: Call if incrOps.contains(callName(c)) =>
       kidsOf(c) match {
         case tgt :: Nil =>
-          val opName = c.methodFullName.stripPrefix("<operator>.")
-          incrAsValue(tgt, incrOps(c.methodFullName), opName, postfix = opName.startsWith("post"))
-        case _ => (Nil, hole("op:" + c.methodFullName.stripPrefix("<operator>.") + ":arity"))
+          val opName = callName(c).stripPrefix("<operator>.")
+          incrAsValue(tgt, incrOps(callName(c)), opName, postfix = opName.startsWith("post"))
+        case _ => (Nil, hole("op:" + callName(c).stripPrefix("<operator>.") + ":arity"))
       }
     // `009-reduce-remaining-holes-4`: `p->pModule->xOpen(args)` reached in a
     // PRELUDE-AWARE position -- try `expr`'s own existing resolution first
@@ -7827,7 +8354,7 @@ import scala.annotation.tailrec
     // `pointerCallFieldDynamic`'s temp-and-dispatch translation -- which
     // NEEDS a prelude slot `expr` alone cannot provide, which is why this
     // case lives here rather than being folded into `expr` itself.
-    case c: Call if c.methodFullName == "<operator>.pointerCall" =>
+    case c: Call if callName(c) == "<operator>.pointerCall" =>
       val baseline = expr(c)
       if (!baseline.value.get("k").exists(_.str == "hole")) (Nil, baseline)
       else {
@@ -7836,22 +8363,20 @@ import scala.annotation.tailrec
       }
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
-    case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
+    case c: Call if rightShiftOps.contains(callName(c)) && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
-      shiftRightOp(a) match {
+      sourceRightShift(c) match {
         case Some(op) =>
-          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+          binopValue(op, a, b)
         case None => (Nil, hole("op:shiftRight:unknown-signedness"))
       }
-    case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
-                    !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
+    case c: Call if binops.contains(callName(c)) && kidsOf(c).size == 2 &&
+                    !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(callName(c))) =>
       val List(a, b) = kidsOf(c)
-      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-      (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> binops(c.methodFullName), "a" -> ae, "b" -> be))
-    case c: Call if unops.contains(c.methodFullName) && kidsOf(c).size == 1 =>
+      binopValue(binops(callName(c)), a, b)
+    case c: Call if unops.contains(callName(c)) && kidsOf(c).size == 1 =>
       val (pa, ae) = exprV(kidsOf(c).head)
-      (pa, ujson.Obj("k" -> "unop", "op" -> unops(c.methodFullName), "a" -> ae))
+      (pa, typedUnop(unops(callName(c)), kidsOf(c).head, ae))
     // `006-reduce-remaining-holes`, Story 5: `a[i]`, `a` a recognized boxed array
     // -- mirrors `callExpr`'s own matching case exactly (this file's `exprV`
     // never routes an `indexOps` call through `callExpr`, so without this the
@@ -7863,13 +8388,13 @@ import scala.annotation.tailrec
     // doc comment for the full bug report and reasoning) for the identical
     // `exprV`-never-routes-through-`callExpr` reason the `boxedArrays` case just
     // below already documents for itself.
-    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
+    case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 &&
                     isIrefExpr(kidsOf(c)(0)) =>
       val List(a, b) = kidsOf(c)
       val (pb, be) = exprV(b)
       (pb, ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "binop", "op" -> "+",
         "a" -> expr(a), "b" -> be)))
-    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
+    case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 &&
                     rawLocalOrParamName(kidsOf(c)(0)).map(localName).exists(boxedArrays.contains) =>
       val List(a, b) = kidsOf(c)
       val arrName = rawLocalOrParamName(a).map(localName).get
@@ -7879,7 +8404,7 @@ import scala.annotation.tailrec
     // `009-reduce-remaining-holes-4`: `s.arr[i]`/`p->arr[i]` -- `exprV`'s own
     // independent copy of `callExpr`'s matching case, same push, for the
     // identical `exprV`-never-routes-through-`callExpr` reason documented above.
-    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
+    case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 &&
                     (boxedStructArrayIndexOperand(c).isDefined || pointerStructArrayIndexOperand(c).isDefined) =>
       val (structName, f, idxNode) =
         boxedStructArrayIndexOperand(c).orElse(pointerStructArrayIndexOperand(c)).get
@@ -7887,11 +8412,16 @@ import scala.annotation.tailrec
       (pb, ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "irefIndex",
         "a" -> ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> structName), "f" -> f),
         "i" -> be)))
-    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 =>
+    case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
       val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-      (pa ++ pb, ujson.Obj("k" -> "index", "a" -> ae, "b" -> be))
-    case c: Call if fieldOps.contains(c.methodFullName) && resolvedRef(c).isEmpty &&
+      if (pb.isEmpty) (pa, ujson.Obj("k" -> "index", "a" -> ae, "b" -> be))
+      else {
+        val tmp = freshExprVTemp()
+        (pa ++ List(ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> ae)) ++ pb,
+          ujson.Obj("k" -> "index", "a" -> ujson.Obj("k" -> "name", "v" -> tmp), "b" -> be))
+      }
+    case c: Call if fieldOps.contains(callName(c)) && resolvedRef(c).isEmpty &&
                     asField(c).isDefined =>
       val (r, f) = asField(c).get
       val (pr, re) = exprV(r)
@@ -7903,23 +8433,44 @@ import scala.annotation.tailrec
     // only the positional-argument VALUES are threaded through `exprV`, and only when
     // at least one of them actually has a prelude to hoist; otherwise this returns
     // `expr(c)` verbatim; byte-identical to today.
-    case c: Call if !c.methodFullName.startsWith("<operator>") && c.methodFullName != "<unknownFullName>" =>
+    case c: Call if !callName(c).startsWith("<operator>") && callName(c) != "<unknownFullName>" =>
       val baseline = expr(c)
-      val posArgs = kidsOf(c).filter(k => aidx(k) >= 1 && !isKeywordArg(k))
+      val posArgs = namedCallReceiver(c).toList ++
+        kidsOf(c).filter(k => aidx(k) >= 1 && !isKeywordArg(k))
       val ok = baseline.value.get("k").exists(_.str == "call") &&
                baseline.value.get("args").flatMap(_.arrOpt).exists(_.length >= posArgs.length)
       if (!ok) (Nil, baseline)
       else {
         val argsArr = baseline("args").arr.toList
         val recur = posArgs.map {
-          case sc: Call if sc.methodFullName == "<operator>.starredUnpack" =>
+          case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
             (List.empty[ujson.Obj], argExpr(sc))
-          case a => val (pa, ae) = exprV(a); (pa, ae: ujson.Value)
+          case a =>
+            val (pa, ae) = exprV(a)
+            (pa, if (pa.isEmpty) argExpr(a) else ae: ujson.Value)
         }
-        val prelude = recur.flatMap(_._1)
-        if (prelude.isEmpty) (Nil, baseline)
-        else (prelude, ujson.Obj("k" -> "call", "f" -> baseline("f"),
-                                 "args" -> ujson.Arr.from(recur.map(_._2) ++ argsArr.drop(posArgs.length))))
+        val lastEffect = recur.lastIndexWhere(_._1.nonEmpty)
+        if (lastEffect < 0) (Nil, baseline)
+        // Expanding an iterable can itself fail or read mutable state. Saving
+        // just its container before a later effect would not save the expansion.
+        else if (recur.take(lastEffect).exists { case (_, e) =>
+          e.objOpt.flatMap(_.get("k")).exists(_.str == "starred")
+        }) (Nil, hole("call:effect-after-starred"))
+        else {
+          var prelude = List.empty[ujson.Obj]
+          val savedArgs = recur.zipWithIndex.map { case ((pa, ae), i) =>
+            prelude = prelude ++ pa
+            if (i < lastEffect) {
+              // Complete this argument before running a later argument's lifted
+              // assignments. This also preserves exceptions from earlier calls.
+              val tmp = freshExprVTemp()
+              prelude = prelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> ae)
+              ujson.Obj("k" -> "name", "v" -> tmp): ujson.Value
+            } else ae
+          }
+          (prelude, ujson.Obj("k" -> "call", "f" -> baseline("f"),
+            "args" -> ujson.Arr.from(savedArgs ++ argsArr.drop(posArgs.length))))
+        }
       }
     // `009-reduce-remaining-holes-4`: `c ? t : e` where `t`/`e` may themselves need
     // a prelude -- SQLite's own extremely common "optional vtable method" idiom,
@@ -7939,19 +8490,19 @@ import scala.annotation.tailrec
     // just concatenate both preludes before the value the way a plain `binop`'s
     // two operands could -- it has to become a real `ifte` STATEMENT, assigning
     // into one fresh temp so the overall expression still yields a value.
-    case c: Call if c.methodFullName == "<operator>.conditional" && kidsOf(c).size == 3 =>
+    case c: Call if callName(c) == "<operator>.conditional" && kidsOf(c).size == 3 =>
       val List(condN, trueN, falseN) = kidsOf(c)
       val (condPrelude, condE) = exprV(condN)
       val (tPrelude, tE) = exprV(trueN)
       val (ePrelude, eE) = exprV(falseN)
       if (tPrelude.isEmpty && ePrelude.isEmpty)
-        (condPrelude, ujson.Obj("k" -> "cond", "c" -> condE, "t" -> tE, "e" -> eE))
+        (condPrelude, conditionalValue(c, ujson.Obj("k" -> "cond", "c" -> condE, "t" -> tE, "e" -> eE)))
       else {
         val tmp = freshExprVTemp()
         val ifStmt = ujson.Obj("k" -> "ifte", "c" -> condE,
           "t" -> seqOf(tPrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> tE)),
           "e" -> seqOf(ePrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> eE)))
-        (condPrelude :+ ifStmt, ujson.Obj("k" -> "name", "v" -> tmp))
+        (condPrelude :+ ifStmt, conditionalValue(c, ujson.Obj("k" -> "name", "v" -> tmp)))
       }
     // `009-reduce-remaining-holes-4`: `(void)e`, `e` IMPURE -- `callExpr`'s own
     // cast-to-void handling keeps `e`'s effects by emitting `expr(e)` directly
@@ -7965,7 +8516,7 @@ import scala.annotation.tailrec
     // instead ONLY for this one impure-void case; every other cast shape falls
     // through to the unchanged `(Nil, expr(other))` fallback below, byte-identical
     // to before.
-    case c: Call if c.methodFullName == "<operator>.cast" && kidsOf(c).size == 2 &&
+    case c: Call if callName(c) == "<operator>.cast" && kidsOf(c).size == 2 &&
                     resolveIntType(staticTypeOf(kidsOf(c)(0))).isEmpty &&
                     bareType(staticTypeOf(kidsOf(c)(0))) == "void" &&
                     !pureExpr(kidsOf(c)(1)) =>
@@ -7978,7 +8529,7 @@ import scala.annotation.tailrec
     * `ctorAlloc` for the expression-position form of the same pattern. */
   @tailrec
   def stmts(ks: List[AstNode], acc: List[ujson.Obj] = Nil): List[ujson.Obj] = ks match {
-    case (asg: Call) :: (ctor: Call) :: rest if asg.methodFullName == "<operator>.assignment" =>
+    case (asg: Call) :: (ctor: Call) :: rest if callName(asg) == "<operator>.assignment" =>
       val merged =
         for {
           tr  <- kidsOf(asg) match {
@@ -8151,62 +8702,65 @@ import scala.annotation.tailrec
       kidsOf(r).headOption match {
         case Some(e) =>
           val (prelude, ev) = valueOf(e)
-          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> ev))
+          val returned = if (cppFile && ev("k").str != "hole")
+            primitiveInt(currentReturnType).map(t =>
+              ujson.Obj("k" -> "unop", "op" -> ("cast:" + t), "a" -> ev)).getOrElse(ev)
+            else ev
+          seqOf(prelude :+ ujson.Obj("k" -> "ret", "e" -> returned))
         case None => ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))
       }
-    case c: Call if c.methodFullName == "<operator>.assignment" =>
+    case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
         case lhs :: rhs :: Nil => assignTo(lhs, rhs, None)
         case _                 => holeS("assign:arity")
       }
-    case c: Call if augOps.contains(c.methodFullName) =>
+    case c: Call if augOps.contains(callName(c)) =>
       kidsOf(c) match {
-        case lhs :: rhs :: Nil => assignTo(lhs, rhs, Some(augOps(c.methodFullName)))
+        case lhs :: rhs :: Nil => assignTo(lhs, rhs, Some(augOps(callName(c))))
         case _                 => holeS("assign:arity")
       }
     // `x >>= n`. Same two-operators-one-token problem as `>>`, and the target's type is
     // what decides; an unrecovered type is a hole rather than a guessed sign.
-    case c: Call if c.methodFullName == "<operator>.assignmentArithmeticShiftRight" =>
+    case c: Call if assignRightShiftOps.contains(callName(c)) =>
       kidsOf(c) match {
         case lhs :: rhs :: Nil =>
-          shiftRightOp(lhs) match {
+          sourceRightShift(c, assignment = true) match {
             case Some(op) => assignTo(lhs, rhs, Some(op))
             case None     => holeS("op:shiftRight:unknown-signedness")
           }
         case _ => holeS("assign:arity")
       }
-    case c: Call if incrOps.contains(c.methodFullName) =>
+    case c: Call if incrOps.contains(callName(c)) =>
       kidsOf(c) match {
         case tgt :: Nil =>
-          incrStmt(tgt, incrOps(c.methodFullName),
-                   c.methodFullName.stripPrefix("<operator>."))
-        case _ => holeS("op:" + c.methodFullName.stripPrefix("<operator>.") + ":arity")
+          incrStmt(tgt, incrOps(callName(c)),
+                   callName(c).stripPrefix("<operator>."))
+        case _ => holeS("op:" + callName(c).stripPrefix("<operator>.") + ":arity")
       }
-    case c: Call if c.methodFullName == "<operator>.pass" => skip
-    case c: Call if c.methodFullName == "<operator>.raise" =>
-      // Children: the exception, plus an optional `from <e>` cause we do not model.
-      kidsOf(c).headOption match {
+    case c: Call if callName(c) == "<operator>.pass" => skip
+    case c: Call if callName(c) == "<operator>.raise" =>
+      if (pyFile) pythonRaise(c)
+      else kidsOf(c).headOption match {
         case Some(e) => ujson.Obj("k" -> "raise", "e" -> expr(e))
         // A bare `raise` re-raises the exception in flight; Core has no such notion.
         case None    => holeS("op:raise-bare")
       }
-    case c: Call if c.methodFullName == "<operator>.delete" =>
+    case c: Call if callName(c) == "<operator>.delete" =>
       kidsOf(c) match {
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
         // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
         // `del` only unbinds a variable, so translating them would be a lie.
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
-        case (x: Call) :: Nil if x.methodFullName.startsWith("<operator>") =>
-          holeS("op:delete-" + x.methodFullName.stripPrefix("<operator>."))
+        case (x: Call) :: Nil if callName(x).startsWith("<operator>") =>
+          holeS("op:delete-" + callName(x).stripPrefix("<operator>."))
         case _ => holeS("op:delete-shape")
       }
-    // A synchronisation primitive in statement position is `Stmt.skip`: Core is
-    // sequential, so an uncontended acquire/release changes nothing the program can
-    // read. See `syncPrimitives` for what is given up (nothing Core could observe)
-    // and why the trylock family is excluded (it returns a value).
-    case c: Call if syncPrimitives.contains(c.methodFullName.split("\\.").last) =>
-      syncElided += 1; skip
+    // A sequential model cannot validate synchronization. Even its sequential
+    // effects can be observable (local_irq_save writes flags; argument evaluation
+    // can have side effects). Preserve that boundary instead of silently skipping.
+    case c: Call if syncPrimitives.contains(callName(c).split("\\.").last) =>
+      holeS("effect:kernel-sync:" + callName(c).split("\\.").last)
     // `009-reduce-remaining-holes-4`: `exprV`, not plain `expr` -- a bare CALL
     // statement (result discarded) is exactly where `p->pModule->xOpen(args);`,
     // a `pointerCall` with no assignment around it at all, shows up, and
@@ -8227,21 +8781,15 @@ import scala.annotation.tailrec
           val (prelude, condVal) = exprV(kids(0))
           seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> condVal, "t" -> stmt(kids(1)),
                                      "e" -> (if (kids.size > 2) stmt(kids(2)) else skip)))
-        // A loop's own condition is instead evaluated ONCE PER ITERATION, so the same
-        // "splice the prelude once, ahead of the loop" trick would be wrong: an
-        // assignment-as-value inside a `while`/`do`/`for` condition would fire only on
-        // the very first check, then read a permanently stale value on every
-        // subsequent one -- a silent wrong answer, not merely a missed improvement.
-        // Fixing that needs the condition's prelude re-run before every re-check
-        // (and before every `continue`, matching `pushStep`'s own precedent for a
-        // `for`-loop's step) -- a real, separate increment this plan does not
-        // attempt, so a loop condition keeps the plain `expr(cond)` it has today.
+        // A loop test's prelude runs at every check, never just before entry.
         case "WHILE" if kids.size >= 2 =>
           // A `while` whose condition is the frontend's synthetic iterator probe only
           // makes sense inside the `for` shape above; on its own it is not a condition.
           if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
-          else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
-                         "body" -> outsideLoopScope(stmt(kids(1))))
+          else {
+            val (prelude, cond) = exprV(kids(0))
+            conditionedLoop(prelude, cond, outsideLoopScope(stmt(kids(1))))
+          }
 
         // `do B while (C)` is NOT `while (C) B`, and translating it as one was a silent
         // mistranslation: a do-while runs its body at least once, so with `C` initially
@@ -8257,15 +8805,20 @@ import scala.annotation.tailrec
         // loops keep their own `continue` (`pushDoTest` stops at `loop`/`forIn`), and `C`
         // may be evaluated more than once per source iteration only on paths where the
         // original would have evaluated it too.
-        case "DO" if kids.size >= 2 =>
-          if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
-          else {
-            val cond = expr(kids(0))
-            val test = ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
-                                 "e" -> ujson.Obj("k" -> "brk"))
-            val body = pushDoTest(outsideLoopScope(stmt(kids(1))), cond)
-            ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
-                      "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> test))
+        case "DO" =>
+          // The C frontend puts the body first, unlike WHILE. Use the
+          // CONDITION edge rather than assuming a shared child ordering.
+          val conditions = cs.condition.l
+          val bodies = kids.filterNot(k => conditions.exists(_.id == k.id))
+          (conditions, bodies) match {
+            case (List(condition), List(bodyNode)) =>
+              val (prelude, cond) = exprV(condition)
+              val test = seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
+                                   "e" -> ujson.Obj("k" -> "brk")))
+              val body = pushDoTest(outsideLoopScope(stmt(bodyNode)), cond, prelude)
+              ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                        "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> test))
+            case _ => holeS("control:DO:condition-shape")
           }
         case "FOR"      => forStmt(cs)
         // `007-reduce-remaining-holes-2` US4: see `switchStmt`'s own doc comment for the
@@ -8291,12 +8844,15 @@ import scala.annotation.tailrec
         case "BREAK"    => ujson.Obj("k" -> "brk")
         case "CONTINUE" => ujson.Obj("k" -> "cont")
         case "ELSE" | "CATCH" | "FINALLY" => seqOf(kids.map(stmt))
-        case "TRY"      => tryStmt(kids)
+        case "TRY"      => tryStmt(cs)
         case t          => holeS("control:" + t)
       }
     case i: Identifier => ujson.Obj("k" -> "exprS", "e" -> expr(i))
     case l: Literal    => ujson.Obj("k" -> "exprS", "e" -> expr(l))
-    case m: MethodRef  => skip   // a nested `def`; its body is exported as its own function
+    case m: MethodRef  => pythonDefinitionGap(m).map(holeS).getOrElse(skip)
+    // Kotlin puts declarations directly in the file initializer, while other
+    // frontends put MethodRefs there. The bodies are separate exported functions.
+    case m: Method if moduleScope && List(".kt", ".kts").exists(currentFile.endsWith) => skip
     case t: TypeRef    => skip   // a nested `class`, likewise
     case j: JumpTarget => skip
     // `global x` / `nonlocal x` arrive as UNKNOWN nodes carrying their source text; the
@@ -8337,13 +8893,42 @@ import scala.annotation.tailrec
     case other         => holeS("stmt:" + other.label)
   }
 
-  /** try / except / else / finally.
-    *
-    * Note what the CPG does *not* carry: pysrc2cpg drops the exception *type* of each
-    * handler entirely (a CATCH has only its body). So a single handler is translated as
-    * catch-all — the only reading available — and anything where the choice of handler
-    * would be observable stays a hole. */
-  def tryStmt(kids: List[AstNode]): ujson.Obj = {
+  /** Normalize Python raises before entering Core's generic exception control.
+    * A raw string cannot stand in for an exception instance. Source syntax proves
+    * literal values invalid and identifies unshadowed builtin constructors; the
+    * dynamic operation refuses the remaining ambiguous instance representation. */
+  def pythonRaise(c: Call): ujson.Obj = pythonSourceInfo(c, "raises") match {
+    case None => holeS("op:raise-source-metadata")
+    case Some(info) =>
+      val kind = info("kind").str
+      if (kind == "hole") holeS(info("label").str)
+      else if (kind == "class")
+        ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
+          "op" -> ("py:exception:" + info("name").str),
+          "a" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr())))
+      else kidsOf(c).headOption match {
+        case None => holeS("op:raise-shape")
+        case Some(value) =>
+          val (prelude, translated) = valueOf(value)
+          if (kind == "constructor") {
+            if (translated("k").str != "call") holeS("op:raise-constructor-shape")
+            else seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" ->
+              ujson.Obj("k" -> "unop", "op" -> ("py:exception:" + info("name").str),
+                "a" -> ujson.Obj("k" -> "tupleE", "items" -> translated("args")))))
+          } else {
+            val op = if (kind == "invalid-value") "py:raise-invalid" else "py:raise"
+            seqOf(prelude :+ ujson.Obj("k" -> "exprS", "e" ->
+              ujson.Obj("k" -> "unop", "op" -> op, "a" -> translated)))
+          }
+      }
+  }
+
+  /** Python try / except / else / finally. Headers come from the original source;
+    * CPG CATCH nodes contain only bodies. Builtin exception inheritance is expanded
+    * into dispatch over Core's named exception representation. Unsupported dynamic
+    * classes, aliases and payload inspection remain explicit holes, not catch-alls. */
+  def tryStmt(cs: ControlStructure): ujson.Obj = {
+    val kids = kidsOf(cs)
     def of(t: String) = kids.collect {
       case c: ControlStructure if c.controlStructureType == t => c
     }
@@ -8353,53 +8938,72 @@ import scala.annotation.tailrec
     val bodyNodes = kids.filterNot(_.isInstanceOf[ControlStructure])
     val body      = seqOf(bodyNodes.map(stmt))
     if (bodyNodes.isEmpty) holeS("control:TRY-shape")
-    // Which handler runs depends on the exception type, which the CPG discarded.
-    else if (catches.size > 1) holeS("control:TRY-multiCatch")
     else {
-      // `try: B except: H else: E finally: F` is three independent layers, and now that
-      // `Stmt.tryFinally` exists each one has a constructor, so they compose:
-      //
-      //   inner = B                                    (no handler)
-      //         | tryCatch(B, e, H)                     (handler, no else)
-      //         | ok = true; tryCatch(B, e, {ok = false; H}); if ok then E
-      //   whole = inner | tryFinally(inner, F)
-      //
-      // The `else` encoding is the only one that needs an explanation. `E` must run only
-      // when `B` raised nothing, and `E`'s own exceptions must not reach `H`. The flag is
-      // not an invention: it is exactly the "did the body complete normally" bit the
-      // construct is about. `E` sits outside the `tryCatch`, so its exceptions propagate;
-      // every other way out of `B` — return, break, continue, or a handler that re-raises
-      // — leaves before the `if`, which is Python's rule that `else` is skipped whenever
-      // the body did not complete normally. The flag is numbered per `try`, because a
-      // nested `try/else` completing normally would otherwise re-arm the enclosing one's.
-      //
-      // `finally` is outermost, which is what makes it run on the `return`/`break`/
-      // `continue` paths as well: `Stmt.tryFinally` intercepts every `Ctl`, re-raising the
-      // body's outcome after the finalizer unless the finalizer itself leaves abnormally.
-      // The previous encoding — `tryCatch(B, e, F; raise e); F` — could not, because `ret`
-      // passes straight through a `tryCatch` and would have skipped the trailing copy;
-      // that is the whole of what `control:TRY-finally-escaping` was recording.
       val inner =
         if (catches.isEmpty && elses.isEmpty) body
-        else if (catches.size == 1 && elses.isEmpty)
-          ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
-                    "handler" -> stmt(catches.head))
-        else if (catches.size == 1) {
-          elseFlagSeq += 1
-          val flag = "__else_ok" + elseFlagSeq
-          seqOf(List(
-            ujson.Obj("k" -> "assign", "x" -> flag,
-                      "e" -> ujson.Obj("k" -> "bool", "v" -> true)),
-            ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> "__exc",
-                      "handler" -> ujson.Obj("k" -> "seq",
-                        "a" -> ujson.Obj("k" -> "assign", "x" -> flag,
-                                         "e" -> ujson.Obj("k" -> "bool", "v" -> false)),
-                        "b" -> stmt(catches.head))),
-            ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> flag),
-                      "t" -> seqOf(elses.map(stmt)), "e" -> skip)))
+        else if (catches.isEmpty) holeS("control:TRY-else-without-except")
+        else if (!pyFile) holeS("control:TRY-handler-language")
+        else {
+          val recovered = for {
+            info <- pythonHandlers(currentFile)
+            line <- cs.lineNumber
+            column <- cs.columnNumber
+            meta <- info("tries").obj.get(s"$line:$column")
+          } yield (info, meta)
+          recovered match {
+            case None => holeS("control:TRY-source-metadata")
+            case Some((_, meta)) if meta("star").bool => holeS("control:TRY-exception-group")
+            case Some((_, meta)) if meta("handlers").arr.size != catches.size ||
+                meta("else").bool != elses.nonEmpty ||
+                meta("finally").bool != finallys.nonEmpty => holeS("control:TRY-handler-shape")
+            case Some((info, meta)) =>
+              // Use identifiers impossible in Python source. The old __exc and
+              // __else_okN names overwrote real locals, even for a plain bare handler.
+              val exception = freshExprVTemp()
+              val pending = ujson.Obj("k" -> "name", "v" -> exception)
+              def member(names: ujson.Value): ujson.Obj =
+                ujson.Obj("k" -> "inOp", "neg" -> false, "a" -> pending,
+                  "b" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr.from(
+                    names.arr.map(n => ujson.Obj("k" -> "str", "v" -> n.str)))))
+              val known = member(info("exceptions"))
+              // A single catch surrounds B. Dispatch inside its handler preserves
+              // source order; an exception raised by H never enters a later handler.
+              val dispatch = catches.zip(meta("handlers").arr.toList).reverse.foldLeft(
+                  ujson.Obj("k" -> "raise", "e" -> pending)) { case (rest, (c, header)) =>
+                val selected = if (header("binding") != ujson.Null)
+                  holeS("control:TRY-handler-binding") else stmt(c)
+                header("kind").str match {
+                  case "bare" => selected
+                  case "hole" => holeS(header("label").str)
+                  case "typed" =>
+                    val choice = ujson.Obj("k" -> "ifte", "c" -> member(header("accepted")),
+                      "t" -> selected, "e" -> rest)
+                    // Exception objects and payloads have no faithful representation
+                    // yet. Comparing them as unrelated strings would invent a miss.
+                    ujson.Obj("k" -> "ifte", "c" -> known, "t" -> choice,
+                      "e" -> holeS("control:TRY-exception-representation"))
+                }
+              }
+              if (elses.isEmpty)
+                ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> exception,
+                  "handler" -> dispatch)
+              else {
+                val flag = freshExprVTemp()
+                // Else runs only after normal body completion and outside the catch.
+                // Return/break/continue propagate past this trailing conditional.
+                seqOf(List(
+                  ujson.Obj("k" -> "assign", "x" -> flag,
+                    "e" -> ujson.Obj("k" -> "bool", "v" -> true)),
+                  ujson.Obj("k" -> "tryCatch", "body" -> body, "x" -> exception,
+                    "handler" -> seqOf(List(
+                      ujson.Obj("k" -> "assign", "x" -> flag,
+                        "e" -> ujson.Obj("k" -> "bool", "v" -> false)), dispatch))),
+                  ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> flag),
+                    "t" -> seqOf(elses.map(stmt)), "e" -> skip)))
+              }
+          }
         }
-        // `else` with no `except` is not legal Python; if the CPG says so, say so.
-        else holeS("control:TRY-else-without-except")
+      // Finally encloses both the body and dispatch, including unmatched exceptions.
       if (finallys.isEmpty) inner
       else if (finallys.size == 1)
         ujson.Obj("k" -> "tryFinally", "body" -> inner, "fin" -> stmt(finallys.head))
@@ -8413,11 +9017,11 @@ import scala.annotation.tailrec
   // they are excluded rather than quietly padding the verifiable core. The file-level
   // `<module>`/`<global>` pseudo-methods are excluded from *this* list too, and re-added
   // below as initializers, so they never inflate the function count either.
-  lazy val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
-  lazy val cppExts   = List(".c", ".h", ".cpp", ".cc", ".hpp")
+  lazy val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".cxx", ".hh", ".hpp", ".java", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".kt", ".go")
+  lazy val cppExts   = List(".c", ".h", ".cpp", ".cc", ".cxx", ".hh", ".hpp")
   // `010-reach-90pct-hole-free`: `cLikeExts` minus `.js`/`.ts` -- see
   // `charLiteralIsNumeric`'s own doc comment for why those two are excluded.
-  lazy val charLiteralExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".kt", ".go")
+  lazy val charLiteralExts = List(".c", ".h", ".cpp", ".cc", ".cxx", ".hh", ".hpp", ".java", ".kt", ".go")
 
   /** The name a method is exported under.
     *
@@ -8748,13 +9352,25 @@ import scala.annotation.tailrec
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
     * the file-level pseudo-method, where every identifier assignment is a global write. */
   def emit(m: Method, isModule: Boolean): ujson.Obj = {
+    currentReturnType = m.methodReturn.typeFullName
     moduleScope  = isModule
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    if (cppFile) {
+      // c2cpg drops `unsigned` from some C++ METHOD_RETURN types. Recover the
+      // builtin declaration specifiers from this method's CPG source span.
+      val marker = ("\\b" + java.util.regex.Pattern.quote(m.name) + "\\s*\\(").r
+      marker.findFirstMatchIn(m.code).foreach { found =>
+        val prefix = m.code.substring(0, found.start).trim
+        val storage = Set("static", "extern", "inline", "constexpr", "consteval", "virtual", "friend")
+        val words = prefix.split("\\s+").filterNot(storage.contains).mkString(" ")
+        if (resolveIntType(words).nonEmpty) currentReturnType = words
+      }
+    }
     charLiteralIsNumeric = charLiteralExts.exists(e => m.filename.toLowerCase.endsWith(e))
     def fieldReceiverNames(op: String): Set[String] =
-      m.body.ast.isCall.filter(_.methodFullName == op).l.flatMap { c =>
+      m.body.ast.isCall.filter(c => callName(c) == op).l.flatMap { c =>
         val ks = kidsOf(c)
         if (ks.size < 2) None else Some(ks(ks.size - 2))
       }.collect { case i: Identifier => i.name }.toSet
@@ -8763,6 +9379,11 @@ import scala.annotation.tailrec
     localTypes   = (m.local.l.map(l => l.name -> l.typeFullName) ++
                     m.parameter.l.map(pp => pp.name -> pp.typeFullName))
                    .filter(_._2 != "ANY").toMap
+    inlineStructFields = if (!m.filename.toLowerCase.endsWith(".c") || isModule) Map.empty else
+      m.local.l.groupBy(_.name).toList.flatMap { case (name, decls) =>
+        if (decls.size != 1 || m.parameter.exists(_.name == name)) None
+        else inlineIntegerStruct(decls.head).map(name -> _)
+      }.toMap
     genuineLocalNames = m.local.l.filter(_.closureBindingId.isEmpty).map(_.name).toSet ++
                         m.parameter.l.map(_.name).toSet
     currentFile  = m.filename
@@ -8773,7 +9394,7 @@ import scala.annotation.tailrec
     // bound more than once is dropped: which binding a later call sees would be a
     // flow-sensitive question, and this analysis is not.
     boundMethods = m.body.ast.isCall
-      .filter(_.methodFullName == "<operator>.assignment").l
+      .filter(c => callName(c) == "<operator>.assignment").l
       .flatMap { a =>
         kidsOf(a) match {
           case (t: Identifier) :: rhs :: Nil =>
@@ -8783,7 +9404,7 @@ import scala.annotation.tailrec
       }
       .groupBy(_._1).collect { case (k, List(one)) => k -> one._2 }.toMap
     attrsOf = m.body.ast.isCall
-      .filter(c => fieldOps.contains(c.methodFullName)).l
+      .filter(c => fieldOps.contains(callName(c))).l
       .flatMap(fa => asField(fa).collect { case (r: Identifier, f) => r.name -> f })
       .groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
     // `003-box-address-taken-locals`: every name whose address is taken anywhere in
@@ -8809,7 +9430,7 @@ import scala.annotation.tailrec
     // against, only a call site that was ALREADY going to hole on its own
     // terms, with or without `nm` being boxed. Verified via two dedicated
     // fixtures (see this commit) before this real corpus was re-exported.
-    val addrCalls = m.body.ast.isCall.filter(_.methodFullName == "<operator>.addressOf").l
+    val addrCalls = m.body.ast.isCall.filter(c => callName(c) == "<operator>.addressOf").l
     val candidates: Map[String, List[Call]] =
       addrCalls.flatMap(c => kidsOf(c) match {
         case List(n) => boxableName(n).map(_ -> c)
@@ -8821,14 +9442,14 @@ import scala.annotation.tailrec
     // this method (see `ptrAliases`'s own doc comment for why this must be stricter
     // than merely "the only ADDRESS-OF-shaped assignment to `p`").
     ptrAliases = {
-      val assigns = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val assigns = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
       val assignCounts = assigns.flatMap { a =>
         kidsOf(a) match { case (t: Identifier) :: _ :: Nil => Some(t.name); case _ => None }
       }.groupBy(identity).view.mapValues(_.size).toMap
       assigns.flatMap { a =>
         kidsOf(a) match {
           case (t: Identifier) :: (rhs: Call) :: Nil
-              if rhs.methodFullName == "<operator>.addressOf" &&
+              if callName(rhs) == "<operator>.addressOf" &&
                  assignCounts.getOrElse(t.name, 0) == 1 &&
                  !boxedLocals.contains(localName(t.name)) =>
             kidsOf(rhs) match {
@@ -8849,7 +9470,7 @@ import scala.annotation.tailrec
     // construction, see `closedOutParams`'s doc comment) -- each checked against the
     // whole-program precondition (`closedOutParam`).
     closedOutParams = {
-      val derefOperands = m.body.ast.isCall.filter(_.methodFullName == "<operator>.indirection").l
+      val derefOperands = m.body.ast.isCall.filter(c => callName(c) == "<operator>.indirection").l
         .flatMap(c => kidsOf(c) match { case List(n) => rawLocalOrParamName(n); case _ => None })
         .toSet
       m.parameter.l
@@ -8872,7 +9493,7 @@ import scala.annotation.tailrec
     // established style (e.g. `ancestorsTo`'s `guard` counter) since a real chain in
     // source is never more than a handful of assignments long regardless.
     fnPtrVars = {
-      val assigns = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val assigns = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
       val assignCounts = assigns.flatMap { a =>
         kidsOf(a) match { case (t: Identifier) :: _ :: Nil => Some(t.name); case _ => None }
       }.groupBy(identity).view.mapValues(_.size).toMap
@@ -8894,7 +9515,7 @@ import scala.annotation.tailrec
           case (t: Identifier) :: (mr: MethodRef) :: Nil if assignCounts.getOrElse(t.name, 0) == 1 =>
             fnTarget(mr).map(localName(t.name) -> _)
           case (t: Identifier) :: (addr: Call) :: Nil
-              if assignCounts.getOrElse(t.name, 0) == 1 && addr.methodFullName == "<operator>.addressOf" =>
+              if assignCounts.getOrElse(t.name, 0) == 1 && callName(addr) == "<operator>.addressOf" =>
             kidsOf(addr) match {
               case List(mr: MethodRef) => fnTarget(mr).map(localName(t.name) -> _)
               case _                   => None
@@ -8942,7 +9563,7 @@ import scala.annotation.tailrec
     // `boxedArrays` before this filter was added), not merely assumed correct
     // from the operator-call convention alone.
     def nameEverPassedToCall(nm: String): Boolean =
-      m.body.ast.isCall.filterNot(_.methodFullName.startsWith("<operator>")).l
+      m.body.ast.isCall.filterNot(c => callName(c).startsWith("<operator>")).l
         .exists(c => kidsOf(c).exists(k => aidx(k) >= 1 && argFeedsName(k, nm)))
     // `007-reduce-remaining-holes-2`: the one narrow exception to the exclusion
     // above -- `nm` still escapes via a call argument, but SAFELY, when EVERY such
@@ -8957,11 +9578,11 @@ import scala.annotation.tailrec
     // wholesale, now narrowed to the one shape this can verify sound without a
     // general points-to analysis.
     def nameEscapesSafely(nm: String, wholeObjectAddressOk: Boolean): Boolean =
-      m.body.ast.isCall.filterNot(_.methodFullName.startsWith("<operator>")).l
+      m.body.ast.isCall.filterNot(c => callName(c).startsWith("<operator>")).l
         .forall { c =>
           kidsOf(c).filter(k => aidx(k) >= 1 && argFeedsName(k, nm)).forall { k =>
             val elementOrFieldAddress = k match {
-              case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+              case addr: Call if callName(addr) == "<operator>.addressOf" =>
                 kidsOf(addr) match {
                   case List(x) =>
                     asIndex(x).exists { case (r, _) => rawLocalOrParamName(r).map(localName).contains(nm) } ||
@@ -8993,7 +9614,7 @@ import scala.annotation.tailrec
             // hole) -- extending that is a separate, unverified change this fix does
             // not make.
             val wholeObjectAddress = wholeObjectAddressOk && (k match {
-              case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
+              case addr: Call if callName(addr) == "<operator>.addressOf" =>
                 kidsOf(addr) match {
                   case List(x) => argFeedsName(x, nm)
                   case _       => false
@@ -9011,9 +9632,9 @@ import scala.annotation.tailrec
             // `rawLocalOrParamName` reads without needing to see through an
             // `addressOf` at all.
             val bareArrayDecay = rawLocalOrParamName(k).map(localName).contains(nm)
-            val calleeIsInProgram = !c.methodFullName.startsWith("<operator>") && methodByName.contains(c.methodFullName)
+            val calleeIsInProgram = !callName(c).startsWith("<operator>") && methodByName.contains(callName(c))
             ((elementOrFieldAddress || bareArrayDecay) && calleeIsInProgram &&
-              methodByName.get(c.methodFullName).exists(callee =>
+              methodByName.get(callName(c)).exists(callee =>
                 closedIrefOutParam(callee, aidx(k)) ||
                 closedIrefOutParamsTransitive.contains((callee.fullName, aidx(k))))) ||
             (wholeObjectAddress && calleeIsInProgram) ||
@@ -9058,7 +9679,7 @@ import scala.annotation.tailrec
     // Story 5's own scope boundary (research.md §5.3) was written for locals within
     // one function's activation, and a module-scope name was never meant to be in
     // scope for it at all.
-    boxedArrays = if (moduleScope) Map.empty else {
+    boxedArrays = if (!cppFile || moduleScope) Map.empty else {
       // `008-reduce-remaining-holes-3` US1: `arrayShape` (a literal integer size)
       // is tried FIRST, byte-identical to before this feature -- only when it does
       // NOT match does `resolveMacroArraySize` get a chance, on the SAME bracket
@@ -9099,13 +9720,13 @@ import scala.annotation.tailrec
     // after it, so a struct's member list is only ever read from the CPG once
     // per candidate name.
     val structCandidateDecls: Map[String, TypeDecl] =
-      if (moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
+      if (!cppFile || moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
         val (name, isParam, ty) = l match {
           case ll: Local             => (ll.name, false, localTypes.get(ll.name))
           case pp: MethodParameterIn => (pp.name, true, localTypes.get(pp.name))
           case _                     => ("", false, None)
         }
-        ty.filter(isClassType).flatMap(structTypeDeclOf).map { td =>
+        ty.filter(_ => !inlineStructFields.contains(name)).filter(isClassType).flatMap(structTypeDeclOf).map { td =>
           // `009-reduce-remaining-holes-4`: a PARAMETER (struct passed BY VALUE)
           // with an array-typed member is excluded here, unlike a LOCAL -- a
           // local's own prologue always starts EVERY member (array or scalar)
@@ -9124,8 +9745,11 @@ import scala.annotation.tailrec
           (localName(name), hasArrayMember, td)
         }
       }.filterNot(_._2).map { case (nm, _, td) => nm -> td }.toMap
-    boxedStructs = if (moduleScope) Map.empty else {
-      val candidates = structCandidateDecls.map { case (nm, td) => nm -> td.member.l.map(_.name) }
+    // This is C/C++ aggregate storage, not reference-language object storage.
+    // Applying it to Python classes discarded constructors and alias writes.
+    boxedStructs = if (!cppFile || moduleScope) Map.empty else {
+      val candidates = structCandidateDecls.map { case (nm, td) => nm -> td.member.l.map(_.name) } ++
+        inlineStructFields.map { case (nm, fields) => localName(nm) -> fields.map(_._1) }
       candidates.filter { case (nm, _) => nameSafelyBoxable(nm, wholeObjectAddressOk = true) }
     }
     // `009-reduce-remaining-holes-4`: for each boxed struct NAME (locals only,
@@ -9137,7 +9761,7 @@ import scala.annotation.tailrec
     // resolved (a `sizeof`, a VLA, a macro not in this file's table) is simply
     // absent from this map, and `&s.thatMember[i]` keeps its existing hole --
     // exactly `boxedArrays`' own precedent for a local array of unknown size.
-    boxedStructArrayMembers = if (moduleScope) Map.empty else
+    boxedStructArrayMembers = if (!cppFile || moduleScope) Map.empty else
       structCandidateDecls.filter { case (nm, _) => boxedStructs.contains(nm) }
         .map { case (nm, td) =>
           nm -> td.member.l.flatMap(mm => arraySizeOf(mm.typeFullName, m.filename).map(mm.name -> _)).toMap
@@ -9191,19 +9815,19 @@ import scala.annotation.tailrec
     // SQLite's own convention already draws exactly the line this mechanism
     // needs, more reliably than any local usage heuristic could.
     ptrIrefAllocNames = if (moduleScope) Map.empty else {
-      val fieldAccessReceivers = m.body.ast.isCall.filter(c => fieldOps.contains(c.methodFullName)).l
+      val fieldAccessReceivers = m.body.ast.isCall.filter(c => fieldOps.contains(callName(c))).l
         .flatMap(c => kidsOf(c).headOption.flatMap(rawLocalOrParamName)).map(localName).toSet
-      val assigns = m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      val assigns = m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
       val assignCounts = assigns.flatMap { a =>
         kidsOf(a) match { case (t: Identifier) :: _ :: Nil => Some(t.name); case _ => None }
       }.groupBy(identity).view.mapValues(_.size).toMap
       assigns.flatMap { a =>
         kidsOf(a) match {
           case List(t: Identifier, call: Call)
-              if assignCounts.getOrElse(t.name, 0) == 1 && knownAllocators.contains(call.methodFullName) &&
+              if assignCounts.getOrElse(t.name, 0) == 1 && knownAllocators.contains(callName(call)) &&
                  !fieldAccessReceivers.contains(localName(t.name)) &&
                  localTypes.get(t.name).exists(isCStringType) =>
-            kidsOf(call).lift(knownAllocators(call.methodFullName)).map(lenArg => localName(t.name) -> lenArg)
+            kidsOf(call).lift(knownAllocators(callName(call))).map(lenArg => localName(t.name) -> lenArg)
           case _ => None
         }
       }.toMap
@@ -9266,7 +9890,7 @@ import scala.annotation.tailrec
       // `Some(Some(srcName))`: sound PROVIDED `srcName` is (or becomes, in the
       // SAME fixed point below) itself `ptrIrefNames`-tracked.
       def classifyIrefAssignRhs(rhs: AstNode): Option[Option[String]] = rhs match {
-        case c: Call if c.methodFullName == "<operator>.addressOf" =>
+        case c: Call if callName(c) == "<operator>.addressOf" =>
           kidsOf(c) match {
             case List(operand)
                 if boxedArrayIndexOperand(operand).isDefined ||
@@ -9279,7 +9903,7 @@ import scala.annotation.tailrec
           }
         case src: Identifier if boxedArrays.contains(localName(src.name)) =>
           Some(None)
-        case c: Call if c.methodFullName == "<operator>.addition" =>
+        case c: Call if callName(c) == "<operator>.addition" =>
           kidsOf(c) match {
             case List(a, b) =>
               val aName = rawLocalOrParamName(a).map(localName)
@@ -9289,7 +9913,7 @@ import scala.annotation.tailrec
               else None
             case _ => None
           }
-        case c: Call if c.methodFullName == "<operator>.subtraction" =>
+        case c: Call if callName(c) == "<operator>.subtraction" =>
           kidsOf(c) match {
             case List(a, b) =>
               val aName = rawLocalOrParamName(a).map(localName)
@@ -9298,7 +9922,7 @@ import scala.annotation.tailrec
           }
         // A C chained assignment (`t = (inner = expr);`) -- `t` copies whatever
         // name `inner`'s own assignment binds, exactly like a bare copy.
-        case inner: Call if inner.methodFullName == "<operator>.assignment" =>
+        case inner: Call if callName(inner) == "<operator>.assignment" =>
           kidsOf(inner) match {
             case List(innerLhs: Identifier, _) => Some(Some(localName(innerLhs.name)))
             case _ => None
@@ -9308,7 +9932,7 @@ import scala.annotation.tailrec
       }
 
       val assignsByName: Map[String, List[AstNode]] =
-        m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
           .flatMap(a => kidsOf(a) match {
             case List(t: Identifier, rhs) => Some(localName(t.name) -> rhs)
             case _ => None
@@ -9459,11 +10083,11 @@ import scala.annotation.tailrec
     val localCandidates = (if (moduleScope) Nil else m.local.l)
       .filter(l => isCStringType(l.typeFullName) && strCursorEligible(m, l.name, allowDefiningAssign = true))
       .filter { l =>
-        m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
           .count(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == l.name; case _ => false }) == 1
       }
     val candidateRhs: Map[String, AstNode] = localCandidates.flatMap { l =>
-      m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
         .find(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == l.name; case _ => false })
         .flatMap(a => kidsOf(a) match { case _ :: rhs :: Nil => Some(rhs); case _ => None })
         .map(rhs => localName(l.name) -> rhs)
@@ -9514,7 +10138,7 @@ import scala.annotation.tailrec
       (if (moduleScope) Nil else m.local.l)
         .filter(l => strCursorParams.contains(localName(l.name)))
         .flatMap { l =>
-          m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+          m.body.ast.isCall.filter(c => callName(c) == "<operator>.assignment").l
             .find(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == l.name; case _ => false })
             .flatMap(a => kidsOf(a) match {
               case _ :: rhs :: Nil => cursorBaseAndOffset(rhs)
@@ -9659,9 +10283,12 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "assign", "x" -> (nm + "$off"), "e" -> ujson.Obj("k" -> "int", "v" -> 0))
     }
     val allPrologues = prologues ++ aggPrologues ++ strCursorPrologues
-    val body = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    val translatedBody = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    val body = pythonSignatureGap(m).map(label => seqOf(List(holeS(label), translatedBody)))
+      .getOrElse(translatedBody)
     moduleScope = false
     localTypes = Map.empty
+    inlineStructFields = Map.empty
     genuineLocalNames = Set.empty
     valueReceivers = Set.empty
     ptrReceivers = Set.empty
@@ -9694,14 +10321,25 @@ import scala.annotation.tailrec
     // the filename itself contains dots (`__init__.py`).
     val qualSegs = exportName(m).split(":<module>\\.").lastOption
                      .map(_.split('.').toList).getOrElse(Nil)
-    val isMethodDecl =
+    val legacyMethodDecl =
       qualSegs.length >= 2 && classNames.contains(qualSegs(qualSegs.length - 2))
+    val isMethodDecl = if (pyFile) pythonSignatureInfo(m)
+      .map(_("isMethod").bool).getOrElse(legacyMethodDecl) else legacyMethodDecl
     val ps = m.parameter.l.sortBy(_.index)
                .filterNot(p => isMethodDecl && p.name == "self")
+               // c2cpg represents f(void) with an unnamed void parameter. It
+               // declares zero arguments; keeping it invents a required value.
+               .filterNot(p => cppFile && p.name.isEmpty && p.typeFullName.trim == "void")
     val stars = ps.map(p => p.name -> paramStars(p, m.filename)).toMap
     val obj = ujson.Obj(
       "name"   -> exportName(m),
       "file"   -> m.filename,
+      "sourceName" -> m.name,
+      "paramTypes" -> ujson.Arr.from(ps.filterNot(p => cppFile && p.name == "this").map(_.typeFullName)),
+      "returnType" -> currentReturnType,
+      "paramIntegerTypes" -> ujson.Arr.from(ps.filterNot(p => cppFile && p.name == "this")
+        .map(p => primitiveInt(p.typeFullName).getOrElse(""))),
+      "returnIntegerType" -> primitiveInt(currentReturnType).getOrElse(""),
       // `ps` is already sorted and self-filtered (needed for `*args`/`**kwargs`
       // detection). `this` leaves the list for the same reason `self` does: `applyFunc`
       // binds the receiver itself, under the name the body now uses.
@@ -9733,6 +10371,42 @@ import scala.annotation.tailrec
       ps.find(p => stars(p.name) == 1 || (stars(p.name) == 0 && p.isVariadic))
         .foreach(p => obj("vararg") = p.name)
       ps.find(p => stars(p.name) == 2).foreach(p => obj("kwarg") = p.name)
+      def refuseBinding(label: String): Unit = {
+        obj("vararg") = "<unmodelled-signature-args>"
+        obj("kwarg") = "<unmodelled-signature-keywords>"
+        obj("body") = holeS(label)
+      }
+      if (!isModule && pythonSignatureGap(m).nonEmpty)
+        refuseBinding(pythonSignatureGap(m).get)
+      else if (!isModule) pythonSignatureInfo(m).foreach { signature =>
+        val sourceParams = signature("parameters").arr.map(_.str)
+          .filterNot(p => isMethodDecl && p == "self").toSet
+        val exportedParams = ps.map(_.name).toSet
+        val receiverKeywordCollision = obj.value.contains("kwarg") &&
+          !signature("positionalOnly").arr.contains(ujson.Str("self"))
+        val bindingGap =
+          if (isMethodDecl && (signature("firstPositional") != ujson.Str("self") ||
+              signature("decorated").bool || receiverKeywordCollision))
+            Some("call:python-receiver-signature")
+          else if (signature("decorated").bool) Some("call:python-decorator-binding")
+          else if (signature("privateParameters").bool) Some("call:python-private-parameters")
+          else if (sourceParams != exportedParams) Some("call:python-signature-shape")
+          else None
+        if (bindingGap.nonEmpty) {
+          // Core injects an ordinary receiver under `self`. Other receiver names,
+          // absent/keyword-only receivers and descriptor/decorator binding need
+          // their own semantics. A keyword collector can also hide a duplicate
+          // non-positional-only `self`, because receiver stripping removes it
+          // from the signature checked by Core. Permissive collectors ensure that
+          // argument rejection cannot run before the explicit gap and produce a
+          // wrong TypeError for a call the native callable would accept. The same
+          // boundary protects decorated functions and private-parameter mangling.
+          refuseBinding(bindingGap.get)
+        } else obj("pythonSignature") = ujson.Obj.from(
+          List("positionalOnly", "keywordOnly", "required").map { key =>
+            key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
+          } :+ ("isMethod" -> signature("isMethod")))
+      }
     }
     obj
   }
@@ -9753,38 +10427,23 @@ import scala.annotation.tailrec
   val synthetic = List("<metaClassAdapter>", "<metaClassCallHandler>",
                        "<global>", "<body>", "<fakeNew>", "<clinit>")
 
-  /** `009-reduce-remaining-holes-4`: a pure PROTOTYPE declaration -- `SQLITE_API
-    * const char *sqlite3_column_database_name(sqlite3_stmt*,int);` in `sqlite3.h`,
-    * no `{...}` body anywhere in source -- confirmed live to be the dominant real
-    * shape (117 of 159 solo-`stmt:empty-ast-children`-blocked functions sampled
-    * this session) behind a label that looked like a translation gap but is
-    * actually a MEASUREMENT one: Joern still emits a `Method` node for the bare
-    * declaration (`isExternal=false`, since it is a local, not a library, symbol),
-    * with a synthetic zero-child `Block` whose leftover `.code` text (an attribute
-    * macro, the trailing declarator) is non-empty -- exactly `stmt:empty-ast-
-    * children`'s own trigger condition, reused verbatim here, but checked at the
-    * METHOD's own top-level body, not a nested block partway through real logic
-    * (that second, genuinely-different shape -- 13 of the 159 sampled -- is a real
-    * function with an actual dark-`#ifdef` block inside it, and stays exactly the
-    * hole it already is, unaffected by this filter). There is no real logic here
-    * to be hole-free OR holed about -- counting it inflated both the denominator
-    * and the hole-free numerator, mirroring this file's own adjacent precedent
-    * for `<metaClassCallHandler>` et al. immediately above: excluding it removes
-    * padding, not coverage. Deliberately NOT applied to a genuinely empty `{}`
-    * body (`stripBlockCode` empty there) -- that shape already translates
-    * correctly today (an empty statement sequence) and is real, if trivial, code,
-    * not measurement padding. */
+  /** Joern can represent a prototype or macro declaration as a non-external
+    * method with a nonempty synthetic block but no AST children. Exclude that
+    * shape only when the method's source has no opening brace. A real function
+    * whose conditional body the frontend could not parse must remain a hole;
+    * Linux __sw_hweight64 demonstrated why the child count alone is unsafe.
+    * Truly empty {} bodies remain ordinary, empty functions. */
   def isBodylessDeclaration(m: Method): Boolean =
     m.astChildren.l.collectFirst { case b: Block => b } match {
-      case Some(b) => b.astChildren.isEmpty && stripBlockCode(b.code).nonEmpty
+      case Some(b) => b.astChildren.isEmpty && stripBlockCode(b.code).nonEmpty && !m.code.contains("{")
       case None    => false
     }
 
-  val methods = cpg.method.isExternal(false)
-    .whereNot(_.nameExact("<module>"))
+  val candidateMethods = cpg.method.isExternal(false)
+    .whereNot(_.nameExact("<module>", "<global>"))
     .l.filterNot(m => synthetic.exists(m.fullName.contains))
-    .filterNot(isBodylessDeclaration)
-    .take(maxMethods)
+  val excludedDeclarations = candidateMethods.filter(isBodylessDeclaration)
+  val methods = candidateMethods.filterNot(isBodylessDeclaration).take(maxMethods)
 
   // The file-level pseudo-method. It was previously excluded outright, which meant every
   // module-level constant, class and `def` was an unresolvable free name — the single
@@ -9827,7 +10486,7 @@ import scala.annotation.tailrec
   // functions passing their own already-simple local variable) rather than an
   // unbounded fixed point this file has no established precedent for at
   // whole-program scale. Every priming pass's own diagnostic side effects
-  // (`syncElided`/`useElided`'s own counters, `elseFlagSeq`'s own synthesized
+  // (`metaElided`/`useElided`'s own counters, `freshExprVTemp`'s synthesized
   // flag names) are harmless to repeat: the former are cosmetic console counts
   // only, and the latter needs only PER-RUN uniqueness, which a monotonically
   // increasing counter still guarantees regardless of its starting value.
@@ -9885,10 +10544,21 @@ import scala.annotation.tailrec
     total
   }
   val doc = ujson.Arr.from(all)
+  val metadata = ujson.Obj(
+    "candidateMethods" -> candidateMethods.size,
+    "exportedFunctions" -> funcs.size,
+    "moduleInitializers" -> inits.size,
+    "truncatedByMethodLimit" -> (candidateMethods.size - excludedDeclarations.size > maxMethods),
+    "excludedDeclarations" -> ujson.Arr.from(excludedDeclarations.map { m =>
+      ujson.Obj("name" -> m.fullName, "file" -> m.filename,
+                "line" -> m.lineNumber.getOrElse(0), "code" -> m.code.take(300))
+    }),
+    "sourceCensusComplete" -> false,
+    "note" -> "CPG census only. Unparsed source functions may be absent; compiler census not available.")
+  os.write.over(os.Path(out + ".meta.json", os.pwd), ujson.write(metadata, indent = 2))
   println(s"data model assumed for target-sized integer types: ${dataModel.toLowerCase}"
         + (if (modelInts.isEmpty) " (UNKNOWN -- `long`/`size_t` casts are holes)" else ""))
   if (metaElided > 0) println(s"elided $metaElided kernel metadata declaration(s)")
-  if (syncElided > 0) println(s"elided $syncElided sequentially-unobservable synchronisation call(s)")
   if (useElided > 0) println(s"elided $useElided USE(x) no-op macro(s)")
   println(s"exported ${funcs.size} functions + ${inits.size} module initializers to $out "
         + s"(${countKind(doc, "closure")} closures, ${countKind(doc, "setGlobal")} global writes)")

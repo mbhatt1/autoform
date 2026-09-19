@@ -207,6 +207,43 @@ def excNames : List String :=
 /-- Raise a named exception. -/
 private def raiseE (n : String) : EResult := .exn (.str n)
 
+/-- Construct the represented class of a builtin exception, validating constructor
+arguments before discarding its currently unmodeled payload. Python 3.10+ SyntaxError
+and IndentationError inspect the details iterable only at arity two. Four or six
+fields are accepted; five is not. Unknown object iterators remain holes. -/
+def makeException (name : String) (args : List Val) : EResult :=
+  if !excNames.contains name then .hole s!"exception:{name}:unmodelled-class"
+  else if name == "SyntaxError" || name == "IndentationError" then
+    match args with
+    | [_, details] =>
+        match details with
+        | .ref _ | .iref _ _ | .fn _ | .clos _ _ | .clsClos _ _ | .bobj _ _ =>
+            .hole s!"exception:{name}:details-iterator"
+        | _ =>
+            match details.iterable with
+            | some fields =>
+                if fields.length == 4 || fields.length == 6 then .val (.str name)
+                else raiseE "TypeError"
+            | none => raiseE "TypeError"
+    | _ => .val (.str name)
+  else .val (.str name)
+
+/-- Validate a dynamically raised Python value. Named strings remain ambiguous
+until exception instances have a distinct value representation. Builtin class
+references use the exporter's reserved name and instantiate with no arguments. -/
+def raiseValue : Val → EResult
+  | .str name =>
+      if excNames.contains name then .hole "raise:ambiguous-exception-value"
+      else raiseE "TypeError"
+  | .fn name =>
+      if name.startsWith "$pythonExceptionClass$" then
+        match makeException (name.drop "$pythonExceptionClass$".length).toString [] with
+        | .val value => .exn value
+        | outcome => outcome
+      else .hole "raise:unmodelled-callable"
+  | .ref _ | .iref _ _ | .clos _ _ | .clsClos _ _ => .hole "raise:unmodelled-object"
+  | _ => raiseE "TypeError"
+
 /-! ## Free builtins -/
 
 /-- Builtin *type* names `isinstance` can decide against. -/
@@ -302,8 +339,8 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     let ok (r : EResult) : Option (Heap × EResult) := some (h, r)
     let v (x : Val) : Option (Heap × EResult) := ok (.val x)
     if excNames.contains name then
-      -- `KeyError(k)` — payload dropped, matching the interpreter's own representation.
-      v (.str name)
+      -- Validation can itself raise, even when the caller never raises the instance.
+      ok (makeException name args)
     else
     match name, args with
     -- len: code points for `str`, exactly like CPython.
@@ -652,8 +689,8 @@ Delete a case from `builtinCore` and leave its name in `freeNames`, and this fai
 find. -/
 private def wHeap : Heap := [{ cls := "C", fields := [("f", .unit)] }]
 
-/-- Arguments on which each free name is answered. Exception constructors accept
-anything, so they fall through to `[]`. -/
+/-- Arguments on which each free name is answered. Represented exception constructors
+accept no arguments, so their witnesses fall through to `[]`. -/
 private def freeWitness : String → List Val
   | "len"        => [.list []]
   | "abs"        => [.int 0]

@@ -45,15 +45,11 @@ arithmetic now agrees with Node up to `Number.MAX_SAFE_INTEGER` (2^53 - 1).
 doubles, and this project's `Val` has no single "JS number" representation that is
 sometimes-int-sometimes-float the way `Number` is — `NumConfig.python`'s *unbounded*
 integers are themselves a known-wrong approximation past 2^53 (Numeric.lean already
-recorded this before this dialect existed). Bitwise/shift operators (`&`, `|`, `^`, `<<`,
-`>>`, `>>>`) go through the same `NumConfig`, but real JS converts their operands to
-Int32 first (ECMA `ToInt32`) — a genuinely different width policy from JS's own
-arithmetic operators. Modelling that correctly needs a *second* numeric config per
-dialect (one for arithmetic, one for bitwise), which `Dialect.toNumConfig`'s
-one-config-per-dialect shape does not support yet; until it does, `<<`/`>>`/bitwise ops
-on `.javascript` inherit the unbounded config and are a known, recorded gap, not a
-claimed fix. `Lang.approximated` still marks JavaScript/TypeScript `true` for this
-reason. -/
+recorded this before this dialect existed). Untagged bitwise/shift operators also
+inherit that unbounded configuration. Fresh Joern exports instead preserve these
+operations as `num:js:i32:<op>`; TypedNumeric applies Number coercion to 32 bits.
+String/object coercion and BigInt remain outside that subset. General Number
+arithmetic still makes `Lang.approximated` true for JavaScript/TypeScript. -/
 inductive Dialect where
   | python
   | cLike
@@ -560,6 +556,18 @@ inductive Stmt where
   | hole     : String → Stmt
   deriving Repr, Inhabited
 
+/-- Python parameter kinds recovered from the source definition. Default values
+are not stored here: evaluating and retaining them requires function-object state.
+`required` names parameters without defaults, excluding `*args` and `**kwargs`. -/
+structure PythonSignature where
+  positionalOnly : List String := []
+  keywordOnly : List String := []
+  required : List String := []
+  /-- Lexical method classification from Python source. `none` retains the
+  historical naming heuristic for models without this information. -/
+  isMethod : Option Bool := none
+  deriving Repr, Inhabited
+
 /-- A function: name, parameters, body.
 
 `params` lists **every** parameter name in source order, including the variadic ones.
@@ -575,16 +583,23 @@ structure Func where
   vararg : Option String := none
   /-- The `**kwargs` parameter's name, if the function has one. -/
   kwarg  : Option String := none
+  /-- Source Python binding rules. `none` is legacy/foreign metadata, not evidence
+  that an omitted parameter has a default. Newly exported Python definitions
+  always supply this field or contain an explicit metadata hole. -/
+  pythonSignature : Option PythonSignature := none
   deriving Repr, Inhabited
 
-/-- Whether this `Func` is a method, by the exporter's naming convention: the segment after
-`<module>.` is `Class.method` rather than a bare function name. Used to recover Python's
-unbound-method rule, where a method reached as a plain value takes its receiver as the
-first positional argument. -/
+/-- Whether this `Func` is a method. Source metadata distinguishes nested functions
+from class methods; a dotted qualified name cannot establish that distinction.
+Legacy models retain the naming heuristic. Used for Python's unbound-method rule,
+where a method reached as a plain value takes its receiver as the first argument. -/
 def Func.isMethod (fn : Func) : Bool :=
-  match fn.name.splitOn "<module>." with
-  | [_, rest] => rest.any (· == '.')
-  | _         => false
+  match fn.pythonSignature.bind (·.isMethod) with
+  | some method => method
+  | none =>
+    match fn.name.splitOn "<module>." with
+    | [_, rest] => rest.any (· == '.')
+    | _         => false
 
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where

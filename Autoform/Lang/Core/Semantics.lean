@@ -1,5 +1,6 @@
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
+import Autoform.Lang.Core.TypedNumeric
 import Autoform.Lang.Core.Stdlib
 
 /-!
@@ -77,16 +78,32 @@ def Dialect.imod : Dialect → Int → Int → Int
   | .javascript, a, b => Int.fmod a b
 
 
-/-- Result of executing a statement: how control left it. -/
+/-- Result of executing a statement: how control left it and the locals at that point.
+Handlers and finalizers run in this environment, including after a return or exception. -/
 inductive Ctl where
   | normal    : Env → Ctl
-  | ret       : Val → Ctl
+  | ret       : Val → Env → Ctl
   | brk       : Env → Ctl
   | cont      : Env → Ctl
-  | exn       : Val → Ctl
+  | exn       : Val → Env → Ctl
   | hole      : String → Ctl
   | outOfFuel : Ctl
   deriving Repr, Inhabited
+
+/-- Locals at a language-level exit. Interpreter failures have no resumable state. -/
+def Ctl.env (fallback : Env) : Ctl → Env
+  | .normal ρ | .ret _ ρ | .brk ρ | .cont ρ | .exn _ ρ => ρ
+  | _ => fallback
+
+/-- Resume a pending exit after a normally completing finalizer, retaining its writes.
+The value of a pending return or exception was already evaluated and stays unchanged. -/
+def Ctl.withEnv (ρ : Env) : Ctl → Ctl
+  | .normal _ => .normal ρ
+  | .ret v _ => .ret v ρ
+  | .brk _ => .brk ρ
+  | .cont _ => .cont ρ
+  | .exn v _ => .exn v ρ
+  | other => other
 
 /-- Lift a machine-integer outcome into an evaluation outcome.
 
@@ -184,6 +201,10 @@ def ordToE (op : String) (o : Option Ordering) : EResult :=
 
 /-- Binary operators where at least one operand is a float. -/
 def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
+  let op := match op with
+    | "py:/" | "js:/" => "/"
+    | "js:+" => "+" | "js:-" => "-" | "js:*" => "*" | "js:%" => "%"
+    | other => other
   match op with
   | "&&" => .val (.bool (a.truthy && b.truthy))
   | "||" => .val (.bool (a.truthy || b.truthy))
@@ -197,7 +218,7 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    | "-" => fc.sub x y
                    | "*" => fc.mul x y
                    | "/" => fc.div x y
-                   | _   => fc.pyMod x y)
+                   | _   => if d == .python then fc.pyMod x y else fc.fmod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -211,7 +232,7 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- `x ** y` on floats is `pow`, which IEEE does define, but which this model does not
   -- implement. See `Float.lean`'s "what is deliberately NOT modelled".
   | "**" => .hole "float:pow"
-  | _    => .hole s!"binop:{op}"
+  | _    => TypedNumeric.binary op a b
 
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
@@ -229,6 +250,27 @@ def binopNeedsHeap (op : String) (x y : Val) : Bool :=
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
     (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, beq_iff_eq, h, h2]
+
+/-- Explicit language operators for newly exported terms. Keeping this dispatch
+separate also keeps reduction of the legacy integer operators inexpensive. -/
+def languageBinop (op : String) (a b : Val) : EResult :=
+  match op, a, b with
+  -- New exports distinguish Python true division from the legacy floor-division
+  -- spelling in previously generated terms. Round the ratio once, including big
+  -- integers whose individual conversion to float would overflow.
+  | "py:/", .int x, .int y =>
+      if y == 0 then .exn (.str "ZeroDivisionError")
+      else
+        let q := Format.binary64.round (xor (x < 0) (y < 0)) x.natAbs y.natAbs
+        if q.isInf then .exn (.str "OverflowError") else .val (.float q)
+  | "js:+", .str x, .str y => .val (.str (x ++ y))
+  | "js:+", _, _ => flBinop .javascript "+" a b
+  | "js:-", _, _ => flBinop .javascript "-" a b
+  | "js:*", _, _ => flBinop .javascript "*" a b
+  | "js:/", _, _ => flBinop .javascript "/" a b
+  | "js:%", _, _ => flBinop .javascript "%" a b
+  | "py:/", _, _ => flBinop .python "/" a b
+  | _, _, _ => TypedNumeric.binary op a b
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
@@ -370,7 +412,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- of the expression is the RIGHT operand under value semantics.
   | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => .hole s!"binop:{op}"
+  | _, _, _              => languageBinop op a b
 
 /-!
 ### Operator equations
@@ -473,6 +515,13 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
+  -- Source normalization distinguishes statically invalid raise operands from
+  -- strings that might be the current representation of an exception instance.
+  -- evalExpr evaluates the operand first, preserving its own errors and effects.
+  | "py:raise-invalid", _ =>
+      if d == .python then .exn (.str "TypeError") else .hole "raise:wrong-dialect"
+  | "py:raise", value =>
+      if d == .python then Stdlib.raiseValue value else .hole "raise:wrong-dialect"
   -- Negation goes through `NumConfig` for the same reason the binary operators do:
   -- `-INT_MIN` is not representable, so under a fixed-width dialect it must wrap, trap,
   -- or become a hole — never the unrepresentable number. This path was left unchecked
@@ -522,7 +571,13 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u32", .bool b => .val (.int (if b then 1 else 0))
   | "cast:i64", .bool b => .val (.int (if b then 1 else 0))
   | "cast:u64", .bool b => .val (.int (if b then 1 else 0))
-  | _, _        => .hole s!"unop:{op}"
+  | _, _        =>
+      if op.startsWith "py:exception:" then
+        if d != .python then .hole "exception:wrong-dialect"
+        else match a with
+          | .tuple args => Stdlib.makeException (op.drop "py:exception:".length).toString args
+          | _ => .hole "exception:argument-shape"
+      else TypedNumeric.unary op a
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/
@@ -634,31 +689,36 @@ def strKeyed : Val → Option (List (String × Val))
         | _,      _         => none) (some [])
   | _ => none
 
-/-- The parameters that receive positional arguments: every parameter except the
-variadic ones. -/
+/-- Parameters that receive positional arguments, excluding variadic collectors
+and recovered Python keyword-only parameters. -/
 def Func.posParams (fn : Func) : List String :=
-  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p
+  fn.params.filter fun p => fn.vararg != some p && fn.kwarg != some p &&
+    !(fn.pythonSignature.map (fun s => s.keywordOnly.contains p)).getD false
+
+/-- Parameters which can be supplied by name. A positional-only name belongs in
+`**kwargs` when that collector exists; it must not overwrite the positional value. -/
+def Func.keywordParams (fn : Func) : List String :=
+  match fn.pythonSignature with
+  | none => fn.posParams
+  | some signature => fn.params.filter fun p =>
+      fn.vararg != some p && fn.kwarg != some p && !signature.positionalOnly.contains p
 
 /-- Bind a call's arguments into the callee's environment.
 
-The rule is CPython's, minus default values (which Core does not model):
+Argument validation happens in `applyFunc` and `applyClosure` before execution.
+This helper constructs the environment for a valid call:
 
 * positional arguments fill `posParams` left to right;
 * leftovers go to `vararg` as a `tuple` — an empty one when there are none, which is
   why `def f(*a)` called with no arguments binds `a` to `()` rather than to `unit`;
-* a keyword argument naming a positional parameter binds that parameter;
+* a keyword argument naming a keyword-capable parameter binds that parameter;
 * every other keyword argument goes to `kwarg` as a `dict` with `str` keys.
 
-Two deliberate departures, both recorded rather than hidden:
-
-* **Surplus positional arguments are dropped when there is no `*args`.** CPython raises
-  `TypeError`. This is the behaviour `applyFunc` already had (`params.zip vs` truncates),
-  and it is left alone here so that this change is about starred arguments only.
-* **A keyword argument matching no parameter is dropped here** when there is no
-  `**kwargs`. `bindParams` is only the binding half; `kwargsRejected` below detects that
-  case and `applyFunc` turns it into CPython's `TypeError` before the body ever runs, so
-  the drop is never observable. Nothing previously produced keyword arguments, so this
-  cannot change any existing behaviour. -/
+Surplus positional arguments and unexpected keywords are rejected by the callers.
+Recovered Python signatures also reject missing required parameters and duplicate
+bindings. Default values remain unsupported by source translation. Functions with
+legacy metadata (`pythonSignature = none`) retain their historical binding behavior;
+this helper alone is not a Python call validator. -/
 def bindParams (fn : Func) (base : Env) (vs : List Val)
     (kws : List (String × Val)) : Env :=
   let ps    := fn.posParams
@@ -667,8 +727,8 @@ def bindParams (fn : Func) (base : Env) (vs : List Val)
   let ρ₁    := match fn.vararg with
                | some a => Env.set ρ₀ a (.tuple rest)
                | none   => ρ₀
-  let named := kws.filter (fun kv => ps.contains kv.1)
-  let extra := kws.filter (fun kv => !ps.contains kv.1)
+  let named := kws.filter (fun kv => fn.keywordParams.contains kv.1)
+  let extra := kws.filter (fun kv => !fn.keywordParams.contains kv.1)
   let ρ₂    := named.foldl (fun (e : Env) (x, v) => Env.set e x v) ρ₁
   match fn.kwarg with
   | some k => Env.set ρ₂ k (.dict (extra.map fun kv => (.str kv.1, kv.2)))
@@ -684,10 +744,9 @@ theorem `surplusPositional_is_a_known_divergence`, now
 direction: a call the real program rejects loudly runs to completion in Core and every
 theorem about it is a theorem about a program CPython never executes.
 
-Only a *surplus* is rejected. Too few arguments is still not an error here, because Core
-does not model default values: `def k(a=None)` renders as `params := ["a"]`, so raising
-on an under-supplied call would reject calls CPython accepts. That asymmetry is
-deliberate and is the reason this is not simply an arity equality test.
+This check rejects only a surplus. `signatureRejected` separately checks missing
+required parameters when Python signature metadata is present. Legacy functions
+without that metadata cannot distinguish required parameters from defaults.
 
 A `*args` parameter absorbs any surplus, so a callee with `vararg` is never rejected. -/
 def posRejected (fn : Func) (vs : List Val) : Bool :=
@@ -705,7 +764,7 @@ needed for the same reason — a proof about a literal `Func` cannot fire a hypo
 lemma without first deciding which `fn` it is about. -/
 @[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
     (vs : List Val) :
-    posRejected ⟨name, params, body, none, none⟩ vs
+    posRejected ⟨name, params, body, none, none, none⟩ vs
       = decide (params.length < vs.length) := by
   have : (List.filter (fun p => none != some p) params) = params := by
     simp [List.filter_eq_self]
@@ -716,23 +775,42 @@ lemma without first deciding which `fn` it is about. -/
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
 separate and `applyFunc` turns it into the exception. -/
 def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
-  fn.kwarg.isNone && kws.any (fun kv => !fn.posParams.contains kv.1)
+  fn.kwarg.isNone && kws.any (fun kv => !fn.keywordParams.contains kv.1)
 
 /-- A call with no keyword arguments can never be rejected. -/
 @[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
   simp [kwargsRejected]
+
+/-- Validate already evaluated arguments against a recovered Python signature.
+Captured locals cannot supply missing parameters. Positional-only keywords may
+enter `**kwargs`, but cannot satisfy a required positional-only parameter.
+Duplicate keyword expansion must also be checked during argument evaluation to
+preserve the timing of an error relative to later argument effects. -/
+def signatureRejected (fn : Func) (vs : List Val) (kws : List (String × Val)) : Bool :=
+  match fn.pythonSignature with
+  | none => false
+  | some signature =>
+      let positional := fn.posParams.take vs.length
+      let named := (kws.map Prod.fst).filter fn.keywordParams.contains
+      signature.required.any (fun p => !(positional ++ named).contains p) ||
+        named.any positional.contains ||
+        decide ((kws.map Prod.fst).eraseDups.length < kws.length)
+
+@[simp] theorem signatureRejected_legacy (name : String) (params : List String)
+    (body : Stmt) (vararg kwarg : Option String) (vs : List Val) (kws : List (String × Val)) :
+    signatureRejected ⟨name, params, body, vararg, kwarg, none⟩ vs kws = false := rfl
 
 /-- A function with no variadic parameters, called with no keyword arguments, binds
 exactly what `applyFunc` bound before the calling convention existed. This is the
 compatibility equation: every corpus rendered before starred arguments were modelled has
 `vararg = none` and `kwarg = none`, so nothing about it changed. -/
 theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
-    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) :
+    (h1 : fn.vararg = none) (h2 : fn.kwarg = none) (h3 : fn.pythonSignature = none) :
     bindParams fn base vs [] =
       (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
   have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
     simp [List.filter_eq_self]
-  simp [bindParams, Func.posParams, h1, h2, this]
+  simp [bindParams, Func.posParams, Func.keywordParams, h1, h2, h3, this]
 
 /-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
 with both variadic fields at their `none` defaults. Stated separately because the
@@ -740,9 +818,9 @@ hypothesis form of `bindParams_plain` cannot fire on a literal without first dec
 which `fn` it is about. -/
 @[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
     (base : Env) (vs : List Val) :
-    bindParams ⟨name, params, body, none, none⟩ base vs [] =
+    bindParams ⟨name, params, body, none, none, none⟩ base vs [] =
       (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
-  bindParams_plain base vs rfl rfl
+  bindParams_plain base vs rfl rfl rfl
 
 /-- The short class name behind a class VALUE.
 
@@ -951,11 +1029,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .val k) =>
           -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
           match c.unbuiltin, k with
-          | .list vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
-              else (h₂, .exn (.str "IndexError"))
-          | .tuple vs, .int i =>
-              if hh : i.toNat < vs.length then (h₂, .val (vs[i.toNat]))
+          | .list vs, .int i | .tuple vs, .int i =>
+              -- Python indexes relative to the end for negative integers.
+              -- Check the signed bound before toNat, which otherwise clamps a
+              -- negative index to zero and can make incorrect mutants survive.
+              let j := if ctx.dialect == .python && i < 0 then i + (vs.length : Int) else i
+              if j < 0 then (h₂, .exn (.str "IndexError"))
+              else if hh : j.toNat < vs.length then (h₂, .val (vs[j.toNat]))
               else (h₂, .exn (.str "IndexError"))
           | .dict kvs, key =>
               match kvs.find? (fun kv => Val.beq kv.1 key) with
@@ -1325,11 +1405,12 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
                         | some s => [("self", s)]
                         | none   => []
       let ρ := bindParams fn base vs kws
-      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+        (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
-      | (h₁, .ret v)    => (h₁, .val v)
+      | (h₁, .ret v _)  => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
-      | (h₁, .exn v)    => (h₁, .exn v)
+      | (h₁, .exn v _)  => (h₁, .exn v)
       | (h₁, .hole l)   => (h₁, .hole l)
       | (h₁, .outOfFuel)=> (h₁, .outOfFuel)
       | (h₁, _)         => (h₁, .hole "call:stray-control-flow")
@@ -1346,11 +1427,12 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
   | n+1, h, fn, cap, vs, kws =>
       let base : Env := cap
       let ρ : Env := bindParams fn base vs kws
-      if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+      if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+        (h, .exn (.str "TypeError")) else
       match execStmt ctx n h ρ fn.body with
-      | (h₁, .ret v)     => (h₁, .val v)
+      | (h₁, .ret v _)   => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v _)   => (h₁, .exn v)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
       | (h₁, _)          => (h₁, .hole "call:stray-control-flow")
@@ -1438,13 +1520,13 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .expr e =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val _)     => (h₁, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setGlobal x e =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v)     => (h₁.setField ctx.globals x v, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .assign x e =>
@@ -1452,19 +1534,19 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .val v)     =>
           if (ρ.get ("<glob>" ++ x)).truthy then (h₁.setField ctx.globals x v, .normal ρ)
           else (h₁, .normal (ρ.set x v))
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .ret e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .ret v)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .val v)     => (h₁, .ret v ρ)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .raise e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .exn v)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .val v)     => (h₁, .exn v ρ)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setField r f v =>
@@ -1472,7 +1554,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .val (.ref addr)) =>
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
-        | (h₂, .exn e)     => (h₂, .exn e)
+        | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val fv) =>
@@ -1487,12 +1569,12 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
             let (h₂, addr) := boxFn h₁ fv
             match evalExpr ctx n h₂ ρ v with
             | (h₃, .val vv)    => (h₃.setField addr f vv, .normal (Env.set ρ x (.ref addr)))
-            | (h₃, .exn e)     => (h₃, .exn e)
+            | (h₃, .exn e)     => (h₃, .exn e ρ)
             | (h₃, .hole l)    => (h₃, .hole l)
             | (h₃, .outOfFuel) => (h₃, .outOfFuel)
           else (h₁, .hole s!"setField:{f}:non-object")
         | _ => (h₁, .hole s!"setField:{f}:non-object")
-      | (h₁, .exn e) => (h₁, .exn e)
+      | (h₁, .exn e) => (h₁, .exn e ρ)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .setIndex _ _ _ =>
@@ -1506,11 +1588,11 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .val (.iref r sel)) =>
         match evalExpr ctx n h₁ ρ v with
         | (h₂, .val vv)    => (h₂.setField r sel.key vv, .normal ρ)
-        | (h₂, .exn e)     => (h₂, .exn e)
+        | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val _)      => (h₁, .hole "setDerefIref:non-iref")
-      | (h₁, .exn e)      => (h₁, .exn e)
+      | (h₁, .exn e)      => (h₁, .exn e ρ)
       | (h₁, .hole l)     => (h₁, .hole l)
       | (h₁, .outOfFuel)  => (h₁, .outOfFuel)
   | n+1, h, ρ, .seq a b =>
@@ -1521,24 +1603,25 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match evalExpr ctx n h ρ c with
       | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
                             else execStmt ctx n h₁ ρ e
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .tryFinally body fin =>
       match execStmt ctx n h ρ body with
+      -- These are interpreter failures, not language exits. Running a finalizer
+      -- on a partial execution could turn unsupported or unfinished work into a proof.
+      | (h₁, .hole l) => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
       | (h₁, .normal ρ') => execStmt ctx n h₁ ρ' fin
       | (h₁, r) =>
-          -- The finalizer runs on every path. If it exits abnormally it *discards* the
+          -- The finalizer runs on every language exit. An abnormal exit discards the
           -- body's pending outcome: `try: return 1 finally: return 2` returns 2.
-          let ρ' := match r with
-                    | .normal e | .brk e | .cont e => e
-                    | _                            => ρ
-          match execStmt ctx n h₁ ρ' fin with
-          | (h₂, .normal _) => (h₂, r)
+          match execStmt ctx n h₁ (r.env ρ) fin with
+          | (h₂, .normal ρ') => (h₂, r.withEnv ρ')
           | (h₂, r')        => (h₂, r')
   | n+1, h, ρ, .tryCatch body x handler =>
       match execStmt ctx n h ρ body with
-      | (h₁, .exn v) => execStmt ctx n h₁ (ρ.set x v) handler
+      | (h₁, .exn v ρ') => execStmt ctx n h₁ (ρ'.set x v) handler
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
@@ -1550,7 +1633,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
             | (h₂, .brk ρ')    => (h₂, .normal ρ')
             | (h₂, r)          => (h₂, r)
           else (h₁, .normal ρ)
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `007-reduce-remaining-holes-2` US4: catches a `.brk` from its inner statement and
@@ -1568,7 +1651,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
         match v.iterable with
         | some vs => execFor ctx n h₁ ρ x vs body
         | none    => (h₁, .hole "forIn:non-iterable")
-      | (h₁, .exn v)     => (h₁, .exn v)
+      | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
 

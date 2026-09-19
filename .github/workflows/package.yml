@@ -1,0 +1,136 @@
+name: Python package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install build twine
+      # build creates the wheel FROM the sdist, catching missing source resources.
+      - run: python -m build
+      - run: python -m twine check --strict dist/*
+      - name: Distribution bytes, versions and license notices match source
+        run: python scripts/check_distribution.py dist
+      - name: Release tag matches package version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          assert os.environ['RELEASE_TAG'] == 'v' + version
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  install:
+    needs: build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - run: python -m pip install pytest packaging 'tomli>=2,<3; python_version < "3.11"'
+      - name: Install wheel and exercise CLI outside checkout
+        run: |
+          export AUTOFORM_TEST_WHEEL="$(find "$PWD/dist" -name '*.whl' -print -quit)"
+          python -m pytest tests/test_package.py -q
+
+  installed-proofs:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - name: Install wheel with machine dependencies
+        run: |
+          python -m pip install packaging
+          python scripts/check_distribution.py dist
+          wheel=$(find "$PWD/dist" -name '*.whl' -print -quit)
+          python -m pip install "${wheel}[machine]"
+      - name: Install pinned Lean
+        run: |
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Assembly to a kernel checked theorem outside the repository
+        run: |
+          cd "$RUNNER_TEMP"
+          autoform init
+          autoform machine .autoform-work/examples/machine/add_aarch64.s Installed \
+            --assemble aarch64-unknown-linux-gnu --entry 0 \
+            --register x0=3 --register x1=4 --stop 4 --expect x0=7
+          cd .autoform-work
+          lake build Autoform.Lang.PCode.Properties
+          lake env leanchecker --fresh Autoform.Lang.PCode.Properties
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installed-machine-evidence
+          path: ${{ runner.temp }}/.autoform-work/artifacts/machine/
+
+  source-proofs:
+    needs: build
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/source.yml
+    with:
+      distribution_artifact: python-distributions
+
+  repository-checks:
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/ci.yml
+
+  machine-checks:
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/machine.yml
+
+  publish:
+    if: github.event_name == 'release'
+    needs: [install, installed-proofs, source-proofs, repository-checks, machine-checks]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/autoform-lean
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - name: Publish using the configured PyPI trusted publisher
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -3,49 +3,25 @@ import Autoform.Lang.Core.Semantics
 /-!
 # General fuel monotonicity for the Core interpreter
 
-Open obligation #1 of `Autoform/Refine.lean` §5, closed here up to one honest exclusion.
+For all seven mutually recursive interpreter functions, increasing fuel preserves
+any result that is not `outOfFuel`, including its heap and statement-local environment.
+The proof is one induction over the simultaneous `FuelStep` statement.
 
-**What is proved.** For all seven mutually recursive interpreter functions of
-`Autoform/Lang/Core/Semantics.lean` — `evalExpr`, `applyFunc`, `applyClosure`, `evalList`,
-`evalPairs`, `execStmt`, `execFor` — raising the fuel budget cannot change a result that
-did not itself run out of fuel:
+`tryFinally` propagates interpreter holes and exhausted fuel without running the
+finalizer on a partial execution. Finalizers still run for every language-level exit,
+and may replace a pending return, exception, break or continue. This distinction
+removes the old fuel-monotonicity counterexample.
 
-    evalExpr ctx k h ρ e = (h', r) → r ≠ .outOfFuel → evalExpr ctx (k+1) h ρ e = (h', r)
-
-and, by induction on the gap, the same for any `k ≤ k'`. The "out of fuel" side condition
-is spelled per return type: `EResult.outOfFuel` for `evalExpr`/`applyFunc`/`applyClosure`,
-`Sum.inl EResult.outOfFuel` for `evalList`/`evalPairs` (which return
-`Heap × Sum EResult _`), and `Ctl.outOfFuel` — a constructor of `Ctl`, not of `EResult` —
-for `execStmt`/`execFor`.
-
-The proof is a single induction on the fuel `k`, over the seven-way conjunction
-`FuelStep`; every recursive call in the interpreter is at `k`, so one induction hypothesis
-serves all seven functions.
-
-**What is excluded, and why it must be.** `Stmt.tryFinally`, and nothing else. It is the
-only construct in the interpreter that does not propagate an out-of-fuel sub-result: when
-the body runs out of fuel and the finalizer exits abnormally, Python's rule makes the
-finalizer's outcome *discard* the body's, so the statement returns an ordinary result
-computed from a partially-mutated heap — and a larger budget mutates that heap further.
-`tryFinally_breaks_fuel_mono` at the bottom of this file exhibits a four-line program
-whose result is `return 1` at fuel 4 and `return 2` at fuel 5, neither of them
-`outOfFuel`. So the theorems carry `tfFreeS` side conditions (`fuelMonoExclusions` lists
-the exclusion as a value), and `tfFree_of_table` discharges them for any program whose
-function table contains no `tryFinally`.
+The `_all` entry points cover all statement constructors without a syntactic
+restriction. Older entry points retain their `TFFreeCtx`/`tfFreeS` arguments so
+previously generated proofs still elaborate; those premises are no longer needed
+by the checked induction. The predicates retain their original syntactic meaning.
 -/
 
 namespace Autoform.Core
 
-/-- `tryFinally`-freedom, the one syntactic exclusion this file needs.
-
-`Stmt.tryFinally` is the *only* interpreter construct whose result does not propagate an
-out-of-fuel sub-result: when the body runs out of fuel and the finalizer exits abnormally,
-the finalizer's outcome *discards* the body's, so the whole statement can return a
-perfectly ordinary result computed from a partially-mutated heap. Raising the budget lets
-the body get further, changing that heap — so fuel monotonicity is *false* in the presence
-of `tryFinally` (see `tryFinally_breaks_fuel_mono` at the bottom of this file for a
-machine-checked counterexample). Every other construct propagates `outOfFuel`, which is
-exactly what makes the induction go through. -/
+/-- Legacy predicate: this statement contains no `tryFinally`.
+The unrestricted `_all` theorems no longer require it. -/
 def tfFreeS : Stmt → Bool
   | .tryFinally _ _  => false
   | .seq a b         => tfFreeS a && tfFreeS b
@@ -65,36 +41,56 @@ def TFFreeCtx (ctx : Ctx) : Prop :=
   (∀ n fn, ctx.resolve n = some fn → tfFreeS fn.body = true) ∧
   (∀ c m fn, ctx.resolveMethod c m = some fn → tfFreeS fn.body = true)
 
+/-- Structural coverage witness used by the simultaneous induction. Every current
+statement constructor is covered, including finalizers. The older `tfFreeS` predicate
+remains available for previously generated proofs that explicitly mention it. -/
+private def controlCovered : Stmt → Bool
+  | .tryFinally a b | .seq a b => controlCovered a && controlCovered b
+  | .ifte _ a b => controlCovered a && controlCovered b
+  | .loop _ b | .breakBlock b | .forIn _ _ b => controlCovered b
+  | .tryCatch a _ b => controlCovered a && controlCovered b
+  | _ => true
+
+private theorem controlCovered_all (s : Stmt) : controlCovered s = true := by
+  induction s <;> simp_all [controlCovered]
+
+private def CoveredCtx (ctx : Ctx) : Prop :=
+  (∀ n fn, ctx.resolve n = some fn → controlCovered fn.body = true) ∧
+  (∀ c m fn, ctx.resolveMethod c m = some fn → controlCovered fn.body = true)
+
+private theorem coveredCtx_all (ctx : Ctx) : CoveredCtx ctx :=
+  ⟨fun _ fn _ => controlCovered_all fn.body, fun _ _ fn _ => controlCovered_all fn.body⟩
+
 /-- The seven-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
-  (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (e : Expr) (h' : Heap)
+  (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (e : Expr) (h' : Heap)
         (r : EResult),
       evalExpr ctx k h ρ e = (h', r) → r ≠ .outOfFuel →
       evalExpr ctx (k+1) h ρ e = (h', r))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (fn : Func), tfFreeS fn.body = true →
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (fn : Func), controlCovered fn.body = true →
         ∀ (s : Option Val) (vs : List Val) (kws : List (String × Val))
           (h' : Heap) (r : EResult),
       applyFunc ctx k h fn s vs kws = (h', r) → r ≠ .outOfFuel →
       applyFunc ctx (k+1) h fn s vs kws = (h', r))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (fn : Func), tfFreeS fn.body = true →
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (fn : Func), controlCovered fn.body = true →
         ∀ (cap : List (String × Val)) (vs : List Val) (kws : List (String × Val))
           (h' : Heap) (r : EResult),
       applyClosure ctx k h fn cap vs kws = (h', r) → r ≠ .outOfFuel →
       applyClosure ctx (k+1) h fn cap vs kws = (h', r))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (es : List Expr) (h' : Heap)
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (es : List Expr) (h' : Heap)
         (r : Sum EResult (List Val × List (String × Val))),
       evalList ctx k h ρ es = (h', r) → r ≠ .inl .outOfFuel →
       evalList ctx (k+1) h ρ es = (h', r))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (ps : List (Expr × Expr))
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (ps : List (Expr × Expr))
         (h' : Heap) (r : Sum EResult (List (Val × Val))),
       evalPairs ctx k h ρ ps = (h', r) → r ≠ .inl .outOfFuel →
       evalPairs ctx (k+1) h ρ ps = (h', r))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (s : Stmt),
-        tfFreeS s = true → ∀ (h' : Heap) (c : Ctl),
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (s : Stmt),
+        controlCovered s = true → ∀ (h' : Heap) (c : Ctl),
       execStmt ctx k h ρ s = (h', c) → c ≠ .outOfFuel →
       execStmt ctx (k+1) h ρ s = (h', c))
-  ∧ (∀ (ctx : Ctx), TFFreeCtx ctx → ∀ (h : Heap) (ρ : Env) (x : String) (vs : List Val)
-        (body : Stmt), tfFreeS body = true → ∀ (h' : Heap) (c : Ctl),
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (x : String) (vs : List Val)
+        (body : Stmt), controlCovered body = true → ∀ (h' : Heap) (c : Ctl),
       execFor ctx k h ρ x vs body = (h', c) → c ≠ .outOfFuel →
       execFor ctx (k+1) h ρ x vs body = (h', c))
 
@@ -642,7 +638,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy))
       · intro ctx hctx h fn hfree self? vs kws h' r hy hne
         simp only [applyFunc] at hy ⊢
-        by_cases hk : (kwargsRejected fn kws || posRejected fn vs) = true
+        by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
@@ -652,7 +648,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
              first | exact hy | (split <;> first | exact hy | simp_all))
       · intro ctx hctx h fn hfree cap vs kws h' r hy hne
         simp only [applyClosure] at hy ⊢
-        by_cases hk : (kwargsRejected fn kws || posRejected fn vs) = true
+        by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
         split at hy <;> first
@@ -817,7 +813,35 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                       | (cases hy; exact absurd rfl hne)
                       | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
                 all_goals (dsimp only at hy ⊢; exact hy)
-        | tryFinally a b => simp [tfFreeS] at hfree
+        | tryFinally a b =>
+            simp only [controlCovered, Bool.and_eq_true] at hfree
+            simp only [execStmt] at hy ⊢
+            rcases hA : execStmt ctx k h ρ a with ⟨h₁, c₁⟩
+            rw [hA] at hy
+            cases c₁ with
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | hole l =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact hy
+            | normal ρ' =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne
+            | ret v ρ' | exn v ρ' =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                dsimp only [Ctl.env] at hy ⊢
+                rcases hB : execStmt ctx k h₁ ρ' b with ⟨h₂, c₂⟩
+                rw [hB] at hy
+                cases c₂ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihS _ hctx _ _ _ hfree.2 _ _ hB (by simp)]; exact hy)
+            | brk ρ' | cont ρ' =>
+                rw [ihS _ hctx _ _ _ hfree.1 _ _ hA (by simp)]
+                dsimp only [Ctl.env] at hy ⊢
+                rcases hB : execStmt ctx k h₁ ρ' b with ⟨h₂, c₂⟩
+                rw [hB] at hy
+                cases c₂ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihS _ hctx _ _ _ hfree.2 _ _ hB (by simp)]; exact hy)
         | expr e =>
             simp only [execStmt] at hy ⊢
             rcases hA : evalExpr ctx k h ρ e with ⟨h₁, r₁⟩
@@ -899,7 +923,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                              | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy))
                 all_goals (dsimp only at hy ⊢; exact hy)
         | seq a b =>
-            simp only [tfFreeS, Bool.and_eq_true] at hfree
+            simp only [controlCovered, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢
             rcases hA : execStmt ctx k h ρ a with ⟨h₁, c₁⟩
             rw [hA] at hy
@@ -910,7 +934,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                    | exact hy
                    | exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne)
         | breakBlock a =>
-            have hb : tfFreeS a = true := by simpa [tfFreeS] using hfree
+            have hb : controlCovered a = true := by simpa [controlCovered] using hfree
             simp only [execStmt] at hy ⊢
             rcases hA : execStmt ctx k h ρ a with ⟨h₁, c₁⟩
             rw [hA] at hy
@@ -918,7 +942,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
               | (cases hy; exact absurd rfl hne)
               | (rw [ihS _ hctx _ _ _ hb _ _ hA (by simp)]; exact hy)
         | tryCatch a x hd =>
-            simp only [tfFreeS, Bool.and_eq_true] at hfree
+            simp only [controlCovered, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢
             rcases hA : execStmt ctx k h ρ a with ⟨h₁, c₁⟩
             rw [hA] at hy
@@ -929,7 +953,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                    | exact hy
                    | exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne)
         | ifte cnd t el =>
-            simp only [tfFreeS, Bool.and_eq_true] at hfree
+            simp only [controlCovered, Bool.and_eq_true] at hfree
             simp only [execStmt] at hy ⊢
             rcases hA : evalExpr ctx k h ρ cnd with ⟨h₁, r₁⟩
             rw [hA] at hy
@@ -946,7 +970,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 · rw [if_neg hv] at hy ⊢
                   exact ihS _ hctx _ _ _ hfree.2 _ _ hy hne
         | loop cnd bdy =>
-            have hb : tfFreeS bdy = true := by simpa [tfFreeS] using hfree
+            have hb : controlCovered bdy = true := by simpa [controlCovered] using hfree
             simp only [execStmt] at hy ⊢
             rcases hA : evalExpr ctx k h ρ cnd with ⟨h₁, r₁⟩
             rw [hA] at hy
@@ -969,7 +993,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                          | exact ihS _ hctx _ _ _ hfree _ _ hy hne)
                 · rw [if_neg hv] at hy ⊢; exact hy
         | forIn x e bdy =>
-            have hb : tfFreeS bdy = true := by simpa [tfFreeS] using hfree
+            have hb : controlCovered bdy = true := by simpa [controlCovered] using hfree
             simp only [execStmt] at hy ⊢
             rcases hA : evalExpr ctx k h ρ e with ⟨h₁, r₁⟩
             rw [hA] at hy
@@ -1058,11 +1082,8 @@ theorem tfFree_of_table {ctx : Ctx}
 
 /-! ## Public statements
 
-Each of the seven interpreter functions, at `k` and at `k+1`, and then the `k ≤ k'`
-corollary. All carry `TFFreeCtx` (no reachable function body uses `tryFinally`) and, where
-the function takes a statement, that the statement is `tryFinally`-free. See `tfFreeS` and
-`tryFinally_breaks_fuel_mono` for why that exclusion is necessary rather than an artefact
-of the proof. -/
+The older entry points retain their syntactic premises for existing generated code.
+The unrestricted `_all` versions below establish the same results without them. -/
 
 /-- Raising the budget by one cannot change an expression result that did not run out of
 fuel. -/
@@ -1070,7 +1091,7 @@ theorem evalExpr_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : 
     {ρ : Env} {e : Expr} {r : EResult}
     (he : evalExpr ctx k h ρ e = (h', r)) (hne : r ≠ .outOfFuel) :
     evalExpr ctx (k+1) h ρ e = (h', r) :=
-  (fuelStep k).1 ctx hctx h ρ e h' r he hne
+  (fuelStep k).1 ctx (coveredCtx_all ctx) h ρ e h' r he hne
 
 /-- `applyFunc` version. -/
 theorem applyFunc_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
@@ -1079,7 +1100,7 @@ theorem applyFunc_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' :
     {r : EResult} (he : applyFunc ctx k h fn self? vs kws = (h', r))
     (hne : r ≠ .outOfFuel) :
     applyFunc ctx (k+1) h fn self? vs kws = (h', r) :=
-  (fuelStep k).2.1 ctx hctx h fn hfn self? vs kws h' r he hne
+  (fuelStep k).2.1 ctx (coveredCtx_all ctx) h fn (controlCovered_all fn.body) self? vs kws h' r he hne
 
 /-- `applyClosure` version. -/
 theorem applyClosure_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
@@ -1087,7 +1108,7 @@ theorem applyClosure_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h
     {vs : List Val} {kws : List (String × Val)} {r : EResult}
     (he : applyClosure ctx k h fn cap vs kws = (h', r)) (hne : r ≠ .outOfFuel) :
     applyClosure ctx (k+1) h fn cap vs kws = (h', r) :=
-  (fuelStep k).2.2.1 ctx hctx h fn hfn cap vs kws h' r he hne
+  (fuelStep k).2.2.1 ctx (coveredCtx_all ctx) h fn (controlCovered_all fn.body) cap vs kws h' r he hne
 
 /-- `evalList` version. Its "out of fuel" is spelled `Sum.inl EResult.outOfFuel`, since the
 function returns `Sum EResult (List Val × List (String × Val))`. -/
@@ -1095,14 +1116,14 @@ theorem evalList_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : 
     {ρ : Env} {es : List Expr} {r : Sum EResult (List Val × List (String × Val))}
     (he : evalList ctx k h ρ es = (h', r)) (hne : r ≠ .inl .outOfFuel) :
     evalList ctx (k+1) h ρ es = (h', r) :=
-  (fuelStep k).2.2.2.1 ctx hctx h ρ es h' r he hne
+  (fuelStep k).2.2.2.1 ctx (coveredCtx_all ctx) h ρ es h' r he hne
 
 /-- `evalPairs` version, same `Sum.inl EResult.outOfFuel` spelling. -/
 theorem evalPairs_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
     {ρ : Env} {ps : List (Expr × Expr)} {r : Sum EResult (List (Val × Val))}
     (he : evalPairs ctx k h ρ ps = (h', r)) (hne : r ≠ .inl .outOfFuel) :
     evalPairs ctx (k+1) h ρ ps = (h', r) :=
-  (fuelStep k).2.2.2.2.1 ctx hctx h ρ ps h' r he hne
+  (fuelStep k).2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ ps h' r he hne
 
 /-- `execStmt` version. Its "out of fuel" is `Ctl.outOfFuel`, a constructor of `Ctl`
 rather than of `EResult`. -/
@@ -1110,14 +1131,14 @@ theorem execStmt_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : 
     {ρ : Env} {st : Stmt} (hst : tfFreeS st = true) {c : Ctl}
     (he : execStmt ctx k h ρ st = (h', c)) (hne : c ≠ .outOfFuel) :
     execStmt ctx (k+1) h ρ st = (h', c) :=
-  (fuelStep k).2.2.2.2.2.1 ctx hctx h ρ st hst h' c he hne
+  (fuelStep k).2.2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ st (controlCovered_all st) h' c he hne
 
 /-- `execFor` version, also with `Ctl.outOfFuel`. -/
 theorem execFor_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : Heap}
     {ρ : Env} {x : String} {vs : List Val} {body : Stmt} (hb : tfFreeS body = true)
     {c : Ctl} (he : execFor ctx k h ρ x vs body = (h', c)) (hne : c ≠ .outOfFuel) :
     execFor ctx (k+1) h ρ x vs body = (h', c) :=
-  (fuelStep k).2.2.2.2.2.2 ctx hctx h ρ x vs body hb h' c he hne
+  (fuelStep k).2.2.2.2.2.2 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
 
 /-- **Fuel monotonicity for expressions**: any larger budget gives the same heap and the
 same result. -/
@@ -1200,43 +1221,163 @@ theorem execFor_fuel_mono {ctx : Ctx} (hctx : TFFreeCtx ctx) {k k' : Nat} {h h' 
   | zero => exact he
   | succ n ih => exact execFor_fuel_succ hctx hb ih hne
 
-/-! ## The excluded case, exhibited
+/-! ## Unrestricted fuel monotonicity
 
-Not an artefact of the proof: `tryFinally` really does break fuel monotonicity. -/
+These entry points also cover `tryFinally`; no syntactic exclusions are required. -/
 
-/-- A context with no functions at all — the exclusion has nothing to do with calls. -/
+/-- Raising the budget by one cannot change an expression result that did not run out of
+fuel. -/
+theorem evalExpr_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {ρ : Env} {e : Expr} {r : EResult}
+    (he : evalExpr ctx k h ρ e = (h', r)) (hne : r ≠ .outOfFuel) :
+    evalExpr ctx (k+1) h ρ e = (h', r) :=
+  (fuelStep k).1 ctx (coveredCtx_all ctx) h ρ e h' r he hne
+
+/-- `applyFunc` version. -/
+theorem applyFunc_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {fn : Func} {self? : Option Val} {vs : List Val}
+    {kws : List (String × Val)}
+    {r : EResult} (he : applyFunc ctx k h fn self? vs kws = (h', r))
+    (hne : r ≠ .outOfFuel) :
+    applyFunc ctx (k+1) h fn self? vs kws = (h', r) :=
+  (fuelStep k).2.1 ctx (coveredCtx_all ctx) h fn (controlCovered_all fn.body) self? vs kws h' r he hne
+
+/-- `applyClosure` version. -/
+theorem applyClosure_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {fn : Func} {cap : List (String × Val)}
+    {vs : List Val} {kws : List (String × Val)} {r : EResult}
+    (he : applyClosure ctx k h fn cap vs kws = (h', r)) (hne : r ≠ .outOfFuel) :
+    applyClosure ctx (k+1) h fn cap vs kws = (h', r) :=
+  (fuelStep k).2.2.1 ctx (coveredCtx_all ctx) h fn (controlCovered_all fn.body) cap vs kws h' r he hne
+
+/-- `evalList` version. Its "out of fuel" is spelled `Sum.inl EResult.outOfFuel`, since the
+function returns `Sum EResult (List Val × List (String × Val))`. -/
+theorem evalList_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val × List (String × Val))}
+    (he : evalList ctx k h ρ es = (h', r)) (hne : r ≠ .inl .outOfFuel) :
+    evalList ctx (k+1) h ρ es = (h', r) :=
+  (fuelStep k).2.2.2.1 ctx (coveredCtx_all ctx) h ρ es h' r he hne
+
+/-- `evalPairs` version, same `Sum.inl EResult.outOfFuel` spelling. -/
+theorem evalPairs_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {ρ : Env} {ps : List (Expr × Expr)} {r : Sum EResult (List (Val × Val))}
+    (he : evalPairs ctx k h ρ ps = (h', r)) (hne : r ≠ .inl .outOfFuel) :
+    evalPairs ctx (k+1) h ρ ps = (h', r) :=
+  (fuelStep k).2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ ps h' r he hne
+
+/-- `execStmt` version. Its "out of fuel" is `Ctl.outOfFuel`, a constructor of `Ctl`
+rather than of `EResult`. -/
+theorem execStmt_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {ρ : Env} {st : Stmt} {c : Ctl}
+    (he : execStmt ctx k h ρ st = (h', c)) (hne : c ≠ .outOfFuel) :
+    execStmt ctx (k+1) h ρ st = (h', c) :=
+  (fuelStep k).2.2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ st (controlCovered_all st) h' c he hne
+
+/-- `execFor` version, also with `Ctl.outOfFuel`. -/
+theorem execFor_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
+    {ρ : Env} {x : String} {vs : List Val} {body : Stmt} {c : Ctl} (he : execFor ctx k h ρ x vs body = (h', c)) (hne : c ≠ .outOfFuel) :
+    execFor ctx (k+1) h ρ x vs body = (h', c) :=
+  (fuelStep k).2.2.2.2.2.2 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
+
+/-- **Fuel monotonicity for expressions**: any larger budget gives the same heap and the
+same result. -/
+theorem evalExpr_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {ρ : Env} {e : Expr} {r : EResult} (hk : k ≤ k')
+    (he : evalExpr ctx k h ρ e = (h', r)) (hne : r ≠ .outOfFuel) :
+    evalExpr ctx k' h ρ e = (h', r) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact evalExpr_fuel_succ_all ih hne
+
+/-- `applyFunc`, any larger budget. -/
+theorem applyFunc_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {fn : Func} {self? : Option Val} {vs : List Val}
+    {kws : List (String × Val)}
+    {r : EResult} (hk : k ≤ k') (he : applyFunc ctx k h fn self? vs kws = (h', r))
+    (hne : r ≠ .outOfFuel) : applyFunc ctx k' h fn self? vs kws = (h', r) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact applyFunc_fuel_succ_all ih hne
+
+/-- `applyClosure`, any larger budget. -/
+theorem applyClosure_fuel_mono_all {ctx : Ctx} {k k' : Nat}
+    {h h' : Heap} {fn : Func} {cap : List (String × Val)} {vs : List Val} {kws : List (String × Val)}
+    {r : EResult} (hk : k ≤ k')
+    (he : applyClosure ctx k h fn cap vs kws = (h', r)) (hne : r ≠ .outOfFuel) :
+    applyClosure ctx k' h fn cap vs kws = (h', r) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact applyClosure_fuel_succ_all ih hne
+
+/-- `evalList`, any larger budget. -/
+theorem evalList_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {ρ : Env} {es : List Expr} {r : Sum EResult (List Val × List (String × Val))} (hk : k ≤ k')
+    (he : evalList ctx k h ρ es = (h', r)) (hne : r ≠ .inl .outOfFuel) :
+    evalList ctx k' h ρ es = (h', r) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact evalList_fuel_succ_all ih hne
+
+/-- `evalPairs`, any larger budget. -/
+theorem evalPairs_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {ρ : Env} {ps : List (Expr × Expr)} {r : Sum EResult (List (Val × Val))} (hk : k ≤ k')
+    (he : evalPairs ctx k h ρ ps = (h', r)) (hne : r ≠ .inl .outOfFuel) :
+    evalPairs ctx k' h ρ ps = (h', r) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact evalPairs_fuel_succ_all ih hne
+
+/-- **Fuel monotonicity for statements**, any larger budget. -/
+theorem execStmt_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {ρ : Env} {st : Stmt} {c : Ctl} (hk : k ≤ k')
+    (he : execStmt ctx k h ρ st = (h', c)) (hne : c ≠ .outOfFuel) :
+    execStmt ctx k' h ρ st = (h', c) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact execStmt_fuel_succ_all ih hne
+
+/-- `execFor`, any larger budget. -/
+theorem execFor_fuel_mono_all {ctx : Ctx} {k k' : Nat} {h h' : Heap}
+    {ρ : Env} {x : String} {vs : List Val} {body : Stmt} {c : Ctl} (hk : k ≤ k') (he : execFor ctx k h ρ x vs body = (h', c))
+    (hne : c ≠ .outOfFuel) : execFor ctx k' h ρ x vs body = (h', c) := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_le hk
+  clear hk
+  induction d with
+  | zero => exact he
+  | succ n ih => exact execFor_fuel_succ_all ih hne
+
+/-! ## Incomplete execution is never masked by a finalizer -/
+
 def cexCtx : Ctx := { dialect := .python, table := [], globals := 0 }
-
-/-- A heap holding just the module-globals frame. -/
 def cexHeap : Heap := [{ cls := "<module>", fields := [], captured := [] }]
 
-/-- `try: x = 1; x = 2 finally: return x`.
-
-With 4 units of fuel the body runs out after the first assignment; the finalizer exits
-abnormally, which *discards* the body's pending `outOfFuel` and returns `x = 1`. With 5
-units the body completes and the finalizer sees `x = 2`. Both results are ordinary — no
-`outOfFuel` anywhere — and they differ. -/
+/-- `try: x = 1; x = 2 finally: return x`, formerly a fuel-monotonicity counterexample. -/
 def cexStmt : Stmt :=
   .tryFinally
     (.seq (.setGlobal "x" (.lit (.int 1)))
       (.seq (.setGlobal "x" (.lit (.int 2))) .skip))
     (.ret (.name "x"))
 
-/-- **The side condition is necessary.** A `tryFinally` statement whose result at fuel 4 is
-`return 1` and at fuel 5 is `return 2`, neither of them `outOfFuel`. So the unrestricted
-form of the theorem — `execStmt ctx k h ρ s = (h', c) → c ≠ .outOfFuel →
-execStmt ctx (k+1) h ρ s = (h', c)` — is false, and `tfFreeS` is not a proof artefact. -/
-theorem tryFinally_breaks_fuel_mono :
-    (execStmt cexCtx 4 cexHeap [] cexStmt).2 = .ret (.int 1) ∧
-    (execStmt cexCtx 5 cexHeap [] cexStmt).2 = .ret (.int 2) ∧
-    tfFreeS cexStmt = false :=
-  ⟨rfl, rfl, rfl⟩
+/-- The incomplete body remains out of fuel; only a complete body reaches the finalizer. -/
+theorem tryFinally_preserves_incomplete :
+    (execStmt cexCtx 4 cexHeap [] cexStmt).2 = .outOfFuel ∧
+    (execStmt cexCtx 5 cexHeap [] cexStmt).2 = .ret (.int 2) [] :=
+  ⟨rfl, rfl⟩
 
-/-- The complete list of interpreter constructors excluded from fuel monotonicity, as a
-machine-checkable value. Exactly one: `Stmt.tryFinally`, for the reason exhibited by
-`tryFinally_breaks_fuel_mono`. Every other `Expr` and `Stmt` constructor, and all seven
-mutually recursive interpreter functions, are covered. -/
-def fuelMonoExclusions : List String := ["Stmt.tryFinally"]
+/-- No statement constructors are excluded by the unrestricted theorems. -/
+def fuelMonoExclusions : List String := []
 
 -- Axiom audit: these must list only `propext`, `Classical.choice`, `Quot.sound`.
 #print axioms evalExpr_fuel_mono
@@ -1247,6 +1388,8 @@ def fuelMonoExclusions : List String := ["Stmt.tryFinally"]
 #print axioms execStmt_fuel_mono
 #print axioms execFor_fuel_mono
 #print axioms tfFree_of_table
-#print axioms tryFinally_breaks_fuel_mono
+#print axioms tryFinally_preserves_incomplete
+#print axioms execStmt_fuel_mono_all
+#print axioms applyFunc_fuel_mono_all
 
 end Autoform.Core

@@ -52,9 +52,12 @@ import os
 import random
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+
+import proof_artifacts
 
 # ---------------------------------------------------------------------------
 # declaration map: which source lines belong to which declaration
@@ -71,6 +74,8 @@ DEF_KINDS = {"def", "abbrev", "instance"}
 # thing the theorem is stated against, which proves nothing. They are parsed only so
 # their lines are not misattributed to the preceding definition.
 SPEC_KINDS = {"inductive", "structure", "class"}
+COMMAND_RE = re.compile(r'^\s*(?:#\w+|(?:import|open|namespace|section|end|variable|universe|'
+                        r'set_option|attribute|run_cmd|initialize|syntax|macro|elab)\b)')
 
 
 class Decl:
@@ -83,11 +88,16 @@ class Decl:
 
 def parse_decls(lines):
     """Return declarations with 1-based inclusive line ranges."""
+    from audit_all import strip_lean_comments
     decls = []
-    for i, line in enumerate(lines, start=1):
+    for i, line in enumerate(strip_lean_comments(''.join(lines)).splitlines(), start=1):
         m = DECL_RE.match(line)
         if m:
             decls.append(Decl(m.group(1), m.group(2) or f"<anon@{i}>", i))
+        elif COMMAND_RE.match(line):
+            # An audit command or output pin after a theorem is not part of its
+            # proof. Its diagnostic cannot establish that the theorem failed.
+            decls.append(Decl('command', f'<command@{i}>', i))
     for j, d in enumerate(decls):
         d.end = (decls[j + 1].start - 1) if j + 1 < len(decls) else len(lines)
     return decls
@@ -254,6 +264,15 @@ AST_OP_ALONE = re.compile(r'^(\s*")([^"]+)(")\s*$')
 AST_OP_HEAD = re.compile(r'\.(binop|unop)\s*$')
 AST_UNOP_SWAPS = {"-": "+", "!": "-", "~": "-"}
 
+
+def swapped_operator(operator, swaps):
+    """Keep the source family and width when perturbing typed operator tags."""
+    if operator.startswith(("num:", "py:", "js:")):
+        prefix, separator, suffix = operator.rpartition(":")
+        changed = swaps.get(suffix)
+        return prefix + separator + changed if changed else None
+    return swaps.get(operator)
+
 # `.inOp neg` / `.isOp neg` — the negation flag. Flipping it inverts every membership or
 # identity test, which is a silent wrong answer rather than a crash.
 AST_POLARITY = re.compile(r'(\.(?:inOp|isOp)\s+)(true|false)\b')
@@ -329,7 +348,7 @@ def gen_mutants_generated(lines, decls):
                 cand.append((raw[:m.start()] + repl + raw[m.end():], op))
 
             for m in AST_BINOP.finditer(raw):
-                nw = AST_BINOP_SWAPS.get(m.group(2))
+                nw = swapped_operator(m.group(2), AST_BINOP_SWAPS)
                 if nw:
                     sub_at(m, m.group(1) + nw + m.group(3), f"ast-binop:{m.group(2)}->{nw}")
             # operator string on a continuation line of a pretty-printed `.binop`/`.unop`
@@ -341,12 +360,12 @@ def gen_mutants_generated(lines, decls):
                 head = AST_OP_HEAD.search(lines[prev - 1].rstrip()) if prev >= d.start else None
                 if head:
                     swaps = AST_BINOP_SWAPS if head.group(1) == "binop" else AST_UNOP_SWAPS
-                    nw = swaps.get(m.group(2))
+                    nw = swapped_operator(m.group(2), swaps)
                     if nw:
                         cand.append((m.group(1) + nw + m.group(3) + "\n",
                                      f"ast-{head.group(1)}:{m.group(2)}->{nw}"))
             for m in AST_UNOP.finditer(raw):
-                nw = AST_UNOP_SWAPS.get(m.group(2))
+                nw = swapped_operator(m.group(2), AST_UNOP_SWAPS)
                 if nw:
                     sub_at(m, m.group(1) + nw + m.group(3), f"ast-unop:{m.group(2)}->{nw}")
             for m in AST_POLARITY.finditer(raw):
@@ -416,15 +435,38 @@ def lake_env():
 
 
 def run_build(root, module, timeout):
+    process = None
+    timed_out = False
     try:
-        r = subprocess.run(["lake", "build", module], cwd=root, env=lake_env(),
-                           capture_output=True, text=True, timeout=timeout)
-        return r.returncode, (r.stdout or "") + (r.stderr or ""), False
-    except subprocess.TimeoutExpired as e:
-        out = (e.stdout or b"") if isinstance(e.stdout, bytes) else (e.stdout or "")
-        if isinstance(out, bytes):
-            out = out.decode("utf-8", "replace")
-        return 1, out, True
+        process = subprocess.Popen(["lake", "build", module], cwd=root, env=lake_env(),
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, start_new_session=True)
+        try:
+            out, err = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            os.killpg(process.pid, signal.SIGKILL)
+            try:
+                out, err = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                # A detached descendant may retain the pipe. Keep cleanup bounded.
+                out, err = exc.stdout or b'', exc.stderr or b''
+                out = out.decode('utf-8', 'replace') if isinstance(out, bytes) else out
+                err = err.decode('utf-8', 'replace') if isinstance(err, bytes) else err
+        return (1 if timed_out else process.returncode), (out or '') + (err or ''), timed_out
+    except OSError as exc:
+        return 127, str(exc), timed_out
+    finally:
+        if process is not None:
+            # Killing lake alone leaves its Lean compiler alive and able to write
+            # stale build artifacts during the subsequent restoration build.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+            process.stdout.close()
+            process.stderr.close()
 
 
 # Lean/lake has emitted diagnostics in two shapes across toolchain versions:
@@ -438,25 +480,21 @@ _ERR_POS_FIRST = re.compile(r'^(.*?):(\d+):(\d+):\s*error', re.M)
 _ERR_SEV_FIRST = re.compile(r'^error:\s*(\S.*?):(\d+):(\d+):', re.M)
 
 
-def all_error_lines(output):
-    """(basename, line) for every positional error in the build output, whatever file."""
+def all_error_lines(output, root=None):
+    """Positional errors; use canonical paths when attributing a real build."""
     out = []
     for pat in (_ERR_POS_FIRST, _ERR_SEV_FIRST):
         for m in pat.finditer(output):
             path = m.group(1).strip()
-            out.append((os.path.basename(path), int(m.group(2))))
+            name = os.path.realpath(os.path.join(root, path)) if root is not None else os.path.basename(path)
+            out.append((name, int(m.group(2))))
     return out
 
 
-def error_lines(output, target_basename):
+def error_lines(output, target, root=None):
     """Line numbers carrying an error, restricted to the named file."""
-    out = []
-    for pat in (_ERR_POS_FIRST, _ERR_SEV_FIRST):
-        for m in pat.finditer(output):
-            path = m.group(1).strip()
-            if target_basename in path or path in ("", "."):
-                out.append(int(m.group(2)))
-    return sorted(set(out))
+    name = os.path.realpath(target) if root is not None else os.path.basename(target)
+    return sorted({line for path, line in all_error_lines(output, root) if path == name})
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +536,7 @@ def main():
                          "mutant population is reported separately as coverage. Without "
                          "this the two are conflated and every theorem looks weak simply "
                          "because most mutants are in functions it never mentions.")
+    ap.add_argument("--spec-report", help="use proved specification subjects from synth_specs.py")
     ap.add_argument("--generated", action="store_true",
                     help="force the translated-module operators (auto-enabled for files "
                          "under Autoform/Generated/)")
@@ -530,6 +569,28 @@ def main():
     build_module = args.spec_module or args.module
     generated = args.generated or ("Autoform/Generated/" in path.replace(os.sep, "/"))
 
+    if args.spec_report:
+        with open(args.spec_report, encoding="utf-8") as stream:
+            evidence = json.load(stream)
+        if (not evidence.get("build_clean") or
+                args.module != "Autoform.Generated." + evidence.get("module", "") or
+                build_module != "Autoform.SpecsGen." + evidence.get("module", "")):
+            ap.error("specification report does not match the built subject and proof module")
+        bindings = evidence.get('artifact_hashes', {})
+        if (bindings.get('model') != proof_artifacts.digest(path)
+                or bindings.get('proof') != proof_artifacts.digest(spec_path)):
+            ap.error('specification report does not match the current model and proof source')
+        proven = [s for s in evidence.get("specs", []) if s.get("proved") and s.get("definition")]
+        if not proven:
+            ap.error("specification report has no proved subjects")
+        known_defs = {d.name for d in decls if d.kind in DEF_KINDS}
+        known_theorems = {d.name for d in spec_decls if d.kind in THEOREM_KINDS}
+        if any(s["definition"] not in known_defs or s["id"] not in known_theorems for s in proven):
+            ap.error("specification report names a missing definition or theorem")
+        args.theorems = args.theorems or ",".join(s["id"] for s in proven)
+        args.subject = args.subject or ";".join(s["id"] + "=" + s["definition"] for s in proven)
+        args.decls = args.decls or ",".join(sorted({s["definition"] for s in proven}))
+
     if args.theorems:
         targets = [t.strip() for t in args.theorems.split(",") if t.strip()]
     else:
@@ -549,215 +610,254 @@ def main():
     # otherwise leaves a mutant on disk, where a concurrent commit can capture it. The
     # backup is written once, before anything is touched, and removed on a clean exit.
     backup = path + ".mutate-backup"
-    with open(backup, "w", encoding="utf-8") as f:
-        f.write(original)
-
-    all_mutants = (gen_mutants_generated(lines, decls) if generated
-                   else gen_mutants(lines, decls))
-    if args.decls:
-        keep = {d.strip() for d in args.decls.split(",") if d.strip()}
-        all_mutants = [m for m in all_mutants if m.decl in keep]
-        missing = keep - {m.decl for m in all_mutants}
-        for d in sorted(missing):
-            print(f"warning: no mutant generated for declaration {d!r}")
-    random.shuffle(all_mutants)
-    mutants = all_mutants[:args.max_mutants]
-
-    print(f"file      : {path}")
-    print(f"module    : {args.module}")
-    print(f"operators : {'translated-module (AST literal)' if generated else 'Lean definition'}")
-    if spec_path != path:
-        print(f"spec file : {spec_path}")
-        print(f"built     : {build_module}")
-    print(f"theorems  : {', '.join(targets)}")
-    print(f"mutants   : {len(mutants)} of {len(all_mutants)} generated\n")
-
-    print("baseline build ...", flush=True)
-    rc, out, to = run_build(root, build_module, args.timeout)
-    if rc != 0:
-        print("BASELINE FAILS TO BUILD -- fix the file first.")
-        print(out[-2000:])
-        # A gate that cannot run must leave a record saying so. Returning with no JSON
-        # is indistinguishable, downstream, from a gate that was never asked to run, and
-        # a missing artifact reads as "nothing to report" rather than "the subject does
-        # not compile". The report is written with an explicit failure status and no
-        # theorem scores at all, so nothing can mistake it for evidence.
-        with open(args.json_path, "w", encoding="utf-8") as f:
-            json.dump({"file": path, "module": args.module,
-                       "spec_file": spec_path if spec_path != path else None,
-                       "spec_module": build_module,
-                       "status": "BASELINE_FAILED",
-                       "reason": "the module under test does not build before any "
-                                 "mutation is applied; no mutation verdict is possible",
-                       "build_tail": out[-4000:],
-                       "theorems": {}, "mutants": []}, f, indent=2)
-        print(f"wrote {os.path.abspath(args.json_path)} (status BASELINE_FAILED)")
-        return 3
-    print("baseline ok\n")
-
-    stats = {t: {"killed": 0, "survived": 0, "survivors": []} for t in targets}
-    invalid, records, coarse, inconclusive, pinned = 0, [], 0, 0, 0
-
     try:
-        for i, mut in enumerate(mutants, 1):
-            new_lines = list(lines)
-            new_lines[mut.line - 1] = mut.new
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("".join(new_lines))
-
-            rc, out, timed_out = run_build(root, build_module, args.timeout)
-            # A failure that names no source position is not a verdict: it is lock
-            # contention, a half-written dependency, or a missing `.olean` from a
-            # concurrent build. Retry before believing it — otherwise the gate reports a
-            # kill for a theorem that was never even elaborated.
-            for _ in range(2):
-                if rc == 0 or timed_out or all_error_lines(out):
-                    break
-                rc, out, timed_out = run_build(root, build_module, args.timeout)
-            # Errors in the *mutated* file mean the mutant is not well-typed; errors in
-            # the *spec* file mean a theorem noticed. When the two are the same file
-            # these collapse to the original behaviour.
-            errs = error_lines(out, base)
-            spec_errs = errs if spec_path == path else error_lines(out, spec_base)
-            # Errors in files that are neither the mutated file nor the spec file are
-            # somebody else's problem: a broken dependency, a concurrent edit, a stale
-            # cache. Counting such a build failure as a "kill" would credit the theorem
-            # with catching a bug it never saw — the exact self-deception this gate
-            # exists to prevent — so those mutants are reported INCONCLUSIVE and left
-            # out of the score entirely.
-            foreign = [l for l in all_error_lines(out)
-                       if l[0] not in (base, spec_base)]
-            hit_defs = {decl_at(decls, l).name for l in errs
-                        if decl_at(decls, l) and decl_at(decls, l).kind in DEF_KINDS}
-            hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
-                        if decl_at(spec_decls, l)
-                        and decl_at(spec_decls, l).kind in THEOREM_KINDS}
-            # An error in the spec file that lands on no theorem is (almost always) a
-            # `#guard_msgs` pin: the mutant WAS caught, but not by a theorem. Crediting it
-            # to every theorem would be the coarse fallback wearing a disguise, so it is
-            # recorded separately and changes no theorem's score.
-            pin_only = bool(spec_errs) and not hit_thms
-
-            rec = mut.to_json()
-            if rc != 0 and not errs and not spec_errs and foreign:
-                rec["verdict"] = "inconclusive"
-                rec["foreign_errors"] = sorted({f for f, _ in foreign})
-                inconclusive += 1
-                print(f"[{i}/{len(mutants)}] INCONCL. {mut.op:22s} L{mut.line} ({mut.decl}) "
-                      f"— build broke in {', '.join(sorted({f for f, _ in foreign}))}, "
-                      f"nothing to attribute")
-            elif rc != 0 and hit_defs and not hit_thms:
-                # the mutation broke the definition itself: not a behavioural bug
-                rec["verdict"] = "invalid"
-                invalid += 1
-                print(f"[{i}/{len(mutants)}] INVALID  {mut.op:22s} L{mut.line} ({mut.decl}) "
-                      f"— mutant does not typecheck")
-            else:
-                rec["verdict"] = {}
-                rec["timeout"] = timed_out
-                if pin_only:
-                    rec["caught_by_pins"] = True
-                    pinned += 1
-                if rc != 0 and not errs and not spec_errs:
-                    coarse += 1
-                    rec["attribution"] = "coarse"
-                    rec["build_tail"] = out[-600:]
-                for t in targets:
-                    # A build failure with no attributable line is counted as a kill for
-                    # every theorem — coarse, but it must not fire merely because the
-                    # errors landed in the *spec* file, which is the normal cross-file
-                    # case and is attributable via `hit_thms`.
-                    unattributable = rc != 0 and not errs and not spec_errs
-                    dead = (t in hit_thms) or timed_out or unattributable
-                    if dead:
-                        stats[t]["killed"] += 1
-                    else:
-                        stats[t]["survived"] += 1
-                        stats[t]["survivors"].append(mut.to_json())
-                    rec["verdict"][t] = "killed" if dead else "survived"
-                tag = ",".join(f"{t}={v}" for t, v in rec["verdict"].items())
-                mark = "KILLED " if all(v == "killed" for v in rec["verdict"].values()) else "SURVIVED"
-                print(f"[{i}/{len(mutants)}] {mark} {mut.op:22s} L{mut.line} ({mut.decl}) {tag}")
-            records.append(rec)
-    finally:
-        with open(path, "w", encoding="utf-8") as f:
+        with open(backup, "x", encoding="utf-8") as f:
             f.write(original)
-        if os.path.exists(backup):
-            os.remove(backup)
-        # make sure the restored file is what the build cache sees next time
-        run_build(root, build_module, args.timeout)
+    except FileExistsError:
+        print('REFUSING TO MUTATE: existing backup may belong to an active or interrupted run: ' + backup)
+        return 2
 
-    print("\n=== mutation score ===")
-    # `module` is the module that was MUTATED, not the one that was rebuilt: scripts/sacm.py
-    # attributes G4 (specification non-vacuity) by this field, and the claim being supported
-    # is a claim about the subject of the mutations.
-    report = {"file": path, "module": args.module, "seed": args.seed,
-              "status": "OK",
-              "operators": "generated-ast" if generated else "lean-def",
-              "spec_file": spec_path if spec_path != path else None,
-              "spec_module": build_module,
-              "decls": sorted({m.decl for m in mutants}),
-              "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
-              "invalid": invalid, "inconclusive": inconclusive,
-              "theorems": {}, "mutants": records}
-    subject = {}
-    if args.subject:
-        for entry in args.subject.split(";"):
-            if "=" in entry:
-                t, ds = entry.split("=", 1)
-                subject[t.strip()] = [d.strip() for d in ds.split("+") if d.strip()]
-        report["subject_map"] = subject
+    backup_owned = True
 
-    exit_code = 0
-    for t in targets:
-        k, s = stats[t]["killed"], stats[t]["survived"]
-        coverage = (k / (k + s)) if (k + s) else 0.0
-        if t in subject:
-            on = [r for r in records if isinstance(r.get("verdict"), dict)
-                  and r["decl"] in subject[t]]
-            ok = sum(1 for r in on if r["verdict"][t] == "killed")
-            k, s = ok, len(on) - ok
-        score = (k / (k + s)) if (k + s) else 0.0
-        if t in subject and (k + s) == 0:
-            verdict = "UNTESTED"
-        else:
-            verdict = "HAS TEETH" if score == 1.0 else ("WEAK" if score > 0 else "VACUOUS")
-        scope = "on-subject" if t in subject else "all-mutants"
-        print(f"{t}: killed {k}, survived {s}  score {score:.2%} ({scope})  "
-              f"[{verdict}]" + (f"  coverage {coverage:.2%}" if t in subject else ""))
-        if t in subject:
-            stats[t]["survivors"] = [r for r in stats[t]["survivors"]
-                                     if r["decl"] in subject[t]]
-        for sv in stats[t]["survivors"]:
-            print(f"    survivor: {sv['decl']} L{sv['line']} [{sv['op']}]")
-            print(f"      - {sv['before']}")
-            print(f"      + {sv['after']}")
-        report["theorems"][t] = {"killed": k, "survived": s, "score": score,
-                                 "scope": scope, "coverage_score": coverage,
-                                 "verdict": verdict, "survivors": stats[t]["survivors"]}
-        if s:
-            exit_code = 1
-    if invalid:
-        print(f"({invalid} mutants discarded: they broke the definition's own typechecking)")
-    if inconclusive:
-        print(f"({inconclusive} mutants INCONCLUSIVE: the build failed in an unrelated "
-              f"file — concurrent edit or broken dependency — so no verdict is honest. "
-              f"They are excluded from the score, not counted as kills.)")
-    if coarse:
-        print(f"WARNING: {coarse} mutant(s) failed the build with no line attributable to "
-              f"either file. Those were credited to EVERY theorem, so the per-theorem "
-              f"breakdown for them is not trustworthy — see STRATEGY.md 14's caveat.")
-    if pinned:
-        print(f"({pinned} mutant(s) were caught by a `#guard_msgs` pin rather than by any "
-              f"theorem. Pins are real detection, but they are not proofs, so they are "
-              f"reported here and credited to NO theorem's score.)")
-    report["coarse_attributions"] = coarse
-    report["caught_by_pins_only"] = pinned
+    def restore_source():
+        nonlocal backup_owned
+        if backup_owned:
+            with open(path, "w", encoding="utf-8") as stream:
+                stream.write(original)
+            if os.path.exists(backup):
+                os.remove(backup)
+            backup_owned = False
 
-    with open(args.json_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
-    print(f"\nwrote {os.path.abspath(args.json_path)}")
-    return exit_code
+    # Cover candidate generation and the baseline too: an interrupt before the
+    # mutation loop must not strand its exclusive backup marker.
+    try:
+        all_mutants = (gen_mutants_generated(lines, decls) if generated
+                       else gen_mutants(lines, decls))
+        if args.decls:
+            keep = {d.strip() for d in args.decls.split(",") if d.strip()}
+            all_mutants = [m for m in all_mutants if m.decl in keep]
+            missing = keep - {m.decl for m in all_mutants}
+            for d in sorted(missing):
+                print(f"warning: no mutant generated for declaration {d!r}")
+        random.shuffle(all_mutants)
+        # Spend the first round on distinct subjects. A global shuffle let a large
+        # function consume the entire budget while other proved subjects went untested.
+        first, rest, seen_subjects = [], [], set()
+        for mutant in all_mutants:
+            if mutant.decl not in seen_subjects:
+                first.append(mutant)
+                seen_subjects.add(mutant.decl)
+            else:
+                rest.append(mutant)
+        mutants = (first + rest)[:args.max_mutants]
+
+        print(f"file      : {path}")
+        print(f"module    : {args.module}")
+        print(f"operators : {'translated-module (AST literal)' if generated else 'Lean definition'}")
+        if spec_path != path:
+            print(f"spec file : {spec_path}")
+            print(f"built     : {build_module}")
+        print(f"theorems  : {', '.join(targets)}")
+        print(f"mutants   : {len(mutants)} of {len(all_mutants)} generated\n")
+
+        print("baseline build ...", flush=True)
+        rc, out, to = run_build(root, build_module, args.timeout)
+        if rc != 0:
+            print("BASELINE FAILS TO BUILD -- fix the file first.")
+            print(out[-2000:])
+            # A gate that cannot run must leave a record saying so. Returning with no JSON
+            # is indistinguishable, downstream, from a gate that was never asked to run, and
+            # a missing artifact reads as "nothing to report" rather than "the subject does
+            # not compile". The report is written with an explicit failure status and no
+            # theorem scores at all, so nothing can mistake it for evidence.
+            with open(args.json_path, "w", encoding="utf-8") as f:
+                json.dump({"file": path, "module": args.module,
+                           "spec_file": spec_path if spec_path != path else None,
+                           "spec_module": build_module,
+                           "status": "BASELINE_FAILED",
+                           "reason": "the module under test does not build before any "
+                                     "mutation is applied; no mutation verdict is possible",
+                           "build_tail": out[-4000:],
+                           "theorems": {}, "mutants": []}, f, indent=2)
+            print(f"wrote {os.path.abspath(args.json_path)} (status BASELINE_FAILED)")
+            restore_source()
+            return 3
+        print("baseline ok\n")
+
+        stats = {t: {"killed": 0, "survived": 0, "survivors": []} for t in targets}
+        invalid, records, coarse, inconclusive, pinned = 0, [], 0, 0, 0
+
+        try:
+            for i, mut in enumerate(mutants, 1):
+                new_lines = list(lines)
+                new_lines[mut.line - 1] = mut.new
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("".join(new_lines))
+
+                rc, out, timed_out = run_build(root, build_module, args.timeout)
+                # A failure that names no source position is not a verdict: it is lock
+                # contention, a half-written dependency, or a missing `.olean` from a
+                # concurrent build. Retry before believing it — otherwise the gate reports a
+                # kill for a theorem that was never even elaborated.
+                for _ in range(2):
+                    if rc == 0 or timed_out or all_error_lines(out):
+                        break
+                    rc, out, timed_out = run_build(root, build_module, args.timeout)
+                # Errors in the *mutated* file mean the mutant is not well-typed; errors in
+                # the *spec* file mean a theorem noticed. When the two are the same file
+                # these collapse to the original behaviour.
+                errs = error_lines(out, path, root)
+                spec_errs = errs if spec_path == path else error_lines(out, spec_path, root)
+                # Errors in files that are neither the mutated file nor the spec file are
+                # somebody else's problem: a broken dependency, a concurrent edit, a stale
+                # cache. Counting such a build failure as a "kill" would credit the theorem
+                # with catching a bug it never saw — the exact self-deception this gate
+                # exists to prevent — so those mutants are reported INCONCLUSIVE and left
+                # out of the score entirely.
+                foreign = [l for l in all_error_lines(out, root)
+                           if l[0] not in (os.path.realpath(path), os.path.realpath(spec_path))]
+                hit_defs = {decl_at(decls, l).name for l in errs
+                            if decl_at(decls, l) and decl_at(decls, l).kind in DEF_KINDS}
+                hit_thms = {decl_at(spec_decls, l).name for l in spec_errs
+                            if decl_at(spec_decls, l)
+                            and decl_at(spec_decls, l).kind in THEOREM_KINDS}
+                # An error in the spec file that lands on no theorem is (almost always) a
+                # `#guard_msgs` pin: the mutant WAS caught, but not by a theorem. Crediting it
+                # to every theorem would be the coarse fallback wearing a disguise, so it is
+                # recorded separately and changes no theorem's score.
+                pin_only = bool(spec_errs) and not hit_thms
+
+                rec = mut.to_json()
+                if timed_out or (rc != 0 and (foreign or not hit_defs and not hit_thms)):
+                    rec["verdict"] = "inconclusive"
+                    rec["timeout"] = timed_out
+                    rec["reason"] = ("build timed out" if timed_out else
+                                     "dependency failed" if foreign else "unattributed build failure")
+                    rec["foreign_errors"] = sorted({f for f, _ in foreign})
+                    rec["build_tail"] = out[-600:]
+                    if not foreign and not timed_out:
+                        coarse += 1
+                        rec["attribution"] = "unattributed"
+                    inconclusive += 1
+                    print(f"[{i}/{len(mutants)}] INCONCL. {mut.op:22s} L{mut.line} ({mut.decl}) "
+                          f"— {rec['reason']}; no theorem credited")
+                elif rc != 0 and hit_defs:
+                    # the mutation broke the definition itself: not a behavioural bug
+                    rec["verdict"] = "invalid"
+                    invalid += 1
+                    print(f"[{i}/{len(mutants)}] INVALID  {mut.op:22s} L{mut.line} ({mut.decl}) "
+                          f"— mutant does not typecheck")
+                else:
+                    rec["verdict"] = {}
+                    rec["timeout"] = timed_out
+                    if pin_only:
+                        rec["caught_by_pins"] = True
+                        pinned += 1
+                    for t in targets:
+                        # Only a diagnostic in this theorem establishes a detected
+                        # mutation. A timeout or infrastructure failure proves nothing.
+                        dead = t in hit_thms
+                        if dead:
+                            stats[t]["killed"] += 1
+                        else:
+                            stats[t]["survived"] += 1
+                            stats[t]["survivors"].append(mut.to_json())
+                        rec["verdict"][t] = "killed" if dead else "survived"
+                    tag = ",".join(f"{t}={v}" for t, v in rec["verdict"].items())
+                    mark = "KILLED " if all(v == "killed" for v in rec["verdict"].values()) else "SURVIVED"
+                    print(f"[{i}/{len(mutants)}] {mark} {mut.op:22s} L{mut.line} ({mut.decl}) {tag}")
+                records.append(rec)
+        finally:
+            restore_source()
+            # On interruption the caller must rebuild before accepting evidence. Starting
+            # another compiler while unwinding would delay cancellation and leak a new
+            # process session if an outer deadline escalates to SIGKILL.
+            if sys.exc_info()[0] is None:
+                restored_code, restored_output, restored_timeout = run_build(root, build_module, args.timeout)
+
+        print("\n=== mutation score ===")
+        # `module` is the module that was MUTATED, not the one that was rebuilt: scripts/sacm.py
+        # attributes G4 (specification non-vacuity) by this field, and the claim being supported
+        # is a claim about the subject of the mutations.
+        report = {"file": path, "module": args.module, "seed": args.seed,
+                  "status": "RESTORE_FAILED" if restored_code else "INCONCLUSIVE" if inconclusive else "OK",
+                  "restored_build": {"exit_code": restored_code, "timeout": restored_timeout,
+                                     "build_tail": restored_output[-2000:] if restored_code else ""},
+                  "operators": "generated-ast" if generated else "lean-def",
+                  "spec_file": spec_path if spec_path != path else None,
+                  "spec_module": build_module,
+                  "decls": sorted({m.decl for m in mutants}),
+                  "mutants_generated": len(all_mutants), "mutants_run": len(mutants),
+                  "invalid": invalid, "inconclusive": inconclusive,
+                  "theorems": {}, "mutants": records}
+        subject = {}
+        if args.subject:
+            for entry in args.subject.split(";"):
+                if "=" in entry:
+                    t, ds = entry.split("=", 1)
+                    subject[t.strip()] = [d.strip() for d in ds.split("+") if d.strip()]
+            report["subject_map"] = subject
+
+        exit_code = 2 if inconclusive or restored_code else 0
+        for t in targets:
+            k, s = stats[t]["killed"], stats[t]["survived"]
+            coverage = (k / (k + s)) if (k + s) else 0.0
+            if t in subject:
+                on = [r for r in records if isinstance(r.get("verdict"), dict)
+                      and r["decl"] in subject[t]]
+                ok = sum(1 for r in on if r["verdict"][t] == "killed")
+                k, s = ok, len(on) - ok
+            score = (k / (k + s)) if (k + s) else 0.0
+            unknown = sum(1 for r in records if r.get("verdict") == "inconclusive"
+                          and (t not in subject or r["decl"] in subject[t]))
+            if unknown:
+                verdict = "INCONCLUSIVE"
+                exit_code = 2
+            elif (k + s) == 0:
+                verdict = "UNTESTED"
+                exit_code = 2
+            else:
+                verdict = "HAS TEETH" if score == 1.0 else ("WEAK" if score > 0 else "VACUOUS")
+            scope = "on-subject" if t in subject else "all-mutants"
+            print(f"{t}: killed {k}, survived {s}  score {score:.2%} ({scope})  "
+                  f"[{verdict}]" + (f"  coverage {coverage:.2%}" if t in subject else ""))
+            if t in subject:
+                stats[t]["survivors"] = [r for r in stats[t]["survivors"]
+                                         if r["decl"] in subject[t]]
+            for sv in stats[t]["survivors"]:
+                print(f"    survivor: {sv['decl']} L{sv['line']} [{sv['op']}]")
+                print(f"      - {sv['before']}")
+                print(f"      + {sv['after']}")
+            report["theorems"][t] = {"killed": k, "survived": s, "score": score,
+                                     "inconclusive": unknown,
+                                     "scope": scope, "coverage_score": coverage,
+                                     "verdict": verdict, "survivors": stats[t]["survivors"]}
+            if s:
+                exit_code = 1
+        if invalid:
+            print(f"({invalid} mutants discarded: they broke the definition's own typechecking)")
+        if inconclusive:
+            print(f"({inconclusive} mutants INCONCLUSIVE: timeout or unattributed/dependency "
+                  f"failure. They are excluded from the score and prevent this gate passing.)")
+        if coarse:
+            print(f"WARNING: {coarse} mutant(s) failed without an attributable diagnostic; "
+                  f"no theorem was credited.")
+        if restored_code:
+            print("RESTORE FAILED: the original source was restored, but its build did not pass.")
+        if pinned:
+            print(f"({pinned} mutant(s) were caught by a `#guard_msgs` pin rather than by any "
+                  f"theorem. Pins are real detection, but they are not proofs, so they are "
+                  f"reported here and credited to NO theorem's score.)")
+        report["coarse_attributions"] = coarse
+        report["caught_by_pins_only"] = pinned
+
+        with open(args.json_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+        print(f"\nwrote {os.path.abspath(args.json_path)}")
+        return exit_code
+    finally:
+        restore_source()
+
 
 
 if __name__ == "__main__":

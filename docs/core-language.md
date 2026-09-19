@@ -22,6 +22,7 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `int : Int → Val` | An integer. Width and overflow are **not** properties of the value — they belong to `NumConfig`, selected by the dialect. A `Val.int` is always the mathematical integer that the configured arithmetic produced. |
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
+| `float : Fl → Val` | A floating-point bit pattern and format, interpreted by the kernel-reducible model in `Float.lean`. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
 | `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
@@ -52,9 +53,10 @@ to build a `bobj` for a class that defines its own `__eq__` (or its own `__init_
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
-There is **no float constructor**. `Autoform/Lang/Core/Float.lean` develops a full
-IEEE-754 model as an explicit bit pattern, but at the time of writing it is not wired into
-`Val`; floats therefore still surface as holes and as skipped differential cases.
+`Autoform/Lang/Core/Float.lean` is wired into `Val` and Core operations. This does
+not establish complete source-language floating-point coverage: unsupported literal
+forms, conversions and runtime value encodings can still produce holes or skips.
+See [typed numerics](typed-numerics.md) for the tested source behavior.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`
 
@@ -90,7 +92,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 
 | Constructor | Meaning |
 |---|---|
-| `lit : Lit → Expr` | An `int` / `str` / `bool` / `unit` literal. |
+| `lit : Lit → Expr` | An `int` / `str` / `bool` / `float` / `unit` literal. |
 | `name : String → Expr` | Variable read. Resolution order: local `Env`, then the globals frame, then the function table (yielding `Val.fn`), then `unit`. The function-table fallback is what makes higher-order code translatable instead of holed. |
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |
@@ -122,7 +124,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
-| `tryFinally : Stmt → Stmt → Stmt` | The finalizer runs on *every* exit path, and an abnormal exit from the finalizer discards the body's pending outcome — Python's rule, so `try: return 1 finally: return 2` returns 2. |
+| `tryFinally : Stmt → Stmt → Stmt` | The finalizer runs on every language-level exit, using the locals at that point. Its assignments survive resuming a pending exit; its own abnormal exit replaces the pending outcome. Interpreter holes and exhausted fuel propagate without running the finalizer — Python's rule, so `try: return 1 finally: return 2` returns 2. |
 | `raise : Expr → Stmt` | Raise the evaluated value as an exception. |
 | `del : String → Stmt` | Remove every binding of a local name. |
 | `setGlobal : String → Expr → Stmt` | Write a module-level binding directly. Module-scope assignment, including `def` and `class`, lowers to this. |
@@ -260,20 +262,33 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 
 | Label family | Meaning | Status |
 |---|---|---|
+| `effect:kernel-sync:<operation>` | Lock, RCU, interrupt or preemption operation whose effects are not modeled. Argument evaluation and flag writes must not silently disappear. | Explicit unsupported effect. |
 | ~~`op:starredUnpack`~~ | `*args` / `**kwargs` splicing. **Closed** (STRATEGY.md §35): `Expr.starred` / `Expr.kwargE` / `Expr.dstarred` and `Func.vararg` / `Func.kwarg` express it. The label no longer occurs. | Implemented. What remains is narrower and separately named: `op:starred-outside-call`, `call:<f>:keyword-to-builtin`. |
 | `op:<name>` | An unmapped `<operator>.*` call. The generic `op:` bucket is where new operator work shows up. (`floorDiv` used to live here and is now mapped to `/`, because the dialect already makes `/` floor under `.python` — check `export_ast.sc`'s operator table before assuming an operator is missing.) | Not yet implemented (per operator). |
 | `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]`, slice deletion, attribute deletion. | Blocked on boxed containers (index/slice); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
 | `op:raise-bare` | A bare `raise` re-raising the in-flight exception; Core has no ambient current-exception. | Not yet implemented. |
-| `control:TRY-finally-escaping` | `try/finally` whose body can `return`/`break`. The non-escaping case *is* translated; when control escapes, `ret` would bypass the trailing finalizer. | Design-limited; needs a richer `Ctl` interaction than one `tryCatch` can express. |
-| `control:TRY-else-without-except`, `control:TRY-multiCatch`, `control:TRY-multiFinally`, `control:TRY-shape` | `try/except/else` (the `else` must run only when nothing was raised, *and* its own exceptions must not be caught), multiple `except` clauses (the CPG discards exception types), and unrecognised `try` shapes. | Partly permanent (the CPG loses the exception types), partly not yet implemented. |
+| `op:raise-cause` | An explicit Python exception cause. | Cause evaluation and exception chaining remain unsupported. |
+| `op:raise-source-metadata`, `op:raise-shape`, `op:raise-constructor-shape` | Python raise metadata or operand shape cannot be recovered faithfully. | Refuses to treat an arbitrary value as a valid exception. |
+| `raise:ambiguous-exception-value` | A dynamically raised value is a string naming a represented exception class. | Core cannot distinguish that string from an exception instance. |
+| `raise:unmodelled-object`, `raise:unmodelled-callable` | A dynamically raised object or callable cannot be classified. | Requires exception-instance or class semantics. |
+| `exception:<class>:details-iterator`, `exception:<class>:unmodelled-class` | An exception constructor needs unsupported iteration or class semantics. | Refuses to guess the constructor outcome. |
+| `raise:wrong-dialect`, `exception:wrong-dialect`, `exception:argument-shape` | Python exception intrinsics have an incompatible dialect or argument encoding. | Source lowering must supply Python and a tuple of evaluated constructor arguments. |
+| `control:TRY-finally-escaping` | Historical label from before `tryFinally` lowering. | Returns, exceptions, breaks and continues now carry their local state through finalizers. |
+| `control:TRY-source-metadata`, `control:TRY-handler-shape` | Original Python syntax is unavailable, cannot be parsed, or does not match the CPG's handler structure. | The exporter recovers headers with Python's parser because the CPG omits them. Missing metadata cannot become a catch-all. |
+| `control:TRY-handler-type`, `control:TRY-handler-shadowed` | A handler uses a dynamic type expression or a name that does not resolve to an unshadowed builtin exception class. | Runtime exception-class resolution remains incomplete. |
+| `control:TRY-handler-binding`, `control:TRY-exception-representation` | A handler binds an exception object or encounters an exception outside Core's named-class representation. | Exception objects and payloads are not faithfully modeled. |
+| `control:TRY-exception-group`, `control:TRY-handler-language` | Python exception groups or a handler in another source language. | Requires the corresponding language's dispatch semantics. |
+| `control:TRY-else-without-except`, `control:TRY-multiFinally`, `control:TRY-shape` | Invalid or unrecognized handler/finalizer structure. | Explicit unsupported frontend shape. `control:TRY-multiCatch` is historical: ordered builtin handlers and tuples now lower to a dispatch chain. |
 | `control:WHILE-iterator` | A desugared iterator loop the exporter could not reconstruct into `forIn`. | Not yet implemented. |
+| `control:DO:condition-shape` | A do-while node without one identifiable condition and body. | Refuses ambiguous frontend structure instead of guessing child order. |
 | `scope:nonlocal-write` | A write to an enclosing function's binding. Capture is by value, so a closure cannot mutate its enclosing frame. | **Permanent by design** until `Env` becomes shared mutable cells — see below. |
 | `scope:class-closure` | A class defined inside a function whose methods read the enclosing scope, where `classClosure` does not apply. | Being closed; check the current AST. |
 | `assign:arity`, `assign:lhs:<shape>`, `assign:aug-impure-target`, `assign:aug-impure-receiver` | Multiple assignment targets, assignment to a shape Core has no statement for, and augmented assignment whose target or receiver would have to be evaluated twice. | Mostly not yet implemented; the "impure" ones are a correctness refusal, not a gap. |
 | `call:computed-callee`, `call:no-callee-name` | A call whose callee is an expression rather than a name the CPG resolved. | Not yet implemented. |
+| `call:effect-after-starred` | A starred argument followed by an argument with lifted assignments or increments. Saving the iterable would not preserve the timing of its expansion. | Explicit unsupported evaluation order. |
 | `import:module-value`, `import:unresolved`, `import:absent:external`, `import:absent:prefix-in-cpg`, `import:absent:relative` | A module used as a value, or an import the CPG could not resolve. The `absent:` labels split the second case by *why*: the module is external to the CPG, a proper prefix of its path is in the CPG (so more resolver work could reach it), or it is a relative import whose target is missing. | Permanent for genuinely external modules; that is the boundary the assurance case declares. `absent:prefix-in-cpg` is the part that is not permanent. |
-| `lit:float`, `lit:unquoted` | A float literal (Core has no float value) and a literal the exporter could not decode. | `lit:float` is blocked on wiring `Float.lean` into `Val`. |
+| `lit:float`, `lit:unquoted` | A float literal unsupported by the source exporter and a literal it could not decode. | Core has float values; source-literal translation still needs coverage. |
 | `expr:BLOCK`, `expr:BLOCK-impure`, `expr:BLOCK-prelude`, `expr:empty-block`, `expr:genExp`, `expr:<label>` | Statement-expressions and generator expressions. `genExp` needs laziness Core does not have. | Mixed. |
 | `cstr:pointer-arith`, `cstr:address-compare`, `cstr:address-equality` | C string operations that are pointer operations, refused rather than given the Python answer. | **Permanent by design** until Core models addresses. |
 | `stmt:<label>`, `stmt:UNKNOWN:<...>` | A CPG statement node with no mapping. The `UNKNOWN` bucket is where new front-end shapes appear. | Not yet implemented. |
@@ -283,6 +298,13 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | Label | Raised when |
 |---|---|
 | `call:<name>` | The callee resolves neither in the program, nor as a value in scope, nor in the modelled stdlib. In the AST a call to an untranslated function is indistinguishable from a call to a translated one, which is why the ledger reports call-closure separately from hole-freedom. |
+| `call:python-defaults` | Default storage and definition-time evaluation remain unsupported. The exporter inserts a hole before the body, including calls which supply every argument. Recovered signatures without defaults support required, positional-only and keyword-only binding. Historical ASTs can still contain `call:python-positional-only` and `call:python-keyword-only` holes; re-export to recover their signatures. |
+| `call:python-signature-shape` | Source parameter names disagree with the exported CPG parameter shape. The exporter refuses to guess a signature. Legacy models without `pythonSignature` retain historical binding behavior and need re-export before claiming source call fidelity. |
+| `call:python-receiver-signature` | A method lacks an ordinary first positional `self`, has decorators whose descriptor binding is not modeled, or combines a keyword-bindable receiver with `**kwargs`, which can hide a duplicate receiver argument. Placeholder argument collectors ensure the explicit gap is reached instead of producing an incorrect arity exception. They do not claim that the source method accepts arbitrary arguments. A positional-only `self` can still be modeled with `**kwargs`. |
+| `call:python-decorator-binding` | A decorated function can be replaced by a callable with a different body or signature. Static calls cannot safely use the original declaration; calls remain explicit gaps before argument-binding rejection. |
+| `call:python-private-parameters` | Parameters with private names inside a class scope require Python name mangling, including in nested functions. Their current source/CPG signature mapping is not faithful, so calls remain explicit gaps. |
+| `function:python-default-evaluation` | Creating a Python function with defaults. Default expressions execute at definition time and can raise or retain mutable state; skipping them would change even callers which never invoke the function. |
+| `call:python-signature-metadata`, `function:python-signature-metadata` | The source signature is unavailable or cannot be matched to its CPG method. Missing metadata cannot imply that the calling convention is supported. |
 | `entry:<name>` | `runFunc`/`runMain` could not resolve the requested entry point. |
 | `field:<f>:non-object`, `setField:<f>:non-object` | Attribute read/write on a non-reference. |
 | `mcall:<Cls>.<m>` | No such method on the receiver's class. |
@@ -294,10 +316,19 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `forIn:non-iterable` | Iterating a non-iterable. |
 | `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
+| `numeric:unknown-type:<op>` | Joern did not supply enough type information to choose an integer width and signedness. |
+| `numeric:operand:<op>` | A typed integer operator received a value outside its model, including JS string/object coercion. |
+| `numeric:unsupported-js-op:<op>` | A numeric tag requests an operation outside the JS Number bitwise subset. |
 | `ub:<reason>` | The configured integer arithmetic says the source language does not define this operation. |
 | `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`. |
 | `call:stray-control-flow` | A `brk`/`cont` escaped a function body — a transpiler bug if it appears. |
 | `initializers:outOfFuel` | Module initializers did not finish within the fuel budget. |
+
+New Python exports carry lexical method classification in `pythonSignature.isMethod`.
+Nested functions keep their ordinary parameters even when a class has the same name
+as their enclosing function. Core uses this metadata for unbound method calls;
+legacy models without it retain the historical name-based heuristic and must be
+re-exported before claiming faithful receiver binding.
 
 ### Permanent by design vs not yet implemented
 
@@ -324,8 +355,8 @@ The distinction tells you whether a hole is work or a boundary.
 
 * `setIndex:immutable-containers`, `mcall:*:unboxed-container`, `op:delete-index/slice` —
   all one feature: boxed mutable containers. See `docs/boxed-containers.md`.
-* `lit:float` and the float skips in the differential oracle — wiring `Float.lean` into
-  `Val`.
+* `lit:float` and remaining float skips in the differential oracle — source-literal
+  translation and runtime value encoding beyond the supported cases.
 * `control:TRY-*` beyond the translated shapes — a richer control-flow encoding.
 * `call:<name>` for stdlib callees — more of `Stdlib.lean`. This is the largest single
   lever on the verifiable core, because a function is only as analysable as its callees.

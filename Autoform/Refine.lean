@@ -354,7 +354,7 @@ theorem execStmt_del (x : String) :
 
 theorem execStmt_ret_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.ret e) = (h₁, .ret v) := by simp [execStmt, he]
+    execStmt ctx (k+1) h ρ (.ret e) = (h₁, .ret v ρ) := by simp [execStmt, he]
 
 /-- Assignment binds locally, provided `x` was not declared `global` in this scope.
 The hypothesis is not decoration: `declGlobal` installs a marker that redirects the write
@@ -371,15 +371,15 @@ theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
 
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v) := by simp [execStmt, he]
+    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v ρ) := by simp [execStmt, he]
 
 theorem execStmt_seq_normal {a b : Stmt} {h₁ : Heap} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .normal ρ')) :
     execStmt ctx (k+1) h ρ (.seq a b) = execStmt ctx k h₁ ρ' b := by simp [execStmt, ha]
 
-theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val}
-    (ha : execStmt ctx k h ρ a = (h₁, .ret v)) :
-    execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v) := by simp [execStmt, ha]
+theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
+    (ha : execStmt ctx k h ρ a = (h₁, .ret v ρ')) :
+    execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v ρ') := by simp [execStmt, ha]
 
 theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
     (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
@@ -391,9 +391,9 @@ theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
     execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ e := by
   simp [execStmt, hc, hv]
 
-theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} {v : Val}
-    (hb : execStmt ctx k h ρ b = (h₁, .exn v)) :
-    execStmt ctx (k+1) h ρ (.tryCatch b x hd) = execStmt ctx k h₁ (ρ.set x v) hd := by
+theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
+    (hb : execStmt ctx k h ρ b = (h₁, .exn v ρ')) :
+    execStmt ctx (k+1) h ρ (.tryCatch b x hd) = execStmt ctx k h₁ (ρ'.set x v) hd := by
   simp [execStmt, hb]
 
 theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ : Heap} {v : Val}
@@ -420,11 +420,12 @@ theorem applyFunc_succ (fn : Func) (self? : Option Val) (vs : List Val)
     applyFunc ctx (k+1) h fn self? vs kws =
       (let base : Env := match self? with | some s => [("self", s)] | none => []
        let ρ' := bindParams fn base vs kws
-       if kwargsRejected fn kws || posRejected fn vs then (h, .exn (.str "TypeError")) else
+       if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
+         (h, .exn (.str "TypeError")) else
        match execStmt ctx k h ρ' fn.body with
-       | (h₁, .ret v)     => (h₁, .val v)
+       | (h₁, .ret v _)   => (h₁, .val v)
        | (h₁, .normal _)  => (h₁, .val .unit)
-       | (h₁, .exn v)     => (h₁, .exn v)
+       | (h₁, .exn v _)   => (h₁, .exn v)
        | (h₁, .hole l)    => (h₁, .hole l)
        | (h₁, .outOfFuel) => (h₁, .outOfFuel)
        | (h₁, _)          => (h₁, .hole "call:stray-control-flow")) := rfl
@@ -1542,10 +1543,10 @@ theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
       hinv (by omega)
   obtain ⟨rfl, hacc⟩ := hpost
   have hret : execStmt ctxC (G+2) [] ρ' (.ret (.name "acc"))
-      = ([], .ret (.int (triN (n.toNat + 1)))) :=
+      = ([], .ret (.int (triN (n.toNat + 1))) ρ') :=
     execStmt_ret_val ctxC (G+1) [] ρ' (evalExpr_name ctxC G [] ρ' "acc" hacc)
   have hbody : execStmt ctxC (G+7) [] [("n", Val.int n)] f_sumto.body
-      = ([], .ret (.int (triN (n.toNat + 1)))) := by
+      = ([], .ret (.int (triN (n.toNat + 1))) ρ') := by
     simp only [f_sumto]
     rw [execStmt_seq_normal ctxC (G+6) [] _ s1,
         execStmt_seq_normal ctxC (G+5) [] _ s2,
@@ -1694,11 +1695,11 @@ theorem gcdish_run (a b : Int) (ha : 0 ≤ a) (hb : 0 ≤ b) (fuel : Nat)
   obtain ⟨rfl, hav⟩ := hpost
   have hskip : execStmt ctxS (G+3) [] ρ' .skip = ([], .normal ρ') := execStmt_skip ctxS (G+2) [] _
   have hret : execStmt ctxS (G+3) [] ρ' (.ret (.name "a"))
-      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) :=
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int)) ρ') :=
     execStmt_ret_val ctxS (G+2) [] ρ' (evalExpr_name ctxS (G+1) [] ρ' "a" hav)
   have hbody : execStmt ctxS (G+5) [] [("b", Val.int b), ("a", Val.int a)]
         f_ops_py__module__gcdish.body
-      = ([], .ret (.int ((Int.gcd a b : Nat) : Int))) := by
+      = ([], .ret (.int ((Int.gcd a b : Nat) : Int)) ρ') := by
     simp only [f_ops_py__module__gcdish]
     rw [execStmt_seq_normal ctxS (G+4) [] _ hloop,
         execStmt_seq_normal ctxS (G+3) [] _ hskip,
@@ -1869,20 +1870,20 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
       (evalExpr_name ctxT (j+2) h _ "self" hslf) hplus
   have hret : execStmt ctxT (j+4) (h.setField r "n" (.int (acc + iv)))
         [("k", Val.int iv), ("self", Val.ref r)] (.ret ((Expr.name "self").field "n"))
-      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) :=
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv)) [("k", .int iv), ("self", .ref r)]) :=
     execStmt_ret_val ctxT (j+3) _ _
       (evalExpr_field_obj ctxT (j+2) _ _
         (evalExpr_name ctxT (j+1) _ _ "self" hslf) ho' hfind')
   have hbody : execStmt ctxT (j+5) h [("k", Val.int iv), ("self", Val.ref r)]
         f_counter_bump.body
-      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) := by
+      = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv)) [("k", .int iv), ("self", .ref r)]) := by
     simp only [f_counter_bump]
     rw [execStmt_seq_normal ctxT (j+4) h _ hsf]
     exact hret
   have happ : applyFunc ctxT (j+6) h f_counter_bump (some (.ref r)) [Val.int iv] []
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
     rw [applyFunc_succ ctxT (j+5) h f_counter_bump (some (.ref r)) [Val.int iv] []]
-    simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+    simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
       Bool.false_eq_true, if_false, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
@@ -1957,7 +1958,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         f_counter_init (some (.ref 0)) [Val.int 0] []
       = ([{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }], .val .unit) := by
     rw [applyFunc_succ ctxT (G+8) _ f_counter_init (some (.ref 0)) [Val.int 0] []]
-    simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+    simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
       List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
       Bool.false_eq_true, if_false, bindParams_mk,
       List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
@@ -2007,17 +2008,17 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
       (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)]
     exact hfor
   have hret : execStmt ctxT (G+10) h' ρ' (.ret ((Expr.name "c").field "n"))
-      = (h', .ret (.int (isum ys))) :=
+      = (h', .ret (.int (isum ys)) ρ') :=
     execStmt_ret_val ctxT (G+9) _ _
       (evalExpr_field_obj ctxT (G+8) _ _ (evalExpr_name ctxT (G+7) _ _ "c" hc') ho' hfind')
   have hbody : execStmt ctxT (G+12) [] [("xs", Val.list (ys.map Val.int))] f_counter_total.body
-      = (h', .ret (.int (isum ys))) := by
+      = (h', .ret (.int (isum ys)) ρ') := by
     simp only [f_counter_total]
     rw [execStmt_seq_normal ctxT (G+11) [] _ hassign,
         execStmt_seq_normal ctxT (G+10) _ _ hforIn]
     exact hret
   rw [applyFunc_succ ctxT (G+12) [] f_counter_total none [Val.list (ys.map Val.int)] []]
-  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, Bool.false_or,
+  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, Bool.false_or, Bool.or_false,
     List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
     Bool.false_eq_true, if_false, bindParams_mk,
     List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢

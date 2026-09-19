@@ -17,12 +17,17 @@ Stated in `STRATEGY.md` §17 and re-derived the hard way in §19, §27, §30, §
 and **an independent recomputation**. No amount of care inside a single artifact
 substitutes for either.
 
-## What is tracked, and why (policy decided 2026-08-19)
+## What is tracked, and why
 
-> **The AST is the tracked source of truth. `Autoform/Generated/<M>.lean` is a build
-> product and is not tracked.** The one exception is `Cachetools.lean`; see below.
+The AST is the source for a generated module, and `artifact-manifest.json` pins
+both input and output hashes. Most rendered modules are untracked build products.
+The repository also retains these tracked renders: `CMath`, `Cachetools`,
+`LinuxLibSample`, `V8BaseSample`, and `SC`. Check the inventory with
+`git ls-files 'Autoform/Generated/*.lean'`; never edit a render by hand.
 
-This reverses the earlier policy, and the reversal is the point of the section.
+The move toward AST-first storage was decided on 2026-08-19. The historical
+reasoning below explains that policy; the actual tracked exceptions and import
+graph still determine what a build and audit check.
 
 **The incident that set the old policy.** A mutation-gate mutant reached git and survived
 four commits. `_DefaultSize.__getitem__` returned `0` where the cachetools docstring says
@@ -46,35 +51,36 @@ are visible to an independent re-render. That argument is still correct and
 module went in the same way earlier. Cleaning them up forced the question the first
 incident had obscured: *what does tracking the module buy, given the AST is tracked?*
 
-`render_lean.py` is a deterministic function of the JSON alone — verified byte-identical
-across runs. So a tracked module carries **no information the tracked AST does not already
-determine**. What it carries instead is a write channel, and the mutant used it: the
-mutant reached git *because* the module was tracked. A 21 MB machine-generated file has no
-reviewable diff, so a one-token change inside it passes every human gate. Untracking the
-module does not remove a defence; it removes the hole the defence was patching. A mutant
-now has to enter through `ast-<M>.json`, where it is a small, reviewable JSON diff.
+For a fixed renderer and module name, rendering the same AST is deterministic.
+Tracking a large render duplicates that derivable content and creates another place
+where a mutation can persist unnoticed. Keeping only the AST makes the input diff
+the review target. Local renders can still be mutated, so every materialization
+must be checked against the reviewed input and renderer.
 
-**The cost, stated honestly.** A clean clone can no longer `lake build
-Autoform.Generated.<M>` without running the renderer first (`autoform.sh` and
-`scripts/check_render.py --typecheck` both do). `Autoform.lean` imports no generated
-module, so the root build is unaffected. For the four large corpora — Ansible, LinuxLib,
-LinuxCrypto, V8Base — the AST is itself 15–55 MB, *larger* than the module it renders to,
-so tracking the AST by bytes would trade one blob for a bigger one. Those four are tracked
-by **sha256 + provenance** in `artifact-manifest.json` and are otherwise reproducible only
-by re-exporting from the corpus CPG. That is a real reduction in what a clean clone can
-check on its own, and it is recorded here rather than papered over.
+**Build and replay scope.** The root import graph reaches generated `CMath`,
+`Cachetools`, `LinuxLibSample`, `V8BaseSample`, and `V8Base`. CI materializes
+`V8Base` from its tracked AST before the root build; the other imported renders
+are tracked. A clean clone therefore needs that rendering step before a full
+`lake build`. An audit of a root module reaches its imports, not every Lean file
+in the directory.
 
-**The exception.** `Autoform/Generated/Cachetools.lean` stays tracked. Two conditions make
-tracking a render worth its drift risk, and only Cachetools meets both: hand-written
-theorems refer to it by name (all 108 of them), and at 300 KB its diff is still something
-a person can read. `check_render.py` diffs it against a fresh render on every run — the
-original check, kept exactly where it has teeth.
+The installed CLI has a separate root, `Autoform.Runtime`. Its only generated
+corpus dependency is `Cachetools`, reached through `Autoform.Contracts`. The
+historical corpus proofs belong to the repository build and release gate.
+`Autoform/SpecsGen/V8Exp.lean` and `V8Exp2.lean` are tracked but outside the root
+import graph; a root replay alone provides no replay evidence for those files.
 
-`Autoform/Generated/SC.lean` is a second, less comfortable exception: there is no
-`ast-SC.json` anywhere in the repo, so the AST-only policy has nothing to regenerate it
-from and untracking it would delete it rather than move it upstream. It stays tracked, and
-`check_render.py` can say nothing about it at all. That is a gap, named here so it is not
-mistaken for coverage.
+**Input availability.** `ast-V8Base.json` is tracked. The manifest also promises
+`Ansible`, `LinuxLib`, and `LinuxCrypto`, whose AST bytes are not tracked. A hash
+and an out-of-tree path do not make those inputs available to a clean clone, nor
+establish their source revision or extraction history. Missing inputs remain
+`UNVERIFIABLE` until the exact bytes can be supplied and checked. Re-exporting a
+different source revision with today's exporter produces new evidence, not a
+reproduction of the old artifact.
+
+`Autoform/Generated/SC.lean` has neither a tracked AST nor a manifest entry and
+is outside both import graphs. `check_render.py` cannot establish its derivation,
+and root replay does not check it. That gap must remain explicit.
 
 ## `artifact-manifest.json` — the identity of both halves
 
@@ -84,13 +90,17 @@ note. It is written by `scripts/check_render.py --record`, which should only eve
 *after* reviewing the change it is about to bless. Re-recording a hash you have not looked
 at converts this file from evidence into a rubber stamp.
 
+The recorder currently derives `ast_tracked` from a root-level file's existence,
+not Git's index. Check actual tracking with `git ls-files`; do not use that field
+alone as evidence that an input will be present in a clean clone.
+
 ## `scripts/check_render.py` — three claims that can still be false
 
 Untracking the module did not turn this check into a no-op. It made it check different
 things, each independently falsifiable:
 
-1. **AST integrity** — `sha256(ast-<M>.json)` equals the recorded hash. Under the new
-   policy the AST is the only place a mutant can enter.
+1. **AST integrity** — `sha256(ast-<M>.json)` equals the recorded hash. This catches
+   changes to the input independently of changes to a materialized module.
 2. **Render stability** — `sha256(render(AST))` equals the recorded render hash. This is
    what byte-comparing against the tracked module bought (the pinned identity of the
    artifact every downstream number describes) without the megabytes and without the
@@ -105,7 +115,7 @@ accepts. Weaker than "the committed module is correct", stronger than "the bytes
 and checked against the toolchain rather than against a hash we wrote ourselves.
 
 ```bash
-scripts/check_render.py                    # every module in the manifest
+scripts/check_render.py                    # manifest modules and local ast-*.json files
 scripts/check_render.py --typecheck V8Base
 scripts/check_render.py --record LangGo    # only after reviewing the change
 ```
@@ -115,17 +125,16 @@ verified and some **UNVERIFIABLE**. A missing AST, a missing manifest entry or a
 render is reported with a reason and a non-zero exit — this check must never pass by
 having stopped looking.
 
-**Open finding, recorded rather than laundered.** On the first run under the new policy,
-`Cachetools` came back MISMATCH: the tracked module was rendered by an older
-`render_lean.py` (no `set_option maxRecDepth`, pre-indent-cap layout) and is ~1148 lines
-different from a fresh render, though whitespace-insensitively the terms agree. It was not
-re-rendered here, because the theorems that depend on it were being edited
-concurrently. `check_render.py` therefore exits 1 today, on purpose. The fix is to
-re-render Cachetools and re-run its proofs; suppressing the verdict until then would be
-the exact failure mode this document exists to prevent.
+**Resolving drift.** Run the checker to obtain the current verdict. Review a fresh
+render against the old bytes before recording new pins. Changes to headers and
+changes to executable dialects require different evidence; successful elaboration
+alone does not establish source equivalence. Regenerate through the renderer,
+rebuild affected imports, rerun native comparisons where semantics changed, and
+repeat the required proof, mutation and fresh replay checks. A missing corpus or
+mismatched render remains a release blocker throughout this process.
 
 **Still in history.** Untracking removes these blobs from the *tip*, not from the object
-graph. The 35 MB module and today's 27 MB are still reachable from old commits and would
+graph. Historical generated modules remain reachable from old commits and would
 need a history rewrite and a force-push to clear — which needs the repository owner's
 explicit consent and has not been done.
 
@@ -192,10 +201,11 @@ it produced a wrong correction to a right finding.
 
 ## Running them
 
-`assure.sh` runs `check_render.py` then `check_docs.py` before building the assurance
-case. Both are advisory there (`|| true`) so a stale figure does not block evidence
-generation — but a red check means every number downstream describes a program nobody
-wrote, and should be treated that way.
+Repository CI runs these integrity checks as required gates. The package's release
+workflow requires that repository CI before publication. `assure.sh` delegates to
+`scripts/assure.py`, which builds evidence for the selected source and module; it
+does not run the repository-wide historical render or documentation checks. A
+successful scoped run therefore does not establish release readiness.
 
 ```bash
 scripts/check_render.py && scripts/check_docs.py

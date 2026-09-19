@@ -1,5 +1,7 @@
 import Autoform.Lang.Imp.Syntax
 import Autoform.Lang.Imp.Semantics
+import Autoform.Lang.PCode.Semantics
+import Autoform.Lang.PCode.Properties
 import Autoform.Harness.Audit
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Semantics
@@ -21,7 +23,7 @@ import Autoform.CallingConvention
 import Autoform.SpecsGen.Basis
 
 -- ---------------------------------------------------------------------------
--- Every module in the repository is now in this graph.
+-- Shared corpus specifications imported below participate in this replay graph.
 --
 -- Until today each `Autoform/Generated/<M>.lean` declared `namespace Autoform.Generated`
 -- and defined `program` inside it, so importing two generated corpora failed outright:
@@ -57,16 +59,7 @@ import Autoform.Specs.CppCastSpec
 import Autoform.SpecsGen.V8Base
 import Autoform.Specs.DoWhileSpec
 
--- ---------------------------------------------------------------------------
--- The one module still outside this graph, and why.
---
--- `Autoform/SpecsGen/V8Base.lean` (229 synthesised laws over the 1,920-function V8 base
--- corpus) is NOT here, and the reason is no longer the namespace collision this change
--- removed -- `Autoform.Specs.V8Spec`, which imports the same `Generated.V8Base`, is in
--- the graph two lines above. The reason is elaboration cost: a single `lean` process on
--- that file ran past 57 minutes of CPU and 16 GB of RSS without finishing (see
--- `scripts/check_specs.py`, which exists for exactly this module and has always recorded
--- it as not proving). Importing it would make every `lake build` in the repository
--- unbounded, so it stays gated behind `scripts/check_specs.py V8Base` until its laws are
--- regenerated in a form that elaborates. Its CI inventory floor is a floor on TEXT and
--- says so; do not read it as a proof count.
+-- The split V8Base specification modules are imported above and participate in
+-- both the build and fresh replay. Generated.SC and the experimental V8Exp/V8Exp2
+-- specification modules remain outside this graph; audit them explicitly before
+-- treating their statements as replayed evidence. See docs/integrity.md.

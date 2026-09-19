@@ -40,6 +40,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import proof_artifacts
+
 REPO = Path(__file__).resolve().parent.parent
 
 # Axioms whose presence changes what a proof means.  Mirrors
@@ -54,6 +56,7 @@ GENERATED_PREFIX = "Autoform.Generated"
 
 # The subtree that is claimed to be escape-hatch free.
 CORE_DIR = "Autoform/Lang/Core"
+TRUSTED_SEMANTICS_DIRS = (CORE_DIR, "Autoform/Lang/PCode")
 
 # Files whose escape hatches are deliberate demonstrations, not debt.
 # `Demo.lean` proves a `sorry`-admitted theorem *on purpose* to show the audit
@@ -76,7 +79,7 @@ import Autoform
 import Lean
 open Lean Elab Command
 
-/-- Sweep every declaration whose defining module is under `Autoform`, and report its
+/- Sweep every declaration whose defining module is under `Autoform`, and report its
 axiom basis.  This is exactly what `#audit_axioms` does, applied to everything. -/
 run_cmd do
   let env ← getEnv
@@ -107,7 +110,7 @@ run_cmd do
 """
 
 
-def axiom_sweep() -> dict:
+def axiom_sweep(module: str = "Autoform") -> dict:
     """Run the Lean-side sweep and classify the result."""
     result = {
         "status": "unknown",
@@ -123,7 +126,7 @@ def axiom_sweep() -> dict:
         mode="w", suffix=".lean", dir=str(REPO), delete=False, prefix="_audit_sweep_"
     )
     try:
-        tmp.write(AXIOM_SWEEP_LEAN)
+        tmp.write(AXIOM_SWEEP_LEAN.replace("import Autoform\n", "import " + module + "\n", 1))
         tmp.close()
         proc = subprocess.run(
             ["lake", "env", "lean", os.path.basename(tmp.name)],
@@ -144,14 +147,22 @@ def axiom_sweep() -> dict:
             pass
 
     out = proc.stdout
-    if "AUTOFORM_AUDIT_BEGIN" not in out:
+    if proc.returncode != 0 or "AUTOFORM_AUDIT_BEGIN" not in out:
         result["status"] = "ERROR"
-        result["error"] = (proc.stdout + proc.stderr)[-4000:]
+        # A failed Lean command can still emit the JSON payload. Preserve the
+        # diagnostic rather than burying it beneath thousands of declarations.
+        diagnostics = [line for line in (proc.stdout + proc.stderr).splitlines()
+                       if not line.startswith('[{"')]
+        result["error"] = (f"Lean exited {proc.returncode}:\n" + '\n'.join(diagnostics))[-4000:]
         return result
 
     payload = out.split("AUTOFORM_AUDIT_BEGIN", 1)[1].split("AUTOFORM_AUDIT_END", 1)[0]
     decls = json.loads(payload.strip())
     result["declarations"] = len(decls)
+    root_theorems = [d for d in decls if d["module"] == module and d["kind"] == "theorem"]
+    result["root_theorems"] = len(root_theorems)
+    result["root_theorem_names"] = sorted(d["name"] for d in root_theorems)
+    result["root_axioms"] = sorted({a for d in root_theorems for a in d["axioms"]})
 
     hist: dict[str, int] = {}
     for d in decls:
@@ -173,6 +184,58 @@ def axiom_sweep() -> dict:
     result["axiom_histogram"] = dict(sorted(hist.items(), key=lambda kv: -kv[1]))
     result["status"] = "LEAK" if result["leaks"] else "CLEAN"
     return result
+
+
+INVENTORY_LEAN = r'''
+import ROOT_MODULE
+import Lean
+open Lean Elab Command
+run_cmd do
+  let env ← getEnv
+  let mut modules : Array Json := #[]
+  for name in env.header.moduleNames do
+    let file ← findOLean name
+    modules := modules.push <| Json.mkObj
+      [("name", Json.str name.toString), ("olean", Json.str file.toString)]
+  IO.println "AUTOFORM_IMPORTS_BEGIN"
+  IO.println (Json.arr modules).compress
+  IO.println "AUTOFORM_IMPORTS_END"
+'''
+
+
+def module_inventory(module):
+    """Ask Lean which compiled modules its import environment actually resolved."""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.lean', dir=REPO,
+                                     prefix='_audit_imports_', delete=False) as stream:
+        stream.write(INVENTORY_LEAN.replace('ROOT_MODULE', module))
+        path = Path(stream.name)
+    try:
+        result = subprocess.run(['lake', 'env', 'lean', path.name], cwd=REPO,
+                                env=elan_env(), capture_output=True, text=True, timeout=300)
+        if result.returncode:
+            raise ValueError('cannot inventory imports: ' + (result.stdout + result.stderr)[-2000:])
+        data = json.loads(result.stdout.split('AUTOFORM_IMPORTS_BEGIN\n', 1)[1]
+                          .split('\nAUTOFORM_IMPORTS_END', 1)[0])
+        if module not in {item['name'] for item in data}:
+            raise ValueError('root module missing from import inventory')
+        return data
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def prepare_replay(module, evidence):
+    """Build current sources before auditing; capture exact replay inputs."""
+    before = proof_artifacts.project_sources(REPO)
+    inputs = {proof_artifacts.key(REPO, p): proof_artifacts.digest(p) for p in evidence}
+    result = subprocess.run(['lake', 'build', module], cwd=REPO, env=elan_env(),
+                            capture_output=True, text=True, timeout=1800)
+    if result.returncode:
+        raise ValueError('current source does not build: ' + (result.stdout + result.stderr)[-2000:])
+    modules = module_inventory(module)
+    files = proof_artifacts.snapshot(REPO, modules, before, evidence)
+    if any(files.get(name) != digest for name, digest in inputs.items()):
+        raise ValueError('pipeline evidence changed during audit preparation')
+    return {'status': 'READY', 'files': files, 'modules': [m['name'] for m in modules]}
 
 
 # --------------------------------------------------------------------------- #
@@ -284,7 +347,7 @@ def source_sweep() -> dict:
                     "demonstration": Path(rel).name in DEMONSTRATION_FILES,
                 })
 
-    core = [f for f in findings if f["file"].startswith(CORE_DIR)]
+    core = [f for f in findings if f["file"].startswith(TRUSTED_SEMANTICS_DIRS)]
     generated = [f for f in findings if f["file"].startswith("Autoform/Generated/")]
     return {
         "files_scanned": scanned,
@@ -338,7 +401,7 @@ def _leanchecker_exe() -> str | None:
     return None
 
 
-def lean4checker(fresh: bool = True) -> dict:
+def lean4checker(fresh: bool = True, module: str = "Autoform") -> dict:
     """Externally re-verify the .olean files, or report the gap honestly.
 
     We invoke it through `lake env` so that LEAN_PATH covers this package *and* its
@@ -347,7 +410,7 @@ def lean4checker(fresh: bool = True) -> dict:
     `--fresh` replays every constant -- imported ones included -- into an empty
     environment.  That is the mode we rely on: it is the one demonstrated to reject a
     tampered `.olean` anywhere in the transitive import graph, at the cost of being
-    single-threaded (~1.5 min for `Autoform`).  Without `--fresh` the checker can
+    single-threaded (large generated corpora can take many minutes). Without `--fresh` the checker can
     silently check almost nothing when the named module is a bare re-export list, which
     is exactly the shape `Autoform.lean` has; see STRATEGY.md 19 on silent oracles.
     """
@@ -367,7 +430,7 @@ def lean4checker(fresh: bool = True) -> dict:
             ),
         }
 
-    cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + ["Autoform"]
+    cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + [module]
     try:
         proc = subprocess.run(
             cmd, cwd=str(REPO), env=elan_env(),
@@ -390,7 +453,7 @@ def lean4checker(fresh: bool = True) -> dict:
         "stdout": proc.stdout[-4000:],
         "stderr": proc.stderr[-4000:],
         "detail": (
-            "the kernel replayed every constant reachable from `Autoform` into a fresh "
+            f"the kernel replayed every constant reachable from `{module}` into a fresh "
             "environment and accepted them all"
             if proc.returncode == 0 else
             "the independent kernel REJECTED the compiled environment"
@@ -405,6 +468,9 @@ def lean4checker(fresh: bool = True) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="autoform trust-audit sweep")
     ap.add_argument("-o", "--output", default=str(REPO / "audit.json"))
+    ap.add_argument("--module", default="Autoform", help="root module whose full import closure is audited")
+    ap.add_argument("--evidence", type=Path, action="append", default=[],
+                    help="require this pipeline artifact and bind its bytes to the replay (repeatable)")
     ap.add_argument("--skip-lean", action="store_true",
                     help="source sweep only (no lake invocation)")
     ap.add_argument("--strict", action="store_true",
@@ -413,18 +479,31 @@ def main() -> int:
                     help="run leanchecker without --fresh (faster, weaker: it may check "
                          "almost nothing for a re-export-only root module)")
     args = ap.parse_args()
+    if not re.fullmatch(r"Autoform(?:\.[A-Za-z_][A-Za-z0-9_]*)*", args.module):
+        ap.error("--module must be an Autoform module name")
 
-    report: dict = {"repo": str(REPO)}
+    report: dict = {"repo": str(REPO), "root_module": args.module}
+    ready = False
+    report['artifact_snapshot'] = {'status': 'SKIPPED', 'files': {}}
+    if not args.skip_lean:
+        try:
+            report['artifact_snapshot'] = prepare_replay(args.module, args.evidence)
+            ready = True
+        except (OSError, ValueError, KeyError, IndexError, subprocess.TimeoutExpired) as exc:
+            report['artifact_snapshot'] = {'status': 'ERROR', 'files': {}, 'error': str(exc)}
     report["source_sweep"] = source_sweep()
     report["axiom_sweep"] = (
         {"status": "SKIPPED", "leaks": [], "declarations": 0,
          "declared_axioms": [], "nonstandard_axioms": [], "axiom_histogram": {}}
-        if args.skip_lean else axiom_sweep()
+        if not ready else axiom_sweep(args.module)
     )
     report["lean4checker"] = (
-        {"status": "SKIPPED", "available": False} if args.skip_lean
-        else lean4checker(fresh=not args.no_fresh)
+        {"status": "SKIPPED", "available": False} if not ready
+        else lean4checker(fresh=not args.no_fresh, module=args.module)
     )
+    if ready:
+        changed = proof_artifacts.changed(REPO, report['artifact_snapshot']['files'])
+        report['artifact_snapshot'].update(status='CHANGED' if changed else 'STABLE', changed=changed)
 
     ax = report["axiom_sweep"]
     src = report["source_sweep"]
@@ -438,18 +517,27 @@ def main() -> int:
         if f["kind"] in ("sorry", "native_decide") and not f["demonstration"]
     ]
     failures = []
+    if not args.skip_lean and report['artifact_snapshot']['status'] != 'STABLE':
+        failures.append('replay artifacts are not stable: ' +
+                        str(report['artifact_snapshot'].get('error', report['artifact_snapshot'].get('changed'))))
     if ax["status"] == "LEAK":
         failures.append(f"{len(ax['leaks'])} declaration(s) with a trusted-code axiom")
     if ax["status"] == "ERROR":
         failures.append("axiom sweep could not run: " + str(ax.get("error"))[:200])
+    if ax.get('nonstandard_axioms') or ax.get('declared_axioms'):
+        failures.append('proofs depend on undeclared assumptions or project axioms')
     if real_src_leaks:
         failures.append(f"{len(real_src_leaks)} sorry/native_decide in source")
+    if not src["core_clean"]:
+        failures.append(f"{len(src['core_findings'])} escape hatch(es) in trusted semantics")
     if l4c["status"] == "FAILED":
         failures.append("leanchecker rejected the .oleans")
     if l4c["status"] == "ERROR":
         failures.append("leanchecker could not run: " + str(l4c.get("detail"))[:200])
     if args.strict and l4c["status"] == "UNVERIFIED":
         failures.append("leanchecker unavailable (--strict)")
+    if args.strict and l4c['status'] == 'SKIPPED':
+        failures.append('kernel replay skipped (--strict)')
 
     report["verdict"] = {"failures": failures, "pass": not failures}
 
@@ -494,12 +582,12 @@ def main() -> int:
             tag = "  [demonstration]" if f["demonstration"] else ""
             p(f"      {f['file']}:{f['line']}: {f['text'][:90]}{tag}")
     p("")
-    p(f"    Core semantics ({CORE_DIR}) claim: free of sorry/partial/unsafe/"
+    p(f"    Trusted semantics ({', '.join(TRUSTED_SEMANTICS_DIRS)}) claim: free of sorry/partial/unsafe/"
       "native_decide/implemented_by/axiom")
     if src["core_clean"]:
-        p("    VERIFIED: no findings under Core.")
+        p("    VERIFIED: no findings under trusted semantics.")
     else:
-        p(f"    CLAIM FALSE: {len(src['core_findings'])} finding(s) under Core:")
+        p(f"    CLAIM FALSE: {len(src['core_findings'])} finding(s) under trusted semantics:")
         for f in src["core_findings"]:
             p(f"      {f['file']}:{f['line']} [{f['kind']}] {f['text'][:90]}")
     p("")

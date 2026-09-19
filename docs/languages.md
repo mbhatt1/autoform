@@ -1,5 +1,19 @@
 # Language support — measured
 
+The current end-to-end regression fixtures cover Python, C, C++, Java, Go,
+JavaScript, TypeScript and Kotlin. Run `AUTOFORM_TEST_JOERN=1 python -m pytest
+tests/test_source_pipeline.py -q` to translate them through Joern, compare with the
+real runtimes and compile the resulting conformance theorems. This validates the
+fixture operations; it is not whole-language or arbitrary-repository equivalence.
+
+This is a historical source-frontend measurement. Some recorded defects have since
+been fixed (including the JavaScript dialect and JSX/TSX recognition); it is not a
+current capability registry. The binary/assembly path, its tested architectures,
+and its outstanding limitations are documented in [machine-code.md](machine-code.md).
+The current Joern numeric changes and their native-runtime checks are documented
+in [typed-numerics.md](typed-numerics.md); the historical measurements below have
+not been rerun against whole repositories.
+
 The README claims the CPG is "already a universal AST … *one* semantics and *one*
 exporter cover all of them". Until this run, everything measured was Python (`cachetools`)
 plus a five-function hand-written C file. This document records what the unmodified
@@ -177,9 +191,21 @@ not fixable inside the semantics; it needs an exporter change.
 
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
 
-`.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
-`java64` and `go64` configs — but `Dialect` has only two constructors (`python`,
-`cLike`), so nothing can select them. They are dead code.
+`.java`/`.go` → `.cLike` → `c32Wrapv` on the **untagged** path. `Numeric.lean` defines
+`java32`, `java64` and `go64`, and `Dialect` still has no `.java`/`.go` constructor to
+select them (its three are `python`, `cLike`, `javascript`).
+
+These configs are no longer dead code: the exporter now tags each operation with its
+resolved operand type (`num:java:i64:+`), and `TypedNumeric.parse` turns that tag into a
+width-correct config, so a *tagged* Java `long` really is 64-bit and division by zero
+raises `ArithmeticException` rather than holing. The row below is therefore the
+behaviour of the **untagged fallback**, which is what an operation gets when the
+exporter could not resolve its operand type. Untypable operations are emitted as
+`numeric:unknown-type:<op>` holes rather than guessed — on a live Apache Spark export
+that was 66 holes out of 5099.
+
+`Lang.numConfig` (`Numeric.lean`) maps `.java` to `java64`, which contradicts the
+untagged path; it has no callers and is marked non-normative in its docstring.
 
 | input | real runtime | Core |
 |---|---|---|
