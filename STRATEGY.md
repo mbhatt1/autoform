@@ -634,13 +634,47 @@ This is the vacuity class `#audit_depends` **cannot** see — `evalStmt_sound` d
 
 The fix was to pin `evalBExpr` against something not defined in terms of itself — the
 integer order and equality on `evalExpr`'s results (`Characterization` section in
-`Autoform/Lang/Imp/Semantics.lean`). Re-running the gate: **8 killed / 0 survived, 100%,
-HAS TEETH**.
+`Autoform/Lang/Imp/Semantics.lean`). Re-running the gate then reported **8 killed / 0
+survived, 100%, HAS TEETH**.
 
-*Caveat on the measurement:* when a mutant makes the module fail to compile, every theorem
-in that module is recorded as having killed it, so per-theorem attribution is coarse. The
-aggregate claim (these mutants are now caught) is sound; the per-theorem breakdown is not
-yet trustworthy and should be refined by isolating theorems into separate modules.
+**That 100% is withdrawn.** It was produced while `error_lines` could not parse this
+toolchain's diagnostics, so no kill was attributable to any individual theorem. With the
+regex fixed, the coarse fallback removed, and a startup calibration (`error_lines_sanity`)
+that refuses to score at all when diagnostics cannot be attributed, the gate has been re-run
+over **all 39 mutants** — 12 invalid, 27 scored, 0 coarse, 0 inconclusive
+(`mutation-Imp.json`):
+
+**24 of 27 scored mutants are killed by some theorem in the file.** The 3 survivors are
+`_+1` → `_+0` on `evalStmt`'s fuel patterns and are *equivalent mutants*: `| 0, _, _` is
+the first arm, so `_+0` is shadowed at zero fuel and identical above it.
+
+The re-run is worth more than the number, because it found two gaps the 100% had hidden:
+
+1. **`evalExpr` was constrained by nothing.** The characterization pinned `evalBExpr`
+   *against* `evalExpr` and stopped there, so `+`→`-`, `-`→`+` and `*`→`/` survived every
+   theorem in the file — the same vacuity class, one level further down. Fixed by
+   `evalExpr_add`/`_sub`/`_mul`.
+2. **A hole under a loop could be relabelled as exhausted fuel.** Replacing
+   `.hitHole h => .hitHole h` with `.hitHole h => .outOfFuel` was caught by nothing:
+   `evalStmt_sound` constrains only `.ok`. That mutant erases the `outOfFuel` / `hitHole`
+   distinction §5 rests on — untranslated code would read as a resource limit. Fixed by
+   `evalStmt_seq_hole_propagates` / `evalStmt_loop_hole_propagates`.
+
+A third observation is about the gate, not the specification: the explicitly-shaped
+`≠`/`∃` theorems score 0%, 0% and 3.7%, not because they are vacuous but because they are
+**shadowed**. A mutation that would refute one first breaks the `@[simp] rfl` lemma the
+proof goes *through*; Lean reports the error at that lemma, admits it with `sorryAx`, and
+`simp` then discharges the downstream theorem from a false hypothesis. Per-theorem scores
+in a file with a `simp` characterization set therefore understate detection, and the union
+is the quantity to read.
+
+*Caveat on the measurement, resolved:* this used to read "when a mutant makes the module
+fail to compile, every theorem in that module is recorded as having killed it, so
+per-theorem attribution is coarse." That fallback no longer exists — a build failure
+carrying no diagnostic attributable to the mutated file or the spec file is recorded
+INCONCLUSIVE and excluded from the score, and a run containing one cannot pass. The
+remaining limit on per-theorem attribution is the `simp`-shadowing described above, which
+understates rather than inflates.
 
 ### Tier 3: audit, portfolio, assurance case
 

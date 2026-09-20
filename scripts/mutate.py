@@ -497,6 +497,52 @@ def error_lines(output, target, root=None):
     return sorted({line for path, line in all_error_lines(output, root) if path == name})
 
 
+def error_lines_sanity(outputs):
+    """Did this toolchain's diagnostics turn out to be readable?
+
+    `all_error_lines` is the only thing standing between this gate and a meaningless
+    score. If Lean changes its diagnostic format again the regexes stop matching, every
+    mutant lands in the INCONCLUSIVE bucket, and the gate reports a clean-looking run
+    that established nothing -- the same silent failure that once made a 100% score an
+    artifact of the harness rather than a property of the specifications.
+
+    The evidence needed to tell those apart is already in hand: the build output of the
+    mutants that went unattributed. No probe, no subprocess, no toolchain assumption --
+    an earlier version shelled out to `lean`, which cost an invocation per run and, with
+    a stubbed `HOME`, was slow enough to starve the stage-deadline tests.
+
+    Returns (status, detail):
+      "ok"          -- nothing looked like an unparsed diagnostic;
+      "broken"      -- output carries error text that names a file and line, yet neither
+                       pattern could parse it. That is a format change, and the score
+                       must not stand;
+      "unavailable" -- the builds failed without producing anything diagnostic-shaped
+                       (a stub, a missing toolchain, a killed process). Absence of
+                       evidence, not evidence of breakage.
+    """
+    # Deliberately looser than the real patterns: something that mentions a .lean file
+    # and a line number is a diagnostic, whatever punctuation the toolchain puts around
+    # it. If this matches and the strict patterns did not, they have drifted.
+    loose = re.compile(r'([^\s:]+\.lean)\D{0,20}?(\d+)', re.M)
+    saw_diagnostic_shape = False
+    for out in outputs:
+        if not out:
+            continue
+        if all_error_lines(out):
+            return "ok", "diagnostics from this run parsed into file/line positions"
+        if 'error' in out.lower() and loose.search(out):
+            saw_diagnostic_shape = True
+    if saw_diagnostic_shape:
+        sample = next((o for o in outputs if o and 'error' in o.lower()), '')
+        return "broken", (
+            "build output names a .lean file and a line next to an error, but neither "
+            "diagnostic pattern could attribute it. Per-theorem attribution is therefore "
+            "broken on this toolchain and every mutant would score INCONCLUSIVE.\n"
+            f"  sample:\n{sample[-800:]}")
+    return "unavailable", ("the failing builds produced no diagnostic-shaped output at "
+                           "all, so there is nothing to calibrate against here")
+
+
 # ---------------------------------------------------------------------------
 # driver
 # ---------------------------------------------------------------------------
@@ -842,6 +888,24 @@ def main():
         if coarse:
             print(f"WARNING: {coarse} mutant(s) failed without an attributable diagnostic; "
                   f"no theorem was credited.")
+            # Two very different things produce that warning: mutants that genuinely
+            # failed without a position, or a diagnostic format this gate can no longer
+            # read. Only the second invalidates the whole run, and it is only worth the
+            # cost of a probe once something has actually gone unattributed -- when every
+            # mutant was attributed, attribution demonstrably works.
+            status, detail = error_lines_sanity(
+                [r.get("build_tail", "") for r in records
+                 if r.get("attribution") == "unattributed"])
+            report["attribution_calibration"] = {"status": status, "detail": detail}
+            if status == "broken":
+                print(f"DIAGNOSTIC ATTRIBUTION IS BROKEN: {detail}")
+                report["status"] = "ATTRIBUTION_BROKEN"
+                report["reason"] = ("the error-line regexes do not match this toolchain's "
+                                    "diagnostics, so no mutant could be credited to a "
+                                    "theorem; any score here is an artifact of the harness")
+                exit_code = 3
+            elif status == "unavailable":
+                print(f"(could not calibrate the diagnostic format: {detail.splitlines()[0]})")
         if restored_code:
             print("RESTORE FAILED: the original source was restored, but its build did not pass.")
         if pinned:

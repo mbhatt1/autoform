@@ -177,16 +177,22 @@ not match the runtime — caught automatically rather than by inspection.
   Lean's `Int`, which had mistranslated every C and Java program. Fix: the Core language
   is now parameterized by dialect.
 - **Vacuity the dependency check cannot see.** The mutation gate scored `evalStmt_sound`
-  at 25% (WEAK) — all six survivors were `evalBExpr` mutations, because `BigStep`'s side
+  at 25% (WEAK) — every survivor was an `evalBExpr` mutation, because `BigStep`'s side
   conditions are stated in terms of `evalBExpr` itself, so a mutation changes both sides
-  of the equation. Adding independent characterization lemmas raised the reported score
-  to 100%. That figure is **not attributable**: it was produced by the same
-  `scripts/mutate.py` whose `error_lines` regex never matched this toolchain's
-  diagnostics, so every "kill" came from the coarse build-failure fallback rather than
-  from any individual theorem (see the trust chain below). The vacuity the lemmas were
-  added to fix is real and was found by mutation; the 100% is not evidence that they
-  fixed it. Re-running the gate on `Autoform/Lang/Imp/*` would settle it and has not been
-  done.
+  of the equation. Characterization lemmas were added to fix that, and a 100% score was
+  reported; that figure was never attributable, because `scripts/mutate.py`'s
+  `error_lines` regex did not match this toolchain's diagnostics. Both the regex and the
+  coarse "credit every theorem" fallback are now gone, and the gate has been **re-run
+  over all 39 mutants of `Autoform/Lang/Imp/*`** with attribution working
+  (`mutation-Imp.json`, 0 coarse / 0 inconclusive):
+  **24 of 27 scored mutants are killed by some theorem.** The 3 survivors are `_+1` →
+  `_+0` on the fuel patterns, which are equivalent mutants — `| 0, _, _` is the first
+  arm, so they are unkillable by construction. Two things the re-run found that the
+  100% had hidden: `evalExpr` was characterized by nothing at all, so `+`→`-`, `-`→`+`
+  and `*`→`/` survived every theorem in the file; and a hole reached under a loop could
+  be reclassified as `outOfFuel` with no theorem objecting — the *"Ignorance ≠
+  behaviour"* distinction two lines up. Both are now pinned. No single theorem scores
+  above 26%: the useful quantity is the union, not a per-theorem percentage.
 - **41% of the FVSpec benchmark is vacuous under static screening.** 3,833 of 9,352
   analyzed problems. The dominant pattern: Python determinism tests (`f(x) == f(x)`)
   transliterated into Lean, where purity makes them `rfl`. Spec *translation* is not spec

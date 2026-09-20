@@ -330,3 +330,58 @@ class TestScoringRules:
     def test_the_build_is_retried_before_a_failure_is_believed(self, mutate):
         src = open(mutate.__file__).read()
         assert "if rc == 0 or timed_out or all_error_lines(out):" in src
+
+
+class TestDiagnosticCalibration:
+    """`error_lines_sanity` — the guard the regex comment promises.
+
+    Both diagnostic shapes are matched today, but the reason the gate once reported a
+    meaningless 100% is that nothing noticed when they stopped matching. It reads the
+    build output the run already captured, so it costs nothing and assumes no toolchain.
+    """
+
+    def test_output_that_parsed_is_ok(self, mutate):
+        status, _ = mutate.error_lines_sanity(['Foo.lean:2:25: error: type mismatch\n'])
+        assert status == 'ok'
+
+    def test_the_severity_first_shape_is_also_ok(self, mutate):
+        status, _ = mutate.error_lines_sanity(['error: Foo.lean:2:25: type mismatch\n'])
+        assert status == 'ok'
+
+    def test_a_drifted_diagnostic_format_is_broken(self, mutate):
+        """The regression that matters: a file and line are plainly there, and neither
+        strict pattern can read them."""
+        status, detail = mutate.error_lines_sanity(
+            ['error: in Foo.lean at line 2, column 25: type mismatch\n'])
+        assert status == 'broken'
+        assert 'attribut' in detail.lower()
+
+    def test_output_with_no_diagnostic_shape_is_unavailable(self, mutate):
+        """A stubbed `lake`, a killed process or a missing toolchain produces failures
+        with nothing diagnostic in them. That is not evidence the format changed, and
+        treating it as such aborted a harness driving `lake` through a stub."""
+        status, detail = mutate.error_lines_sanity(
+            ['error: no default toolchain configured\n', ''])
+        assert status == 'unavailable'
+        assert 'nothing to calibrate' in detail.lower()
+
+    def test_it_needs_no_subprocess_and_no_toolchain(self, mutate, monkeypatch):
+        def explode(*a, **k):
+            raise AssertionError('error_lines_sanity must not shell out')
+
+        monkeypatch.setattr(mutate.subprocess, 'run', explode)
+        monkeypatch.setattr(mutate.subprocess, 'Popen', explode)
+        assert mutate.error_lines_sanity(['Foo.lean:2:1: error: x\n'])[0] == 'ok'
+
+    def test_the_gate_refuses_to_score_when_attribution_is_broken(self, mutate):
+        src = Path(mutate.__file__).read_text()
+        assert 'ATTRIBUTION_BROKEN' in src
+        assert 'if status == "broken":' in src
+
+    def test_the_check_only_runs_once_something_went_unattributed(self, mutate):
+        """Diagnosis, not a toll on every run: a run in which every mutant was
+        attributed has already demonstrated that attribution works."""
+        src = Path(mutate.__file__).read_text()
+        probe = src.index('status, detail = error_lines_sanity(')
+        guard = src.index('if coarse:', src.index('=== mutation score ==='))
+        assert guard < probe, 'the check must sit inside the `if coarse:` branch'
