@@ -181,6 +181,26 @@ jobs:
       - name: check_specs_fresh — specs describe the corpus in the tree
         run: python3 scripts/check_specs_fresh.py
 
+      # An AST is evidence about the exporter that produced it. Nothing recorded which
+      # exporter that was: `provenance.py record` writes `joern_version` and
+      # `exporter_sha256`, and for a long time nothing called it, so every committed AST
+      # was unattributed and the field that would have flagged the character-literal fix
+      # as a reason to re-export was never written (docs/integrity.md).
+      #
+      # This step is the cheap half of that. It does not re-export anything; it asks
+      # whether each tracked AST is either attributed or named in
+      # provenance/unattributed.json with a reason. The backlog is not an exemption: an
+      # entry stops applying the moment its artifact's digest changes, so regenerating a
+      # listed AST turns this step red until real provenance is recorded for it. That is
+      # the whole point, and it is why the file cannot simply be topped up with today's
+      # digests.
+      #
+      # Exit codes: 0 attributed or explicitly baselined, 1 a violation, 2 nothing
+      # checked at all. 2 fails for the same reason it does everywhere else in this file
+      # -- a check that passes by finding nothing is not a check.
+      - name: check_provenance — every tracked AST is attributed or named
+        run: python3 scripts/check_provenance.py
+
       # THE CONFORMANCE ORACLE MUST NOT BE DARK.
       #
       # differential.py is the only check that compares the semantics to a real runtime;

@@ -219,7 +219,31 @@ have flagged this exporter change as a reason to re-export was never written.
 `autoform.sh` stage 3 now records it, so ASTs produced from here on are attributed.
 That does **not** retroactively attribute the ones already committed: they remain
 unattributed, which is now itself the signal that they predate the fix.
-`scripts/check_provenance.py` is still in no workflow.
+
+`scripts/check_provenance.py` **is now a required CI gate**, which it could not be while
+it exited 1. Three artifacts were violating it: `ast-Cachetools.json` and
+`ast-V8Numbers.json` had been regenerated since their baseline entries were written, so
+their digests no longer matched and the entries had stopped applying; `ast-V8Base.json`
+was in neither the baseline nor `provenance/`, which was an omission rather than a signal.
+
+One of the three was closed with evidence rather than with a digest bump.
+`ast-Cachetools.json`'s source tree was previously "not identified anywhere in the
+repository"; it is now identified as **cachetools v7.1.7** — the only release predating the
+2026-08-22 regeneration — because a fresh export of that tag reproduces its exact 209-entry
+`(name, file)` set across all five modules. It still DIFFERS in the bodies, for two
+separable reasons worth keeping apart: today's exporter emits six per-function keys the
+artifact has no trace of (`paramTypes`, `paramIntegerTypes`, `pythonSignature`,
+`returnType`, `returnIntegerType`, `sourceName`), and after discounting those, 105 of 209
+entries still differ. So the artifact predates exporter work considerably larger than the
+character-literal fix, and re-exporting would produce new evidence rather than reproduce
+the old artifact.
+
+The other two are recorded honestly as the weakest class of entry in the file: they name
+the commit that produced or changed the artifact and nothing about the tree it came from.
+A V8-sized C++ corpus cannot be identified by matching a fresh export the way cachetools
+was. **The gate passing does not mean the ASTs are attributed** — it reports 0 of 14
+attributed, with all 14 named. What it now prevents is a *new* unattributed artifact, and
+a regenerated one silently keeping an entry that no longer describes it.
 
 ## Two failure shapes worth naming
 
@@ -242,5 +266,5 @@ does not run the repository-wide historical render or documentation checks. A
 successful scoped run therefore does not establish release readiness.
 
 ```bash
-scripts/check_render.py && scripts/check_docs.py
+scripts/check_render.py && scripts/check_docs.py && scripts/check_provenance.py
 ```

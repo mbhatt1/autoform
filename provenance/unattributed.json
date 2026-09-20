@@ -6,11 +6,21 @@
   "you must record real provenance for it. scripts/check_provenance.py --strict refuses",
   "the backlog entirely.",
   "",
-  "The three entries with reproduction_attempted=true were checked, not assumed: each was",
+  "The four entries with reproduction_attempted=true were checked, not assumed: each was",
   "re-exported from its source tree with the pinned Joern and the committed exporter, and",
   "each DIFFERS. That is the finding, and it is why this file says `unattributed` rather",
   "than quietly recording today's exporter digest against yesterday's artifact -- which",
   "would have made a false claim look like a green check.",
+  "",
+  "ast-Cachetools.json is the one entry whose source revision was RECOVERED rather than",
+  "recorded: a fresh export of cachetools v7.1.7 reproduces its exact 209-entry (name,",
+  "file) set, which is what identifies the tag. It still DIFFERS in the bodies, so it",
+  "stays here -- but its source_hint is now a public tag rather than a dead scratch path.",
+  "",
+  "ast-V8Numbers.json and ast-V8Base.json are the weakest entries in this file and say so:",
+  "they name the commit that produced or changed the artifact and nothing about the tree it",
+  "came from. A C++ corpus that size cannot be identified by matching a fresh export the way",
+  "cachetools was. Do not read them as equivalent to the reproduction_attempted=true entries.",
   "",
   "source_hint paths are per-session scratch directories. They are a lead for whoever",
   "regenerates these, not a stable location, and check_provenance.py does not read them.",
@@ -31,10 +41,10 @@
    "reproduced": false
   },
   "ast-Cachetools.json": {
-   "artifact_sha256": "368bf5615c24ea1fecdff4bafe94694340f1ce06a396f0afd32fbb89625f28fd",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/cachetools",
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
-   "reproduction_attempted": false,
+   "artifact_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
+   "source_hint": "cachetools v7.1.7 (https://github.com/tkem/cachetools, tag v7.1.7, src/cachetools/ as the export root)",
+   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. The source tree IS now identified -- it was not before. A fresh export of cachetools v7.1.7 (the only release predating this artifact's 2026-08-22 regeneration in aa60de8) yields the same 209 entries with an identical (name, file) set across all five modules, which is what identifies the revision. The bodies differ for two separable reasons: (1) today's exporter emits six per-function keys this artifact has no trace of -- paramTypes, paramIntegerTypes, pythonSignature, returnType, returnIntegerType, sourceName; (2) after discounting those, 105 of 209 entries still differ. So this artifact predates exporter work substantially larger than the character-literal fix, and re-exporting would produce new evidence rather than reproduce it. Closing this means landing a fresh export together with its render, manifest hashes and regenerated specs.",
+   "reproduction_attempted": true,
    "reproduced": false
   },
   "ast-LangC.json": {
@@ -100,6 +110,13 @@
    "reproduction_attempted": true,
    "reproduced": false
   },
+  "ast-V8Base.json": {
+   "artifact_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+   "source_hint": null,
+   "reason": "Was in neither this backlog nor provenance/, which is an omission rather than a signal: every other tracked AST is accounted for one way or the other, and this one was simply never listed. It entered the tree in df77544 (2026-08-25, '285 tracked theorems were pinned to a corpus no clone could see'), which tracked the AST precisely so a clone could see the corpus. Same gap as ast-V8Numbers.json: the V8 tree and revision are not identified and the CPG was not kept, so reproduction was not attempted. Closing this needs the V8 revision recorded and a re-export from it.",
+   "reproduction_attempted": false,
+   "reproduced": false
+  },
   "ast-V8BaseSample.json": {
    "artifact_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
    "source_hint": "extracted from ast-V8Base.json (untracked; .gitignore names it a local build product)",
@@ -108,9 +125,9 @@
    "reproduced": false
   },
   "ast-V8Numbers.json": {
-   "artifact_sha256": "9742832f6f8eeff1b64102635129f4fe70926d0b724c0cc54fc6ae865a38564e",
-   "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/v8/src/numbers (a git checkout; revision not recorded at export time)",
-   "reason": "Not reproduced: the source tree it was exported from is not identified anywhere in the repository, and the .cpg was not kept. Attribution requires re-exporting from a known tree with scripts/provenance.py record.",
+   "artifact_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
+   "source_hint": null,
+   "reason": "Regenerated by 52a6987 (2026-08-21, 'Wire float literals to Float.lean'), which is how the digest moved off the earlier baseline. Reproduction NOT attempted: the entries come from V8's conversions.cc, hash-seed.cc, ieee754.cc and math-random.cc, and neither the V8 tree nor its revision is identified anywhere in this repository, nor was the CPG kept. This is the weakest class of entry here -- it names when the artifact changed and under which commit, not what it was built from. Unlike ast-Cachetools.json, whose revision was recovered by matching a fresh export's function set, a C++ corpus of this size cannot be identified that way cheaply. Closing this needs the V8 revision recorded and a re-export from it.",
    "reproduction_attempted": false,
    "reproduced": false
   }
