@@ -651,6 +651,12 @@ structure PythonSignature where
   /-- Lexical method classification from Python source. `none` retains the
   historical naming heuristic for models without this information. -/
   isMethod : Option Bool := none
+  /-- What the receiver IS, when it is not an instance. `some "class"` is a
+  `@classmethod`: Python passes the class as the first positional, so the exporter keeps
+  that parameter (usually `cls`) in `params` instead of stripping it the way it strips
+  `self`, and the `.mcall` sites pass the class value with no separate receiver. `none`
+  is an ordinary method or a plain function, and nothing about them changes. -/
+  receiverKind : Option String := none
   deriving Repr, Inhabited
 
 /-- A function: name, parameters, body.

@@ -403,13 +403,19 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             -- and the hypothesis are shaped differently.
                             rw [hres2] at hy
                             dsimp only at hy ⊢
-                            split at hy
-                            · next hc =>
-                                simp only [hc, if_true]
-                                exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
-                            · next hc =>
-                                simp only [hc, if_false, Bool.false_eq_true]
-                                exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                            -- A `@classmethod` value prepends its class instead of
+                            -- splitting a receiver off; a third `applyFunc`, same IH.
+                            by_cases hcm : fn2.isClassMethod = true
+                            · rw [if_pos hcm] at hy ⊢
+                              exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                            · rw [if_neg hcm] at hy ⊢
+                              split at hy
+                              · next hc =>
+                                  simp only [hc, if_true]
+                                  exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                              · next hc =>
+                                  simp only [hc, if_false, Bool.false_eq_true]
+                                  exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
                         | none => rw [hres2] at hy; exact hy
                     case clos g cap =>
                         rw [hg] at hy
@@ -479,11 +485,17 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             | none => simp only [hrm] at hy ⊢; exact hy
                             | some fn2 =>
                                 simp only [hrm] at hy ⊢
-                                cases hvs : vs.1 with
-                                | nil => simp only [hvs] at hy ⊢; exact hy
-                                | cons recv rest =>
-                                    simp only [hvs] at hy ⊢
-                                    exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                -- `@classmethod`: the class value goes in as the first
+                                -- positional; otherwise the receiver is split off.
+                                by_cases hcm : fn2.isClassMethod = true
+                                · rw [if_pos hcm] at hy ⊢
+                                  exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                · rw [if_neg hcm] at hy ⊢
+                                  cases hvs : vs.1 with
+                                  | nil => simp only [hvs] at hy ⊢; exact hy
+                                  | cons recv rest =>
+                                      simp only [hvs] at hy ⊢
+                                      exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
                 case ref rr =>
                     dsimp only at hy ⊢
                     rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
@@ -558,11 +570,17 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             | some fn =>
                                 rw [hrm] at hy
                                 dsimp only at hy ⊢
-                                by_cases hcap : o.captured.isEmpty = true
-                                · rw [if_pos hcap] at hy ⊢
+                                -- `@classmethod` passes the class with no receiver; the
+                                -- instance/closure split below is the ordinary case.
+                                by_cases hcm : fn.isClassMethod = true
+                                · rw [if_pos hcm] at hy ⊢
                                   exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
-                                · rw [if_neg hcap] at hy ⊢
-                                  exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                · rw [if_neg hcm] at hy ⊢
+                                  by_cases hcap : o.captured.isEmpty = true
+                                  · rw [if_pos hcap] at hy ⊢
+                                    exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                  · rw [if_neg hcap] at hy ⊢
+                                    exact ihC _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
                 -- An instance of a class with a builtin base (`Val.bobj`) dispatches to
                 -- the class's own method when it has one, and otherwise to `Stdlib`.
                 -- Only the first branch is a recursive call, so only it needs an IH.

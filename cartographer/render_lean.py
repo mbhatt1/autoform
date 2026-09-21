@@ -596,10 +596,15 @@ def render_func(f, nm) -> list:
         signature = f['pythonSignature']
         keys = ('positionalOnly', 'keywordOnly', 'required')
         if (not isinstance(signature, dict) or not set(keys) <= set(signature)
-                or set(signature) - set(keys) - {'isMethod', 'defaults'}):
+                or set(signature) - set(keys) - {'isMethod', 'defaults', 'receiverKind'}):
             raise ValueError('invalid Python signature fields')
         if 'isMethod' in signature and type(signature['isMethod']) is not bool:
             raise ValueError('invalid Python method classification')
+        # The only receiver kind Core distinguishes is the class of a `@classmethod`.
+        # Anything else is not a value this renderer knows how to bind, and inventing
+        # one is exactly the silent mistranslation a raise here prevents.
+        if 'receiverKind' in signature and signature['receiverKind'] != 'class':
+            raise ValueError('unknown Python receiver kind: %r' % (signature['receiverKind'],))
         ordinary = set(f.get('params', [])) - {f.get('vararg'), f.get('kwarg')}
         for key in keys:
             values = signature[key]
@@ -612,6 +617,8 @@ def render_func(f, nm) -> list:
                            for key in keys)
         if 'isMethod' in signature:
             fields += ', isMethod := some ' + str(signature['isMethod']).lower()
+        if 'receiverKind' in signature:
+            fields += ', receiverKind := some ' + lean_str(signature['receiverKind'])
         defaults = signature.get('defaults') or []
         if defaults:
             # A default names an ordinary parameter, names it once, and never names a

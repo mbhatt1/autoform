@@ -400,6 +400,15 @@ def visit(node, scopes):
         static_method = (len(decorators) == 1 and isinstance(decorators[0], ast.Name)
                          and decorators[0].id == 'staticmethod'
                          and builtin_name('staticmethod', scopes))
+        # `@classmethod` is the other binding directive with no residue: its entire
+        # meaning is "the receiver is the class". Core passes the class as the first
+        # positional and the parameter that receives it (usually `cls`) is KEPT in the
+        # signature rather than stripped like `self`. Only meaningful inside a class --
+        # a module-level `@classmethod` is a decorator like any other and still holes.
+        class_method = (len(decorators) == 1 and isinstance(decorators[0], ast.Name)
+                        and decorators[0].id == 'classmethod'
+                        and builtin_name('classmethod', scopes)
+                        and scopes[-1].get_type() == 'class')
         parameters = [a.arg for a in [*node.args.posonlyargs, *node.args.args,
             *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
             *([node.args.kwarg] if node.args.kwarg else [])]]
@@ -417,9 +426,11 @@ def visit(node, scopes):
             'positional_only': bool(node.args.posonlyargs),
             'keyword_only': bool(node.args.kwonlyargs),
             'firstPositional': next((a.arg for a in [*node.args.posonlyargs, *node.args.args]), None),
-            'decorated': bool(getattr(node, 'decorator_list', [])) and not static_method,
+            'decorated': (bool(getattr(node, 'decorator_list', []))
+                          and not static_method and not class_method),
             'isMethod': scopes[-1].get_type() == 'class' and not static_method,
             'staticMethod': static_method,
+            'classMethod': class_method,
             'privateParameters': bool(class_scopes and class_scopes[-1].get_name().lstrip('_')
                 and any(name.startswith('__') and not name.endswith('__') for name in parameters)),
             'parameters': parameters,
@@ -10608,8 +10619,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       qualSegs.length >= 2 && classNames.contains(qualSegs(qualSegs.length - 2))
     val isMethodDecl = if (pyFile) pythonSignatureInfo(m)
       .map(_("isMethod").bool).getOrElse(legacyMethodDecl) else legacyMethodDecl
+    // A `@classmethod` receives the CLASS as its first positional. Core passes it that
+    // way (`Func.isClassMethod` at every `.mcall` site), so the receiving parameter --
+    // `cls`, by convention, but any name -- stays in the signature instead of being
+    // stripped and re-injected under `self` the way an instance receiver is.
+    val isClassMethodDecl = pyFile && pythonSignatureInfo(m)
+      .exists(_.obj.get("classMethod").exists(_.bool))
     val ps = m.parameter.l.sortBy(_.index)
-               .filterNot(p => isMethodDecl && p.name == "self")
+               .filterNot(p => isMethodDecl && !isClassMethodDecl && p.name == "self")
                // c2cpg represents f(void) with an unnamed void parameter. It
                // declares zero arguments; keeping it invents a required value.
                .filterNot(p => cppFile && p.name.isEmpty && p.typeFullName.trim == "void")
@@ -10663,13 +10680,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         refuseBinding(pythonSignatureGap(m).get)
       else if (!isModule) pythonSignatureInfo(m).foreach { signature =>
         val sourceParams = signature("parameters").arr.map(_.str)
-          .filterNot(p => isMethodDecl && p == "self").toSet
+          .filterNot(p => isMethodDecl && !isClassMethodDecl && p == "self").toSet
         val exportedParams = ps.map(_.name).toSet
         val receiverKeywordCollision = obj.value.contains("kwarg") &&
           !signature("positionalOnly").arr.contains(ujson.Str("self"))
         val bindingGap =
-          if (isMethodDecl && (signature("firstPositional") != ujson.Str("self") ||
-              signature("decorated").bool || receiverKeywordCollision))
+          // The receiver-shape checks are about an INSTANCE receiver that Core injects
+          // under `self`. A classmethod injects nothing -- its receiver is an ordinary
+          // first positional -- so `firstPositional` being `cls` is the expected shape,
+          // not a gap, and the keyword-collector collision cannot arise.
+          if (isMethodDecl && !isClassMethodDecl &&
+              (signature("firstPositional") != ujson.Str("self") ||
+               signature("decorated").bool || receiverKeywordCollision))
             Some("call:python-receiver-signature")
           else if (signature("decorated").bool) Some("call:python-decorator-binding")
           else if (signature("privateParameters").bool) Some("call:python-private-parameters")
@@ -10737,6 +10759,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             List("positionalOnly", "keywordOnly", "required").map { key =>
               key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
             } ++ List("isMethod" -> signature("isMethod")) ++
+              (if (isClassMethodDecl) List("receiverKind" -> ujson.Str("class")) else Nil) ++
               (if (literalDefaults.arr.nonEmpty) List("defaults" -> literalDefaults) else Nil))
         }
       }
