@@ -260,11 +260,26 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-Source coverage still has gaps in mutable containers, cross-scope writes, calling
-conventions, and language-specific numeric behavior. `Val.float` is now wired into
-Core semantics; that does not establish coverage of all source float operations or
-machine floating-point instructions. Boundary contracts exist, but partially
-translated programs still need explicit assumptions and satisfiability evidence.
+Source coverage's four long-standing gaps now stand differently, and each claim below is
+a measurement rather than an impression:
+
+* **Mutable containers — done.** A Python list or dict literal allocates; containers have
+  identity; `a = [1,2]; b = a; b[0] = 9` makes `a[0]` nine, as in CPython. See
+  [the migration](docs/boxed-containers.md).
+* **Cross-scope writes — done** for the case where the binding dominates the capture.
+  `nonlocal` is boxed in the defining scope and shared with the closure; anything else
+  still holes ([§11](docs/languages.md)).
+* **Calling conventions — largely done.** Literal and in-program-function defaults,
+  `@staticmethod`, and recovered signatures all bind. Four defaults remain, and they are
+  the ones whose value genuinely is not time-invariant.
+* **Language-specific numeric behavior — no open divergence.** The differential suite was
+  run across the whole language matrix against real runtimes: 5 passed, 2 xfailed, and
+  neither xfail is numeric ([typed numerics](docs/typed-numerics.md)).
+
+`Val.float` is now wired into Core semantics; that does not establish coverage of all
+source float operations or machine floating-point instructions. Boundary contracts exist,
+but partially translated programs still need explicit assumptions and satisfiability
+evidence.
 See [the source-language measurements](docs/languages.md) and
 [the machine-code gap list](docs/machine-code.md#remaining-work-toward-arbitrary-codebases)
 for the scope of the remaining work.

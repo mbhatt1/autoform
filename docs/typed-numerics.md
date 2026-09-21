@@ -106,3 +106,35 @@ Language rules: [Java numeric operators](https://docs.oracle.com/javase/specs/jl
 [C++ integer literal types](https://eel.is/c++draft/lex.icon),
 [Go integer operators](https://go.dev/ref/spec#Integer_operators), and
 [ECMAScript ToInt32](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-toint32).
+
+## The differential suite, run across every language
+
+`tests/test_source_numeric.py::test_joern_native_numeric` is parameterised over the
+language matrix and gated behind `AUTOFORM_TEST_JOERN=1`, so it does not run in an
+ordinary `pytest` invocation — it parses with Joern, exports, renders, and compares
+against the real runtime for each language. Run in full (Joern 4.0.606, `cc`, `node`,
+`javac`, `go`):
+
+    5 passed, 2 xfailed
+
+**No open numeric divergence.** Every arithmetic, shift, bitwise, short-circuit,
+assignment-order and call-order case in the matrix agrees with its native runtime. That
+is a measurement, not an absence of reports: "no known divergence" and "the suite was run
+and says so" are different claims, and only the second one is evidence.
+
+The two `xfail`s are `strict`, so they would fail the suite if they started passing, and
+neither is numeric:
+
+* **`indexSnapshot`** — JavaScript array literals need reference and identity semantics.
+  This is now *closer* than the reason recorded against it. The JS frontend lowers
+  `[a, b]` to `__ecma.Array.factory()` followed by `.push(a)`, `.push(b)`, which is
+  exactly the mutable-container idiom `docs/boxed-containers.md` now implements — a boxed
+  `Obj` with a `.list` payload, mutated in place. Three things remain, and none is
+  aliasing: `__ecma.Array.factory()` must translate to an empty boxed array; the boxing
+  gate in `evalExpr` must admit `.javascript` as well as `.python` (JS arrays are
+  reference types, so this is correct rather than convenient); and `push` needs
+  JavaScript semantics — it returns the new **length**, where Python's `append` returns
+  `None`, so `Stdlib.method` cannot simply be routed there for `.javascript`.
+* **`indexString`** — UTF-16 string indexing, which is a separate representation question
+  and unrelated to containers.
+
