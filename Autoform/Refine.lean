@@ -881,9 +881,10 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     -- `cls` is an ordinary class, not one with a builtin base: those allocate a
     -- `Val.bobj` and never reach `__init__` (see `Semantics.allocBuiltin`).
     (hbb : ctx.builtinBase cls = none)
-    -- `__init__` under Python, `<init>` under JavaScript (`Dialect.ctorName`); a concrete
-    -- `ctx` reduces this to the literal, so existing call sites pass `"__init__"` proofs.
-    (hm : ctx.resolveMethod cls ctx.dialect.ctorName = some fn)
+    -- The constructor as `Semantics.evalExpr` finds it: `Ctx.resolveCtor` tries `__init__`
+    -- (Python) and then `<init>` (JavaScript, Java). A concrete `ctx` reduces it, so a
+    -- call site proves the premise by computation.
+    (hm : ctx.resolveCtor cls = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
         (some (.ref h₁.length)) vs kws = (h₃, .val w)) :
     evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by
@@ -1872,6 +1873,10 @@ theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump
 theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
   rfl
 
+/-- The constructor as `Expr.alloc` finds it (`Ctx.resolveCtor`: `__init__` first). -/
+theorem resolveCtor_init : ctxT.resolveCtor "Counter" = some f_counter_init := by
+  simp only [Ctx.resolveCtor, resolve_init]
+
 
 
 theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep h r a) :
@@ -2028,7 +2033,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         (evalList_nil ctxT (G+7) [] _))
       (by intro c cap; simp [Env.get])
       (by simp [ctxT, ctxOf, CounterProgram, Ctx.builtinBase])
-      resolve_init hinit
+      resolveCtor_init hinit
     simpa using h
   have hgc : (Env.get ([("xs", Val.list (ys.map Val.int))] : Env) ("<glob>" ++ "c")).truthy = false := by
     simp [Env.get, Val.truthy]

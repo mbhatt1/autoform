@@ -688,6 +688,23 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
 
+/-- Nor a `<init>` (the JavaScript/Java constructor name `Ctx.resolveCtor` tries second). -/
+theorem resolveMethod_hashedTuple_initJs (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolveMethod "_HashedTuple" "<init>" = none := by
+  simp only [Ctx.resolveMethod, ctxOf, table_keysProgramWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rw [show ("." ++ "_HashedTuple" ++ "." ++ "<init>") = "._HashedTuple.<init>" from by rfl]
+  simp +decide [List.filter_cons, String.endsWith]
+  simp only [Ctx.resolve, ctxOf, table_keysProgramWith]
+  rw [show ("." ++ "<init>") = ".<init>" from by rfl]
+  simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
+    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+
+/-- So `Expr.alloc "_HashedTuple"` runs no constructor at all. -/
+theorem resolveCtor_hashedTuple (e : Expr) :
+    (ctxOf (keysProgramWith e)).resolveCtor "_HashedTuple" = none := by
+  simp only [Ctx.resolveCtor, resolveMethod_hashedTuple_init, resolveMethod_hashedTuple_initJs]
+
 /-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
@@ -821,7 +838,7 @@ theorem methodkey_refinesUnder_value :
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
-    resolveMethod_hashedTuple_init, methodkeyWith,
+    resolveMethod_hashedTuple_init, resolveCtor_hashedTuple, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
 
@@ -908,6 +925,9 @@ theorem resolveMethod_hashedTuple_init' :
     (ctxOf keysProgram).resolveMethod "_HashedTuple" "__init__" = none := by
   rfl
 
+theorem resolveCtor_hashedTuple' : (ctxOf keysProgram).resolveCtor "_HashedTuple" = none := by
+  rfl
+
 /-! ### The unconditional theorem
 
 The point of the whole section: with the calling convention modelled, the contract is no
@@ -937,7 +957,7 @@ theorem methodkey_refines :
   apply forall_ge_of_forall_add
   intro k
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgram, ctx_fold,
-    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init', Dialect.ctorName,
+    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init', resolveCtor_hashedTuple',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, Env.set, Env.get, Val.truthy,
     Val.iterable, strKeyed, Heap.get, Heap.alloc]

@@ -1147,3 +1147,51 @@ is checked against CPython by the `sliceDProg` `#guard`s in `Semantics.lean`.
   wrong type (`b'a' == 'a'` is `False`); a `Val.bytes` touches every exhaustive match
   over `Val` in `FuelMono`, `ExcSafe`, `Ledger` and `Basis`, and is not done here.
 
+#### 16.H Java objects, exceptions, casts, arrays, `for` (2026-09-21)
+
+Grounded in the Java Language Specification (SE 21), section cited at each rule in the
+code. Measured on `ast-LangJava.json` (gson, 669 functions) before the change: `op:alloc`
+166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43,
+`control:FOR` 30. What this pass changed, and what it deliberately did not:
+
+* **`this` was unbound.** The Java frontend spells the receiver `this` (JLS §15.8.3) and
+  Core binds it as `self`; only C++ was being renamed, so every `this.x` in a Java method
+  read `unit` from an unbound name -- 559 sites in gson, all silently wrong, none a hole.
+  `localName` now renames it for `.java` files. This is the single largest fidelity fix
+  here and it moves no hole count at all, which is the point of the differential oracle.
+* **Constructors and method names.** javasrc2cpg names methods with their erased
+  signature (`pkg.Cls.<init>:void(int)`, JLS §8.4.9/§8.8), so Core's dotted-suffix
+  `resolveMethod` never matched a Java method. `stripSig` drops the signature before the
+  suffix test (structurally, kernel-reducible) and `Ctx.resolveCtor` tries `__init__` then
+  `<init>`: `new Box(7)` now runs the constructor with `this` bound (§15.9.4). `#guard`
+  `javaProg` in `Semantics.lean`.
+* **Casts (§5.1.2, §5.1.3).** To `byte`/`short`/`char`/`int`/`long`: Core's `cast:*`
+  operators. Integral→integral discards all but the low-order bits (`IntType.wrap`).
+  Floating→integral is `javaFloatToIntegral`: NaN → 0, round toward zero, saturate to
+  `int`/`long`, then narrow again for `byte`/`short`/`char` -- `(int) 3.9 == 3`,
+  `(int) NaN == 0`, `(int) 1e30 == Integer.MAX_VALUE`, `(byte) 300.9 == 44`, each a
+  `#guard`. Under `.cLike` the same float cast stays a hole: C17 §6.3.1.4 makes it
+  undefined out of range. Casts to `float`/`double` (`op:cast:java-floating`) and
+  reference casts (`op:cast:java-reference`, §5.5.1 may throw `ClassCastException`) keep
+  named holes.
+* **`throw` (§14.18).** Lowered to `Stmt.raise`; under `.java` Core raises the value
+  as-is. Handler dispatch for typed `catch` (§14.20.1, by class ancestry) is NOT done: the
+  `try` lowering still holes a Java `catch (T e)` as `control:TRY-handler-language`, so
+  the 125 `control:THROW` holes become raises whose catching is a separate, named gap.
+* **Array initializers (§10.6, §4.3.1).** `{a, b, c}` is a new array object with
+  left-to-right initializers: the boxed list literal under `.java`. `new int[n]`
+  (§15.10.2, default values §4.12.5) is not lowered yet.
+* **Collections.** `knowsMethod .java` now answers `java.util.List`/`Map` on the boxed
+  list/dict: `add` (returns `true`), `get` (`IndexOutOfBoundsException` on any
+  out-of-range index -- no negative indexing), `size`, `isEmpty`, `contains`, `put`
+  (previous value or `null`), `containsKey`; `knowsMethod_java_complete` proves each name
+  is answered. `new ArrayList<>()` itself is still the frontend's alloc-block shape and is
+  not lowered here.
+* **Not done, on purpose:** `instanceof` (§15.20.2 needs a run-time class test against
+  the corpus's class hierarchy -- no Core expression reads an object's class yet), classic
+  `for` (§14.14.1 already lowers via `forStmt` where the CPG has four clauses; the 30
+  bare `control:FOR` holes are a different child shape not yet examined), `new C(args)`
+  for corpus classes in the exporter (the frontend's three-statement alloc block is not
+  yet folded for Java, so `op:alloc` stays 166 until it is). Every one of these is a
+  hole, never a guess.
+

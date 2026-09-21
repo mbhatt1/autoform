@@ -1118,3 +1118,46 @@ class TestSliceDPythonLabels:
                         'andChain', 'assertFails', 'assertPasses'):
             assert f'#guard match runFunc sliceDProg 200 "{subject}" []' in guards, subject
 
+class TestJavaCoreSemantics:
+    """Java under `Dialect.java`: the rules landed in 16.H of docs/languages.md, each pinned
+    to the text that carries its JLS citation so the citation cannot drift from the rule."""
+
+    SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
+    STD = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Stdlib.lean').read_text()
+    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+
+    def test_this_is_the_receiver_in_java_too(self):
+        # JLS 15.8.3; without this every `this.x` in a Java method read an unbound name.
+        assert 'if ((cppFile || javaFile) && n == "this") "self" else n' in self.EXP
+        assert 'JLS §15.8.3' in self.EXP
+
+    def test_signatures_are_stripped_before_method_resolution(self):
+        assert 'def stripSig (k : String) : String' in self.SEM
+        assert 'strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)' in self.SEM
+        assert 'def Ctx.resolveCtor' in self.SEM and 'ctx.resolveMethod cls "<init>"' in self.SEM
+        assert '#guard stripSig "a.py:<module>.C.f" == "a.py:<module>.C.f"' in self.SEM
+
+    def test_float_to_integral_follows_jls_5_1_3(self):
+        assert 'def javaFloatToIntegral (ty : IntType) (f : Fl) : Int' in self.SEM
+        assert 'JLS §5.1.3' in self.SEM
+        # NaN → 0, saturation, two-step narrowing, and the C non-claim, each a #guard
+        for g in ('(.float (Fl.ofBits 0x7FF8000000000000)) == .val (.int 0)',
+                  '(.float (Fl.ofBits 0x462B7E3ED64C4C00)) == .val (.int 2147483647)',
+                  '"cast:i8"  (.float (Fl.ofBits 0x4072D66666666666)) == .val (.int 44)',
+                  'applyUnop .cLike "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with'):
+            assert g in self.SEM, g
+
+    def test_java_collections_have_their_own_table(self):
+        assert 'def javaMethodNames : List String' in self.STD
+        assert 'theorem knowsMethod_java_complete' in self.STD
+        assert '"IndexOutOfBoundsException"' in self.STD
+        assert 'method_java_none' not in self.STD.replace('the `method_java_none` that', '')
+
+    def test_exporter_lowers_throw_arrays_and_primitive_casts_for_java(self):
+        assert 'case "THROW" if (jsLikeFile || javaFile) && kids.size == 1 =>' in self.EXP
+        assert 'mfn == "<operator>.arrayInitializer" && javaFile' in self.EXP
+        assert 'def javaCast(kids: List[AstNode]): ujson.Obj' in self.EXP
+        for w in ('case "byte"  => Some("i8")', 'case "char"  => Some("u16")', 'case "long"  => Some("i64")'):
+            assert w in self.EXP, w
+        assert 'hole("op:cast:java-reference")' in self.EXP
+

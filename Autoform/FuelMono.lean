@@ -41,6 +41,7 @@ def TFFreeCtx (ctx : Ctx) : Prop :=
   (∀ n fn, ctx.resolve n = some fn → tfFreeS fn.body = true) ∧
   (∀ c m fn, ctx.resolveMethod c m = some fn → tfFreeS fn.body = true)
 
+
 /-- Structural coverage witness used by the simultaneous induction. Every current
 statement constructor is covered, including finalizers. The older `tfFreeS` predicate
 remains available for previously generated proofs that explicitly mention it. -/
@@ -60,6 +61,15 @@ private def CoveredCtx (ctx : Ctx) : Prop :=
 
 private theorem coveredCtx_all (ctx : Ctx) : CoveredCtx ctx :=
   ⟨fun _ fn _ => controlCovered_all fn.body, fun _ _ fn _ => controlCovered_all fn.body⟩
+
+/-- Both spellings a constructor lookup tries (`__init__`, then Java's `<init>`) are
+`resolveMethod` lookups, so the second conjunct covers whatever `resolveCtor` finds. -/
+private theorem resolveCtor_covered {ctx : Ctx} (hctx : CoveredCtx ctx) {cls : String}
+    {fn : Func} (h : ctx.resolveCtor cls = some fn) : controlCovered fn.body = true := by
+  unfold Ctx.resolveCtor at h
+  split at h
+  · next f hf => cases h; exact hctx.2 _ _ _ hf
+  · exact hctx.2 _ _ _ h
 
 /-- The eight-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
@@ -919,7 +929,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 case clsClos cname cvs =>
                     rw [hcap] at hy
                     dsimp only at hy ⊢
-                    cases hrm : Ctx.resolveMethod ctx cls ctx.dialect.ctorName with
+                    cases hrm : Ctx.resolveCtor ctx cls with
                     | none => rw [hrm] at hy; exact hy
                     | some fn =>
                         rw [hrm] at hy
@@ -930,11 +940,11 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         rw [hC] at hy
                         cases r₃ <;> first
                           | (cases hy; exact absurd rfl hne)
-                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy)
+                          | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
                 all_goals
                   (rw [hcap] at hy
                    dsimp only at hy ⊢
-                   cases hrm : Ctx.resolveMethod ctx cls ctx.dialect.ctorName with
+                   cases hrm : Ctx.resolveCtor ctx cls with
                    | none => rw [hrm] at hy; exact hy
                    | some fn =>
                        rw [hrm] at hy
@@ -945,7 +955,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                        rw [hC] at hy
                        cases r₃ <;> first
                          | (cases hy; exact absurd rfl hne)
-                         | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hC (by simp)]; exact hy))
+                         | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy))
       · intro ctx hctx h fn hfree self? vs kws h' r hy hne
         simp only [applyFunc] at hy ⊢
         by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
@@ -1714,7 +1724,7 @@ theorem tfFree_of_table {ctx : Ctx}
   split at hr
   · rename_i a f rest hfilt
     have hmem : (a, f) ∈ ctx.table.filter
-        (fun p => strEndsWith p.1 ("." ++ c ++ "." ++ m)) := by
+        (fun p => strEndsWith (stripSig p.1) ("." ++ c ++ "." ++ m)) := by
       rw [hfilt]; exact List.mem_cons_self
     have : f = fn := by simpa using hr
     exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1

@@ -5966,6 +5966,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * project's ledger exists to prevent. So `.go` files keep today's `control:SWITCH`
     * hole, honestly, until this is checked; `switchStmt` is applied everywhere else. */
   def goFile: Boolean = currentFile.toLowerCase.endsWith(".go")
+  def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
 
   /** One `{...}` field of an f-string.
     *
@@ -6042,7 +6043,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       case _              => None
     }
   }
-  def localName(n: String): String = if ((cppFile || jsLikeFile) && n == "this") "self" else n
+  // JLS §15.8.3: `this` "denotes a value that is a reference to the object for which the
+  // instance method was invoked". Core binds that object under `self` (`selfEnv`), so
+  // the identifier is renamed for Java exactly as it is for C++ -- without this every
+  // `this.x` in a Java method read `unit` from an unbound name (559 sites in the gson
+  // corpus).
+  def localName(n: String): String = if ((cppFile || jsLikeFile || javaFile) && n == "this") "self" else n
 
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
@@ -6136,6 +6142,32 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * forward reference may not cross a `val`. */
   def sliceBoundJson(b: AstNode): ujson.Obj =
     if (isNoneBound(b)) ujson.Obj("k" -> "unit") else expr(b)
+
+  /** A Java cast (JLS §5.5). To an integral primitive it is a narrowing or widening
+    * primitive conversion, §5.1.2/§5.1.3: Core's `cast:<width>` unary operator, whose
+    * `.int` arm is §5.1.3's "discards all but the n lowest order bits" and whose `.float`
+    * arm under `.java` is the round-toward-zero-then-saturate rule (`Semantics.lean`,
+    * `javaFloatToIntegral`). `char` is a 16-bit unsigned type (§4.2.1), hence `u16`. A
+    * cast to `float`/`double` is a rounding conversion Core does not model for Java
+    * yet, and a reference cast may throw `ClassCastException` at run time (§5.5.1) --
+    * both keep their own hole names so the ledger tells them apart. */
+  def javaCast(kids: List[AstNode]): ujson.Obj = {
+    val target = staticTypeOf(kids(0)).trim
+    val width = target match {
+      case "byte"  => Some("i8")
+      case "short" => Some("i16")
+      case "char"  => Some("u16")
+      case "int"   => Some("i32")
+      case "long"  => Some("i64")
+      case _       => None
+    }
+    width match {
+      case Some(w) => ujson.Obj("k" -> "unop", "op" -> ("cast:" + w), "a" -> expr(kids(1)))
+      case None =>
+        if (target == "float" || target == "double") hole("op:cast:java-floating")
+        else hole("op:cast:java-reference")
+    }
+  }
 
   def expr(n: AstNode): ujson.Obj = unwrapMacro(n) match {
     case l: Literal =>
@@ -7641,7 +7673,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       hole(if (kids.nonEmpty) "op:alloc:array-decl"
            else if (inCtorShape(c)) "op:alloc:ctor-unresolved-class"
            else "op:alloc:ctor-shape")
+    // JLS §10.6: an array initializer "creates a new array object" and its initializers
+    // "are then executed from left to right"; arrays are objects (§4.3.1), so under
+    // `.java` this is the boxed list literal -- identity, mutation, `length` as the
+    // field read `.field` already answers for a boxed list.
+    else if (mfn == "<operator>.arrayInitializer" && javaFile)
+      ujson.Obj("k" -> "listE", "items" -> exprs(kids))
     else if (mfn == "<operator>.arrayInitializer") arrayInit(kids)
+    else if (mfn == "<operator>.cast" && kids.size == 2 && javaFile) javaCast(kids)
     // `static_assert(cond)` / `static_assert(cond, "msg")`.
     //
     // This is the one construct in the C++ ledger that is genuinely *nothing* at run time,
@@ -9968,10 +10007,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // the value AS IS (`Semantics.lean`'s `.raise`, the non-Python path) -- JS can
         // throw anything, and `catch (e)` below binds whatever it was. Prelude-aware, so
         // `throw new Error(f())` sequences `f()` before the raise.
-        case "THROW" if jsLikeFile && kids.size == 1 =>
+        // Java `throw e` (JLS §14.18): the expression is evaluated and the resulting
+        // reference is thrown; Core's `.raise` under `.java` raises the value as-is, the
+        // same non-Python path JavaScript uses. Which `catch` receives it (§14.20) is
+        // the handler dispatch's business, not the throw's.
+        case "THROW" if (jsLikeFile || javaFile) && kids.size == 1 =>
           val (prelude, value) = exprV(kids.head)
           seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" -> value))
-        case "THROW" if jsLikeFile => holeS("control:THROW:shape")
+        case "THROW" if jsLikeFile || javaFile => holeS("control:THROW:shape")
         case t          => holeS("control:" + t)
       }
     case i: Identifier => ujson.Obj("k" -> "exprS", "e" -> expr(i))

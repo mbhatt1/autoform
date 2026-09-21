@@ -676,7 +676,34 @@ String methods are not modelled at all: an exception value and a string are the 
 def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
     Option (Heap × MethodResult) :=
   match d with
-  | .cLike | .java | .go => none
+  | .cLike | .go => none
+  -- `java.util.List`/`Map` on the boxed list/dict `new ArrayList<>()`/`new HashMap<>()`
+  -- allocate. Return values are the Collections Framework's, not Python's: `add`
+  -- returns `true` (`Collection.add`), `get(i)` throws `IndexOutOfBoundsException` for
+  -- ANY out-of-range index -- Java has no negative indexing -- `Map.put` returns the
+  -- previous value or `null`, `Map.get` the value or `null` (`java.util.Map`). The
+  -- frontend's `$obj.<init>()` on the fresh collection is the no-argument constructor
+  -- (JLS §15.9.4): it does nothing to an empty collection and yields no value.
+  | .java =>
+    let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
+    let pv (x : Val) : Option (Heap × MethodResult) := p (.val x)
+    let m (r : EResult) (nv : Val) : Option (Heap × MethodResult) := some (h, .mutating r nv)
+    match recv, name, args with
+    | .list _,  "<init>", []    => pv .unit
+    | .dict _,  "<init>", []    => pv .unit
+    | .list vs, "add", [x]      => m (.val (.bool true)) (.list (vs ++ [x]))
+    | .list vs, "get", [.int i] =>
+        if 0 ≤ i ∧ i < vs.length then pv (vs.getD i.toNat .unit)
+        else p (.exn (.str "IndexOutOfBoundsException"))
+    | .list vs, "size", []      => pv (.int vs.length)
+    | .list vs, "isEmpty", []   => pv (.bool vs.isEmpty)
+    | .list vs, "contains", [x] => pv (.bool (vs.any (fun v => Val.beq v x)))
+    | .dict kvs, "put", [k, v]  => m (.val ((dictGet kvs k).getD .unit)) (.dict (dictSet kvs k v))
+    | .dict kvs, "get", [k]     => pv ((dictGet kvs k).getD .unit)
+    | .dict kvs, "containsKey", [k] => pv (.bool (dictGet kvs k).isSome)
+    | .dict kvs, "size", []     => pv (.int kvs.length)
+    | .dict kvs, "isEmpty", []  => pv (.bool kvs.isEmpty)
+    | _, _, _ => none
   | .javascript =>
     let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
     let pv (x : Val) : Option (Heap × MethodResult) := p (.val x)
@@ -796,6 +823,10 @@ empty array is `undefined`, and `includes`/`indexOf` are JavaScript's names for 
 Python spells `in`/`index`. -/
 def jsMethodNames : List String := [ "push", "pop", "indexOf", "includes" ]
 
+/-- The `java.util.List`/`Map` names `methodCore .java` answers on a boxed collection. -/
+def javaMethodNames : List String :=
+  [ "<init>", "add", "get", "size", "isEmpty", "contains", "put", "containsKey" ]
+
 /-- Does `method` model this method name under this dialect?
 
 **This one is an upper bound, and you should treat it as one.** Unlike `knowsFree` it
@@ -815,7 +846,8 @@ is only usable where the receiver value is in hand — the interpreter, or the c
 harness, not the static ledger. -/
 def knowsMethod (d : Dialect) (name : String) : Bool :=
   match d with
-  | .cLike | .java | .go => false
+  | .cLike | .go => false
+  | .java       => javaMethodNames.contains name
   | .javascript => jsMethodNames.contains name
   | .python     => methodNames.contains name
 
@@ -930,13 +962,15 @@ the vacuity `STRATEGY.md` §14 and the mutation gate exist to catch. -/
     builtin .java h n as = none := rfl
 @[simp] theorem builtin_go_none (h : Heap) (n : String) (as : List Val) :
     builtin .go h n as = none := rfl
-@[simp] theorem method_java_none (h : Heap) (r : Val) (n : String) (as : List Val) :
-    method .java h r n as = none := rfl
+/-- Java has a method table now (`javaMethodNames`); `knowsMethod_java` below is the exact
+statement and `knowsMethod_java_complete` its completeness, so the `method_java_none` that
+stood here (false as of the table) is gone. -/
+@[simp] theorem knowsMethod_java (n : String) :
+    knowsMethod .java n = javaMethodNames.contains n := rfl
 @[simp] theorem method_go_none (h : Heap) (r : Val) (n : String) (as : List Val) :
     method .go h r n as = none := rfl
 @[simp] theorem knowsFree_java (n : String) : knowsFree .java n = false := rfl
 @[simp] theorem knowsFree_go (n : String) : knowsFree .go n = false := rfl
-@[simp] theorem knowsMethod_java (n : String) : knowsMethod .java n = false := rfl
 @[simp] theorem knowsMethod_go (n : String) : knowsMethod .go n = false := rfl
 
 /-! JavaScript DOES have a method table now (`jsMethodNames`: array `push`/`pop`/…), so
@@ -1068,6 +1102,37 @@ private def jsMethodWitness : String → Val × List Val
   | "indexOf"  => (.list [], [.unit])
   | "includes" => (.list [], [.unit])
   | _          => (.unit, [])
+
+/-- Receiver and arguments on which each Java method name is answered. -/
+private def javaMethodWitness : String → Val × List Val
+  | "<init>"      => (.list [], [])
+  | "add"         => (.list [], [.unit])
+  | "get"         => (.dict [], [.unit])
+  | "size"        => (.list [], [])
+  | "isEmpty"     => (.list [], [])
+  | "contains"    => (.list [], [.unit])
+  | "put"         => (.dict [], [.unit, .unit])
+  | "containsKey" => (.dict [], [.unit])
+  | _             => (.unit, [])
+
+/-- Every name `knowsMethod .java` accepts is genuinely answered. -/
+theorem knowsMethod_java_complete :
+    javaMethodNames.all (fun n =>
+      (method .java wHeap (javaMethodWitness n).1 n (javaMethodWitness n).2).isSome) = true := by
+  decide
+
+-- `ArrayList.add` returns true; `get(-1)` on a one-element list throws (no negative
+-- indexing in Java); `Map.put` returns the previous value; `Map.get` of a missing key is null.
+#guard match method .java [] (.list []) "add" [.int 1] with
+       | some (_, .mutating (.val (.bool true)) (.list [.int 1])) => true | _ => false
+#guard match method .java [] (.list [.int 5]) "get" [.int (-1)] with
+       | some (_, .pure (.exn (.str "IndexOutOfBoundsException"))) => true | _ => false
+#guard match method .java [] (.list [.int 5]) "get" [.int 0] with
+       | some (_, .pure (.val (.int 5))) => true | _ => false
+#guard match method .java [] (.dict [(.str "a", .int 1)]) "put" [.str "a", .int 2] with
+       | some (_, .mutating (.val (.int 1)) (.dict [(.str "a", .int 2)])) => true | _ => false
+#guard match method .java [] (.dict []) "get" [.str "zz"] with
+       | some (_, .pure (.val .unit)) => true | _ => false
 
 /-- Every name `knowsMethod .javascript` accepts is genuinely answered. -/
 theorem knowsMethod_javascript_complete :
