@@ -506,6 +506,15 @@ def visit(node, scopes):
             'staticMethod': static_method,
             'property': sole_property,
             'classMethod': class_method,
+            # An instance method whose only parameters after `self` are collectors:
+            # `def f(self, *args, **kwargs)`. Informational -- the exporter binds it
+            # through `receiverName` -- and asserted by tests/test_python_receivers.py.
+            'receiverThenCollectors': (scopes[-1].get_type() == 'class' and not static_method
+                and not class_method
+                and len(node.args.posonlyargs) + len(node.args.args) == 1
+                and next(a.arg for a in [*node.args.posonlyargs, *node.args.args]) == 'self'
+                and not node.args.kwonlyargs
+                and bool(node.args.vararg or node.args.kwarg)),
             'privateParameters': bool(class_scopes and class_scopes[-1].get_name().lstrip('_')
                 and any(name.startswith('__') and not name.endswith('__') for name in parameters)),
             'parameters': parameters,
@@ -11068,7 +11077,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         val sourceParams = signature("parameters").arr.map(_.str)
           .filterNot(p => isMethodDecl && !isClassMethodDecl && p == "self").toSet
         val exportedParams = ps.map(_.name).toSet
-        val receiverKeywordCollision = obj.value.contains("kwarg") &&
+        // `def f(self, **kw)`: receiver stripping removes `self` from the signature Core
+        // checks, so `o.f(self=1)` -- a TypeError in CPython, "multiple values for
+        // argument 'self'" -- would land in `**kw` silently. This used to hole the whole
+        // definition (`call:python-receiver-signature`, 11 functions in cachetools, every
+        // one a `def f(self, *args, **kwargs)`). Now the receiver's NAME travels in the
+        // signature (`receiverName`) and `kwargsRejected` refuses the keyword. Not when
+        // `self` is positional-only: `def f(self, /, **kw)` really does put `self=1` in
+        // `kw`, and nothing needs refusing.
+        val receiverKeywordShadow = isMethodDecl && !isClassMethodDecl &&
+          obj.value.contains("kwarg") &&
           !signature("positionalOnly").arr.contains(ujson.Str("self"))
         // `decorated` is already false for a sole `@property` (the extractor treats it
         // like `@staticmethod`: a directive with no residue). The getter is then an
@@ -11081,7 +11099,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           // not a gap, and the keyword-collector collision cannot arise.
           if (isMethodDecl && !isClassMethodDecl &&
               (signature("firstPositional") != ujson.Str("self") ||
-               signature("decorated").bool || receiverKeywordCollision))
+               signature("decorated").bool))
             Some("call:python-receiver-signature")
           else if (signature("decorated").bool) Some("call:python-decorator-binding")
           else if (signature("privateParameters").bool) Some("call:python-private-parameters")
@@ -11090,9 +11108,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         if (bindingGap.nonEmpty) {
           // Core injects an ordinary receiver under `self`. Other receiver names,
           // absent/keyword-only receivers and descriptor/decorator binding need
-          // their own semantics. A keyword collector can also hide a duplicate
-          // non-positional-only `self`, because receiver stripping removes it
-          // from the signature checked by Core. Permissive collectors ensure that
+          // their own semantics. Permissive collectors ensure that
           // argument rejection cannot run before the explicit gap and produce a
           // wrong TypeError for a call the native callable would accept. The same
           // boundary protects decorated functions and private-parameter mangling.
@@ -11160,6 +11176,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
             } ++ List("isMethod" -> signature("isMethod")) ++
               (if (isClassMethodDecl) List("receiverKind" -> ujson.Str("class")) else Nil) ++
+              (if (receiverKeywordShadow) List("receiverName" -> ujson.Str("self")) else Nil) ++
               (if (valueDefaults.arr.nonEmpty) List("defaults" -> valueDefaults) else Nil) ++
               (if (classAttrDefaults.arr.nonEmpty) List("classAttrDefaults" -> classAttrDefaults) else Nil))
         }

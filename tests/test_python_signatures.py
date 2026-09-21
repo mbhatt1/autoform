@@ -34,7 +34,8 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        staticMethod=False, property=False, classMethod=False, nonlocalUses=[], nonlocalDefines=[],
+        staticMethod=False, property=False, classMethod=False, receiverThenCollectors=False,
+        nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
     # holes the definition. A LITERAL default is modelled, so it clears the flag and
@@ -684,3 +685,70 @@ class TestClassAttributeDefaults:
         assert 'classAttrDefaults : List (String × String × String) := []' in \
             (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
         assert 'default:{p}:class-attr-unresolved' in sem
+
+
+class TestReceiverThenCollectors:
+    """`def f(self, *args, **kwargs)` -- a receiver followed by nothing but collectors.
+
+    The exporter used to hole this whole shape as `call:python-receiver-signature`, for one
+    reason: receiver stripping removes `self` from the signature Core checks, so
+    `o.f(self=1)` -- `TypeError: got multiple values for argument 'self'` in CPython -- would
+    land in `**kwargs` silently. The stripped receiver's NAME now travels in the signature
+    (`receiverName`) and `kwargsRejected` refuses the keyword; the shape binds. Not for a
+    positional-only `self` (`def f(self, /, **kw)`), where CPython really does put `self=1`
+    in `kw`."""
+
+    def test_the_decoder_marks_the_shape(self):
+        source = ('class C:\n'
+                  '    def f(self, *a, **k):\n'
+                  '        return (a, k)\n'
+                  '    def g(self, x, **k):\n'
+                  '        return x\n'
+                  '    @staticmethod\n'
+                  '    def s(self, *a):\n'
+                  '        return a\n'
+                  '    def h(self, /, **k):\n'
+                  '        return k\n')
+        sigs = {row['name']: row for row in _decode(source)['signatures'].values()}
+        assert sigs['f']['receiverThenCollectors'] is True
+        assert sigs['h']['receiverThenCollectors'] is True
+        assert sigs['g']['receiverThenCollectors'] is False   # an ordinary parameter after self
+        assert sigs['s']['receiverThenCollectors'] is False   # no receiver to strip
+        # The shape is not a decorator residue and is a method like any other.
+        assert sigs['f']['decorated'] is False and sigs['f']['isMethod'] is True
+
+    def test_the_exporter_records_the_name_instead_of_refusing(self):
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert 'receiverKeywordCollision' not in src
+        assert 'List("receiverName" -> ujson.Str("self"))' in src
+        # Only when the shadowing is possible: a keyword collector and a non-positional-only self.
+        assert '!signature("positionalOnly").arr.contains(ujson.Str("self"))' in src
+
+    def test_core_refuses_the_shadowing_keyword(self):
+        """The one CPython behaviour the refusal was protecting is now a check."""
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'receiverName : Option String := none' in \
+            (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert '| some r => kws.any (fun kv => kv.1 == r)' in sem
+        # Checked against CPython in Semantics.lean: ((1, 2), {'x': 3}) and the TypeError.
+        assert '.kwargE "self" (.lit (.int 1))' in sem
+
+    def test_the_renderer_emits_and_validates_the_name(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', ROOT / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        fn = {'name': 'm.py:<module>.C.f', 'params': ['a', 'k'], 'vararg': 'a', 'kwarg': 'k',
+              'body': {'k': 'ret', 'e': {'k': 'int', 'v': '1'}},
+              'pythonSignature': {'positionalOnly': [], 'keywordOnly': [], 'required': [],
+                                  'isMethod': True, 'receiverName': 'self'}}
+        text = '\n'.join(mod.render_func(fn, 'f_m_py__module__C_f'))
+        assert 'receiverName := some "self"' in text
+        # A receiver is a method's; a name that is also an ordinary parameter was not stripped.
+        for bad in ({'isMethod': False, 'receiverName': 'self'},
+                    {'isMethod': True, 'receiverName': 'a'},
+                    {'isMethod': True, 'receiverName': ''}):
+            broken = dict(fn, pythonSignature=dict(fn['pythonSignature'], **bad))
+            with pytest.raises(ValueError):
+                mod.render_func(broken, 'f_m_py__module__C_f')

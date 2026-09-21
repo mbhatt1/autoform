@@ -472,7 +472,16 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
                 cases hres : Ctx.resolve ctx f with
-                | some fn => rw [hres] at hy; exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                | some fn =>
+                    -- A `@classmethod` reached by name prepends its class; either branch
+                    -- is one `applyFunc`, so the same IH closes both.
+                    rw [hres] at hy
+                    dsimp only at hy ⊢
+                    by_cases hcm : fn.isClassMethod = true
+                    · rw [if_pos hcm] at hy ⊢
+                      exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
+                    · rw [if_neg hcm] at hy ⊢
+                      exact ihF _ hctx _ _ (hctx.1 _ _ hres) _ _ _ _ _ hy hne
                 | none =>
                     rw [hres] at hy
                     dsimp only at hy ⊢

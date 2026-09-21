@@ -883,11 +883,22 @@ lemma without first deciding which `fn` it is about. -/
 drop it, which is the silently-wrong shape this project keeps catching, so the check is
 separate and `applyFunc` turns it into the exception. -/
 def kwargsRejected (fn : Func) (kws : List (String × Val)) : Bool :=
-  fn.kwarg.isNone && kws.any (fun kv => !fn.keywordParams.contains kv.1)
+  (fn.kwarg.isNone && kws.any (fun kv => !fn.keywordParams.contains kv.1)) ||
+  -- `def f(self, **kw)` called as `o.f(self=1)`: the bound receiver already fills `self`,
+  -- and CPython raises `TypeError: got multiple values for argument 'self'`. The exporter
+  -- stripped `self` from `params`, so without this the keyword would land in `**kw`
+  -- silently -- see `PythonSignature.receiverName`.
+  (match fn.pythonSignature with
+   | some sig => match sig.receiverName with
+                 | some r => kws.any (fun kv => kv.1 == r)
+                 | none   => false
+   | none => false)
 
 /-- A call with no keyword arguments can never be rejected. -/
 @[simp] theorem kwargsRejected_nil (fn : Func) : kwargsRejected fn [] = false := by
-  simp [kwargsRejected]
+  unfold kwargsRejected
+  simp only [List.any_nil, Bool.and_false, Bool.false_or]
+  split <;> (try split) <;> rfl
 
 /-- Validate already evaluated arguments against a recovered Python signature.
 Captured locals cannot supply missing parameters. Positional-only keywords may
@@ -1419,7 +1430,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inl r)  => (h₁, r)
       | (h₁, .inr (vs, kws)) =>
         match ctx.resolve f with
-        | some fn => applyFunc ctx n h₁ fn none vs kws
+        | some fn =>
+            -- A `@classmethod` called through its qualified name (`C.make(3)` lowered to a
+            -- direct call) is still bound to its class: CPython passes `cls` whether the
+            -- call goes through the class or an instance, so the class value goes in as
+            -- the first positional here exactly as it does at the `.mcall` sites.
+            if fn.isClassMethod then applyFunc ctx n h₁ fn none (fn.ownerClassValue :: vs) kws
+            else applyFunc ctx n h₁ fn none vs kws
         | none    =>
           -- Not a statically known function: it may be a function value or closure held
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
@@ -2928,6 +2945,35 @@ the whole point of the migration, and it is the case Core could not express at a
 before: `Val.list` was a value, so `b = a` copied it and `b[0] = 9` was a hole.
 
 Every expectation is CPython's, executed. -/
+/-! ## A receiver followed by nothing but collectors, checked against CPython
+
+`class C: def f(self, *a, **k): return (a, k)`. The exporter strips `self` and records
+`receiverName := some "self"` because `**k` could otherwise swallow a `self=` keyword.
+Every expected value below is CPython's. -/
+private def collProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.C.f", params := ["a", "k"], vararg := some "a", kwarg := some "k"
+      , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := []
+                                , isMethod := some true, receiverName := some "self" }
+      , body := .ret (.tupleE [.name "a", .name "k"]) } ] }
+private def collCtx : Ctx := { dialect := .python, table := collProg.table }
+private def collCall (args : List Expr) : Heap × EResult :=
+  evalExpr collCtx 60 [{ cls := "C", fields := [] }] [("o", .ref 0)] (.mcall (.name "o") "f" args)
+
+-- o.f(1, 2, x=3)   CPython ((1, 2), {'x': 3}) -- `self` is the receiver, not consumed by `*a`
+#guard match (collCall [.lit (.int 1), .lit (.int 2), .kwargE "x" (.lit (.int 3))]).2 with
+       | .val (.tuple [.tuple [.int 1, .int 2], .dict [(.str "x", .int 3)]]) => true | _ => false
+-- o.f()            CPython ((), {})
+#guard match (collCall []).2 with
+       | .val (.tuple [.tuple [], .dict []]) => true | _ => false
+-- o.f(self=1)      CPython TypeError: f() got multiple values for argument 'self'
+#guard match (collCall [.kwargE "self" (.lit (.int 1))]).2 with
+       | .exn (.str "TypeError") => true | _ => false
+-- o.f(1, self=2)   CPython TypeError (same reason; the positional went to `*a`)
+#guard match (collCall [.lit (.int 1), .kwargE "self" (.lit (.int 2))]).2 with
+       | .exn (.str "TypeError") => true | _ => false
+
 private def aliasProg : Program :=
   { dialect := .python
   , funcs :=

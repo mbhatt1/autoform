@@ -622,7 +622,7 @@ def render_func(f, nm) -> list:
         signature = f['pythonSignature']
         keys = ('positionalOnly', 'keywordOnly', 'required')
         if (not isinstance(signature, dict) or not set(keys) <= set(signature)
-                or set(signature) - set(keys) - {'isMethod', 'defaults', 'receiverKind', 'classAttrDefaults'}):
+                or set(signature) - set(keys) - {'isMethod', 'defaults', 'receiverKind', 'classAttrDefaults', 'receiverName'}):
             raise ValueError('invalid Python signature fields')
         if 'isMethod' in signature and type(signature['isMethod']) is not bool:
             raise ValueError('invalid Python method classification')
@@ -645,6 +645,16 @@ def render_func(f, nm) -> list:
             fields += ', isMethod := some ' + str(signature['isMethod']).lower()
         if 'receiverKind' in signature:
             fields += ', receiverKind := some ' + lean_str(signature['receiverKind'])
+        # The stripped instance receiver's name, kept so `kwargsRejected` can refuse a
+        # keyword of that name (`o.f(self=1)` on `def f(self, **kw)`). It was stripped, so
+        # it must NOT also be an ordinary parameter, and it is a receiver, so the function
+        # must be a method.
+        if 'receiverName' in signature:
+            name = signature['receiverName']
+            if (not isinstance(name, str) or not name or name in f.get('params', [])
+                    or signature.get('isMethod') is not True):
+                raise ValueError('invalid Python receiver name: %r' % (name,))
+            fields += ', receiverName := some ' + lean_str(name)
         defaults = signature.get('defaults') or []
         if defaults:
             # A default names an ordinary parameter, names it once, and never names a
