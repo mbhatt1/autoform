@@ -49,13 +49,6 @@
    "reproduction_attempted": true,
    "reproduced": false
   },
-  "ast-Cachetools.json": {
-   "artifact_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
-   "source_hint": "cachetools v7.1.7 (https://github.com/tkem/cachetools, tag v7.1.7, src/cachetools/ as the export root)",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. The source tree IS now identified -- it was not before. A fresh export of cachetools v7.1.7 (the only release predating this artifact's 2026-08-22 regeneration in aa60de8) yields the same 209 entries with an identical (name, file) set across all five modules, which is what identifies the revision. The bodies differ for two separable reasons: (1) today's exporter emits six per-function keys this artifact has no trace of -- paramTypes, paramIntegerTypes, pythonSignature, returnType, returnIntegerType, sourceName; (2) after discounting those, 105 of 209 entries still differ. So this artifact predates exporter work substantially larger than the character-literal fix, and re-exporting would produce new evidence rather than reproduce it. Closing this means landing a fresh export together with its render, manifest hashes and regenerated specs.",
-   "reproduction_attempted": true,
-   "reproduced": false
-  },
   "ast-LangC.json": {
    "artifact_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
    "source_hint": null,

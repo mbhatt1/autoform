@@ -1,169 +1,169 @@
 {
-  "modules": {
-    "Ansible": {
-      "ast_bytes": 136620489,
-      "ast_hint": "/tmp/final-Ansible.json",
-      "ast_sha256": "f9d015520c6531f5d53bd5a14dc94e57ae7bcc3f82f6188110034bd4abb9d1f6",
-      "ast_tracked": true,
-      "provenance": "AST /tmp/final-Ansible.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 22879677,
-      "render_sha256": "c013250f3e70f4e81a9bda6d02d0d1d6fac23090cbeb73a11604f082478966ae"
-    },
-    "CMath": {
-      "ast_bytes": 4564,
-      "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
-      "ast_tracked": true,
-      "render_bytes": 4746,
-      "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
-    },
-    "Cachetools": {
-      "ast_bytes": 575027,
-      "ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
-      "ast_tracked": true,
-      "render_bytes": 305920,
-      "render_sha256": "6bfedca65be153a940b1f18c19cd6cb5d359b87675684fbe5ae64f6523672ce3"
-    },
-    "LangC": {
-      "ast_bytes": 175419,
-      "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
-      "ast_tracked": true,
-      "render_bytes": 77043,
-      "render_sha256": "2135c3a723e8aa804323777fecfbaece00a3436b09d20da2bba1a033c1fd5f64"
-    },
-    "LangGo": {
-      "ast_bytes": 408379,
-      "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
-      "ast_tracked": true,
-      "render_bytes": 179221,
-      "render_sha256": "9852bb0d7e9f90af648e2452c1ab6ad4ac8c7307505e9cc820b77a9b92cf5648"
-    },
-    "LangJS": {
-      "ast_bytes": 110740,
-      "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
-      "ast_tracked": true,
-      "render_bytes": 49832,
-      "render_sha256": "cffd21dde521f7cc0c91f021e34de0484b2adb54e5f61edc11758dd26c6e31a9"
-    },
-    "LangJava": {
-      "ast_bytes": 1131529,
-      "ast_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
-      "ast_tracked": true,
-      "render_bytes": 803236,
-      "render_sha256": "254148b08771e9b605428d706c77dfc5904cc964be85690524cae1f0c4b0e213"
-    },
-    "LangKt": {
-      "ast_bytes": 3550,
-      "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
-      "ast_tracked": true,
-      "render_bytes": 4398,
-      "render_sha256": "0f3a6d3e30dcb8936e7c317c470f6c81de82377634ce2327d968586ac6fa23f9"
-    },
-    "LangTS": {
-      "ast_bytes": 226862,
-      "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
-      "ast_tracked": true,
-      "render_bytes": 117420,
-      "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
-    },
-    "LinuxCrypto": {
-      "ast_bytes": 18888160,
-      "ast_hint": "/tmp/final-LinuxCrypto.json",
-      "ast_sha256": "98d3a13e5175fff069d4f5ce861ea7845875b3f38e26a0e5faff4708400af84e",
-      "ast_tracked": true,
-      "provenance": "AST /tmp/final-LinuxCrypto.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 5255045,
-      "render_sha256": "da6afd59fdbb6a29f5b41658d96216879a0f9355e8650bb0b39e25b90663415d"
-    },
-    "LinuxLib": {
-      "ast_bytes": 22263110,
-      "ast_hint": "/tmp/final-LinuxLib.json",
-      "ast_sha256": "f841b6a0453ec5c8022676295acd924b766401fb4514cff1c6d64cb255d3077f",
-      "ast_tracked": true,
-      "provenance": "AST /tmp/final-LinuxLib.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
-      "render_bytes": 6624072,
-      "render_sha256": "44387e0e35e3cd08782f8b28319839f81fa2ab75a0a7d0ac0d34d9f85f3d0bfc"
-    },
-    "LinuxLibSample": {
-      "ast_bytes": 1324,
-      "ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
-      "ast_tracked": true,
-      "render_bytes": 4501,
-      "render_sha256": "b41fc8183c2ec42e7c56b7758ccd39bd5140c276387e8e9708d28ea403ca5a23"
-    },
-    "Sample": {
-      "ast_bytes": 6416,
-      "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
-      "ast_tracked": true,
-      "render_bytes": 5627,
-      "render_sha256": "fafaff9de5ca5c603a98fe9c98c883022adf7529946470fd3b2a2156c6967aed"
-    },
-    "Stress": {
-      "ast_bytes": 4324,
-      "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
-      "ast_tracked": true,
-      "render_bytes": 4942,
-      "render_sha256": "7a37d691a93225662c46024b8308969147b4365bfd71e36e37376cb9bc0cff27"
-    },
-    "V8Base": {
-      "ast_bytes": 3198007,
-      "ast_hint": "/tmp/final-V8Base.json",
-      "ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
-      "ast_tracked": true,
-      "provenance": "AST tracked in git (3.2 MB). The 74 spec files under Autoform/SpecsGen/V8Base/ are pinned to it, so a fresh clone can verify them; see STRATEGY 55.",
-      "render_bytes": 1819606,
-      "render_sha256": "c93fb9363dcce65e6cbf537df74bf12eaf89c905f9d0cc3b3a8dbe75f1017809"
-    },
-    "V8BaseSample": {
-      "ast_bytes": 1539,
-      "ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
-      "ast_tracked": true,
-      "render_bytes": 4786,
-      "render_sha256": "6cd7c869b0897bfe07e9eaa7c433b14c60b237dbea111af035c6f0a612e1af75"
-    },
-    "V8Numbers": {
-      "ast_bytes": 427703,
-      "ast_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
-      "ast_tracked": true,
-      "render_bytes": 222657,
-      "render_sha256": "8a8343b8bd9a50b174a4aab8bcc3043074548d6f958c868702d22e2962c87513"
-    }
+ "modules": {
+  "Ansible": {
+   "ast_bytes": 136620489,
+   "ast_hint": "/tmp/final-Ansible.json",
+   "ast_sha256": "f9d015520c6531f5d53bd5a14dc94e57ae7bcc3f82f6188110034bd4abb9d1f6",
+   "ast_tracked": true,
+   "provenance": "AST /tmp/final-Ansible.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
+   "render_bytes": 22879677,
+   "render_sha256": "c013250f3e70f4e81a9bda6d02d0d1d6fac23090cbeb73a11604f082478966ae"
   },
-  "policy": "The AST is the tracked source of truth; Autoform/Generated/*.lean is a build product and is not tracked. See docs/integrity.md. Hashes here pin the identity of both halves; scripts/check_render.py verifies them.",
-  "specs": {
-    "Specs/CachetoolsSpec": {
-      "corpus": "Cachetools",
-      "corpus_ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
-      "source": "ast-Cachetools.json"
-    },
-    "Specs/V8Spec": {
-      "corpus": "V8BaseSample",
-      "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
-      "source": "ast-V8BaseSample.json"
-    },
-    "SpecsGen/Cachetools": {
-      "corpus": "Cachetools",
-      "corpus_ast_sha256": "93cd77a2eb7ea6e668fe4e6ec0b98e2d4d4fe96ffa3a92ae68f6da196a8d44af",
-      "source": "ast-Cachetools.json"
-    },
-    "SpecsGen/LinuxLib": {
-      "corpus": "LinuxLibSample",
-      "corpus_ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
-      "source": "ast-LinuxLibSample.json"
-    },
-    "SpecsGen/LinuxLibSample": {
-      "corpus": "LinuxLibSample",
-      "corpus_ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
-      "source": "ast-LinuxLibSample.json"
-    },
-    "SpecsGen/V8Base": {
-      "corpus": "V8Base",
-      "corpus_ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
-      "source": "ast-V8Base.json"
-    },
-    "SpecsGen/V8BaseSample": {
-      "corpus": "V8BaseSample",
-      "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
-      "source": "ast-V8BaseSample.json"
-    }
+  "CMath": {
+   "ast_bytes": 4564,
+   "ast_sha256": "3873b3f92341849324a5ae3f4e61337f59edbd14522773a620f89842919d7e1d",
+   "ast_tracked": true,
+   "render_bytes": 4746,
+   "render_sha256": "d3a662ae60f3eb5133ea14d12d4d5f99afc5d7bd066eff2b7e3d8297d4a86cb2"
+  },
+  "Cachetools": {
+   "ast_bytes": 634044,
+   "ast_sha256": "5414b9e25624fcf345a562a43c926732aa7066904a8907147f3dd9638422199f",
+   "ast_tracked": true,
+   "render_bytes": 331858,
+   "render_sha256": "e7e63a4ffcf3c9cb84eecaafec42ae6c0ad1c729f1b7973bf5202bd43423c76b"
+  },
+  "LangC": {
+   "ast_bytes": 175419,
+   "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",
+   "ast_tracked": true,
+   "render_bytes": 77043,
+   "render_sha256": "2135c3a723e8aa804323777fecfbaece00a3436b09d20da2bba1a033c1fd5f64"
+  },
+  "LangGo": {
+   "ast_bytes": 408379,
+   "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
+   "ast_tracked": true,
+   "render_bytes": 179221,
+   "render_sha256": "9852bb0d7e9f90af648e2452c1ab6ad4ac8c7307505e9cc820b77a9b92cf5648"
+  },
+  "LangJS": {
+   "ast_bytes": 110740,
+   "ast_sha256": "c1364b453cc999821066562a781d2e1a5fc019b63d57a484af77fb9d41f0e6df",
+   "ast_tracked": true,
+   "render_bytes": 49832,
+   "render_sha256": "cffd21dde521f7cc0c91f021e34de0484b2adb54e5f61edc11758dd26c6e31a9"
+  },
+  "LangJava": {
+   "ast_bytes": 1131529,
+   "ast_sha256": "a87e9d7e816f30a968e79be99fc424ce8105e490b15650c2d52ad40afa4e7c0f",
+   "ast_tracked": true,
+   "render_bytes": 803236,
+   "render_sha256": "254148b08771e9b605428d706c77dfc5904cc964be85690524cae1f0c4b0e213"
+  },
+  "LangKt": {
+   "ast_bytes": 3550,
+   "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
+   "ast_tracked": true,
+   "render_bytes": 4398,
+   "render_sha256": "0f3a6d3e30dcb8936e7c317c470f6c81de82377634ce2327d968586ac6fa23f9"
+  },
+  "LangTS": {
+   "ast_bytes": 226862,
+   "ast_sha256": "7eccba9d4c929611a2def2a264521de2176e7fa487e76974daeeccc998012b29",
+   "ast_tracked": true,
+   "render_bytes": 117420,
+   "render_sha256": "90861a61a8281e335f62d08f15731c7f0aafa6a37d06db107ee3cd15c270d4b6"
+  },
+  "LinuxCrypto": {
+   "ast_bytes": 18888160,
+   "ast_hint": "/tmp/final-LinuxCrypto.json",
+   "ast_sha256": "98d3a13e5175fff069d4f5ce861ea7845875b3f38e26a0e5faff4708400af84e",
+   "ast_tracked": true,
+   "provenance": "AST /tmp/final-LinuxCrypto.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
+   "render_bytes": 5255045,
+   "render_sha256": "da6afd59fdbb6a29f5b41658d96216879a0f9355e8650bb0b39e25b90663415d"
+  },
+  "LinuxLib": {
+   "ast_bytes": 22263110,
+   "ast_hint": "/tmp/final-LinuxLib.json",
+   "ast_sha256": "f841b6a0453ec5c8022676295acd924b766401fb4514cff1c6d64cb255d3077f",
+   "ast_tracked": true,
+   "provenance": "AST /tmp/final-LinuxLib.json is too large to track in git; re-export with cartographer/export_ast.sc from the corpus CPG.",
+   "render_bytes": 6624072,
+   "render_sha256": "44387e0e35e3cd08782f8b28319839f81fa2ab75a0a7d0ac0d34d9f85f3d0bfc"
+  },
+  "LinuxLibSample": {
+   "ast_bytes": 1324,
+   "ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+   "ast_tracked": true,
+   "render_bytes": 4501,
+   "render_sha256": "b41fc8183c2ec42e7c56b7758ccd39bd5140c276387e8e9708d28ea403ca5a23"
+  },
+  "Sample": {
+   "ast_bytes": 6416,
+   "ast_sha256": "06f5f57332569103002a35b05d60949c9606ecf1aca1aaef28a3a234082b95f7",
+   "ast_tracked": true,
+   "render_bytes": 5627,
+   "render_sha256": "fafaff9de5ca5c603a98fe9c98c883022adf7529946470fd3b2a2156c6967aed"
+  },
+  "Stress": {
+   "ast_bytes": 4324,
+   "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+   "ast_tracked": true,
+   "render_bytes": 4942,
+   "render_sha256": "7a37d691a93225662c46024b8308969147b4365bfd71e36e37376cb9bc0cff27"
+  },
+  "V8Base": {
+   "ast_bytes": 3198007,
+   "ast_hint": "/tmp/final-V8Base.json",
+   "ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+   "ast_tracked": true,
+   "provenance": "AST tracked in git (3.2 MB). The 74 spec files under Autoform/SpecsGen/V8Base/ are pinned to it, so a fresh clone can verify them; see STRATEGY 55.",
+   "render_bytes": 1819606,
+   "render_sha256": "c93fb9363dcce65e6cbf537df74bf12eaf89c905f9d0cc3b3a8dbe75f1017809"
+  },
+  "V8BaseSample": {
+   "ast_bytes": 1539,
+   "ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+   "ast_tracked": true,
+   "render_bytes": 4786,
+   "render_sha256": "6cd7c869b0897bfe07e9eaa7c433b14c60b237dbea111af035c6f0a612e1af75"
+  },
+  "V8Numbers": {
+   "ast_bytes": 427703,
+   "ast_sha256": "bcd83966f4ae75b47b0dffe2ba7c076388b2f50dd1c6e41fb48c59573f7b95a7",
+   "ast_tracked": true,
+   "render_bytes": 222657,
+   "render_sha256": "8a8343b8bd9a50b174a4aab8bcc3043074548d6f958c868702d22e2962c87513"
   }
+ },
+ "policy": "The AST is the tracked source of truth; Autoform/Generated/*.lean is a build product and is not tracked. See docs/integrity.md. Hashes here pin the identity of both halves; scripts/check_render.py verifies them.",
+ "specs": {
+  "Specs/CachetoolsSpec": {
+   "corpus": "Cachetools",
+   "corpus_ast_sha256": "5414b9e25624fcf345a562a43c926732aa7066904a8907147f3dd9638422199f",
+   "source": "ast-Cachetools.json"
+  },
+  "Specs/V8Spec": {
+   "corpus": "V8BaseSample",
+   "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+   "source": "ast-V8BaseSample.json"
+  },
+  "SpecsGen/Cachetools": {
+   "corpus": "Cachetools",
+   "corpus_ast_sha256": "5414b9e25624fcf345a562a43c926732aa7066904a8907147f3dd9638422199f",
+   "source": "ast-Cachetools.json"
+  },
+  "SpecsGen/LinuxLib": {
+   "corpus": "LinuxLibSample",
+   "corpus_ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+   "source": "ast-LinuxLibSample.json"
+  },
+  "SpecsGen/LinuxLibSample": {
+   "corpus": "LinuxLibSample",
+   "corpus_ast_sha256": "12abfcf63d6c09966be623a407b6e9165f6240cb90e049f27847aa837e26d57f",
+   "source": "ast-LinuxLibSample.json"
+  },
+  "SpecsGen/V8Base": {
+   "corpus": "V8Base",
+   "corpus_ast_sha256": "3aee4390e0208ce78eefb22bb3899ea928eee5fc80783264991b18d88d9fac29",
+   "source": "ast-V8Base.json"
+  },
+  "SpecsGen/V8BaseSample": {
+   "corpus": "V8BaseSample",
+   "corpus_ast_sha256": "154b11bf3d86784dac0497d1cc30aecb47aa92f856dfd21fd9167048921e44d8",
+   "source": "ast-V8BaseSample.json"
+  }
+ }
 }

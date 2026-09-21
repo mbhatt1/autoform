@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-Cachetools.json",
+ "artifact_bytes": 634044,
+ "artifact_sha256": "5414b9e25624fcf345a562a43c926732aa7066904a8907147f3dd9638422199f",
+ "command": "scripts/reland_corpus.sh /private/tmp/ct-v717 Cachetools",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "a3ce20555f621aea6f1933547e7e9159974a5d0b8fcc59f2be07bee6f764d2d7",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/ct-v717",
+ "source_revision": "tree-sha256:49cb5656b594bd27bd84aa1508661bea0a02a65697a95349afb202f07c7f908f:9files"
+}

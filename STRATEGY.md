@@ -2225,12 +2225,17 @@ function count as 208, 209, 233 and 238. They are consistent as a sequence and c
 as a set, because both the numerator and the denominator moved, sometimes in the same
 revision. This section states the current values and what moved.
 
-**Current, from `ledger-Cachetools.json`, regenerated after the last exporter change:**
+**Current, from `ledger-Cachetools.json`, regenerated after the 2026-09-21 re-land of
+cachetools v7.1.7 (`provenance/ast-Cachetools.json.prov.json`):**
 
     functions        209
-    hole-free        180
-    verifiable core  101
-    holes            40
+    hole-free        189
+    verifiable core  108
+    holes            22
+
+(The previous artifact read 209 / 180 / 101 / 40; what closed the difference is the
+`control:TRY-exception-representation`, `call:python-property-access`,
+`call:python-defaults` and `op:delete-index` labels going to zero -- README's hole table.)
 
 What moved the denominator: `<metaClassCallHandler>` synthetics were excluded (§31),
 removing 30 functions of which 18 had counted as hole-free — padding in both the numerator

@@ -67,7 +67,7 @@ below).
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 180 (86%) | 101 (48%) | 118 | 5,416 | 1,014 |
+| `cachetools` (published) | 209 | 189 (90%) | 108 (51%) | 22 | 5,534 | 867 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |

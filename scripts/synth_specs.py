@@ -558,6 +558,31 @@ def obs_lit(rec):
     return "{ case := %s, expected := %s }" % (case_lit(rec), eresult_lit(rec["outcome"]))
 
 
+def value_has_callable(v):
+    """Does an encoded runtime value contain a function (`["fn", qualname]`) anywhere?
+
+    `scripts/differential.py` counts a returned callable as AGREEING when the two sides'
+    names match by dotted suffix with `<locals>`/`<module>` dropped -- CPython reports a
+    `__qualname__`, Joern a fully-qualified name, and Core answers a closure. That is a
+    name rule, not the `Val` equality `lawConform` states, so such an observation cannot
+    be a conformance theorem as written and is left to the oracle rather than emitted as
+    a candidate that refutation would (correctly) reject."""
+    if not isinstance(v, (list, tuple)) or not v:
+        return False
+    t = v[0]
+    if t == "fn":
+        return True
+    if t in ("list", "tuple") and len(v) > 1 and isinstance(v[1], list):
+        return any(value_has_callable(x) for x in v[1])
+    if t == "dict" and len(v) > 1 and isinstance(v[1], list):
+        return any(value_has_callable(a) or value_has_callable(b) for a, b in v[1])
+    return False
+
+
+def outcome_has_callable(outcome):
+    return bool(outcome) and outcome[0] == "val" and value_has_callable(outcome[1])
+
+
 # ---------------------------------------------------------------------------
 # 5. Candidate generation
 # ---------------------------------------------------------------------------
@@ -1500,6 +1525,12 @@ def main():
                          "Autoform/SpecsGen/<Module>.lean. A targeted run "
                          "(--only-subjects) must use it, or it would silently replace "
                          "the full corpus module with a two-function one")
+    ap.add_argument("--exclude-subjects", default=None,
+                    help="`;`-separated function names to leave OUT of the mined set. For a "
+                         "subject whose by-computation proof does not terminate in the "
+                         "emission budget (a constructor that dispatches through the class "
+                         "name, say). Recorded in the report: the census is smaller by "
+                         "exactly these, and it says so")
     ap.add_argument("--only-subjects", default=None,
                     help="`;`-separated function names (a C++ signature contains commas: mine candidates for exactly "
                          "these call-closed functions and no others. Used to build a "
@@ -1614,6 +1645,15 @@ def main():
                  "runtime": native_report["runtime"], "evidence": os.path.abspath(args.conformance)}
         tests = native_report.get("test_runs", [])
         print("   loaded %d compared observations from %s" % (len(recs), native_report["runtime"]))
+        callable_recs = [r for r in recs if outcome_has_callable(r["outcome"])]
+        if callable_recs:
+            recs = [r for r in recs if not outcome_has_callable(r["outcome"])]
+            stats["skip_callable_outcome"] = len(callable_recs)
+            print("   %d observation(s) return a callable and stay with the oracle: its "
+                  "agreement rule for callables is a name match (see value_has_callable), "
+                  "not the Val equality lawConform states -- over %d function(s): %s"
+                  % (len(callable_recs), len({r["name"] for r in callable_recs}),
+                     ", ".join(sorted({r["name"].split(":<module>.")[-1] for r in callable_recs}))))
     elif args.synthetic:
         # LOUD, not silent: this run has no cross-runtime evidence at all, and the
         # report has to say so where a reader will trip over it rather than in a
@@ -1675,6 +1715,13 @@ def main():
         subjects = sorted(eligible)[:args.max_subjects]
         print("   capped at %d of %d %s functions (--max-subjects); the "
               "report records the cap" % (len(subjects), len(eligible), population))
+    excluded = []
+    if args.exclude_subjects:
+        drop = [n.strip() for n in args.exclude_subjects.split(";") if n.strip()]
+        excluded = [n for n in subjects if n in drop]
+        subjects = [n for n in subjects if n not in drop]
+        print("   excluded %d subject(s) by --exclude-subjects: %s"
+              % (len(excluded), ", ".join(excluded) or "(none matched)"))
     observations = recs if args.conformance_only else incore
     cands = gen_candidates(subjects, byname, observations, rng, synthetic=args.synthetic,
                            conformance_only=args.conformance_only)
@@ -1825,6 +1872,7 @@ def main():
         "subject_population": population,
         "max_subjects": args.max_subjects or None,
         "only_subjects": args.only_subjects,
+        "excluded_subjects": excluded,
         "functions": len(funcs),
         "call_closed": len(core),
         "artifacts": art,

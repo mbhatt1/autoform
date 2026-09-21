@@ -162,17 +162,18 @@ theorem is annotated with what happens to it when `ast-Cachetools.json` is repla
   committed one; only the added `signatureRejected`/`Func.keywordParams` simp arguments
   are needed, because the fresh render carries a real `pythonSignature` and
   `signatureRejected_legacy` no longer discharges the check.
-* `RELAND: BREAKS -- getter is a hole` -- `Cache.maxsize` and `Cache.currsize` are
-  `@property` getters, and the current exporter holes the DEFINITION of a decorated
-  method as `call:python-receiver-signature` (docs/languages.md §12/§14). A theorem
-  about a hole is unprovable; these must be dropped or restated until property
-  definitions translate.
-* `RELAND: BREAKS -- no longer a hole` -- the two `cache_clear` theorems assert that the
-  function REACHES `scope:nonlocal-write`. It no longer does: `nonlocal` writes are boxed
-  (docs/languages.md §11), the function is hole-free, and the negative result it was
-  proving is now false in the good direction. Replace with a positive refinement.
-* `RELAND: verify` -- hole-free but the body differs from the committed one, so the
-  theorem may or may not still hold; check on the first build.
+* `RELAND: BREAKS -- getter is a hole` -- was the prediction for `Cache.maxsize` and
+  `Cache.currsize`, `@property` getters the exporter used to hole as
+  `call:python-receiver-signature`. Property definitions translate now
+  (`Program.properties`, docs/languages.md §12/§14), so on the re-land these theorems
+  SURVIVED unchanged; the annotation is kept as the record of what was expected.
+* `RELAND: replaced` -- the two `cache_clear` theorems asserted that the function REACHES
+  `scope:nonlocal-write`. It no longer does: `nonlocal` writes are boxed
+  (docs/languages.md §11), the function is hole-free, and the negative result was false
+  in the good direction. §3 now states what the function does instead.
+* `RELAND: verified` -- hole-free but the body differed from the committed one; checked
+  on the first build against the re-landed AST (`ast-Cachetools.json`, cachetools v7.1.7,
+  Joern 4.0.606 -- see `provenance/ast-Cachetools.json.prov.json`).
 -/
 -- RELAND: survives (staticmethod fix restored `return 1`; body byte-identical).
 theorem Cache_getsizeof_refines :
@@ -243,7 +244,7 @@ not as a positional parameter — so *any* positional argument is a surplus, and
 covers every argument list; before the calling convention was modelled the surplus was
 silently truncated and this theorem's `.ret` branch was claimed for calls CPython
 rejects. -/
--- RELAND: BREAKS -- getter is a hole (`@property`, call:python-receiver-signature).
+-- RELAND: survived -- predicted to break (`@property` getter holed); property definitions translate now.
 theorem Cache_maxsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.maxsize" 10
       (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__maxsize" v)
@@ -270,7 +271,7 @@ not as a positional parameter — so *any* positional argument is a surplus, and
 covers every argument list; before the calling convention was modelled the surplus was
 silently truncated and this theorem's `.ret` branch was claimed for calls CPython
 rejects. -/
--- RELAND: BREAKS -- getter is a hole (`@property`, call:python-receiver-signature).
+-- RELAND: survived -- predicted to break (`@property` getter holed); property definitions translate now.
 theorem Cache_currsize_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.currsize" 10
       (fun h self _ => ∃ r v, self = .ref r ∧ HasField h r "_Cache__currsize" v)
@@ -303,7 +304,7 @@ functions on a cache whose capacity and occupancy differ.
 so an inequality between two functions is not evidence about either of them. Pinning both
 values is what gives it teeth. The lesson generalises: a witness that asserts a relation
 between two computations tests neither unless the relation is pinned on both sides. -/
--- RELAND: BREAKS -- both getters it names are holes.
+-- RELAND: survived -- predicted to break (both getters holed); property definitions translate now.
 theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
     (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
         = .val (.int 128)
@@ -510,37 +511,19 @@ theorem TTLSetstate_lambda_mrefines :
 legitimate refinement target (see `Refine.lean` §1), so "this method always raises" is a
 complete specification rather than a gap, and `.raise` → `.ret` is refuted by it.
 
-**Recorded caveat, not smoothed over:** the payload is `Val.unit`, not a
-`NotImplementedError` object. `Expr.name "NotImplementedError"` is a builtin the
-transpiler does not model, and the semantics evaluates an unbound name to `unit`. The
-statement therefore says "raises", not "raises `NotImplementedError`" — see obligation (3)
-in §4. -/
+The re-landed export spells `raise NotImplementedError` as the
+`py:exception:NotImplementedError` constructor, whose value IS the class name, and
+`Stmt.raise` under `.python` classifies what it raises (`pythonRaise`): a represented
+class name passes through unchanged. So the statement names the class — the caveat that
+stood here ("raises, but the payload is `unit`") is closed, and obligation (3) in §4
+records what is still not modelled: the exception's *arguments*. -/
 
-/-- Evaluating a bare name never holes and never consumes the heap: every branch of the
-`Expr.name` case — local, global, function value, unbound — returns a value. Needed
-because `NotImplementedError` is an unbound builtin, and `Ctx.resolve` on a 233-entry
-table does not reduce in the kernel. -/
-theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String) :
-    ∃ v, evalExpr ctx (n + 1) h ρ (.name x) = (h, .val v) := by
-  simp only [evalExpr]
-  repeat' split
-  all_goals exact ⟨_, rfl⟩
-
--- RELAND: verify -- `_TimedCache.expire` is hole-free but its body differs from the committed AST.
--- The committed body raises the BARE NAME `NotImplementedError` (`Expr.name`). That name is
--- unbound, so it evaluates to `unit`, and `pythonRaise` classifies `unit` exactly as CPython
--- classifies `raise None`: a `TypeError`. The premise `hres` -- the name is no module
--- function -- is true of this corpus but is a suffix scan over the table (`Ctx.resolve`)
--- that the kernel does not compute, so it is stated rather than proved. The re-landed
--- exporter emits the `py:exception:NotImplementedError` constructor instead, whose value
--- IS the class name; on re-land this theorem drops the premise and names the class -- see
--- obligation (3) in §4.
-theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel)
-    (hres : (ctxOf P).resolve "NotImplementedError" = none) :
-    ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
+-- RELAND: verified on the re-landed body (`raise` of the `py:exception:` constructor).
+theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
+    runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t]
+      = .exn (.str "NotImplementedError") := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
-  refine ⟨.str "TypeError", ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
   simp +decide only [hne, applyFunc, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv,
         bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams,
@@ -548,7 +531,14 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel)
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
-  simp +decide [evalExpr, Heap.get, hres, pythonRaise]
+  -- The constructor's name is a `String.drop` the kernel computes; `startsWith` is a
+  -- simproc. Establish the name first so the rewrite has a literal to work with.
+  have hname : ("py:exception:NotImplementedError".drop "py:exception:".length).toString
+      = "NotImplementedError" := by decide
+  have hname' : ("py:exception:NotImplementedError".drop "py:exception:".length).copy
+      = "NotImplementedError" := by decide
+  simp +decide [evalExpr, evalList, applyUnop, hname, hname', Stdlib.makeException,
+                Stdlib.excNames, pythonRaise, ctxOf, P]
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 
@@ -563,35 +553,29 @@ theorem cachedmethod_none_refines :
   simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools__cachedmethod_py__module___none, ctxOf, P]
 
-/-! ## 3. A negative result on the translated module
+/-! ## 3. The former negative result, now a positive one
 
-`Refine.lean` proves `sample_id_not_refinable` on a copied term. The same argument is
-worth having on the *real* module, because holes in `cachetools` are the reason the SACM
-top claim is UNDEVELOPED. `_uncached_info.cache_clear` is one of the 102: it writes a
-closed-over variable, and `nonlocal` *writes* are an honest hole
-(`Stmt.hole "scope:nonlocal-write"`, README "Not yet built").
+`Refine.lean` proves `sample_id_not_refinable` on a copied term, and this section used to
+prove the same thing about the REAL module: `_uncached_info.cache_clear` writes a
+closed-over variable, `nonlocal` writes were an honest hole (`scope:nonlocal-write`), and
+no shallow specification could refine a hole. That negative result is now false in the
+good direction. `nonlocal` is boxed: `_uncached_info` allocates `misses` as a heap cell
+(`Expr.boxNew`) and the closure captures the reference, so `cache_clear` translates to
+`misses.v = 0` on that cell. The theorem that replaces the negative one says exactly what
+the function does when called with its captured box: it returns `None` and the box's `v`
+is `0` afterwards — stated with `Heap.setField` on the left so nothing about the rest of
+the heap is assumed or lost. -/
 
-The theorem says: no shallow specification, at any fuel bound, on any inhabited domain,
-refines it. Holes are not an inconvenience to be routed around — they are provably
-unspecifiable, and this is now stated about generated code rather than a copy. -/
-
--- RELAND: BREAKS -- no longer a hole. `nonlocal` is boxed; `_uncached_info.cache_clear` translates.
-theorem cache_clear_reaches_hole (k : Nat) (h : Heap) (self : Val) :
-    (runMethod (k + 4) h "cachetools/_cached.py:<module>._uncached_info.cache_clear"
-      self []).2 = .hole "scope:nonlocal-write" := by
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools__cached_py__module___uncached_info_cache_clear rfl]
-  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, Env.set,
+-- RELAND: replaced -- `nonlocal` is boxed, the function translates, and the negative result
+-- it stood for (`cache_clear_reaches_hole`, `cache_clear_not_refinable`) is now false.
+theorem cache_clear_zeroes_the_box (k : Nat) (h : Heap) (r : Ref) :
+    applyClosure (ctxOf P) (k + 5) h
+        f_cachetools__cached_py__module___uncached_info_cache_clear [("misses", .ref r)] [] []
+      = (h.setField r "v" (.int 0), .val .unit) := by
+  simp +decide [applyClosure, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
+        signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools__cached_py__module___uncached_info_cache_clear]
-
--- RELAND: BREAKS -- no longer a hole (follows from the previous theorem breaking).
-theorem cache_clear_not_refinable (N : Nat)
-    (dom : Heap → Val → List Val → Prop) (spec : Heap → Val → List Val → Heap × Outcome)
-    (h : Heap) (self : Val) (hd : dom h self []) :
-    ¬ MRefines "cachetools/_cached.py:<module>._uncached_info.cache_clear" N dom spec := by
-  intro hm
-  have h1 := congrArg Prod.snd (hm h self [] hd (N + 4) (Nat.le_add_right _ _))
-  rw [cache_clear_reaches_hole N h self] at h1
-  exact Outcome.toEResult_ne_hole _ _ h1.symm
 
 /-! ## 4. What the mutation gate actually said
 
@@ -659,12 +643,11 @@ Stated, never admitted. Nothing above is `sorry`, `partial`, `unsafe`, or
    `_Link.unlink` and the eviction loops, which are the functions whose specifications
    would actually be interesting to a `cachetools` user.
 
-3. **Exception payloads are unmodelled.** `TimedCache_expire_raises` pins the *fact* of a
-   raise but not its class, because `NotImplementedError` is an unbound builtin name that
-   the semantics evaluates to `unit`. Modelling builtin exception classes is a transpiler
-   and semantics change, not something this file can repair, and until it happens no
-   statement in this file can distinguish `raise NotImplementedError` from `raise
-   KeyError`.
+3. **Exception arguments are unmodelled.** `TimedCache_expire_raises` names the class —
+   the `py:exception:<Name>` constructor evaluates to the represented class name, and
+   `ExcSafe.lean` proves every Python exception Core raises is one — but an exception is
+   only its class here: `KeyError(key)` and `KeyError()` are the same value, so no
+   statement in this file can speak about what an exception *carries*.
 
 4. **`Cache.get` is not specified.** Its body is `if key in self: return self[key]`, and
    `Expr.inOp`/`Expr.index` applied to a `ref` receiver hole out (`in:non-container`)

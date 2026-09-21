@@ -252,11 +252,11 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **209 agree, 0 divergences, 256 INCONCLUSIVE** on `cachetools` (basis `python-exception-guards-v3`); byte-identical before and after the container switchover. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **219 agree, 0 divergences, 306 INCONCLUSIVE** on `cachetools` v7.1.7 re-exported by the current exporter (basis `python-exception-guards-v3`); 209/0/256 on the previous artifact, byte-identical before and after the container switchover. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on `Autoform/Generated/Cachetools.lean`, 10 survivors all analysed; **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution working (`mutation-Imp.json`) |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only; declaration count lives in `audit.json` (6,786 at the last recorded run; re-measure with `scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
-| untranslated code is declared | hole counting + SACM assumptions | 26 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 22 holes, all named |
 | every AST names the exporter that made it | `scripts/check_provenance.py` | **0 violations**; 0 of 14 tracked ASTs attributed, all 14 named in `provenance/unattributed.json` with a reason |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
@@ -308,10 +308,11 @@ a measurement rather than an impression:
 * **Cross-scope writes — done** for the case where the binding dominates the capture.
   `nonlocal` is boxed in the defining scope and shared with the closure; anything else
   still holes ([§11](docs/languages.md)).
-* **Calling conventions — done but for one default.** Literal, in-program-function and
-  module-attribute defaults all bind, as do `@staticmethod` and recovered signatures. The
-  single remaining hole is `Cache.pop(default=__marker)`: a class-attribute sentinel,
-  which needs a heap read where the binding happens.
+* **Calling conventions — done.** Literal, in-program-function, module-attribute and
+  class-attribute-sentinel defaults all bind (`Cache.pop(default=__marker)` is seeded
+  from the heap where the binding happens), as do `@staticmethod`, `@classmethod` and
+  `@property` definitions and recovered signatures. What remains is a receiver followed
+  by nothing but `*args, **kwargs` — 11 functions in `cachetools`, listed below.
 * **Language-specific numeric behavior — no open divergence.** The differential suite was
   run across the whole language matrix against real runtimes: 5 passed, 2 xfailed, and
   neither xfail is numeric ([typed numerics](docs/typed-numerics.md)).
@@ -328,9 +329,9 @@ for the scope of the remaining work.
 picking the easy one. The table below is a **snapshot to re-measure, not a current
 figure**: passes close labels concurrently, and a count in prose is stale the day it is
 written. Last measured 2026-09-21 on `cachetools` v7.1.7 with the exporter at that
-commit: **97 holes across 74 of 209 functions**, down from 134 across 111 at the start of
-the pass — of which 18 were *added*, because they had been concealing a wrong answer.
-Reproduce it before quoting it:
+commit: **22 holes across 20 of 209 functions**, down from 134 across 111 at the start of
+the pass (and from 97 across 74 midway, when 18 had been *added* because they were
+concealing a wrong answer). Reproduce it before quoting it:
 
 ```sh
 # from a checkout of cachetools v7.1.7 with src/cachetools as the export root
@@ -340,11 +341,14 @@ python3 scripts/lang_matrix.py ast-Cachetools.json   # holes by cause, per corpu
 
 | label | holes (snapshot) | what would close it |
 |---|---|---|
-| `control:TRY-exception-representation` | 34 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter. Every *other* exception producer in Core is already pinned by a theorem; `Stmt.raise` is the one exit ([§10](docs/languages.md)). Grew from 29 as whole-function holes stopped masking it |
-| `call:python-receiver-signature` | 23 | descriptor binding. `@staticmethod` is **done** — its whole meaning is "bind no receiver". 12 of the rest are `@property`, which turns an attribute *access* into a call; the remainder are `@classmethod` and receivers not named `self` |
-| `call:python-property-access` | 21 | running the getter. **This count went up on purpose**: those reads used to lower to a field that does not exist, which Core answered with `unit` *silently*. The dispatch is implemented and proved fuel-monotone; what blocks landing it is one side condition on the accessor theorems ([§10](docs/languages.md), STRATEGY.md §57.10) |
-| `call:computed-callee`, `op:delete-index`, `op:stringExpressionList`, other | 18 | `delIndex` exists in Core and is deliberately not yet emitted for unboxed receivers; the rest are individually small |
-| `call:python-defaults` | 1 | literals, in-program functions and module attributes all bind (**53 → 1**). The last is `Cache.pop(default=__marker)`, a class-attribute sentinel: reading it needs the heap at bind time, and that is the one default that genuinely wants function-object state |
+| `call:python-receiver-signature` | 11 | every one is `def f(self, *args, **kwargs)` — a receiver followed by nothing but collectors (`_TimedCache.get/pop/setdefault`, the six `Descriptor.Wrapper.__call__`s, the two descriptor bases). `@staticmethod`, `@classmethod` and `@property` definitions are **done**; what remains is binding the receiver when every other parameter is a collector, which the exporter refuses rather than let an arity check conceal the gap (`tests/test_python_receivers.py`). Was 23 |
+| `call:computed-callee` | 6 | `_cache.decorator` and the five `*_cache` factories call a closure chosen by a branch — the callee is a run-time value, not a name. Calling through an arbitrary expression — a value-callee form beside `Expr.call`'s name-callee — is the feature |
+| `op:stringExpressionList:non-literal-part` | 3 | f-strings whose parts are not literals (the `_DescriptorBase` deprecation messages) — `str()` of an arbitrary value is the `__str__`/`__repr__` protocol, which Core does not model |
+| `expr:genExp` | 2 | generator expressions in `typedkey` — a lazy iterator with its own scope |
+| `control:TRY-exception-representation` | 0 | **done** (was 34). The guard was standing in for a proof; `ExcSafe.lean` is the proof — under `.python` every exception Core raises names a represented class, by simultaneous induction over the interpreter ([§10](docs/languages.md)) |
+| `call:python-property-access` | 0 | **done** (was 21). The getter runs: a `.field` read that misses the instance and names a `@property` of the receiver's class calls it (`Program.properties`), proved fuel-monotone; `Cache.maxsize`/`currsize` now translate and their theorems survived the re-land unchanged |
+| `call:python-defaults` | 0 | **done** (53 → 0). Literals, in-program functions and module attributes bind at the call; the class-attribute sentinel `Cache.pop(default=__marker)` is seeded from the heap at bind time (`classAttrDefaults`) |
+| `op:delete-index` | 0 | **done.** `del xs[i]` / `del d[k]` emit `Stmt.delIndex` on the boxed container; slices (`xs[a:b]`, `xs[a:b] = ys`, `del xs[a:b]`) landed with them, checked against CPython ([docs/boxed-containers.md](docs/boxed-containers.md)) |
 | `scope:nonlocal-write` | 0 | **done.** The enclosing scope boxes the name, the closure shares the cell. Refused unless the binding dominates the capture — bound at top level before the first nested `def` — because a box that does not exist yet cannot be captured ([§10](docs/languages.md)) |
 
 Each is a feature, not a fix. Two things this table is for: it is the reason

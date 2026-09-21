@@ -9,8 +9,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half.
 
-On `cachetools`, 180 of 209 functions are
-hole-free and 101 are call-closed. A single untranslated construct anywhere in a function
+On `cachetools`, 189 of 209 functions are
+hole-free and 108 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
