@@ -329,8 +329,12 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- field it names" is a claim about ordinary instances. Only Python boxes, so the
     -- obligation is conditional on the dialect and the default discharges it outright
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
-    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
+    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
+    -- accessor named `length` would not be "the field it names" there. Decidable at every
+    -- call site: the dialect and the field name are both concrete.
+    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
@@ -344,9 +348,9 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
-      · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
-        · simp [hgr, hf, hc, hm, hd]
+      · by_cases hd : ctx.dialect.boxesContainers = true
+        · simp [hgr, hf, hc, hm, hlen, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hlen, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
@@ -368,8 +372,12 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- field it names" is a claim about ordinary instances. Only Python boxes, so the
     -- obligation is conditional on the dialect and the default discharges it outright
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
-    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
+    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
+    -- accessor named `length` would not be "the field it names" there. Decidable at every
+    -- call site: the dialect and the field name are both concrete.
+    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
@@ -383,9 +391,9 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
-      · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
-        · simp [hgr, hf, hc, hm, hd]
+      · by_cases hd : ctx.dialect.boxesContainers = true
+        · simp [hgr, hf, hc, hm, hlen, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hlen, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 

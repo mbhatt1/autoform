@@ -1,7 +1,7 @@
 # Boxed containers for Core
 
-**Status: steps 1-4 and THE SWITCHOVER are landed.** A Python list or dict literal
-allocates, containers have identity, and aliasing works — `a = [1,2]; b = a; b[0] = 9`
+**Status: steps 1-4 and THE SWITCHOVER are landed, for Python AND JavaScript.** A
+Python or JavaScript list/dict literal allocates, containers have identity, and aliasing works — `a = [1,2]; b = a; b[0] = 9`
 makes `a[0]` nine, as in CPython. The `Val.eqPy` half of step 2 was already landed (see
 the correction below). What remains is §8's named exclusions — slices — and the
 `(Ref, Nat)` iterator refinements beyond §4. Read this before changing

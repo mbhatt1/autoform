@@ -1054,9 +1054,25 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               -- Check the signed bound before toNat, which otherwise clamps a
               -- negative index to zero and can make incorrect mutants survive.
               let j := if ctx.dialect == .python && i < 0 then i + (vs.length : Int) else i
-              if j < 0 then (h₂, .exn (.str "IndexError"))
+              -- Out of range: Python raises, JavaScript answers `undefined`. Neither is
+              -- a hole -- both are values the language defines.
+              let outOfRange : EResult :=
+                if ctx.dialect == .javascript then .val .unit else .exn (.str "IndexError")
+              if j < 0 then (h₂, outOfRange)
               else if hh : j.toNat < vs.length then (h₂, .val (vs[j.toNat]))
-              else (h₂, .exn (.str "IndexError"))
+              else (h₂, outOfRange)
+          -- JavaScript strings index by UTF-16 code unit. A hit is the one-unit string;
+          -- out of range is `undefined`; a lone surrogate has no `Char` and is refused
+          -- rather than replaced with `'\0'`. Python's `s[i]` keeps the hole it has:
+          -- codepoint indexing with `IndexError` is a separate piece of work.
+          | .str s, .int i =>
+              if ctx.dialect == .javascript then
+                match s.utf16At i with
+                | none   => (h₂, .val .unit)
+                | some u =>
+                    if u.isUTF16Surrogate then (h₂, .hole "index:js-lone-surrogate")
+                    else (h₂, .val (.str (String.singleton (Char.ofNat u))))
+              else (h₂, .hole "index:unsupported")
           | .dict kvs, key =>
               match kvs.find? (fun kv => Val.beq kv.1 key) with
               | some (_, v) => (h₂, .val v)
@@ -1131,7 +1147,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                              -- removing others. Gated on the dialect because only Python
                              -- boxes, so no `.cLike` corpus can reach a payload and none
                              -- of their specs need to say so.
-                             else if ctx.dialect == .python && o.payload.toVal.isSome then
+                             -- JavaScript: `xs.length` on a boxed array is a PROPERTY,
+                             -- not a method, so it is answered here on the field path.
+                             -- The dict case is deliberately absent: a JS object literal's
+                             -- own keys are its fields (`{a: 1}.a`), which Core does not
+                             -- yet model as a payload lookup and so stays the hole below.
+                             else if ctx.dialect == .javascript && f == "length" then
+                               match o.payload with
+                               | .list vs => (h₁, .val (.int vs.length))
+                               | _        => (h₁, .hole s!"field:{f}:on-container")
+                             else if ctx.dialect.boxesContainers && o.payload.toVal.isSome then
                                (h₁, .hole s!"field:{f}:on-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
@@ -1146,6 +1171,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             | some (_, v) => (h₁, .val v)
             | none        => (h₁, .hole s!"field:{f}:absent-from-aggregate")
           else (h₁, .hole s!"field:{f}:non-object")
+      -- JavaScript: `s.length` is the number of UTF-16 code units, not codepoints.
+      | (h₁, .val (.str s)) =>
+          if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.utf16Length))
+          else (h₁, .hole s!"field:{f}:non-object")
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
@@ -1153,12 +1182,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- shape we do not model and it says so.
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
-      -- THE SWITCHOVER. A Python list literal allocates: Python's lists are objects
-      -- with identity. PYTHON ONLY -- a C aggregate initializer is a value, has no
-      -- identity to share, and `Dialect.fieldsOnDicts` reads it by field name, so
-      -- boxing it would make C wrong in the commit that makes Python right.
+      -- THE SWITCHOVER. A Python or JavaScript list literal allocates: both languages'
+      -- arrays are objects with identity. NOT C -- an aggregate initializer is a value,
+      -- has no identity to share, and `Dialect.fieldsOnDicts` reads it by field name, so
+      -- boxing it would make C wrong in the commit that makes Python right. The dialect
+      -- predicate `boxesContainers` is where that line is drawn.
       | (h₁, .inr (vs, []))  =>
-          if ctx.dialect == .python then
+          if ctx.dialect.boxesContainers then
             let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
             (h₂, .val (.ref r))
           else (h₁, .val (.list vs))
@@ -1172,7 +1202,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | n+1, h, ρ, .dictE kvs =>
       match evalPairs ctx n h ρ kvs with
       | (h₁, .inr ps) =>
-          if ctx.dialect == .python then
+          if ctx.dialect.boxesContainers then
             let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
             (h₂, .val (.ref r))
           else (h₁, .val (.dict ps))
@@ -2623,5 +2653,46 @@ private def aliasProg : Program :=
        | .val (.bool true) => true | _ => false
 #guard match runFunc aliasProg 400 "identity" [] with
        | .val (.bool false) => true | _ => false
+
+/-! ## JavaScript arrays and strings
+
+The JS frontend lowers `[a, b]` to `__ecma.Array.factory()` followed by `.push(a)`,
+`.push(b)` -- a constructor plus in-place mutation, which is exactly the boxed-container
+shape. `push` returns the NEW LENGTH where Python's `append` returns `None`, which is why
+`.javascript` has its own `Stdlib.methodCore` table rather than borrowing Python's. Every
+expectation below is Node's. -/
+private def jsProg : Program :=
+  { dialect := .javascript
+  , funcs :=
+    [ { name := "build", params := []
+      , body :=
+          .seq (.assign "xs" (.listE []))
+          (.seq (.expr (.mcall (.name "xs") "push" [.lit (.int 1)]))
+          (.seq (.assign "n" (.mcall (.name "xs") "push" [.lit (.int 2)]))
+                (.ret (.binop "+" (.name "n")
+                         (.binop "*" (.lit (.int 10)) (.field (.name "xs") "length")))))) }
+    , { name := "oob", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1)]))
+                     (.ret (.index (.name "xs") (.lit (.int 5)))) }
+    , { name := "strIdx", params := []
+      , body := .ret (.index (.lit (.str "xy")) (.lit (.int 0))) }
+    , { name := "strLen", params := []
+      , body := .ret (.field (.lit (.str "xy")) "length") } ] }
+
+-- `xs = []; xs.push(1); n = xs.push(2); n + 10 * xs.length`  -- Node: 2 + 20 = 22
+#guard match runFunc jsProg 300 "build" [] with | .val (.int 22) => true | _ => false
+-- Out of range on an array is `undefined`, not an exception.  -- Node: undefined
+#guard match runFunc jsProg 300 "oob" [] with | .val .unit => true | _ => false
+-- `"xy"[0]` is `"x"`; `"xy".length` is 2.
+#guard match runFunc jsProg 300 "strIdx" [] with | .val (.str "x") => true | _ => false
+#guard match runFunc jsProg 300 "strLen" [] with | .val (.int 2) => true | _ => false
+
+-- UTF-16 units: `"😀".length` is 2 and its first unit is a lone surrogate.
+#guard "xy".utf16Length == 2
+#guard "😀".utf16Length == 2
+#guard "xy".utf16At 0 == some 120
+#guard "xy".utf16At 5 == none
+#guard "xy".utf16At (-1) == none
+#guard ("😀".utf16At 0).any Nat.isUTF16Surrogate
 
 end Autoform.Core

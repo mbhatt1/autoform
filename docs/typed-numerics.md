@@ -122,8 +122,9 @@ assignment-order and call-order case in the matrix agrees with its native runtim
 is a measurement, not an absence of reports: "no known divergence" and "the suite was run
 and says so" are different claims, and only the second one is evidence.
 
-The two `xfail`s are `strict`, so they would fail the suite if they started passing, and
-neither is numeric:
+The two `xfail`s were `strict`, so they would fail the suite if they started passing --
+and both marks have now been REMOVED, because the implementation landed. What each one
+needed, for the record:
 
 * **`indexSnapshot`** — JavaScript array literals need reference and identity semantics.
   This is now *closer* than the reason recorded against it. The JS frontend lowers

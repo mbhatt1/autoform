@@ -532,16 +532,12 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
             assert unknown["numbers.Add"]["body"]["e"]["op"] == "num:go:i64:+"
 
 
-@pytest.mark.parametrize("subject", [
-    pytest.param("indexSnapshot", marks=pytest.mark.xfail(strict=True,
-        reason="JavaScript array literals need reference/identity semantics; __ecma.Array.factory remains untranslated")),
-    pytest.param("indexString", marks=pytest.mark.xfail(strict=True,
-        reason="JavaScript string indexing is not implemented in Core; UTF-16 indexing needs separate semantics")),
-])
+@pytest.mark.parametrize("subject", ["indexSnapshot", "indexString"])
 def test_js_indexed_native_conformance(subject, tmp_path, numeric_env, monkeypatch):
-    # Keep the actual native/model comparison for this discovered gap. A future
-    # implementation must satisfy it; mapping arrays to immutable value lists
-    # would silently change their aliasing, identity and truthiness semantics.
+    # Formerly two strict xfails. `indexSnapshot` needed arrays to be objects with
+    # identity -- `__ecma.Array.factory()` is now an empty boxed list and `push` mutates it
+    # in place, returning the new length as Node does. `indexString` needed UTF-16 unit
+    # indexing, which `String.utf16At` provides for the `.javascript` dialect only.
     monkeypatch.setitem(CASES, "js", [(subject, [1, 2]), (subject, [-3, 7])])
     test_joern_native_numeric("js", tmp_path, numeric_env)
 
@@ -582,3 +578,38 @@ def test_every_exception_producer_in_core_is_pinned_by_a_theorem():
     # The predicate must stay a statement about `excNames`, not about some other list
     # that could drift away from the one the exporter's dispatch actually compares to.
     assert 'def ExcSafe (v : Val) : Prop := ∃ n, v = .str n ∧ n ∈ excNames' in stdlib
+
+
+class TestJavaScriptContainers:
+    """Source-level pins for the JavaScript array/string support. The end-to-end check is
+    `test_js_indexed_native_conformance`, which needs Joern and Node; these hold the shape
+    of the implementation in place when that suite is skipped."""
+
+    def test_array_factory_becomes_an_empty_list_literal(self):
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert '"__ecma.Array.factory"' in src
+        assert 'ujson.Obj("k" -> "listE", "items" -> ujson.Arr())' in src
+        # a factory WITH arguments is a different constructor and must not be swallowed
+        assert 'args.isEmpty && kwArgs.isEmpty' in src
+
+    def test_boxing_is_a_named_dialect_predicate(self):
+        """The `== .python` gate was widened by naming the property, not by adding
+        another disjunct at each of the sites that read it."""
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'def boxesContainers : Dialect → Bool' in syntax
+        assert '| .python | .javascript => true' in syntax
+        assert 'if ctx.dialect.boxesContainers then' in sem
+
+    def test_push_returns_the_new_length(self):
+        """The one line that justifies a separate JavaScript method table."""
+        stdlib = (ROOT / 'Autoform/Lang/Core/Stdlib.lean').read_text()
+        assert 'm (.val (.int vs\'.length)) (.list vs\')' in stdlib
+        assert 'theorem knowsMethod_javascript_complete' in stdlib
+
+    def test_utf16_helpers_exist_and_refuse_lone_surrogates(self):
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'def _root_.String.utf16Units' in syntax
+        assert 'def _root_.String.utf16At' in syntax
+        assert 'index:js-lone-surrogate' in sem

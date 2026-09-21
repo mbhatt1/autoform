@@ -568,7 +568,25 @@ String methods are not modelled at all: an exception value and a string are the 
 def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
     Option (Heap × MethodResult) :=
   match d with
-  | .cLike | .javascript => none
+  | .cLike => none
+  | .javascript =>
+    let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
+    let pv (x : Val) : Option (Heap × MethodResult) := p (.val x)
+    let m (r : EResult) (nv : Val) : Option (Heap × MethodResult) := some (h, .mutating r nv)
+    match recv, name, args with
+    -- `push` returns the NEW LENGTH. This single line is the reason JavaScript does not
+    -- reuse the Python table: routing it to `append` would type-check, translate, and
+    -- return `None` where Node returns an integer.
+    | .list vs, "push", xs  => let vs' := vs ++ xs; m (.val (.int vs'.length)) (.list vs')
+    -- `[].pop()` is `undefined`, not an error.
+    | .list vs, "pop", []   =>
+        match vs.getLast? with
+        | some x => m (.val x) (.list vs.dropLast)
+        | none   => pv .unit
+    | .list vs, "indexOf", [x] =>
+        pv (.int (match vs.findIdx? (fun v => Val.beq v x) with | some i => (i : Int) | none => -1))
+    | .list vs, "includes", [x] => pv (.bool (vs.any (fun v => Val.beq v x)))
+    | _, _, _ => none
   | .python =>
     let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
     let pv (x : Val) : Option (Heap × MethodResult) := p (.val x)
@@ -651,6 +669,12 @@ def methodNames : List String :=
   , "append", "insert", "extend", "clear", "remove", "pop", "popitem"
   , "setdefault", "update" ]
 
+/-- The JavaScript array methods `methodCore` answers. Separate from `methodNames`
+because the two tables genuinely differ: `push` returns the new length, `pop` of an
+empty array is `undefined`, and `includes`/`indexOf` are JavaScript's names for what
+Python spells `in`/`index`. -/
+def jsMethodNames : List String := [ "push", "pop", "indexOf", "includes" ]
+
 /-- Does `method` model this method name under this dialect?
 
 **This one is an upper bound, and you should treat it as one.** Unlike `knowsFree` it
@@ -670,8 +694,9 @@ is only usable where the receiver value is in hand — the interpreter, or the c
 harness, not the static ledger. -/
 def knowsMethod (d : Dialect) (name : String) : Bool :=
   match d with
-  | .cLike | .javascript => false
-  | .python => methodNames.contains name
+  | .cLike      => false
+  | .javascript => jsMethodNames.contains name
+  | .python     => methodNames.contains name
 
 /-- Methods on non-object receivers, for `Expr.mcall`. Guarded by `knowsMethod` for the
 same reason `builtin` is guarded by `knowsFree`. -/
@@ -723,8 +748,10 @@ that stops the ledger *overstating* — holds by construction, because `builtin`
 /-- Likewise for methods. -/
 @[simp] theorem knowsMethod_cLike (n : String) : knowsMethod .cLike n = false := rfl
 
-/-- Likewise for methods, under JavaScript. -/
-@[simp] theorem knowsMethod_javascript (n : String) : knowsMethod .javascript n = false := rfl
+/-- Likewise for methods, under JavaScript -- which now HAS a table, so the honest
+statement names it rather than asserting `false`. -/
+@[simp] theorem knowsMethod_javascript (n : String) :
+    knowsMethod .javascript n = jsMethodNames.contains n := rfl
 
 /-- **The direction that matters.** A name the predicate rejects is never answered, so a
 ledger built on `knowsFree` can only understate, never overstate. True by `rfl` under the
@@ -818,6 +845,20 @@ receiver. -/
 theorem knowsMethod_complete :
     methodNames.all (fun n =>
       (method .python wHeap (methodWitness n).1 n (methodWitness n).2).isSome) = true := by
+  decide
+
+/-- Receiver and arguments on which each JavaScript method name is answered. -/
+private def jsMethodWitness : String → Val × List Val
+  | "push"     => (.list [], [.unit])
+  | "pop"      => (.list [], [])
+  | "indexOf"  => (.list [], [.unit])
+  | "includes" => (.list [], [.unit])
+  | _          => (.unit, [])
+
+/-- Every name `knowsMethod .javascript` accepts is genuinely answered. -/
+theorem knowsMethod_javascript_complete :
+    jsMethodNames.all (fun n =>
+      (method .javascript wHeap (jsMethodWitness n).1 n (jsMethodWitness n).2).isSome) = true := by
   decide
 
 /-- `len` of a list is its length — stated against `List.length`, not against `builtin`. -/
