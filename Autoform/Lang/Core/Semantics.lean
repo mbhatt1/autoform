@@ -1292,9 +1292,87 @@ does; everything else names exactly one method. -/
       | "bool" => match pick "__bool__" with
                   | some t => some t
                   | none   => pick "__len__"
+      -- `iter(object)`: "the single argument must be a collection object which supports
+      -- the iterable protocol (the `__iter__()` method)" -- library/functions.html#iter.
+      -- The sequence-protocol fallback (`__getitem__` from 0) needs an iterator OBJECT
+      -- to hand back, which Core has no representation for; it stays the builtin hole.
+      -- `next(iterator)`: "Retrieve the next item from the iterator by calling its
+      -- `__next__()` method" -- library/functions.html#next; the two-argument form is
+      -- `nextDefaultTarget` below.
+      | "iter" => pick "__iter__"
+      | "next" => pick "__next__"
       | _      => none
     | none => none
   | _ => none
+
+/-- `next(iterator, default)`: "If default is given, it is returned if the iterator is
+exhausted, otherwise `StopIteration` is raised" (library/functions.html#next). The
+receiver, its `__next__`, and the default -- when the first argument is an ordinary
+instance whose class defines `__next__`. -/
+def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
+    Option (Ref × Func × Val) :=
+  match f, vs with
+  | "next", [it, d] =>
+      match ctx.dunderOn h it "__next__" with
+      | some (r, fn) => some (r, fn, d)
+      | none         => none
+  | _, _ => none
+
+theorem nextDefaultTarget_resolves {ctx : Ctx} {h : Heap} {f : String} {vs : List Val}
+    {r : Ref} {fn : Func} {d : Val} (hn : nextDefaultTarget ctx h f vs = some (r, fn, d)) :
+    ∃ cls, ctx.resolveMethod cls "__next__" = some fn := by
+  unfold nextDefaultTarget at hn
+  repeat' split at hn
+  all_goals first
+    | (cases hn; exact Ctx.dunderOn_resolves (by assumption))
+    | cases hn
+
+/-! ### The iteration protocol, driven from `for`
+
+`for` (reference/compound_stmts.html §8.3): "An iterator is created for that iterable.
+The first item provided by the iterator is then assigned to the target list ... This
+repeats for each item provided by the iterator. When the iterator is exhausted ... the
+loop terminates." The iterator is created as `iter()` does (library/functions.html#iter):
+the class's `__iter__()`, else the sequence protocol -- `__getitem__()` with integer
+arguments from `0` until `IndexError`. An iterator is driven as `library/stdtypes.html`
+"Iterator Types" says: `__next__()` "Return the next item from the iterator. If there are
+no further items, raise the `StopIteration` exception."
+
+Core drives a user iterator with a STATEMENT it synthesises and runs through `execStmt`,
+rather than with a ninth interpreter function: the iterator is bound to a name no source
+language can spell, each step is `x = it.__next__()` inside a `tryCatch` whose handler
+breaks on `StopIteration` and re-raises anything else, and the body follows. `break`,
+`continue` and `return` in the body mean what §8.3 says because `.loop` already gives them
+that meaning, and "names in the target list are not deleted when the loop is finished"
+because the synthesised loop assigns `x` in the enclosing environment.
+
+Not modelled, and not pretended: the `else` clause (the exporter lowers it separately),
+and "once an iterator's `__next__()` method raises `StopIteration`, it must continue to
+do so" -- a property of the iterator's author, which Core neither checks nor relies on. -/
+
+/-- The synthesised loop's private names. `$` cannot start a Python identifier. -/
+def iterTmp : String := "$iter"
+def idxTmp  : String := "$idx"
+def excTmp  : String := "$exc"
+
+/-- `for x in it` over an ITERATOR (`__next__`), as one Core statement. -/
+def nextDriver (x : String) (body : Stmt) : Stmt :=
+  .loop (.lit (.bool true))
+    (.seq (.tryCatch (.assign x (.mcall (.name iterTmp) "__next__" [])) excTmp
+             (.ifte (.binop "==" (.name excTmp) (.lit (.str "StopIteration")))
+                    .brk (.raise (.name excTmp))))
+          body)
+
+/-- `for x in s` over a SEQUENCE-PROTOCOL object (`__getitem__` from `0` until
+`IndexError`), as one Core statement. -/
+def seqDriver (x : String) (body : Stmt) : Stmt :=
+  .seq (.assign idxTmp (.lit (.int 0)))
+    (.loop (.lit (.bool true))
+      (.seq (.tryCatch (.assign x (.index (.name iterTmp) (.name idxTmp))) excTmp
+               (.ifte (.binop "==" (.name excTmp) (.lit (.str "IndexError")))
+                      .brk (.raise (.name excTmp))))
+      (.seq (.assign idxTmp (.binop "+" (.name idxTmp) (.lit (.int 1))))
+            body)))
 
 /-- What the builtin makes of the dunder's answer. CPython type-checks it: `__len__` must
 return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
@@ -1737,9 +1815,21 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                     | none    => (h₁, .hole s!"call:{g}")
             | _ => (h₁, .hole s!"call:{f}:not-callable")
           | _          =>
-            -- `len(x)`, `bool(x)`, `hash(x)`, `str(x)`, `repr(x)` on an ordinary instance
-            -- whose class defines the dunder run the method (`builtinDunderTarget`); the
-            -- answer is type-checked as CPython does (`builtinDunderResult`).
+            -- `next(it, default)`: the default "is returned if the iterator is exhausted"
+            -- (library/functions.html#next), i.e. when `__next__` raises `StopIteration`;
+            -- any other outcome of `__next__` is the call's outcome.
+            match nextDefaultTarget ctx h₁ f vs with
+            | some (r, fn, d) =>
+              if kws.isEmpty then
+                match applyFunc ctx n h₁ fn (some (.ref r)) [] [] with
+                | (h₂, .exn (.str "StopIteration")) => (h₂, .val d)
+                | (h₂, res)                          => (h₂, res)
+              else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+            | none =>
+            -- `len(x)`, `bool(x)`, `hash(x)`, `str(x)`, `repr(x)`, `iter(x)`, `next(x)` on
+            -- an ordinary instance whose class defines the dunder run the method
+            -- (`builtinDunderTarget`); the answer is type-checked as CPython does
+            -- (`builtinDunderResult`).
             match builtinDunderTarget ctx h₁ f vs with
             | some (r, cls, m) =>
               if kws.isEmpty then
@@ -2490,9 +2580,39 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
         match v with
         | .ref r =>
             match h₁.payload r with
-            | .none => match v.iterable with
-                       | some vs => execFor ctx n h₁ ρ x vs body
-                       | none    => (h₁, .hole "forIn:non-iterable")
+            | .none =>
+                -- An ordinary instance. `iter()` first (`__iter__`, then the sequence
+                -- protocol), then drive what it returned -- see "The iteration protocol,
+                -- driven from `for`" above for the sections this follows.
+                match ctx.dunderOn h₁ v "__iter__" with
+                | some (ri, fn) =>
+                    match applyFunc ctx n h₁ fn (some (.ref ri)) [] [] with
+                    | (h₂, .val it) =>
+                        match it with
+                        | .ref r₂ =>
+                            match h₂.payload r₂ with
+                            | .none =>
+                                match ctx.dunderOn h₂ it "__next__" with
+                                | some _ => execStmt ctx n h₂ (ρ.set iterTmp it) (nextDriver x body)
+                                | none   =>
+                                    match it.iterable with
+                                    | some vs => execFor ctx n h₂ ρ x vs body
+                                    | none    => (h₂, .hole "forIn:iter-returned-non-iterator")
+                            | _ => execForRef ctx n h₂ ρ x r₂ 0 ((h₂.get r₂).elim 0 (·.version)) body
+                        | _ =>
+                            match it.iterable with
+                            | some vs => execFor ctx n h₂ ρ x vs body
+                            | none    => (h₂, .hole "forIn:iter-returned-non-iterator")
+                    | (h₂, .exn e)     => (h₂, .exn e ρ)
+                    | (h₂, .hole l)    => (h₂, .hole l)
+                    | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+                | none =>
+                    match ctx.dunderOn h₁ v "__getitem__" with
+                    | some _ => execStmt ctx n h₁ (ρ.set iterTmp v) (seqDriver x body)
+                    | none   =>
+                        match v.iterable with
+                        | some vs => execFor ctx n h₁ ρ x vs body
+                        | none    => (h₁, .hole "forIn:non-iterable")
             | _     => execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
         | _ =>
             match v.iterable with
@@ -3632,6 +3752,97 @@ private def valueDunderProg : Program :=
 -- `len(Q())`      -- CPython TypeError; Core has no `len` on an instance without `__len__`
 --                    and says so (`call:len`), which is the pre-existing behaviour.
 #guard match runFunc valueDunderProg 200 "lenQ" [] with | .hole _ => true | _ => false
+
+/-! ## The iteration protocol, checked against CPython
+
+`Counter` is the textbook iterator (`__iter__` returns `self`, `__next__` counts to 3 and
+then raises `StopIteration`); `Bag.__iter__` returns a plain list; `Seq` has only
+`__getitem__` and is iterated by the sequence protocol until `IndexError`. Every expected
+value is CPython 3.11's. -/
+private def iterProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.Counter.__iter__", params := []
+      , body := .ret (.name "self") }
+    , { name := "m.py:<module>.Counter.__next__", params := []
+      , body := .ifte (.binop ">=" (.field (.name "self") "i") (.lit (.int 3)))
+                  (.raise (.unop "py:exception:StopIteration" (.tupleE [])))
+                  (.seq (.setField (.name "self") "i"
+                           (.binop "+" (.field (.name "self") "i") (.lit (.int 1))))
+                        (.ret (.field (.name "self") "i"))) }
+    , { name := "m.py:<module>.Bag.__iter__", params := []
+      , body := .ret (.listE [.lit (.int 7), .lit (.int 8)]) }
+    , { name := "m.py:<module>.Seq.__getitem__", params := ["i"]
+      , body := .ifte (.binop ">=" (.name "i") (.lit (.int 2)))
+                  (.raise (.unop "py:exception:IndexError" (.tupleE [])))
+                  (.ret (.binop "*" (.name "i") (.lit (.int 10)))) }
+    -- for x in Counter(): acc += x
+    , { name := "m.py:<module>.collect", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 0)))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "c") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc"))))) }
+    -- for x in Counter(): if x == 2: break; acc += x   -- and x is still bound afterwards
+    , { name := "m.py:<module>.breaks", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 0)))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "c")
+                   (.ifte (.binop "==" (.name "x") (.lit (.int 2))) .brk
+                          (.assign "acc" (.binop "+" (.name "acc") (.name "x")))))
+                (.ret (.tupleE [.name "acc", .name "x"]))))) }
+    -- for x in Bag(): acc += x   -- __iter__ returned a list
+    , { name := "m.py:<module>.viaList", params := []
+      , body :=
+          .seq (.assign "b" (.alloc "Bag" []))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "b") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc")))) }
+    -- for x in Seq(): acc += x   -- sequence protocol: s[0], s[1], IndexError
+    , { name := "m.py:<module>.viaSeq", params := []
+      , body :=
+          .seq (.assign "s" (.alloc "Seq" []))
+          (.seq (.assign "acc" (.lit (.int 0)))
+          (.seq (.forIn "x" (.name "s") (.assign "acc" (.binop "+" (.name "acc") (.name "x"))))
+                (.ret (.name "acc")))) }
+    -- c = Counter(); c.i = 3; next(c)
+    , { name := "m.py:<module>.exhausted", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 3)))
+                (.ret (.call "next" [.name "c"]))) }
+    -- c = Counter(); c.i = 3; next(c, 99)
+    , { name := "m.py:<module>.withDefault", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 3)))
+                (.ret (.call "next" [.name "c", .lit (.int 99)]))) }
+    -- c = Counter(); c.i = 1; next(iter(c))
+    , { name := "m.py:<module>.iterThenNext", params := []
+      , body :=
+          .seq (.assign "c" (.alloc "Counter" []))
+          (.seq (.setField (.name "c") "i" (.lit (.int 1)))
+                (.ret (.call "next" [.call "iter" [.name "c"]]))) } ] }
+
+-- 1 + 2 + 3                                   -- CPython 6
+#guard match runFunc iterProg 400 "collect" [] with | .val (.int 6) => true | _ => false
+-- break at 2: acc = 1, and `x` survives the loop  -- CPython (1, 2)
+#guard match runFunc iterProg 400 "breaks" [] with
+       | .val (.tuple [.int 1, .int 2]) => true | _ => false
+-- 7 + 8                                       -- CPython 15
+#guard match runFunc iterProg 400 "viaList" [] with | .val (.int 15) => true | _ => false
+-- 0 + 10                                      -- CPython 10
+#guard match runFunc iterProg 400 "viaSeq" [] with | .val (.int 10) => true | _ => false
+-- next() past the end                         -- CPython StopIteration
+#guard match runFunc iterProg 400 "exhausted" [] with
+       | .exn (.str "StopIteration") => true | _ => false
+-- next() past the end, with a default         -- CPython 99
+#guard match runFunc iterProg 400 "withDefault" [] with | .val (.int 99) => true | _ => false
+-- next(iter(c)) with c.i = 1                  -- CPython 2
+#guard match runFunc iterProg 400 "iterThenNext" [] with | .val (.int 2) => true | _ => false
 
 /-! ## JavaScript arrays and strings
 

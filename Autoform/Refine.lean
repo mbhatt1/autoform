@@ -902,7 +902,12 @@ theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs)
     (hbox : ∀ r, v = .ref r → h₁.payload r = .none) :
     execStmt ctx (k+1) h ρ (.forIn x e body) = execFor ctx k h₁ ρ x vs body := by
-  cases v <;> simp_all [execStmt, he, hv]
+  -- A `ref` has no `iterable` (an instance iterates through the protocol, `forIn`'s
+  -- `__iter__` arm), so `hv` is contradictory there and the protocol's match need not
+  -- be reduced; every other constructor is the snapshot equation.
+  cases v <;> first
+    | (exfalso; simp [Val.iterable] at hv; done)
+    | simp_all [execStmt, he, hv]
 
 /-! ## 4. End-to-end: real translated functions
 

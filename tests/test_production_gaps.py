@@ -606,7 +606,9 @@ class TestDunderDispatch:
 
     def test_fuel_monotonicity_covers_the_dispatch(self):
         fm = (ROOT / 'Autoform/FuelMono.lean').read_text()
-        assert fm.count('Ctx.dunderOn_resolves hd') == 4
+        # the four container dunders, plus the iteration protocol's `__iter__` (`hdi`)
+        assert fm.count('Ctx.dunderOn_resolves hd') == 5
+        assert 'Ctx.dunderOn_resolves hdi' in fm
         assert 'theorem Ctx.dunderOn_resolves' in self.SEM
 
 
@@ -750,3 +752,48 @@ class TestValueCallees:
         ledger = (ROOT / 'Autoform/Ledger.lean').read_text()
         assert '| .callValue f as => eCalls f ++ eCallsL as' in ledger
         assert '| .callValue f as => 1 + eRisk f + eRiskL as' in ledger
+
+
+class TestIterationProtocol:
+    """`for x in obj` on a user instance follows the language reference: `__iter__`, then
+    `__next__` until `StopIteration` (or `__getitem__` from 0 until `IndexError`), with
+    `break`/`continue`/`return` meaning what §8.3 says. Behaviour is pinned by the
+    `iterProg` `#guard`s in `Semantics.lean` against CPython on every build; these pin the
+    shape so the design cannot drift silently."""
+
+    SEMANTICS = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+    FUELMONO = (ROOT / 'Autoform/FuelMono.lean').read_text()
+
+    def test_for_creates_the_iterator_the_way_iter_does(self):
+        # __iter__ first, then the sequence protocol, then the structural fallback
+        assert 'match ctx.dunderOn h₁ v "__iter__" with' in self.SEMANTICS
+        assert 'match ctx.dunderOn h₁ v "__getitem__" with' in self.SEMANTICS
+        assert 'execStmt ctx n h₁ (ρ.set iterTmp v) (seqDriver x body)' in self.SEMANTICS
+
+    def test_the_iterator_is_driven_by_a_synthesised_statement(self):
+        """No ninth interpreter function: the driver is a Core statement over names no
+        source can spell, so FuelMono's statement IH covers it."""
+        assert 'def iterTmp : String := "$iter"' in self.SEMANTICS
+        assert 'def nextDriver (x : String) (body : Stmt) : Stmt :=' in self.SEMANTICS
+        assert '(.lit (.str "StopIteration")))' in self.SEMANTICS
+        assert 'def seqDriver (x : String) (body : Stmt) : Stmt :=' in self.SEMANTICS
+        assert '(.lit (.str "IndexError")))' in self.SEMANTICS
+        assert 'simp [nextDriver, controlCovered, hb]' in self.FUELMONO
+        assert 'simp [seqDriver, controlCovered, hb]' in self.FUELMONO
+
+    def test_iter_and_next_builtins_and_the_default_form(self):
+        assert '| "iter" => pick "__iter__"' in self.SEMANTICS
+        assert '| "next" => pick "__next__"' in self.SEMANTICS
+        assert 'def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val)' in self.SEMANTICS
+        assert '| (h₂, .exn (.str "StopIteration")) => (h₂, .val d)' in self.SEMANTICS
+
+    def test_every_protocol_claim_has_a_cpython_guard(self):
+        guards = self.SEMANTICS.split('private def iterProg', 1)[1].split('/-! ## JavaScript', 1)[0]
+        for subject in ('collect', 'breaks', 'viaList', 'viaSeq', 'exhausted', 'withDefault',
+                        'iterThenNext'):
+            assert f'#guard match runFunc iterProg 400 "{subject}" []' in guards, subject
+
+    def test_the_spec_sections_are_cited_next_to_the_rules(self):
+        for cite in ('library/functions.html#iter', 'library/functions.html#next',
+                     'reference/compound_stmts.html §8.3', '"Iterator Types"'):
+            assert cite in self.SEMANTICS, cite
