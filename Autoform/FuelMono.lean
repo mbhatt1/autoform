@@ -336,6 +336,42 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 cases r₂ <;> first
                   | (cases hy; exact absurd rfl hne)
                   | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+        -- `xs[lo:hi:st]`: four sub-expressions in CPython's order, then a fuel-free
+        -- payload computation. Same shape as `index`, two levels deeper.
+        | slice a lo hi st =>
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val c =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalExpr ctx k h₁ ρ lo with ⟨h₂, r₂⟩
+                rw [hB] at hy
+                cases r₂ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val lv =>
+                    rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                    dsimp only at hy ⊢
+                    rcases hC : evalExpr ctx k h₂ ρ hi with ⟨h₃, r₃⟩
+                    rw [hC] at hy
+                    cases r₃ with
+                    | exn v => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                    | hole l => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                    | outOfFuel => cases hy; exact absurd rfl hne
+                    | val hv =>
+                        rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                        dsimp only at hy ⊢
+                        rcases hD : evalExpr ctx k h₃ ρ st with ⟨h₄, r₄⟩
+                        rw [hD] at hy
+                        cases r₄ <;> first
+                          | (cases hy; exact absurd rfl hne)
+                          | (rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy)
         | field a f =>
             -- A `@property` read is a CALL (`Program.properties`), so this case recurses
             -- now. Every other outcome is still fuel-free and closes by `exact hy`; only
@@ -929,6 +965,92 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                           | (cases hy; exact absurd rfl hne)
                           | (rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy)
                     all_goals (dsimp only at hy ⊢; exact hy)
+        -- `xs[lo:hi:st] = v`: `setIndex`'s shape with two more bound levels. Order is
+        -- the semantics' -- value, target (must be a ref), lower, upper, step.
+        | setSlice a lo hi st c =>
+            simp only [execStmt] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ c with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn e => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val vv =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalExpr ctx k h₁ ρ a with ⟨h₂, r₂⟩
+                rw [hB] at hy
+                cases r₂ with
+                | exn e => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val ev =>
+                    rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                    cases ev
+                    case ref r =>
+                        dsimp only at hy ⊢
+                        rcases hC : evalExpr ctx k h₂ ρ lo with ⟨h₃, r₃⟩
+                        rw [hC] at hy
+                        cases r₃ with
+                        | exn e => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | hole l => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | outOfFuel => cases hy; exact absurd rfl hne
+                        | val lv =>
+                            rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                            dsimp only at hy ⊢
+                            rcases hD : evalExpr ctx k h₃ ρ hi with ⟨h₄, r₄⟩
+                            rw [hD] at hy
+                            cases r₄ with
+                            | exn e => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                            | hole l => rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy
+                            | outOfFuel => cases hy; exact absurd rfl hne
+                            | val hv =>
+                                rw [ihE _ hctx _ _ _ _ _ hD (by simp)]
+                                dsimp only at hy ⊢
+                                rcases hF : evalExpr ctx k h₄ ρ st with ⟨h₅, r₅⟩
+                                rw [hF] at hy
+                                cases r₅ <;> first
+                                  | (cases hy; exact absurd rfl hne)
+                                  | (rw [ihE _ hctx _ _ _ _ _ hF (by simp)]; exact hy)
+                    all_goals (dsimp only at hy ⊢; exact hy)
+        -- `del xs[lo:hi:st]`: `delIndex`'s shape with two more bound levels.
+        | delSlice a lo hi st =>
+            simp only [execStmt] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn e => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val ev =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                cases ev
+                case ref r =>
+                    dsimp only at hy ⊢
+                    rcases hB : evalExpr ctx k h₁ ρ lo with ⟨h₂, r₂⟩
+                    rw [hB] at hy
+                    cases r₂ with
+                    | exn e => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | outOfFuel => cases hy; exact absurd rfl hne
+                    | val lv =>
+                        rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                        dsimp only at hy ⊢
+                        rcases hC : evalExpr ctx k h₂ ρ hi with ⟨h₃, r₃⟩
+                        rw [hC] at hy
+                        cases r₃ with
+                        | exn e => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | hole l => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | outOfFuel => cases hy; exact absurd rfl hne
+                        | val hv =>
+                            rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                            dsimp only at hy ⊢
+                            rcases hD : evalExpr ctx k h₃ ρ st with ⟨h₄, r₄⟩
+                            rw [hD] at hy
+                            cases r₄ <;> first
+                              | (cases hy; exact absurd rfl hne)
+                              | (rw [ihE _ hctx _ _ _ _ _ hD (by simp)]; exact hy)
+                all_goals (dsimp only at hy ⊢; exact hy)
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>

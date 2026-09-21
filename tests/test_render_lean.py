@@ -341,3 +341,49 @@ class TestModuleShape:
         assert 'vararg := some "args"' in text
         assert text.count("vararg") == 1
         assert "kwarg" not in text
+
+
+# ---------------------------------------------------------------------------
+# slices
+# ---------------------------------------------------------------------------
+
+class TestSlices:
+    """`xs[lo:hi:st]`, `xs[lo:hi:st] = v`, `del xs[lo:hi:st]`.
+
+    An omitted bound arrives as `{"k": "unit"}` and renders as `(.lit .unit)`. That is not
+    a placeholder for a missing `Option`: Python's own bound for "use the default" IS
+    `None`, so `xs[:2]` and `xs[None:2]` must be the same term, and they are.
+    """
+
+    XS = {"k": "name", "v": "xs"}
+    U = {"k": "unit"}
+
+    def test_slice_read_has_four_children_in_cpython_order(self, render_lean):
+        node = {"k": "slice", "a": self.XS, "lo": {"k": "int", "v": "1"}, "hi": self.U, "st": self.U}
+        assert render_lean.expr(node) == '(.slice (.name "xs") (.lit (.int 1)) (.lit .unit) (.lit .unit))'
+
+    def test_a_negative_step_renders_parenthesised(self, render_lean):
+        node = {"k": "slice", "a": self.XS, "lo": self.U, "hi": self.U, "st": {"k": "int", "v": "-1"}}
+        assert render_lean.expr(node) == '(.slice (.name "xs") (.lit .unit) (.lit .unit) (.lit (.int (-1))))'
+
+    def test_slice_assignment_puts_the_value_last(self, render_lean):
+        node = {"k": "setSlice", "r": self.XS, "lo": {"k": "int", "v": "0"}, "hi": {"k": "int", "v": "1"},
+                "st": self.U, "v": {"k": "int", "v": "9"}}
+        assert render_lean.stmt(node) == \
+            '(.setSlice (.name "xs") (.lit (.int 0)) (.lit (.int 1)) (.lit .unit) (.lit (.int 9)))'
+
+    def test_slice_deletion(self, render_lean):
+        node = {"k": "delSlice", "r": self.XS, "lo": self.U, "hi": self.U, "st": {"k": "int", "v": "2"}}
+        assert render_lean.stmt(node) == '(.delSlice (.name "xs") (.lit .unit) (.lit .unit) (.lit (.int 2)))'
+
+    def test_index_deletion_renders_too(self, render_lean):
+        """`delIndex` existed in Core before the renderer knew it; a `del xs[i]` the
+        exporter starts emitting must not be an unknown statement kind."""
+        node = {"k": "delIndex", "a": self.XS, "i": {"k": "int", "v": "0"}}
+        assert render_lean.stmt(node) == '(.delIndex (.name "xs") (.lit (.int 0)))'
+
+    def test_a_missing_bound_key_is_an_error_not_a_default(self, render_lean):
+        """The exporter always emits all three bounds; a node without one is malformed,
+        and silently defaulting it would hide an exporter bug."""
+        with pytest.raises(Exception):
+            render_lean.expr({"k": "slice", "a": self.XS, "lo": self.U})

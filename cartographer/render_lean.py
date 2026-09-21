@@ -162,6 +162,10 @@ def expr_shape(n):
     if k == "binop":  return ".binop", [("atom", lean_str(f('op'))), ("e", f('a')), ("e", f('b'))]
     if k == "unop":   return ".unop", [("atom", lean_str(f('op'))), ("e", f('a'))]
     if k == "index":  return ".index", [("e", f('a')), ("e", f('b'))]
+    # `xs[lo:hi:st]`. All four children are expressions; an omitted bound arrives as
+    # `{"k": "unit"}`, which is Python's own `None` bound and means "the default for this
+    # step's direction". See `Expr.slice` in `Syntax.lean`.
+    if k == "slice":  return ".slice", [("e", f('a')), ("e", f('lo')), ("e", f('hi')), ("e", f('st'))]
     if k == "call":   return ".call", [("atom", lean_str(f('f'))), ("es", f('args'))]
     if k == "hole":   return ".hole", [("atom", lean_str(f('label')))]
     # `003-box-address-taken-locals`: unconditional, constructor-free box allocation.
@@ -274,6 +278,8 @@ def stmt_shape(n):
     if k == "setField": return ".setField", [("e", f('r')), ("atom", lean_str(f('f'))), ("e", f('v'))]
     if k == "setIndex": return ".setIndex", [("e", f('r')), ("e", f('i')), ("e", f('v'))]
     if k == "delIndex": return ".delIndex", [("e", f('a')), ("e", f('i'))]
+    if k == "setSlice": return ".setSlice", [("e", f('r')), ("e", f('lo')), ("e", f('hi')), ("e", f('st')), ("e", f('v'))]
+    if k == "delSlice": return ".delSlice", [("e", f('r')), ("e", f('lo')), ("e", f('hi')), ("e", f('st'))]
     if k == "setDerefIref": return ".setDerefIref", [("e", f('p')), ("e", f('v'))]
     if k == "forIn":    return ".forIn", [("atom", lean_str(f('x'))), ("e", f('e')), ("s", f('body'))]
     if k == "tryCatch": return ".tryCatch", [("s", f('body')), ("atom", lean_str(f('x'))), ("s", f('handler'))]
