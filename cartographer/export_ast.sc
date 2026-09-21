@@ -929,11 +929,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case _             => false
   }
 
-  /** A bound as an expression: `unit` for an omitted/`None` bound, else the expression.
-    * `unit` is what `Expr.slice` means by "use the default" -- see `Syntax.lean`. */
-  def sliceBoundJson(b: AstNode): ujson.Obj =
-    if (isNoneBound(b)) ujson.Obj("k" -> "unit") else expr(b)
-
   /** Re-evaluable without observable effect. Augmented assignment (`o.f += 1`) is
     * desugared by duplicating the target expression, which is only faithful if
     * evaluating it twice is the same as evaluating it once. */
@@ -5904,6 +5899,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       try Some(java.lang.Long.parseLong(inner.drop(1), 8)) catch { case _: NumberFormatException => None }
     else None
   }
+
+  /** A bound as an expression: `unit` for an omitted/`None` bound, else the expression.
+    * `unit` is what `Expr.slice` means by "use the default" -- see `Syntax.lean`. Defined
+    * beside `expr` for the same reason `sliceBoundV` sits beside `exprV`: a script
+    * forward reference may not cross a `val`. */
+  def sliceBoundJson(b: AstNode): ujson.Obj =
+    if (isNoneBound(b)) ujson.Obj("k" -> "unit") else expr(b)
 
   def expr(n: AstNode): ujson.Obj = unwrapMacro(n) match {
     case l: Literal =>
