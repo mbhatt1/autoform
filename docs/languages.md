@@ -444,6 +444,40 @@ at. Two notes for whoever takes it:
 * The instance that was actually observed — `@property` — is fixed at the exporter (§12),
   which needed no Core change and no spec regeneration.
 
+### 14. Property dispatch: implemented, proved fuel-monotone, blocked on one lemma
+
+§12 holes a `@property` read rather than computing `unit`. Making it *work* — running the
+getter, which is what Python does — was implemented end to end and reverted. The semantics
+are not the hard part, and it is worth recording what is.
+
+**What worked.** On a field miss, `evalExpr` resolves the getter and applies it to the
+receiver. `FuelMono`'s `.field` case, previously `exact hy` because the case was
+fuel-free, was extended to the explicit nested proof a recursive branch needs, and it
+goes through.
+
+**Two designs, and the second is the one to keep.** A `Ctx.properties : List (String ×
+String)` field cost **289 broken declarations**, because every `Ctx` literal in
+`Contracts.lean` then disagreed with `ctxOf` about a field it did not mention. Registering
+the getter in the *existing* function table under a marker name no source language can
+spell — `<property>currsize` — needs no new field anywhere, so every `Ctx` term and every
+proof that reduces one stays byte-identical. That is the version that should be built.
+
+**What blocks it.** `applyFunc_ret_field_self` and its twin claim "an accessor returns the
+field it names" for every receiver, and a class with a property of that name now answers a
+call instead. Excluding it needs a side condition of the shape
+`ctx.resolveMethod o.cls (propertyGetter fld) = none`, and that cannot be discharged by
+`rfl`: `o.cls` is universally quantified, and `resolveMethod` falls back to `Ctx.resolve`,
+which suffix-matches over the whole table. Without a discharge the obligation lands on 284
+declarations across the generated specs.
+
+The missing piece is small and identified: a characterisation lemma saying `Ctx.resolve`
+returns `none` when no table entry's name ends with the sought suffix.
+`FuelMono.resolve_go_mem` — "the suffix scanner only ever returns a function drawn from the
+list it scanned, or the accumulator it started with" — is exactly the building block, and
+it already exists. With that lemma the side condition becomes a statement about the
+concrete table, decidable by `rfl` for every corpus, and the 284 collapse the same way the
+switchover's 163 collapsed to 3.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
