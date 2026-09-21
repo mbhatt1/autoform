@@ -791,6 +791,26 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         | hole l => exact hy
         | del x => exact hy
         | declGlobal x => exact hy
+        -- `del e[i]`: same shape as `setIndex` with one level fewer.
+        | delIndex a b =>
+            simp only [execStmt] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn e => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val ev =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                cases ev
+                case ref r =>
+                    dsimp only at hy ⊢
+                    rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
+                    rw [hB] at hy
+                    cases r₂ <;> first
+                      | (cases hy; exact absurd rfl hne)
+                      | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                all_goals (dsimp only at hy ⊢; exact hy)
         -- Boxed containers, step 3: `setIndex` recurses now, so it needs the same
         -- three-level unfolding `setDerefIref` uses -- one level per sub-expression, in
         -- the evaluation order the semantics actually uses (value, target, index).

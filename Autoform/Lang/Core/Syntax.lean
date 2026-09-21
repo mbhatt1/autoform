@@ -528,6 +528,12 @@ inductive Stmt where
   | setField : Expr → String → Expr → Stmt
   /-- `e[i] = v` -/
   | setIndex : Expr → Expr → Expr → Stmt
+  /-- `del e[i]` (`docs/boxed-containers.md` §2). A separate constructor because there was
+  nothing to translate `del` to: the `op:delete-index` holes exist for want of a target,
+  not for want of semantics. Mirrors `setIndex` — `.dict` deletes the key or raises
+  `KeyError`, `.list` drops the position or raises `IndexError`, a `.tuple` payload is a
+  `TypeError`, and an unboxed container value still holes. -/
+  | delIndex : Expr → Expr → Stmt
   /-- `006-reduce-remaining-holes`, Story 5: `*p = v` where `p` is an interior-pointer
   VALUE (as opposed to `Stmt.setField`, which takes an explicit field name for a NAMED
   receiver). Requires its pointer operand to evaluate to `Val.iref r sel` and

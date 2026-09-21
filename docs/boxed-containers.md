@@ -4,8 +4,8 @@
 4-5 and the `Val.eqPy` half of step 2 unimplemented.** Read this before changing
 `Syntax.lean` or `Semantics.lean`.
 
-`Stmt.setIndex` now implements §2 for a receiver that is a `Val.ref` whose `Obj` carries a
-`.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
+`Stmt.setIndex` and the new `Stmt.delIndex` now implement §2 for a receiver that is a
+`Val.ref` whose `Obj` carries a `.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
 any translated program and cost zero proof churn beyond one case in `FuelMono.lean` —
 `setIndex` used to be a constant hole and now recurses, so it needs the three-level
 unfolding `setDerefIref` uses. Landed inert for the same reason step 1 was: the semantics
@@ -198,12 +198,21 @@ key order stays observable and correct.
 
 ### `del d[k]` / `del xs[i]`
 
-Needs a new statement — the current holes `op:delete-index` exist because there is no
-constructor to translate to:
+**Landed.** The constructor exists and `execStmt` implements it:
 
 ```lean
 | delIndex : Expr → Expr → Stmt      -- `del e[i]`
 ```
+
+Adding a `Stmt` constructor cost 63 missing-case errors, all of them in `Semantics.lean`
+plus two `substS` matches in `Contracts.lean` and one `FuelMono` case — mechanical, and
+the only real content is the `execStmt` case itself. Evaluation order here is target then
+index; there is no RHS, so `setIndex`'s surprise does not arise.
+
+The exporter is deliberately NOT yet emitting it. `op:delete-index` stays a hole until
+containers are boxed, because translating it now would turn a static hole into a statement
+that holes at run time — the same behaviour, a smaller static hole count, and a
+hole-freedom number that improved without anything being translated.
 
 Semantics mirror `setIndex`: `.dict` → `dictDel`, missing key → `KeyError`; `.list` →
 `dropAt`, out of range → `IndexError`; `.tuple`/non-container → `TypeError`. Both helpers

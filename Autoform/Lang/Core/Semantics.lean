@@ -1636,6 +1636,34 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn ex)   => (h₁, .exn ex ρ)
       | (h₁, .hole l)   => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .delIndex e i =>
+      -- `del e[i]` (`docs/boxed-containers.md` §2), mirroring `setIndex`. Order is e then
+      -- i -- there is no RHS here, and CPython evaluates target before index.
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.ref r)) =>
+        match evalExpr ctx n h₁ ρ i with
+        | (h₂, .val iv) =>
+          match h₂.payload r with
+          | .list vs =>
+              match iv with
+              | .int k =>
+                  match Stdlib.seqIndex vs.length k with
+                  | some j => (h₂.setPayload r (.list (Stdlib.dropAt vs j)), .normal ρ)
+                  | none   => (h₂, .exn (.str "IndexError") ρ)
+              | _ => (h₂, .exn (.str "TypeError") ρ)
+          | .dict kvs =>
+              if Stdlib.dictHas kvs iv then
+                (h₂.setPayload r (.dict (Stdlib.dictDel kvs iv)), .normal ρ)
+              else (h₂, .exn (.str "KeyError") ρ)
+          | .tuple _ => (h₂, .exn (.str "TypeError") ρ)
+          | .none    => (h₂, .hole "delIndex:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .val _)     => (h₁, .hole "delIndex:immutable-containers")
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -2339,6 +2367,33 @@ private def setIdx (tgt idx val : Expr) : Heap × Ctl :=
 -- a `TypeError` here would be wrong for every class that defines one.
 #guard match (setIdx (.name "o") (.lit (.int 0)) (.lit (.int 9))).2 with
        | .hole "setIndex:immutable-containers" => true | _ => false
+
+private def delIdx (tgt idx : Expr) : Heap × Ctl :=
+  execStmt setIdxCtx 50 setIdxHeap setIdxEnv (.delIndex tgt idx)
+
+-- `del xs[0]`.  CPython: [2]
+#guard match (delIdx (.name "xs") (.lit (.int 0))).1[0]!.payload with
+       | .list [.int 2] => true | _ => false
+
+-- `del d["a"]`.  CPython: {}
+#guard match (delIdx (.name "d") (.lit (.str "a"))).1[1]!.payload with
+       | .dict [] => true | _ => false
+
+-- A key that is not there is `KeyError`, not a silent no-op.  CPython agrees.
+#guard match (delIdx (.name "d") (.lit (.str "zz"))).2 with
+       | .exn (.str "KeyError") _ => true | _ => false
+
+-- Out of range on a list is `IndexError`.  CPython agrees.
+#guard match (delIdx (.name "xs") (.lit (.int 5))).2 with
+       | .exn (.str "IndexError") _ => true | _ => false
+
+-- A `tuple` payload is immutable.
+#guard match (delIdx (.name "t") (.lit (.int 0))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
+
+-- Unboxed container value: still ignorance, still a hole.
+#guard match (delIdx (.listE [.lit (.int 1)]) (.lit (.int 0))).2 with
+       | .hole "delIndex:immutable-containers" => true | _ => false
 
 -- An unboxed `Val.list` still holes. That case is ignorance -- the container is a value
 -- with no identity to mutate -- and removing it is the rest of this migration.
