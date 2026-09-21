@@ -1314,12 +1314,16 @@ LANG_BY_EXT = {".py": "python", ".pyi": "python",
 
 # Integer operations carry their language and promoted width independently of the
 # program dialect. This table does not claim every construct in a language is modeled.
+# `dialect_is_exact` stays False for Java, Go and Kotlin even though each now has (or
+# rides) its own constructor: the UNTAGGED integer path is one width per language (Java
+# `int`, Go `int`), and a `long`/`int8` operation is exact only when the exporter tagged
+# it. Kotlin additionally has structural string `==` where `.java` holes.
 DIALECT_FOR = {"python": ("python", True), "c": ("cLike", True),
-               "java": ("cLike", False),
-               "go": ("cLike", False),
+               "java": ("java", False),
+               "go": ("go", False),
                "js": ("javascript", True),
                "ts": ("javascript", True),
-               "kotlin": ("cLike", False)}
+               "kotlin": ("java", False)}
 
 TOOLCHAIN = {"python": [], "c": ["cc"], "java": ["javac", "java"], "go": ["go"],
              "js": ["node"], "ts": ["node"], "kotlin": ["kotlinc"]}

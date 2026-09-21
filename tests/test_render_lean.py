@@ -175,7 +175,7 @@ class TestRendererRefuses:
 
     @pytest.mark.parametrize("ext,dialect", [
         (".py", ".python"), (".c", ".cLike"), (".cpp", ".cLike"),
-        (".java", ".cLike"), (".ts", ".javascript"), (".go", ".cLike"),
+        (".java", ".java"), (".kt", ".java"), (".ts", ".javascript"), (".go", ".go"),
         (".tsx", ".javascript"), (".jsx", ".javascript"),
     ])
     def test_dialect_inference(self, render_lean, ext, dialect):

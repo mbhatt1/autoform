@@ -477,7 +477,7 @@ on `.int` but not on `.str` — that residue is `dynamic-hole risk`, exactly lik
 `field`/`index` cases the ledger already counts there. -/
 def knowsFree (d : Dialect) (name : String) : Bool :=
   match d with
-  | .cLike | .javascript => false
+  | .cLike | .javascript | .java | .go => false
   | .python => freeNames.contains name
 
 /-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
@@ -485,7 +485,7 @@ guard that keeps the ledger honest. -/
 def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     Option (Heap × EResult) :=
   match d with
-  | .cLike | .javascript => none
+  | .cLike | .javascript | .java | .go => none
   | .python =>
     let ok (r : EResult) : Option (Heap × EResult) := some (h, r)
     let v (x : Val) : Option (Heap × EResult) := ok (.val x)
@@ -645,7 +645,7 @@ String methods are not modelled at all: an exception value and a string are the 
 def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : List Val) :
     Option (Heap × MethodResult) :=
   match d with
-  | .cLike => none
+  | .cLike | .java | .go => none
   | .javascript =>
     let p (r : EResult) : Option (Heap × MethodResult) := some (h, .pure r)
     let pv (x : Val) : Option (Heap × MethodResult) := p (.val x)
@@ -771,7 +771,7 @@ is only usable where the receiver value is in hand — the interpreter, or the c
 harness, not the static ledger. -/
 def knowsMethod (d : Dialect) (name : String) : Bool :=
   match d with
-  | .cLike      => false
+  | .cLike | .java | .go => false
   | .javascript => jsMethodNames.contains name
   | .python     => methodNames.contains name
 
@@ -880,6 +880,20 @@ the vacuity `STRATEGY.md` §14 and the mutation gate exist to catch. -/
 /-- Likewise for methods. -/
 @[simp] theorem method_cLike_none (h : Heap) (r : Val) (n : String) (as : List Val) :
     method .cLike h r n as = none := rfl
+
+/-- Java and Go have no modelled stdlib either: no builtin, no method, at either level. -/
+@[simp] theorem builtin_java_none (h : Heap) (n : String) (as : List Val) :
+    builtin .java h n as = none := rfl
+@[simp] theorem builtin_go_none (h : Heap) (n : String) (as : List Val) :
+    builtin .go h n as = none := rfl
+@[simp] theorem method_java_none (h : Heap) (r : Val) (n : String) (as : List Val) :
+    method .java h r n as = none := rfl
+@[simp] theorem method_go_none (h : Heap) (r : Val) (n : String) (as : List Val) :
+    method .go h r n as = none := rfl
+@[simp] theorem knowsFree_java (n : String) : knowsFree .java n = false := rfl
+@[simp] theorem knowsFree_go (n : String) : knowsFree .go n = false := rfl
+@[simp] theorem knowsMethod_java (n : String) : knowsMethod .java n = false := rfl
+@[simp] theorem knowsMethod_go (n : String) : knowsMethod .go n = false := rfl
 
 /-! JavaScript DOES have a method table now (`jsMethodNames`: array `push`/`pop`/…), so
 the `method_javascript_none` that stood here is false and is gone; `knowsMethod_javascript`
@@ -1029,6 +1043,8 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
   cases d with
   | cLike => simp at hb
   | javascript => simp at hb
+  | java => simp at hb
+  | go => simp at hb
   | python =>
     -- Every branch either returns `(h, _)` or is `none`; `split` enumerates them and
     -- `simp_all` discharges each by injectivity of `some`/`Prod.mk`.

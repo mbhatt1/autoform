@@ -54,6 +54,20 @@ inductive Dialect where
   | python
   | cLike
   | javascript
+  /-- Java. Split from `.cLike` because three of its answers differ from C's: strings are
+  VALUES with `+` as concatenation, arrays and collections have IDENTITY, and `==` on two
+  strings is REFERENCE equality — which is a hole here, not a wrong answer either way.
+  Untagged integer arithmetic is Java `int` (`NumConfig.java32`: wraps, `/` truncates,
+  shift counts masked); a `long` operation reaches Core as a tagged `num:java:i64:*` op
+  and carries its own width (`TypedNumeric`). Kotlin/JVM routes here too — same integer
+  model, same boolean operators; its structural string `==` is left as the
+  reference-equality hole, which is conservative, not wrong. -/
+  | java
+  /-- Go. Split from `.cLike` because its `int` is 64-bit (`NumConfig.go64`: wraps,
+  division by zero panics), its strings are values with content `==`, and slices/maps have
+  identity. A Go ARRAY is a value that copies on assignment; the exporter cannot tell an
+  array from a slice, so array assignment is a known approximation under this dialect. -/
+  | go
   deriving Repr, Inhabited, DecidableEq
 
 namespace Dialect
@@ -68,6 +82,9 @@ commit that made Python right, which is why this is a named predicate rather tha
 def boxesContainers : Dialect → Bool
   | .python | .javascript => true
   | .cLike                => false
+  -- Java arrays and collections are objects; Go slices and maps are references to shared
+  -- storage (`b := a; b[0] = 9` changes `a`). Go ARRAYS are values — see `Dialect.go`.
+  | .java | .go           => true
 
 
 /-- Do `and`/`or` evaluate to one of their **operands** (Python, JavaScript) rather than
@@ -76,6 +93,7 @@ def boolOpsAreValues : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => true
+  | .java | .go => false
 
 /-- Are strings **values** with content equality and concatenation (Python, Java, Go,
 JavaScript), or pointers with address semantics (C)? Under pointer semantics `+`, `<`,
@@ -84,6 +102,17 @@ def stringsAreValues : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => true
+  -- `+` concatenates and `<`/`>` compare contents in both; `==` is the exception for Java
+  -- and has its own predicate below.
+  | .java | .go => true
+
+/-- Is `==` on two strings REFERENCE equality? Java: `new String("a") == "a"` is `false`
+while two interned literals compare `true`, and Core has one `Val.str` for both, so the
+honest answer is a hole (`str:reference-equality`), not `Val.beq`. Everywhere else that
+`stringsAreValues` holds, `==` compares contents (Python, JavaScript, Go). -/
+def stringEqIsReference : Dialect → Bool
+  | .java => true
+  | .python | .cLike | .javascript | .go => false
 
 /-- Is `e.f` on a **dict** value a member selection?
 
@@ -108,6 +137,11 @@ def fieldsOnDicts : Dialect → Bool
   | .python     => false
   | .cLike      => true
   | .javascript => true
+  -- A Go struct literal `T{a: 1}` is an aggregate exactly like the C initializer above.
+  -- Java has no aggregate literal: an object is `new` (an allocation), so a dict is never
+  -- something Java code dots into, and the access stays the `field:*:non-object` hole.
+  | .go         => true
+  | .java       => false
 
 /-- Does comparing an integer against a float compare **exactly** (Python: `10**23 ==
 1e23` is `False`), or promote the integer to a double first (C)? JavaScript has no
@@ -119,6 +153,8 @@ def comparesIntFloatExactly : Dialect → Bool
   | .python     => true
   | .cLike      => false
   | .javascript => false
+  -- Java and Go both promote the integer to the float's type before comparing.
+  | .java | .go => false
 
 end Dialect
 
@@ -133,6 +169,8 @@ def Dialect.toFConfig : Dialect → FConfig
   | .python     => FConfig.python
   | .cLike      => FConfig.cDouble
   | .javascript => FConfig.cDouble
+  -- Java `double` and Go `float64` are IEEE binary64 with the same rounding as C's.
+  | .java | .go => FConfig.cDouble
 
 /-- A heap address. Objects are boxed and mutable; everything else is a value. -/
 abbrev Ref := Nat

@@ -552,6 +552,8 @@ def Dialect.name : Dialect -> String
   | .python     => "python"
   | .cLike      => "c-like"
   | .javascript => "javascript"
+  | .java       => "java"
+  | .go         => "go"
 
 /-- Machine-readable ledger, for `scripts/sacm.py` to consume as evidence.
 

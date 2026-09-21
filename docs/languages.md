@@ -46,13 +46,13 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 |---|---|---|---|---|---|---|---|---|---|
 | Python | yes | yes | yes | `.python` ✅ | 209 | 90% | 97 (46%) | 0.4% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
-| Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
-| Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
 | JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | Node backend present; nothing to compare until it translates |
 | Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
-| Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
+| Kotlin (toy) | yes | yes | yes | `.java` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
 | `.tsx` / `.jsx` | yes | yes | yes | **`.python` ❌ WRONG** | — | — | — | — | none |
 
 **On the "Differential oracle" column.** `scripts/differential.py` now carries a runtime
@@ -70,8 +70,12 @@ Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
 to within the ledger's slightly different node-counting.
 
-⚠️ = the dialect *is* in `render_lean.py`'s `DIALECT` map, but every non-Python language
-maps to the single `.cLike` constructor, which is 32-bit truncating C. See below.
+⚠️ = the dialect *is* in `render_lean.py`'s `DIALECT` map, but the language rides another
+language's constructor: Kotlin/JVM runs as `.java` (same integer model and boolean
+operators; its structural string `==` lands on Java's `str:reference-equality` hole).
+✅ (`#guard`) = the language has its own `Dialect` constructor and the numeric claims in
+§5 are `#guard`s in `Semantics.lean`/`Numeric.lean`, checked on every build — which is
+NOT a differential oracle: the last column is still **none** for both. See below.
 
 ### Failures observed, verbatim
 
@@ -200,11 +204,23 @@ Both compile to `<operator>.equals` in jssrc2cpg and to Core `binop "=="`, evalu
 principle, because the distinction is erased before Core sees it. Verdict: **wrong**, and
 not fixable inside the semantics; it needs an exporter change.
 
-### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
+### 5. Java `long` and Go `int` are 64-bit; Core modelled them as 32-bit — FIXED for Go, named for Java
 
-`.java`/`.go` → `.cLike` → `c32Wrapv` on the **untagged** path. `Numeric.lean` defines
-`java32`, `java64` and `go64`, and `Dialect` still has no `.java`/`.go` constructor to
-select them (its three are `python`, `cLike`, `javascript`).
+**Now:** `Dialect.java` and `Dialect.go` are constructors (`Syntax.lean`), and
+`Dialect.toNumConfig` sends the **untagged** path to `NumConfig.java32` (Java `int`:
+32-bit, wraps, masked shifts) and `NumConfig.go64` (Go `int`: 64-bit, wraps, zero-divide
+panics). The Go rows in the table below are therefore right today, by `#guard` in
+`Numeric.lean` (`Dialect.go.toNumConfig.add 9223372036854775807 1 == .ok
+(-9223372036854775808)`). The Java rows are about `long`, and `long` is NOT what the
+untagged path models: an untagged Java operation is `int`, so `long a = 2147483647L; a+1`
+still reads `-2147483648` **when the exporter could not type it**. That is a named width
+choice — one width per language on the fallback — not a claim; the fix for `long` is the
+tag. `Lang.numConfig` now agrees with the evaluator for every language but C
+(`Lang.numConfig_agrees_with_dialect`, the C exception being standard-vs-compiler).
+
+**Before (retained as the record):** `.java`/`.go` → `.cLike` → `c32Wrapv` on the
+untagged path. `Numeric.lean` defined `java32`, `java64` and `go64`, and `Dialect` had no
+`.java`/`.go` constructor to select them (its three were `python`, `cLike`, `javascript`).
 
 These configs are no longer dead code: the exporter now tags each operation with its
 resolved operand type (`num:java:i64:+`), and `TypedNumeric.parse` turns that tag into a
@@ -218,23 +234,31 @@ that was 66 holes out of 5099.
 `Lang.numConfig` (`Numeric.lean`) maps `.java` to `java64`, which contradicts the
 untagged path; it has no callers and is marked non-normative in its docstring.
 
-| input | real runtime | Core |
-|---|---|---|
-| Java `long a=2147483647L; a+1` | `2147483648` | **`-2147483648`** |
-| Java `long m=100000L; m*m` | `10000000000` | **`1410065408`** |
-| Go `a:=2147483647; a+1` | `2147483648` | **`-2147483648`** |
-| Go `m:=100000; m*m` | `10000000000` | **`1410065408`** |
+| input | real runtime | Core, untagged, before | Core, untagged, now |
+|---|---|---|---|
+| Java `long a=2147483647L; a+1` | `2147483648` | **`-2147483648`** | **`-2147483648`** (`int` width; `long` needs the `num:java:i64` tag) |
+| Java `long m=100000L; m*m` | `10000000000` | **`1410065408`** | **`1410065408`** (same) |
+| Go `a:=2147483647; a+1` | `2147483648` | **`-2147483648`** | `2147483648` ✅ `#guard` |
+| Go `m:=100000; m*m` | `10000000000` | **`1410065408`** | `10000000000` ✅ (`go64`) |
 
 This is the *same* mistranslation §16 records finding for C (`mulbig(100000,100000)`
 giving `1410065408` against `cc`) — except here `1410065408` is the wrong one, because
-Java `long` and Go `int` are 64-bit. Core has no types, so it cannot distinguish Java
-`int` from Java `long`; whichever width it picks is wrong for the other. Verdict:
-**wrong**.
+Java `long` and Go `int` are 64-bit. Core has no types, so on the untagged path it cannot
+distinguish Java `int` from Java `long`; whichever width it picks is wrong for the other,
+and `.java` picks `int`. Verdict: Go **fixed** (`#guard`, no oracle yet); Java **named**
+— right for `int`, wrong for an untyped `long`, exact for a tagged one.
 
-### 6. Java string `+`, `==`: right answer, wrong reason
+### 6. Java string `+`, `==`: right answer, wrong reason — FIXED
 
-Under `.cLike`, `applyBinop` makes `"a" + "b"` a hole labelled
-`str:pointer-arithmetic-not-modelled`, and `s == t` a hole labelled
+**Now:** under `.java`, `Dialect.stringsAreValues` is `true`, so `"a" + "b"` is `"ab"`
+and `<`/`>` compare contents; `==`/`!=` on two strings is the hole
+`str:reference-equality` via the new predicate `Dialect.stringEqIsReference` — Java
+compares references there, and Core's single `Val.str` cannot say whether two equal
+contents are one object. Under `.go`, `==` compares contents. All three are `#guard`s in
+`Semantics.lean`. JavaScript/TypeScript were fixed earlier by `.javascript`.
+
+**Before (retained as the record):** under `.cLike`, `applyBinop` made `"a" + "b"` a hole
+labelled `str:pointer-arithmetic-not-modelled`, and `s == t` a hole labelled
 `str:pointer-equality-not-modelled`. For C those labels are correct. For Java:
 
 * `s == t` is reference equality, so holing is conservative and defensible — though the
@@ -246,8 +270,10 @@ Under `.cLike`, `applyBinop` makes `"a" + "b"` a hole labelled
   `hole "str:pointer-arithmetic-not-modelled"` instead of `"ab"`; JS `1 + "1"` →
   `hole "binop:+"` instead of `"11"`.
 
-Verdict: **hole** (safe) but wrong for three of the four `.cLike` languages. This is the
-inverse of the C case, and it shows that `.cLike` is not one dialect.
+Verdict then: **hole** (safe) but wrong for three of the four `.cLike` languages — the
+inverse of the C case, and the evidence that `.cLike` was not one dialect. Verdict now:
+Java and Go have their own; C is the only `.cLike` language left among those measured
+(Kotlin rides `.java`).
 
 ### 7. Division by zero and shifts: holes and near-misses (checked, not wrong)
 
