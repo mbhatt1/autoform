@@ -1,7 +1,17 @@
 # Boxed containers for Core
 
-**Status: steps 1 and 2 landed; steps 3-5 unimplemented.** Read this before changing
+**Status: step 1 landed; step 2 landed in half; step 3's `setIndex` landed INERT; steps
+4-5 and the `Val.eqPy` half of step 2 unimplemented.** Read this before changing
 `Syntax.lean` or `Semantics.lean`.
+
+`Stmt.setIndex` now implements §2 for a receiver that is a `Val.ref` whose `Obj` carries a
+`.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
+any translated program and cost zero proof churn beyond one case in `FuelMono.lean` —
+`setIndex` used to be a constant hole and now recurses, so it needs the three-level
+unfolding `setDerefIref` uses. Landed inert for the same reason step 1 was: the semantics
+can be checked against CPython before the switchover moves a measured number. An unboxed
+`Val.list` still holes; that case is ignorance and is what the rest of the migration
+removes.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
@@ -161,6 +171,11 @@ A mechanical check for this rule: after the change, `grep -n 'Expr' ` over the m
 path in `Semantics.lean` should find the receiver being *evaluated* and nothing else.
 
 ### `Stmt.setIndex e i v` — `e[i] = v`
+
+**Evaluation order, corrected.** The pseudocode below evaluates the target first. CPython
+does not: for `a[b] = c` it evaluates **c, then a, then b** (checked by execution, not by
+reading the grammar). `execStmt` follows CPython; read the sketch for the payload cases,
+not for the order.
 
 ```
 eval e ↝ .ref r        ; anything else is not a hole any more:

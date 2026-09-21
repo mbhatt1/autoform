@@ -1595,9 +1595,47 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .exn e) => (h₁, .exn e ρ)
       | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
-  | n+1, h, ρ, .setIndex _ _ _ =>
-      -- Container mutation needs boxed containers, which Core does not have yet.
-      (h, .hole "setIndex:immutable-containers")
+  | n+1, h, ρ, .setIndex e i v =>
+      -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). A container that lives
+      -- in the heap as an `Obj` payload can be mutated; a `Val.list`/`Val.dict` *value*
+      -- still cannot, and keeps the hole -- that case is ignorance, not a TypeError.
+      -- Inert until something constructs a payload, which is deliberate: the same staging
+      -- step 1 used, so the semantics can be written and tested before the switchover
+      -- moves any number.
+      --
+      -- Order is v, then e, then i -- CPython evaluates the RHS FIRST. Confirmed by
+      -- execution, and it is not what §2's pseudocode shows.
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val vv) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val (.ref r)) =>
+          match evalExpr ctx n h₂ ρ i with
+          | (h₃, .val iv) =>
+            match h₃.payload r with
+            | .list vs =>
+                match iv with
+                | .int k =>
+                    match Stdlib.seqIndex vs.length k with
+                    | some j => (h₃.setPayload r (.list (vs.set j vv)), .normal ρ)
+                    | none   => (h₃, .exn (.str "IndexError") ρ)
+                | _ => (h₃, .exn (.str "TypeError") ρ)
+            | .dict kvs => (h₃.setPayload r (.dict (Stdlib.dictSet kvs iv vv)), .normal ρ)
+            -- A `tuple` SUBCLASS instance: immutable, and Python says so with a value.
+            | .tuple _  => (h₃, .exn (.str "TypeError") ρ)
+            -- An ordinary instance. `__setitem__` dispatch is the user-class path and is
+            -- not part of this step, so it stays ignorance rather than becoming a
+            -- TypeError that would be wrong for every class that defines one.
+            | .none     => (h₃, .hole "setIndex:immutable-containers")
+          | (h₃, .exn ex)   => (h₃, .exn ex ρ)
+          | (h₃, .hole l)   => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .val _)    => (h₂, .hole "setIndex:immutable-containers")
+        | (h₂, .exn ex)   => (h₂, .exn ex ρ)
+        | (h₂, .hole l)   => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)   => (h₁, .exn ex ρ)
+      | (h₁, .hole l)   => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   -- `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` an interior-pointer VALUE --
   -- requires the pointer operand to evaluate to `Val.iref r sel` and delegates,
   -- unconditionally, to the unchanged `Heap.setField`.
@@ -2256,5 +2294,55 @@ private def cellProg : Program :=
 
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2) -/
 #guard_msgs in #eval runFunc cellProg 200 "outer" []
+
+/-! ## Boxed containers, step 3: `setIndex` on a heap payload
+
+`docs/boxed-containers.md` §2. Nothing constructs a payload yet, so these are the only
+programs that exercise the path — which is why it is landed this way: the semantics can be
+written and checked before the switchover moves any measured number, exactly as step 1 was
+landed inert.
+
+Every expectation below was taken from CPython, not from the design document — whose
+pseudocode also has the evaluation order wrong. It shows the target evaluated first;
+CPython evaluates the RHS first, and `execStmt` follows CPython. -/
+private def setIdxCtx : Ctx := { dialect := .python, table := [] }
+private def setIdxEnv : Env :=
+  [("xs", .ref 0), ("d", .ref 1), ("t", .ref 2), ("o", .ref 3)]
+private def setIdxHeap : Heap :=
+  [ { cls := "list",  fields := [], payload := .list [.int 1, .int 2] }
+  , { cls := "dict",  fields := [], payload := .dict [(.str "a", .int 1)] }
+  , { cls := "T",     fields := [], payload := .tuple [.int 7] }
+  , { cls := "Plain", fields := [] } ]
+private def setIdx (tgt idx val : Expr) : Heap × Ctl :=
+  execStmt setIdxCtx 50 setIdxHeap setIdxEnv (.setIndex tgt idx val)
+
+-- `xs[0] = 9` on a list payload.  CPython: [9, 2]
+#guard match (setIdx (.name "xs") (.lit (.int 0)) (.lit (.int 9))).1[0]!.payload with
+       | .list [.int 9, .int 2] => true | _ => false
+
+-- `d["b"] = 2`.  CPython: {'a': 1, 'b': 2} -- insertion order is observable.
+#guard match (setIdx (.name "d") (.lit (.str "b")) (.lit (.int 2))).1[1]!.payload with
+       | .dict [(.str "a", .int 1), (.str "b", .int 2)] => true | _ => false
+
+-- Mutation bumps the version, so an iterator can tell that it happened.
+#guard (setIdx (.name "xs") (.lit (.int 0)) (.lit (.int 9))).1[0]!.version == 1
+
+-- Out of range is `IndexError` -- a value, not a hole.  CPython agrees.
+#guard match (setIdx (.name "xs") (.lit (.int 5)) (.lit (.int 9))).2 with
+       | .exn (.str "IndexError") _ => true | _ => false
+
+-- A `tuple` subclass instance is immutable, and Python says so with a `TypeError`.
+#guard match (setIdx (.name "t") (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
+
+-- An ordinary instance still holes. `__setitem__` dispatch is not part of this step, and
+-- a `TypeError` here would be wrong for every class that defines one.
+#guard match (setIdx (.name "o") (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .hole "setIndex:immutable-containers" => true | _ => false
+
+-- An unboxed `Val.list` still holes. That case is ignorance -- the container is a value
+-- with no identity to mutate -- and removing it is the rest of this migration.
+#guard match (setIdx (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .hole "setIndex:immutable-containers" => true | _ => false
 
 end Autoform.Core

@@ -791,7 +791,37 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         | hole l => exact hy
         | del x => exact hy
         | declGlobal x => exact hy
-        | setIndex a b c => exact hy
+        -- Boxed containers, step 3: `setIndex` recurses now, so it needs the same
+        -- three-level unfolding `setDerefIref` uses -- one level per sub-expression, in
+        -- the evaluation order the semantics actually uses (value, target, index).
+        | setIndex a b c =>
+            simp only [execStmt] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ c with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn e => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val vv =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalExpr ctx k h₁ ρ a with ⟨h₂, r₂⟩
+                rw [hB] at hy
+                cases r₂ with
+                | exn e => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val ev =>
+                    rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                    cases ev
+                    case ref r =>
+                        dsimp only at hy ⊢
+                        rcases hC : evalExpr ctx k h₂ ρ b with ⟨h₃, r₃⟩
+                        rw [hC] at hy
+                        cases r₃ <;> first
+                          | (cases hy; exact absurd rfl hne)
+                          | (rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy)
+                    all_goals (dsimp only at hy ⊢; exact hy)
         -- `006-reduce-remaining-holes`, Story 5: `*p = v` -- same shape as
         -- `setField`'s `ref`/non-object split, one constructor case instead of three.
         | setDerefIref p v =>
