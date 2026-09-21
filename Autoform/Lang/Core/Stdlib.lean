@@ -684,6 +684,83 @@ is sound and complete by definition and cannot drift. -/
 def answersMethod (d : Dialect) (h : Heap) (recv : Val) (name : String)
     (args : List Val) : Bool := (method d h recv name args).isSome
 
+/-! ## The builtins and container methods raise only represented names
+
+Needed by the try/except invariant (`Autoform/Lang/Core/ExcSafe.lean`). `raiseE` is
+private to this file, which is why these live here rather than beside the induction they
+serve. Each is a scan over the table: every exception either comes from `makeException`
+(already pinned) or is a literal `raiseE "<Name>"`. -/
+
+/-- `builtinCore.minMax` raises only `ValueError`, on an empty iterable. -/
+theorem minMax_excSafe (h : Heap) (x : Val) (isMin : Bool) (h₂ : Heap) (v : Val) :
+    builtinCore.minMax h x isMin = some (h₂, .exn v) → ExcSafe v := by
+  intro hm
+  unfold builtinCore.minMax at hm
+  repeat' split at hm
+  all_goals first | (cases hm; done) | (cases hm; exact excSafe_str (by decide))
+
+theorem builtinCore_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : String)
+    (args : List Val) (h₂ : Heap) (v : Val) :
+    builtinCore d h name args = some (h₂, .exn v) → ExcSafe v := by
+  intro hb
+  subst hd
+  unfold builtinCore at hb
+  dsimp only [raiseE] at hb
+  split at hb
+  · exact makeException_excSafe (Or.inr (Prod.mk.inj (Option.some.inj hb)).2)
+  · repeat' split at hb
+    all_goals first
+      | (cases hb; done)
+      | (simp at hb; done)
+      | (cases hb; exact excSafe_str (by decide))
+      | exact minMax_excSafe _ _ _ _ _ hb
+
+theorem builtin_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : String)
+    (args : List Val) (h₂ : Heap) (v : Val) :
+    builtin d h name args = some (h₂, .exn v) → ExcSafe v := by
+  intro hb
+  unfold builtin at hb
+  split at hb
+  · exact builtinCore_excSafe hd _ _ _ _ _ hb
+  · cases hb
+
+/-- A pure container-method result that is an exception names a represented class. The
+mutating results never carry one: every `.mutating` arm returns a `.val`. -/
+theorem method_pure_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (recv : Val)
+    (name : String) (args : List Val) (h₂ : Heap) (v : Val) :
+    method d h recv name args = some (h₂, .pure (.exn v)) → ExcSafe v := by
+  intro hm
+  subst hd
+  unfold method at hm
+  split at hm
+  · unfold methodCore at hm
+    dsimp only [raiseE] at hm
+    repeat' split at hm
+    all_goals first
+      | (cases hm; done)
+      | (simp at hm; done)
+      | (cases hm; exact excSafe_str (by decide))
+  · cases hm
+
+/-- A mutating container-method result never carries an exception: the exception
+arms (`KeyError`, `ValueError`, `IndexError`) are all `.pure`. Stated because the
+interpreter's boxed-container path writes the new receiver back and returns the result,
+and the try/except invariant has to know that result is not an exception. -/
+theorem method_mutating_not_exn {d : Dialect} (hd : d = .python) (h : Heap) (recv : Val)
+    (name : String) (args : List Val) (h₂ : Heap) (v nv : Val) :
+    method d h recv name args = some (h₂, .mutating (.exn v) nv) → False := by
+  intro hm
+  subst hd
+  unfold method at hm
+  split at hm
+  · unfold methodCore at hm
+    dsimp only [raiseE] at hm
+    repeat' split at hm
+    all_goals first
+      | (cases hm; done)
+      | (simp at hm; done)
+  · cases hm
+
 /-! ## Properties
 
 Only what closes cheaply and independently. Each is stated in terms other than the
