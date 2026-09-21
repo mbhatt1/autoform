@@ -452,3 +452,62 @@ class TestClassAttributeDefaultRendering:
                 {'positionalOnly': [], 'keywordOnly': [], 'required': ['d'],
                  'classAttrDefaults': [['d', 'C', '_C__m']]},
                 ['d'])
+
+
+class TestComprehensionLowering:
+    """A comprehension is one assignment, one loop and one read, and every piece of that
+    already exists in Core -- so it lowers rather than holes. What these pin is the two
+    places the lowering could go quietly wrong: the loop variable leaking into the
+    enclosing scope (Python 3 gives a comprehension its own), and a generator expression
+    being materialised somewhere its laziness is observable.
+
+    The behavioural check is `test_joern_native_numeric[python]` (`compList`,
+    `compNoLeak`, `compDict`, `genTuple`, `genSum`, `withStmt`), which needs Joern and
+    CPython; these hold the shape in place when that suite is skipped.
+    """
+
+    def test_the_three_statement_shape_is_what_is_matched(self):
+        src = EXPORTER.read_text()
+        assert 'def comprehensionParts(b: Block)' in src
+        assert 'case (init: Call) :: loop :: (out: Identifier) :: Nil' in src
+        # the container kinds, and the one Core cannot represent
+        for kind in ('"<operator>.listLiteral" if kidsOf(rhs).isEmpty => Some("list")',
+                     '"<operator>.dictLiteral" if kidsOf(rhs).isEmpty => Some("dict")',
+                     '"<operator>.setLiteral"  if kidsOf(rhs).isEmpty => Some("set")'):
+            assert kind in src, kind
+        assert 'case "set"                 => (Nil, hole("expr:setComp"))' in src
+
+    def test_the_loop_variable_is_rebound_to_an_unspellable_name(self):
+        src = EXPORTER.read_text()
+        assert 'def compName(x: String): String = "$comp$" + x' in src
+        assert 'def renameCompBinders(v: ujson.Value)' in src
+        # destructured targets (`for k, v in pairs`) follow the loop variable
+        assert '(jsonNames(st("e")) intersect bound).nonEmpty) bound += st("x").str' in src
+        # the first iterable is evaluated in the enclosing scope and is NOT renamed
+        assert '"x" -> compName(x), "e" -> o("e"),' in src
+
+    def test_a_generator_expression_lowers_only_where_it_is_consumed_at_once(self):
+        src = EXPORTER.read_text()
+        assert 'case "gen" if !eagerGen    => (Nil, hole("expr:genExp"))' in src
+        assert 'genExpEager = genExpConsumers.contains(c.name)' in src
+        for consumer in ('"tuple"', '"sum"', '"sorted"', '"join"', '"any"', '"all"'):
+            assert consumer in src.split('val genExpConsumers', 1)[1].split(')', 1)[0], consumer
+        # stored or returned: `valueOf` asks with eagerGen = false
+        assert 'comprehensionLowering(b, eagerGen = false)' in src
+        # a plain-`expr` position has no prelude slot and says so
+        assert 'hole("expr:comprehension-position")' in src
+
+    def test_renderer_needs_no_new_shape(self):
+        """The lowering reuses `assign`, `forIn`, `ifte`, `mcall`, `listE`, `dictE`, `name`."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', Path(__file__).resolve().parents[1] / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        loop = {'k': 'forIn', 'x': '$comp$x', 'e': {'k': 'name', 'v': 'xs'},
+                'body': {'k': 'exprS', 'e': {'k': 'mcall', 'recv': {'k': 'name', 'v': 'tmp0'},
+                                            'm': 'append',
+                                            'args': [{'k': 'name', 'v': '$comp$x'}]}}}
+        head, kids = mod.stmt_shape(loop)
+        assert head == '.forIn'
+        assert '$comp$x' in mod.stmt(loop)
