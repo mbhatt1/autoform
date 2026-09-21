@@ -360,6 +360,14 @@ def _default_value(node, scopes=()):
 
 
 def constant_literal(node):
+    # `-1` / `-2.5`: a unary minus on a numeric constant. Language Reference §8.7 --
+    # defaults are evaluated once when the `def` executes -- so the value is the negated
+    # constant, indistinguishable from a literal. `not True` and `-True` are excluded.
+    if (isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub)
+            and isinstance(node.operand, ast.Constant)
+            and isinstance(node.operand.value, (int, float))
+            and not isinstance(node.operand.value, bool)):
+        return constant_literal(ast.Constant(value=-node.operand.value))
     if not isinstance(node, ast.Constant):
         return None
     v = node.value
@@ -481,6 +489,33 @@ def visit(node, scopes):
             *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
             *([node.args.kwarg] if node.args.kwarg else [])]]
         class_scopes = [scope for scope in scopes if scope.get_type() == 'class']
+        # The decorators by dotted source name (`@f(args)` -> `f`, `@t.overload` ->
+        # `t.overload`; anything else `<expr>`), so the exporter can tell a decorator the
+        # program defines from an external one and label the gap by name.
+        def _decorator_root(d):
+            if isinstance(d, ast.Call):
+                d = d.func
+            if isinstance(d, ast.Name):
+                return d.id
+            return dotted_name(d) or '<expr>'
+        decorator_names = [_decorator_root(d) for d in decorators]
+        # `@overload` (typing / typing_extensions, bare or through a module alias): the
+        # decorated definition exists for the type checker only. At run time
+        # `typing.overload` returns a dummy that RAISES `NotImplementedError` when
+        # called, and the real definition that follows rebinds the name
+        # (https://docs.python.org/3/library/typing.html#typing.overload). So the stub
+        # is a function that always raises -- a complete, hole-free translation -- and
+        # its defaults (`...`) never bind because the dummy takes `*args, **kwds`.
+        def _is_imported_name(name):
+            try:
+                return scopes[0].lookup(name).is_imported()
+            except KeyError:
+                return False
+        overload_stub = (len(decorators) == 1 and decorator_names[0].split('.')[-1] == 'overload'
+                         and (('.' in decorator_names[0]
+                               and decorator_names[0].split('.')[0] in _imported_modules)
+                              or ('.' not in decorator_names[0]
+                                  and _is_imported_name('overload'))))
         # A `@property` getter is reached by attribute ACCESS, not by a call. Core has
         # no descriptor protocol, so `c.currsize` lowers to a plain field read of a
         # field that does not exist -- and a missing field on an ordinary object
@@ -506,6 +541,8 @@ def visit(node, scopes):
             'staticMethod': static_method,
             'property': sole_property,
             'classMethod': class_method,
+            'decoratorNames': decorator_names,
+            'overloadStub': overload_stub,
             # An instance method whose only parameters after `self` are collectors:
             # `def f(self, *args, **kwargs)`. Informational -- the exporter binds it
             # through `receiverName` -- and asserted by tests/test_python_receivers.py.
@@ -1526,6 +1563,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     else {
       pythonSignatureInfo(m) match {
         case None => Some("call:python-signature-metadata")
+        // `typing.overload`'s dummy takes `*args, **kwds` and raises: the stub's own
+        // defaults (`...`, usually) are never evaluated for a call, so they are no gap.
+        case Some(s) if s.obj.get("overloadStub").exists(_.bool) => None
         case Some(s) if s("defaults").bool => Some("call:python-defaults")
         case _ => None
       }
@@ -9548,6 +9588,27 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // Kotlin puts declarations directly in the file initializer, while other
     // frontends put MethodRefs there. The bodies are separate exported functions.
     case m: Method if moduleScope && List(".kt", ".kts").exists(currentFile.endsWith) => skip
+    // A Kotlin LOCAL function (Kotlin spec, Declarations -> Function declaration ->
+    // "Local function declaration": declared inside another function, may capture the
+    // enclosing scope, and a captured `var` reassigned later is seen by the local
+    // function -- capture is by reference). Core's `closure` captures the environment
+    // BY VALUE at the definition, so the lowering is exact only when nothing captured
+    // is ever reassigned: every free name of the local function must be assigned at most
+    // once in the enclosing function (its initialiser) and never by the local function
+    // itself. Otherwise it stays a hole that names the reason. The body is exported as
+    // its own function; the local name is bound to a closure over it, and a call by
+    // that name reaches the closure through `Expr.call`'s variable path.
+    case m: Method if List(".kt", ".kts").exists(currentFile.endsWith) =>
+      val frees = usedOf.getOrElse(m.fullName, Set.empty[String]) -- boundOf.getOrElse(m.fullName, Set.empty[String])
+      val writesFree = m.body.ast.isCall.filter(c => callName(c).startsWith("<operator>.assignment"))
+        .l.flatMap(c => kidsOf(c).headOption).collect { case i: Identifier if frees.contains(i.name) => i.name }
+      val parent = nestedOf.collectFirst { case (p, kids) if kids.contains(m.fullName) => p }
+      def assignCount(p: String, name: String): Int = methodByName.get(p).toList
+        .flatMap(_.body.ast.isCall.filter(c => callName(c).startsWith("<operator>.assignment")).l)
+        .flatMap(c => kidsOf(c).headOption).count { case i: Identifier => i.name == name; case _ => false }
+      val mutated = parent.toList.flatMap(p => frees.filter(n => assignCount(p, n) > 1))
+      if (writesFree.nonEmpty || mutated.nonEmpty) holeS("kotlin:local-fn-capture-mutated")
+      else ujson.Obj("k" -> "assign", "x" -> m.name, "e" -> ujson.Obj("k" -> "closure", "f" -> mangledFullName(m.fullName)))
     case t: TypeRef    => skip   // a nested `class`, likewise
     case j: JumpTarget => skip
     // `global x` / `nonlocal x` arrive as UNKNOWN nodes carrying their source text; the
@@ -11155,20 +11216,44 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // like `@staticmethod`: a directive with no residue). The getter is then an
         // ordinary method with `self` stripped, which is exactly how `evalExpr` applies
         // it when a field read dispatches to it.
+        // A decorator the PROGRAM defines is applied at definition time -- Language
+        // Reference §8.7: `@f def g` is `g = f(g)` -- and lowering that is still open
+        // (`call:python-decorator-binding`). A decorator from outside the program
+        // (`contextlib.contextmanager`, `functools.wraps(f)`) cannot be applied here at
+        // all; it is a different gap and carries the decorator's name.
+        val decoratorNames = signature.obj.get("decoratorNames").map(_.arr.map(_.str).toList).getOrElse(Nil)
+        val externalDecorator = decoratorNames.find { d =>
+          val root = d.split('.').last
+          d == "<expr>" ||
+            !(methodByName.keys.exists(_.endsWith("." + root)) || classByFullName.keys.exists(_.endsWith("." + root)))
+        }
+        val decoratorGap =
+          externalDecorator.map(d => "decorator:external:" + d).getOrElse("call:python-decorator-binding")
+        val overloadStub = signature.obj.get("overloadStub").exists(_.bool)
         val bindingGap =
           // The receiver-shape checks are about an INSTANCE receiver that Core injects
           // under `self`. A classmethod injects nothing -- its receiver is an ordinary
           // first positional -- so `firstPositional` being `cls` is the expected shape,
           // not a gap, and the keyword-collector collision cannot arise.
-          if (isMethodDecl && !isClassMethodDecl &&
-              (signature("firstPositional") != ujson.Str("self") ||
-               signature("decorated").bool))
+          if (overloadStub) None
+          else if (signature("decorated").bool) Some(decoratorGap)
+          else if (isMethodDecl && !isClassMethodDecl &&
+              signature("firstPositional") != ujson.Str("self"))
             Some("call:python-receiver-signature")
-          else if (signature("decorated").bool) Some("call:python-decorator-binding")
           else if (signature("privateParameters").bool) Some("call:python-private-parameters")
           else if (sourceParams != exportedParams) Some("call:python-signature-shape")
           else None
-        if (bindingGap.nonEmpty) {
+        if (overloadStub) {
+          // `typing.overload` at run time: the name is bound to a dummy that accepts any
+          // arguments and raises `NotImplementedError`; the following un-decorated
+          // definition rebinds the name (docs.python.org/3/library/typing.html#typing.overload).
+          // Permissive collectors, so no arity check answers before the raise does.
+          obj("vararg") = "<overload-stub-args>"
+          obj("kwarg") = "<overload-stub-keywords>"
+          obj("body") = ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
+            "op" -> "py:exception:NotImplementedError",
+            "a" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr())))
+        } else if (bindingGap.nonEmpty) {
           // Core injects an ordinary receiver under `self`. Other receiver names,
           // absent/keyword-only receivers and descriptor/decorator binding need
           // their own semantics. Permissive collectors ensure that
