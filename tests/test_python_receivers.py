@@ -20,6 +20,12 @@ from test_source_numeric import ROOT, numeric_env, run
 SOURCE = ROOT / 'examples/python_control/receivers.py'
 SUBJECTS = ('absent', 'keyword', 'renamed', 'star_self', 'static',
             'class_named', 'class_self', 'collect')
+# The shapes that STAY holes: no first positional (`absent`, `keyword`, `star_self`) or a
+# receiver not named `self` (`renamed`). Each is a different binding rule from "inject the
+# receiver under `self`", and Core has exactly that one rule.
+HOLED = ('absent', 'keyword', 'renamed', 'star_self')
+# The shapes that bind and whose bodies return an int the observation matrix can read.
+BOUND = {'collect': 1, 'positional_collect': 2}
 GAP = 'call:python-receiver-signature'
 
 
@@ -50,6 +56,12 @@ def test_receiver_source_signature_metadata():
     assert records['keyword']['keywordOnly'] == ['self']
     assert records['star_self']['parameters'] == ['self']
     assert records['positional_collect']['positionalOnly'] == ['self']
+    # A receiver followed by nothing but collectors is its own, bindable shape: the
+    # receiver is `self`, every other parameter is `*args`/`**kwargs`. It binds because
+    # the exporter records the stripped receiver's name (`receiverName`) and Core refuses
+    # a `self=` keyword that would otherwise vanish into `**kwargs`.
+    assert {name for name in SUBJECTS + ('positional_collect',)
+            if records[name]['receiverThenCollectors']} == {'collect', 'positional_collect'}
 
 
 def test_source_python_receiver_gaps(tmp_path, numeric_env):
@@ -79,7 +91,16 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
     assert static['body'] == {'k': 'ret', 'e': {'k': 'tupleE', 'items': [
         {'k': 'name', 'v': 'self'}, {'k': 'name', 'v': 'a'}]}}
     assert static['pythonSignature']['isMethod'] is False
-    for name in (n for n in SUBJECTS if n not in ('class_named', 'class_self', 'static')):
+    # `collect(self, **kw)` translates: `self` is stripped and RECORDED, so a `self=`
+    # keyword is refused instead of landing in `kw`. `positional_collect(self, /, **kw)`
+    # needs no record -- CPython really does put `self=7` in `kw` there.
+    collect = functions['receivers.py:<module>.Receiver.collect']
+    assert collect['body'] == {'k': 'ret', 'e': {'k': 'int', 'v': '1'}}
+    assert collect['kwarg'] == 'kw' and 'vararg' not in collect
+    assert collect['pythonSignature']['receiverName'] == 'self'
+    assert 'receiverName' not in functions[
+        'receivers.py:<module>.Receiver.positional_collect']['pythonSignature']
+    for name in HOLED:
         function = functions[f'receivers.py:<module>.Receiver.{name}']
         assert function['body'] == {'k': 'holeS', 'label': GAP}
         assert 'pythonSignature' not in function
@@ -97,7 +118,9 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
                      [('unknown', 19)], [('self', 7), ('a', 11)],
                      [('receiver', 13), ('a', 11)], [('cls', 17), ('a', 11)]]
     observations, calls, expected = [], [], []
-    for name, count, keywords in itertools.product(SUBJECTS + ('positional_collect',),
+    # `static` and the two classmethods return tuples/the class and are covered by
+    # tests/test_python_signatures.py; this matrix reads ints and holes only.
+    for name, count, keywords in itertools.product(HOLED + tuple(BOUND),
                                                    range(4), keyword_cases):
         arguments = list(range(1, count + 1))
         try:
@@ -115,8 +138,8 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
             f'(evalExpr {context} 512 [] [] '
             f'(.call "receivers.py:<module>.Receiver.{name}" {args})).2',
         ])
-        if name == 'positional_collect':
-            want = 'value:2' if 'value' in outcome else 'exception:TypeError'
+        if name in BOUND:
+            want = f'value:{BOUND[name]}' if 'value' in outcome else 'exception:TypeError'
         else:
             want = 'hole:' + GAP
         expected.extend([want, want])
@@ -151,18 +174,20 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
     assert native_outcome('renamed', [1]) == {'value': 1}
     assert native_outcome('star_self', []) == {'value': 1}
     assert native_outcome('star_self', [1, 2, 3]) == {'value': 4}
-    assert native_outcome('static', [1, 2]) == {'value': (1, 2)}
-    assert native_outcome('static', [], [('self', 7), ('a', 11)]) == {'value': (7, 11)}
-    assert native_outcome('class_named', [], [('a', 11)]) == {'value': 11}
-    assert native_outcome('class_self', [1]) == {'value': 1}
+    # The three shapes not in the matrix, checked natively so the fixture stays honest.
+    assert receiver.static(1, 2) == (1, 2) and receiver.static(self=7, a=11) == (7, 11)
+    assert receiver.class_named(a=11) == 11 and receiver.class_self(1) == 1
+    # The `self=` keyword is exactly where `collect` and `positional_collect` differ.
     assert native_outcome('collect', [], [('self', 7)]) == {'exception': 'TypeError'}
+    assert native_outcome('collect', [], [('a', 11)]) == {'value': 1}
+    assert native_outcome('collect', [1]) == {'exception': 'TypeError'}
     assert native_outcome('positional_collect', [], [('self', 7)]) == {'value': 2}
     assert native_outcome('positional_collect', [1]) == {'exception': 'TypeError'}
     proofs = header + '\nset_option maxRecDepth 10000\nset_option maxHeartbeats 2000000\n'
     # Universal application checks cover more than the finite observed matrix:
     # every evaluated argument list, keyword list, heap and receiver must reach
     # the gap. Two fuel steps suffice to enter the guarded function body.
-    for name in SUBJECTS:
+    for name in HOLED:
         function = 'f_receivers_py__module__Receiver_' + name
         proofs += (
             'example (ctx : Ctx) (fuel : Nat) (heap : Heap) (receiver : Option Val) '

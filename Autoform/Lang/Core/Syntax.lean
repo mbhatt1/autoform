@@ -713,6 +713,18 @@ structure PythonSignature where
   `self`, and the `.mcall` sites pass the class value with no separate receiver. `none`
   is an ordinary method or a plain function, and nothing about them changes. -/
   receiverKind : Option String := none
+  /-- The name of the INSTANCE receiver the exporter stripped from `params`, recorded when
+  a keyword argument of that name must still be refused.
+
+  `def f(self, **kw)` called as `o.f(self=1)` is `TypeError: f() got multiple values for
+  argument 'self'` in CPython: the bound receiver already fills `self`. After stripping,
+  `bindParams` would drop `self=1` into `**kw` and the call would succeed -- the shadowing
+  that made the exporter hole every `def f(self, *args, **kwargs)` as
+  `call:python-receiver-signature`. With the name recorded, `kwargsRejected` refuses the
+  keyword and the shape binds. Set only when the shadowing is possible -- a `**kwargs`
+  collector and a receiver that is not positional-only (`def f(self, /, **kw)` DOES put
+  `self=1` in `kw`) -- and `none` everywhere else, so every rendered corpus keeps its term. -/
+  receiverName : Option String := none
   deriving Repr, Inhabited
 
 /-- A function: name, parameters, body.
