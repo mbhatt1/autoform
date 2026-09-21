@@ -619,6 +619,13 @@ program. -/
 @[simp] theorem builtinBase_keysProgramWith (e : Expr) (cls : String) :
     (ctxOf (keysProgramWith e)).builtinBase cls = none := rfl
 
+/-- The fragment is Python, so `Dialect.ctorName` picks `__init__`. Stated on the
+`ctorName` term itself (not on the `.dialect` projection): rewriting the projection would
+also fire inside the `Ctx` literal and stop `ctx_fold` from folding it back to
+`ctxOf (keysProgramWith e)`, which the `resolve_*` lemmas are stated over. -/
+@[simp] theorem ctorName_keysProgramWith (e : Expr) :
+    (keysProgramWith e).dialect.ctorName = "__init__" := rfl
+
 /-- `methodkey` **as the transpiler used to emit it**: the starred call replaced by the
 hole it produced before `Expr.starred`/`Expr.dstarred` existed. This is the subject of the
 contract-relative theorems below; `keysProgram` above is the current program. -/
@@ -930,7 +937,7 @@ theorem methodkey_refines :
   apply forall_ge_of_forall_add
   intro k
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgram, ctx_fold,
-    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
+    resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init', Dialect.ctorName,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, Env.set, Env.get, Val.truthy,
     Val.iterable, strKeyed, Heap.get, Heap.alloc]
