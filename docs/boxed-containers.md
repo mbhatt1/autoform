@@ -373,7 +373,7 @@ migration cost that buys something.
 
 Counts taken from this repository, not estimated:
 
-### `Autoform/Refine.lean` — 2,067 lines, 115 theorems
+### `Autoform/Refine.lean` — 2,110 lines, 115 theorems
 
 | | count | why |
 |---|--:|---|
@@ -407,7 +407,11 @@ because `Env` is untouched. Every scope stays a value; only the heap grows.
 
 ### `Autoform/Generated/*.lean`
 
-35 sites mention `setIndex`/`listE`/`dictE`. **None need regeneration.** The AST is
+38 sites mention `setIndex`/`listE`/`dictE` — **count the tracked renders only**.
+Measuring `Autoform/Generated/*.lean` on a working tree gives 15,068 across 15 files,
+because most of that directory is untracked local build products (the same ones that make
+`check_render` exit 3 on a dev checkout). `git ls-files 'Autoform/Generated/*.lean' | xargs
+grep` is the measurement this figure means. **None need regeneration.** The AST is
 unchanged; only its meaning changes. This is the deep-embedding payoff: a semantics change
 that re-verifies six corpora without re-running Joern.
 
