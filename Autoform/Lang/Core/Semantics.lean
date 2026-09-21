@@ -631,6 +631,24 @@ def valIn (x c : Val) : EResult :=
 /-- Function table, keyed by name. -/
 abbrev FuncTable := List (String × Func)
 
+/-- The globals-frame key under which a **class attribute** is stored.
+
+Class bodies are not executed as functions in Core, so a class-level binding like
+`__marker = object()` has no frame of its own to live in. It lives in the one globals frame,
+under a key no source language can spell: `<classattr>Cache._Cache__marker`. The exporter
+writes it from the module-objects initialiser; `applyFunc` reads it for a class-attribute
+default and `evalExpr` reads it when `self.<attr>` misses the instance's own fields. One
+key format, defined once, so the two readers cannot disagree with the writer. -/
+@[simp] def classAttrKey (cls attr : String) : String := "<classattr>" ++ cls ++ "." ++ attr
+
+/-- The base environment of a call: `self` bound if there is a receiver. Named so that a
+proof about `applyFunc` has a stable term to case on -- `simp only [applyFunc]` leaves it
+folded -- and `@[simp]` so that every proof unfolding `applyFunc` with plain `simp`
+reduces it exactly as it reduced the inline `match` this replaces. -/
+@[simp] def selfEnv : Option Val → Env
+  | some s => [("self", s)]
+  | none   => []
+
 /-- Everything the interpreter needs: the callable functions and the source dialect. -/
 structure Ctx where
   dialect : Dialect
@@ -718,6 +736,46 @@ def Func.literalDefaults (fn : Func) : List (String × DefaultValue) :=
   match fn.pythonSignature with
   | some sig => sig.defaults
   | none     => []
+
+/-- The class-attribute defaults of `fn` (see `PythonSignature.classAttrDefaults`). Named,
+like `literalDefaults`, so "this function has none" is one rewritable hypothesis
+(`hcad : fn.classAttrDefaults = []`) rather than a `match` on `pythonSignature`. -/
+@[simp] def Func.classAttrDefaults (fn : Func) : List (String × String × String) :=
+  match fn.pythonSignature with
+  | some sig => sig.classAttrDefaults
+  | none     => []
+
+/-- Was parameter `p` supplied by this call? Positionally if it is among the first
+`vs.length` positional parameters, or by keyword. This is the same reading of a call
+`signatureRejected` uses, and it is what "a default applies exactly when the parameter was
+not passed" means for a default that cannot be seeded ahead of the arguments. -/
+@[simp] def paramSupplied (fn : Func) (p : String) (vs : List Val)
+    (kws : List (String × Val)) : Bool :=
+  (fn.posParams.take vs.length).contains p || (kws.map Prod.fst).contains p
+
+/-- Seed class-attribute defaults into a base environment, reading each from the globals
+frame. Structurally recursive on the list so that `[]` -- every function without such a
+default -- reduces to `.inr base` by unfolding alone, with no heap read.
+
+A supplied parameter is skipped: the default is never needed, and resolving it anyway
+would let a call that passed every argument hole on a class attribute it never used. A
+default that is needed and whose class attribute is not in the globals frame is a hole,
+named for the parameter, never a guess -- `unit` here would make `default is self.__marker`
+true for a caller who passed `None`, which is a wrong answer where CPython returns the
+`None`. -/
+@[simp] def seedClassAttrs (ctx : Ctx) (h : Heap) (fn : Func) (base : Env) (vs : List Val)
+    (kws : List (String × Val)) : List (String × String × String) → Sum String Env
+  | [] => .inr base
+  | (p, cls, attr) :: rest =>
+      if paramSupplied fn p vs kws then seedClassAttrs ctx h fn base vs kws rest
+      else
+        match (h.get ctx.globals).bind (fun g => g.fields.find? (·.1 == classAttrKey cls attr)) with
+        | some (_, v) => seedClassAttrs ctx h fn (Env.set base p v) vs kws rest
+        | none        => .inl s!"default:{p}:class-attr-unresolved"
+
+@[simp] def seedClassAttrDefaults (ctx : Ctx) (h : Heap) (fn : Func) (base : Env)
+    (vs : List Val) (kws : List (String × Val)) : Sum String Env :=
+  seedClassAttrs ctx h fn base vs kws fn.classAttrDefaults
 
 /-- Bind a call's arguments into the callee's environment.
 
@@ -1165,6 +1223,21 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                match ctx.resolveMethod o.cls f with
                                | some fn => applyFunc ctx n h₁ fn (some (.ref r)) [] []
                                | none    => (h₁, .hole s!"property:{f}:unresolved")
+                             -- A CLASS attribute read through an instance: `self.__marker`
+                             -- where `__marker = object()` was bound in the class body.
+                             -- Python's lookup falls from the instance to its class, and
+                             -- that is the fallback here -- to the globals-frame key the
+                             -- module initialiser wrote (`classAttrKey`). Python-only,
+                             -- because only Python has class bodies and because that is
+                             -- what keeps every `.cLike` accessor theorem out of the side
+                             -- condition this adds. Not recursive, so fuel-monotonicity of
+                             -- `.field` is unchanged. A miss stays the documented `unit`
+                             -- (docs/languages.md §13 prices changing that separately).
+                             else if ctx.dialect == .python then
+                               match (h₁.get ctx.globals).bind
+                                       (fun g => g.fields.find? (·.1 == classAttrKey o.cls f)) with
+                               | some (_, v) => (h₁, .val v)
+                               | none        => (h₁, .val .unit)
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1511,12 +1584,17 @@ def applyFunc (ctx : Ctx) : Nat → Heap → Func → Option Val → List Val �
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,     _,  _   => (h, .outOfFuel)
   | n+1, h, fn, self?, vs, kws =>
-      let base : Env := match self? with
-                        | some s => [("self", s)]
-                        | none   => []
-      let ρ := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
         (h, .exn (.str "TypeError")) else
+      -- Class-attribute defaults are resolved HERE, not in `bindParams`: they need the
+      -- heap, and `bindParams` is heap-free by design (re-typing it is the `applyBinop`
+      -- problem). Arity was already checked above, so a hole from this step is about a
+      -- class attribute, never about the call shape. For a function with no such
+      -- defaults this is `.inr (selfEnv self?)` by unfolding and nothing changes.
+      match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with
+      | .inl l     => (h, .hole l)
+      | .inr base' =>
+      let ρ := bindParams fn base' vs kws
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v _)  => (h₁, .val v)
       | (h₁, .normal _) => (h₁, .val .unit)
@@ -1535,10 +1613,13 @@ def applyClosure (ctx : Ctx) : Nat → Heap → Func → List (String × Val) �
     List (String × Val) → Heap × EResult
   | 0,   h, _,  _,   _,  _   => (h, .outOfFuel)
   | n+1, h, fn, cap, vs, kws =>
-      let base : Env := cap
-      let ρ : Env := bindParams fn base vs kws
       if kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws then
         (h, .exn (.str "TypeError")) else
+      -- Same class-attribute seeding as `applyFunc`; the captured bindings are the base.
+      match seedClassAttrDefaults ctx h fn cap vs kws with
+      | .inl l     => (h, .hole l)
+      | .inr base' =>
+      let ρ : Env := bindParams fn base' vs kws
       match execStmt ctx n h ρ fn.body with
       | (h₁, .ret v _)   => (h₁, .val v)
       | (h₁, .normal _)  => (h₁, .val .unit)

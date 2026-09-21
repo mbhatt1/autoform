@@ -600,3 +600,83 @@ class TestClassMethodBinding:
         fn['pythonSignature']['receiverKind'] = 'metaclass'
         with pytest.raises(ValueError, match='unknown Python receiver kind'):
             mod.render_func(fn, 'f_make')
+
+class TestClassAttributeDefaults:
+    """`def pop(self, key, default=__marker)` — the sentinel default.
+
+    `__marker = object()` is a CLASS attribute: bound once when the class body runs, the
+    same object at every later lookup, and its whole meaning is an identity no caller can
+    pass. That makes it time-invariant like a literal — but it lives on the heap, so Core
+    resolves it in `applyFunc` (which has the heap) rather than `bindParams` (which must
+    stay heap-free). Two things have to agree for `default is self.__marker` to be right:
+    the default seeded from the globals frame, and the body's read of `self.__marker`
+    through the instance. Both use `classAttrKey`, and the mangled name is computed by the
+    same rule on both sides.
+    """
+
+    def test_a_class_attribute_default_is_recorded_with_its_mangled_name(self):
+        source = ('class Cache:\n'
+                  '    __marker = object()\n\n'
+                  '    def pop(self, key, default=__marker):\n'
+                  '        return default\n')
+        out = _decode(source)
+        recs = {v['name']: v for v in out['signatures'].values()}
+        assert recs['pop']['defaults'] is False
+        assert recs['pop']['defaultValues'] == [
+            ['default', {'k': 'classAttr', 'cls': 'Cache', 'attr': '_Cache__marker'}]]
+        # ...and the sentinel itself is reported so the module initialiser can allocate it.
+        assert out['classAttrSentinels'] == [{'cls': 'Cache', 'attr': '_Cache__marker'}]
+
+    def test_mangling_follows_cpython(self):
+        """Two leading underscores and at most one trailing mangle; `__x__`, `_x` and an
+        all-underscore class do not."""
+        source = ('class _Foo:\n'
+                  '    __a = object()\n'
+                  '    __b__ = object()\n'
+                  '    _c = object()\n\n'
+                  '    def f(self, p=__a, q=__b__, r=_c):\n'
+                  '        return p\n')
+        out = _decode(source)
+        rec = [v for v in out['signatures'].values() if v['name'] == 'f'][0]
+        assert rec['defaultValues'] == [
+            ['p', {'k': 'classAttr', 'cls': '_Foo', 'attr': '_Foo__a'}],
+            ['q', {'k': 'classAttr', 'cls': '_Foo', 'attr': '__b__'}],
+            ['r', {'k': 'classAttr', 'cls': '_Foo', 'attr': '_c'}]]
+        assert {s['attr'] for s in out['classAttrSentinels']} == {'_Foo__a', '__b__', '_c'}
+
+    def test_a_name_not_bound_in_the_class_is_not_a_class_attribute(self):
+        """A module-level `MARKER` read from inside a class is a global, not a class
+        attribute; it keeps the ordinary path (and today, the hole)."""
+        source = ('MARKER = object()\n\n'
+                  'class C:\n'
+                  '    def f(self, d=MARKER):\n'
+                  '        return d\n')
+        rec = [v for v in _decode(source)['signatures'].values() if v['name'] == 'f'][0]
+        assert rec['defaults'] is True
+        assert rec['defaultValues'] == []
+
+    def test_only_the_object_sentinel_shape_is_allocated(self):
+        """`__size = _DefaultSize()` is a class attribute too, but its value is a real
+        constructor call Core cannot pre-run here. It is not reported as a sentinel, so a
+        default naming it holes at the call rather than being seeded with a guess."""
+        source = ('class Cache:\n'
+                  '    __marker = object()\n'
+                  '    __size = _DefaultSize()\n')
+        assert _decode(source)['classAttrSentinels'] == [{'cls': 'Cache', 'attr': '_Cache__marker'}]
+
+    def test_core_and_exporter_share_one_key_format(self):
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert '"<classattr>" + e("cls").str + "." + e("attr").str' in src
+        assert 'def classAttrKey (cls attr : String) : String := "<classattr>" ++ cls ++ "." ++ attr' in sem
+        # the sentinel is a fresh cell, never a constructor call
+        assert '"k" -> "boxNew", "e" -> ujson.Obj("k" -> "unit")' in src
+
+    def test_bindParams_stays_heap_free(self):
+        """The reason `classAttr` is a separate field and not a `DefaultValue`: seeding
+        happens in `applyFunc`, before `bindParams`, and after the arity checks."""
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'match seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with' in sem
+        assert 'classAttrDefaults : List (String × String × String) := []' in \
+            (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert 'default:{p}:class-attr-unresolved' in sem

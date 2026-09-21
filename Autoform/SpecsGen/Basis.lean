@@ -354,12 +354,23 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
-    (hdef : fn.literalDefaults = [] := by rfl) :
+    (hdef : fn.literalDefaults = [] := by rfl)
+    -- No class-attribute default either: `applyFunc` seeds those from the heap before
+    -- `bindParams`, and the accessor claim is about a call that reaches its body.
+    (hcad : fn.classAttrDefaults = [] := by rfl)
+    -- A class attribute of the accessor's own field name would be read through the
+    -- instance when the instance field is missing, and the claim below says `unit` there.
+    -- Python-only, like `hbox`, so the default discharges it for every `.cLike` corpus;
+    -- a Python spec carries it as a domain conjunct (`synth_specs.py` emits it).
+    (hcls : ctx.dialect = .python → ∀ o g, h.get r = some o → h.get ctx.globals = some g →
+        g.fields.find? (·.1 == classAttrKey o.cls fld) = none := by
+      intro hc; exact absurd hc (by decide)) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+    seedClassAttrDefaults, hcad, seedClassAttrs,
     execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -367,8 +378,11 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd,
-                props_any_false_of_all_ne (hprop hd)]
+        · rcases hgg : h.get ctx.globals with _ | g
+          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
+                  props_any_false_of_all_ne (hprop hd)]
+          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcls hd o g hgr hgg,
+                  Option.bind, props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
@@ -400,12 +414,23 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
-    (hdef : fn.literalDefaults = [] := by rfl) :
+    (hdef : fn.literalDefaults = [] := by rfl)
+    -- No class-attribute default either: `applyFunc` seeds those from the heap before
+    -- `bindParams`, and the accessor claim is about a call that reaches its body.
+    (hcad : fn.classAttrDefaults = [] := by rfl)
+    -- A class attribute of the accessor's own field name would be read through the
+    -- instance when the instance field is missing, and the claim below says `unit` there.
+    -- Python-only, like `hbox`, so the default discharges it for every `.cLike` corpus;
+    -- a Python spec carries it as a domain conjunct (`synth_specs.py` emits it).
+    (hcls : ctx.dialect = .python → ∀ o g, h.get r = some o → h.get ctx.globals = some g →
+        g.fields.find? (·.1 == classAttrKey o.cls fld) = none := by
+      intro hc; exact absurd hc (by decide)) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
-  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+    seedClassAttrDefaults, hcad, seedClassAttrs,
     execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
@@ -413,8 +438,11 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd,
-                props_any_false_of_all_ne (hprop hd)]
+        · rcases hgg : h.get ctx.globals with _ | g
+          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
+                  props_any_false_of_all_ne (hprop hd)]
+          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcls hd o g hgr hgg,
+                  Option.bind, props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
