@@ -934,10 +934,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def sliceBoundJson(b: AstNode): ujson.Obj =
     if (isNoneBound(b)) ujson.Obj("k" -> "unit") else expr(b)
 
-  /** `sliceBoundJson`, prelude-aware, for `exprV` positions. */
-  def sliceBoundV(b: AstNode): (List[ujson.Obj], ujson.Obj) =
-    if (isNoneBound(b)) (Nil, ujson.Obj("k" -> "unit")) else exprV(b)
-
   /** Re-evaluable without observable effect. Augmented assignment (`o.f += 1`) is
     * desugared by duplicating the target expression, which is only faithful if
     * evaluating it twice is the same as evaluating it once. */
@@ -8786,6 +8782,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * that must run first plus the resulting value expression, in source evaluation
     * order. Every node shape that cannot itself contain such a construct -- the
     * overwhelming majority -- is the unchanged base case, `(Nil, expr(n))`. */
+  /** `sliceBoundJson`, prelude-aware, for `exprV` positions. Defined HERE, next to
+    * `exprV`, because a Scala script forbids a forward reference that crosses a `val`
+    * (`classNames`, `modelledBases`) -- placed up with the other slice helpers it
+    * failed to compile. */
+  def sliceBoundV(b: AstNode): (List[ujson.Obj], ujson.Obj) =
+    if (isNoneBound(b)) (Nil, ujson.Obj("k" -> "unit")) else exprV(b)
+
   def exprV(n: AstNode): (List[ujson.Obj], ujson.Obj) = unwrapMacro(n) match {
     case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
