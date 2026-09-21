@@ -218,7 +218,7 @@ theorem doubleStar_overflow_lands_in_kwargs :
   simp +decide [runFunc, prog, caller, f_f, f_g, f_h, f_k, f_m, Program.table, Heap.get,
     Ctx.resolve, Ctx.resolve.go, String.endsWith, applyFunc, bindParams, Func.literalDefaults, Func.posParams,
     kwargsRejected, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList,
-    evalPairs, strKeyed, Env.set, Env.get, Heap.alloc]
+    evalPairs, strKeyed, Stdlib.dictOfPairs, Stdlib.dictSet, Val.beq, Env.set, Env.get, Heap.alloc]
 
 theorem all_four_forms_together :
     runFunc prog 60 "c13" []

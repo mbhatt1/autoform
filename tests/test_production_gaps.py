@@ -691,8 +691,8 @@ class TestJavaScriptLowering:
 
     def test_throw_is_a_raise_under_javascript_only(self):
         src = self._src()
-        assert 'case "THROW" if jsLikeFile && kids.size == 1 =>' in src
-        assert 'case "THROW" if jsLikeFile => holeS("control:THROW:shape")' in src
+        assert 'case "THROW" if (jsLikeFile || javaFile) && kids.size == 1 =>' in src  # Java shares the arm (JLS §14.18)
+        assert 'case "THROW" if jsLikeFile || javaFile => holeS("control:THROW:shape")' in src
         # the generic control hole is still the fallthrough for every other language
         assert 'case t          => holeS("control:" + t)' in src
 
@@ -1018,10 +1018,10 @@ class TestJavaScriptObjectsAndEquality:
     def test_the_constructor_name_is_a_dialect_fact(self):
         assert 'def ctorName : Dialect → String' in self.SYN
         assert '| .javascript => "<init>"' in self.SYN
-        assert 'match ctx.resolveMethod cls ctx.dialect.ctorName with' in self.SEM
+        assert 'match ctx.resolveCtor cls with' in self.SEM  # `__init__` then `<init>`: Python, JS and Java
         # the fuel-monotonicity proof cases on the same term
         fm = (Path(__file__).resolve().parents[1] / 'Autoform/FuelMono.lean').read_text()
-        assert 'Ctx.resolveMethod ctx cls ctx.dialect.ctorName' in fm
+        assert 'Ctx.resolveCtor ctx cls' in fm  # the constructor lookup FuelMono splits on
 
     def test_typeof_and_equality_cite_the_spec(self):
         for clause in ('§13.5.3', '§7.2.14 IsStrictlyEqual', '§7.2.13 IsLooselyEqual'):
@@ -1045,7 +1045,7 @@ class TestJavaScriptObjectsAndEquality:
             assert f'runFunc jsProg 300 "{subject}" []' in guards, subject
 
     def test_exporter_treats_this_like_cpp_and_reads_the_source_for_strictness(self):
-        assert 'if ((cppFile || jsLikeFile) && n == "this") "self" else n' in self.EXP
+        assert 'if ((cppFile || jsLikeFile || javaFile) && n == "this") "self" else n' in self.EXP
         assert 'filterNot(x => (cppFile || jsLikeFile) && x == "this")' in self.EXP
         assert 'if (jsLikeFile) None' in self.EXP           # no receiver re-threaded as arg 0
         assert 'def binopFor(c: Call): String' in self.EXP
@@ -1128,7 +1128,7 @@ class TestJavaCoreSemantics:
 
     def test_this_is_the_receiver_in_java_too(self):
         # JLS 15.8.3; without this every `this.x` in a Java method read an unbound name.
-        assert 'if ((cppFile || javaFile) && n == "this") "self" else n' in self.EXP
+        assert 'if ((cppFile || jsLikeFile || javaFile) && n == "this") "self" else n' in self.EXP
         assert 'JLS §15.8.3' in self.EXP
 
     def test_signatures_are_stripped_before_method_resolution(self):
@@ -1141,9 +1141,9 @@ class TestJavaCoreSemantics:
         assert 'def javaFloatToIntegral (ty : IntType) (f : Fl) : Int' in self.SEM
         assert 'JLS §5.1.3' in self.SEM
         # NaN → 0, saturation, two-step narrowing, and the C non-claim, each a #guard
-        for g in ('(.float (Fl.ofBits 0x7FF8000000000000)) == .val (.int 0)',
-                  '(.float (Fl.ofBits 0x462B7E3ED64C4C00)) == .val (.int 2147483647)',
-                  '"cast:i8"  (.float (Fl.ofBits 0x4072D66666666666)) == .val (.int 44)',
+        for g in ('applyUnop .java "cast:i32" (.float (Fl.ofBits 0x7FF8000000000000)) with | .val (.int 0)',
+                  'applyUnop .java "cast:i32" (.float (Fl.ofBits 0x46293E5939A08CEA)) with | .val (.int 2147483647)',
+                  'applyUnop .java "cast:i8" (.float (Fl.ofBits 0x4072CE6666666666)) with | .val (.int 44)',
                   'applyUnop .cLike "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with'):
             assert g in self.SEM, g
 
