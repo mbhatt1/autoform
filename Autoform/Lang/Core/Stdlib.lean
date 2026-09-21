@@ -360,6 +360,10 @@ theorem makeException_excSafe {name : String} {args : List Val} {v : Val} :
   all_goals simp_all [ExcSafe]
 
 set_option maxHeartbeats 1000000 in
+/-- `raise None`: CPython's `TypeError: exceptions must derive from BaseException`. Stated
+because `raiseE` is private and a spec that raises an UNBOUND name reaches this branch. -/
+@[simp] theorem raiseValue_unit : raiseValue .unit = .exn (.str "TypeError") := rfl
+
 /-- `raiseValue` never raises anything but a represented name: raising a string is a
 `TypeError` exactly as in CPython, an object holes, and a builtin class reference is
 routed through `makeException`. -/

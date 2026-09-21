@@ -527,12 +527,20 @@ theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : Str
   all_goals exact ⟨_, rfl⟩
 
 -- RELAND: verify -- `_TimedCache.expire` is hole-free but its body differs from the committed AST.
-theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
+-- The committed body raises the BARE NAME `NotImplementedError` (`Expr.name`). That name is
+-- unbound, so it evaluates to `unit`, and `pythonRaise` classifies `unit` exactly as CPython
+-- classifies `raise None`: a `TypeError`. The premise `hres` -- the name is no module
+-- function -- is true of this corpus but is a suffix scan over the table (`Ctx.resolve`)
+-- that the kernel does not compute, so it is stated rather than proved. The re-landed
+-- exporter emits the `py:exception:NotImplementedError` constructor instead, whose value
+-- IS the class name; on re-land this theorem drops the premise and names the class -- see
+-- obligation (3) in §4.
+theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel)
+    (hres : (ctxOf P).resolve "NotImplementedError" = none) :
     ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
-  obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
-  refine ⟨v, ?_⟩
+  refine ⟨.str "TypeError", ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
   simp +decide only [hne, applyFunc, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv,
         bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams,
@@ -540,8 +548,7 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
-  rw [hv]
-  simp +decide
+  simp +decide [evalExpr, Heap.get, hres, pythonRaise]
 
 /-! ### `_cachedmethod._none` — the sentinel is constant -/
 

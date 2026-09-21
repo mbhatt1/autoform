@@ -369,9 +369,19 @@ theorem execStmt_expr_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
     execStmt ctx (k+1) h ρ (.expr e) = (h₁, .normal ρ) := by simp [execStmt, he]
 
+/-- `raise e`, when `e` evaluates to a value the dialect raises AS IS. Python classifies
+the operand through `pythonRaise` (a represented exception name passes through; a class
+reference instantiates, a stray string is a `TypeError`), so under `.python` the lemma
+asks for that classification to be the identity; every other dialect throws what it was
+given, and the default discharges the hypothesis there. -/
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
-    (he : evalExpr ctx k h ρ e = (h₁, .val v)) :
-    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v ρ) := by simp [execStmt, he]
+    (he : evalExpr ctx k h ρ e = (h₁, .val v))
+    (hr : ctx.dialect = .python → pythonRaise v = .exn v := by
+      intro hc; exact absurd hc (by decide)) :
+    execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v ρ) := by
+  by_cases hd : ctx.dialect = .python
+  · simp [execStmt, he, hd, hr hd]
+  · simp [execStmt, he, hd]
 
 theorem execStmt_seq_normal {a b : Stmt} {h₁ : Heap} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .normal ρ')) :

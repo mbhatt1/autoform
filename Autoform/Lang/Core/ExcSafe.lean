@@ -321,6 +321,20 @@ theorem valIn_ne_exn (x c : Val) {v : Val} : valIn x c = .exn v → False := by
   repeat' split at h
   all_goals cases h
 
+/-- Slice assignment fails only as CPython's `ValueError` (zero step, or an extended slice
+whose lengths differ); `Stmt.setSlice` raises the string it returns. -/
+theorem listSetSlice_error {vs : List Val} {lo hi st : Option Int} {ys : List Val}
+    {ex : String} : Stdlib.listSetSlice vs lo hi st ys = .error ex → ex = "ValueError" := by
+  intro h
+  unfold Stdlib.listSetSlice at h
+  -- The extended-slice branch binds `ks` with a `let`; zeta-reduce before splitting it.
+  repeat' (first | split at h | dsimp only at h)
+  all_goals first | exact (Except.error.inj h).symm | cases h
+
+theorem listSetSlice_excSafe {vs : List Val} {lo hi st : Option Int} {ys : List Val}
+    {ex : String} (h : Stdlib.listSetSlice vs lo hi st ys = .error ex) : ExcSafe (.str ex) := by
+  rw [listSetSlice_error h]; exact Stdlib.excSafe_str (by decide)
+
 theorem allocBuiltin_ne_exn (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val)
     {v : Val} : allocBuiltin ctx cls b vs = .exn v → False := by
   intro h
@@ -365,7 +379,7 @@ private def ExcStep (k : Nat) : Prop :=
         {h' : Heap} {v : Val} {ρ' : Env},
       execForRef ctx k h ρ x r i ver body = (h', .exn v ρ') → ExcSafe v)
 
-/-- Close one leaf of the induction. `hy` is the (already case-split) result equation,
+/-! Close one leaf of the induction. `hy` is the (already case-split) result equation,
 `hd` the dialect hypothesis, `ihE`..`ihRef` the eight induction hypotheses; hygiene is
 off so the macro can name them. The alternatives, in order:
 
@@ -404,11 +418,13 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact Stdlib.builtin_excSafe hd _ _ _ _ _ (by assumption))
   | (cases hy; exact Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption))
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
-  | (cases hy; exact (valIn_ne_exn _ _ (by assumption)).elim)
+  | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
+  | (cases hy; exact listSetSlice_excSafe (by assumption))
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
-  | (exfalso; rename_i hne; simp [hd] at hne))
+  | (exfalso; rename_i hne; simp [hd] at hne)
+  | (trace_state; fail "exc_close: no closer applies"))
 
-/-- Reduce the finalizer helpers, split `hy` on every `match`/`if` it contains, and
+/-! Reduce the finalizer helpers, split `hy` on every `match`/`if` it contains, and
 close every leaf. -/
 set_option hygiene false in
 macro "exc_split" : tactic => `(tactic|

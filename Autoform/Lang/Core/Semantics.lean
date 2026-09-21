@@ -283,7 +283,14 @@ def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                   | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
   | "py:/", _, _ => flBinop .python "/" a b
   | _, _, _ => match d with
-               | .python => .hole s!"numeric:typed-op-in-python:{op}"
+               -- Python never reaches a typed operator (the exporter emits none for it,
+               -- and their traps name themselves in the family's own terms, not as Python
+               -- classes -- see `ExcSafe.lean`). An ORDINARY operator on operands no rule
+               -- above covers keeps the `binop:<op>` label it always had, so a `+` on a
+               -- builtin-based instance is not misreported as a typed-numeric refusal.
+               | .python => if (TypedNumeric.parse op).isSome
+                              then .hole s!"numeric:typed-op-in-python:{op}"
+                              else .hole s!"binop:{op}"
                | _       => TypedNumeric.binary op a b
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.

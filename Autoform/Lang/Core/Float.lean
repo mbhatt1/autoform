@@ -640,6 +640,8 @@ theorem ofInt_exn (c : FConfig) (n : Int) (s : String) :
     c.ofInt n = .exn s → s = "OverflowError" := by
   intro h
   unfold ofInt at h
+  -- `ofInt` binds `r` with a `let`; zeta-reduce before the `if` is splittable.
+  dsimp only at h
   split at h
   · cases h; rfl
   · cases h
