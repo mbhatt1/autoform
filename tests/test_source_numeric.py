@@ -156,6 +156,35 @@ def indexHugeNegative(a, b):
         return (a, b)[-1208925819614629174706176]
     except IndexError:
         return a + b
+def compList(a, b):
+    xs = [a, b, a + b]
+    ys = [x * 2 for x in xs if x > 1]
+    return sum(ys) * 10 + len(ys)
+def compNoLeak(a, b):
+    x = a
+    ys = [x + 1 for x in [b, b]]
+    return x * 100 + ys[0]
+def compDict(a, b):
+    d = {k: v for k, v in [(a, b), (b, a)]}
+    return d[a] * 10 + d[b]
+def genTuple(a, b):
+    t = tuple(x + 1 for x in [a, b])
+    return t[0] * 100 + t[1]
+def genSum(a, b):
+    return sum(x * x for x in [a, b, 3])
+class Held:
+    def __init__(self, v):
+        self.v = v
+    def __enter__(self):
+        return self.v + 1
+    def __exit__(self, *exc):
+        self.v = 0
+        return False
+def withStmt(a, b):
+    h = Held(a)
+    with h as v:
+        b = b + v
+    return b * 10 + h.v
 '''),
     "java": ("JAVASRC", "Numbers.java", '''public class Numbers {
   public static long add(long a, long b) { return a + b; }
@@ -313,7 +342,17 @@ CASES = {
                ("indexTupleNegative", [1, 2]), ("indexTupleNegative", [-3, 7]),
                ("indexNegativeBoundary", [1, 2]), ("indexNegativeBoundary", [-3, 7]),
                ("indexNegativeError", [1, 2]), ("indexNegativeError", [-3, 7]),
-               ("indexHugeNegative", [1, 2]), ("indexHugeNegative", [-3, 7])],
+               ("indexHugeNegative", [1, 2]), ("indexHugeNegative", [-3, 7]),
+               # Comprehensions lower to a boxed list and a `forIn`; the loop variable is
+               # rebound to a synthetic name (`compNoLeak` reads the OUTER `x` afterwards).
+               # A generator expression consumed at once (`tuple`, `sum`) lowers eagerly.
+               ("compList", [9, 3]), ("compList", [-9, 3]),
+               ("compNoLeak", [9, 3]), ("compNoLeak", [-9, 3]),
+               ("compDict", [9, 3]), ("compDict", [-9, 3]),
+               ("genTuple", [9, 3]), ("genTuple", [-9, 3]),
+               ("genSum", [9, 3]), ("genSum", [-9, 3]),
+               # `with` is the frontend's own `__enter__`/`try`-`finally`-`__exit__` lowering.
+               ("withStmt", [9, 3]), ("withStmt", [-9, 3])],
     "java": [("add", [2147483647, 1]), ("add", [9223372036854775807, 1]),
              ("div", [-9223372036854775808, -1]), ("shift", [1, 32]),
              ("shift", [1, -1]), ("unsigned", [-1, 1]),

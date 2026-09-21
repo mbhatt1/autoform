@@ -496,6 +496,48 @@ this file keeps recording in other forms: a design that is cheaper to *write* ca
 more expensive to *prove*, and which one matters is not visible until the proof is
 attempted.
 
+#### 10.6 Comprehensions, generator expressions and `with`
+
+**Comprehensions lower.** pysrc2cpg spells `[e for x in xs if p]` as a block of three
+statements — `tmp0 = []`, the ordinary `for` lowering with the body `if p: tmp0.append(e)`,
+and a read of `tmp0` — and every piece of that is a Core construct already: under `.python`
+the list literal allocates, `append` writes through the payload, `forIn`/`ifte` are the
+loop. The exporter's `comprehensionLowering` recognises exactly that shape (one assignment
+to a temporary from an empty `listLiteral`/`dictLiteral`/`setLiteral`/`genExp`, one loop,
+one read of the same temporary) and emits it as a prelude plus a read. A dict
+comprehension is the same with `tmp0[k] = v`; a set comprehension stays `expr:setComp`,
+because Core has no set value.
+
+**The loop variable does not leak.** Python 3 gives a comprehension its own scope —
+`x = 1; ys = [x for x in xs]; x` is still `1` — while Core's `forIn` binds into the
+enclosing environment. Left alone, a later read of `x` would have seen the last element:
+a silent wrong answer, the kind this document exists to catch. Every `forIn` the lowering
+produces is therefore rebound to `$comp$x`, a name no source language can spell, and its
+body renamed to match; the names the frontend binds *from* the loop variable (the
+destructuring `k = tmp[0]; v = tmp[1]` of `for k, v in pairs`) follow it. The first
+loop's iterable is left alone, because Python evaluates it in the enclosing scope.
+`compNoLeak` in `tests/test_source_numeric.py` reads the outer `x` afterwards and is
+compared against CPython.
+
+**A generator expression lowers only where laziness is unobservable.** `(x for x in xs)`
+is lazy and Core has no representation for a suspended frame. Handed directly to a
+consumer that exhausts it at once and in full — `tuple(g)`, `list(g)`, `sum(g)`, `any`,
+`all`, `sorted`, `min`, `max`, `len`, `"".join(g)` (the set is `genExpConsumers`) — it is
+materialised as a list, which is observationally equal for a finite iterable with no
+side effects in its body. Stored, returned, or passed anywhere else it stays
+`expr:genExp`. `typedkey`'s two `tuple(type(v) for ...)` are the consumed shape.
+
+**`with` was already translating; the approximation is now named.** The frontend lowers
+`with cm as x: body` to `__enter__`/`try`–`finally`/`__exit__()` itself, and the exporter
+rejoins the bound-method temporaries into `mcall`s (`boundMethodCall`), so the 49
+`tryFinally` bodies in the cachetools render include every `with self.__timer`. What is
+approximate is the finaliser: Python passes `(type, value, traceback)` to `__exit__` and
+lets a truthy return SUPPRESS the exception; the lowered call passes nothing and never
+suppresses. For a context manager whose `__exit__` ignores its arguments and returns a
+falsy value — every one in cachetools — this is exact. A suppressing `__exit__` would
+observe the difference; it is recorded here as `control:WITH-exit-args` and is the next
+thing to close if a corpus has one.
+
 ### 15. Three small exporter labels, dispositioned
 
 * **`op:delete-index` — closed for Python.** `del xs[i]` / `del d[k]` lower to

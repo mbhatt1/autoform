@@ -665,6 +665,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // `006-reduce-remaining-holes`, Story 3: counter for `freshExprVTemp`'s
   // never-collides synthetic name (a postfix increment/decrement used as a value).
   var exprVTempCounter: Int = 0
+  /** Set while `exprV` walks the positional arguments of a call that CONSUMES its
+    * argument at once (`tuple(...)`, `sum(...)`, ...): the one position where a generator
+    * expression may be lowered eagerly. See `comprehensionLowering`. */
+  var genExpEager: Boolean = false
+  /** Builtins and methods that consume an iterable argument immediately and completely. */
+  val genExpConsumers: Set[String] =
+    Set("tuple", "list", "set", "frozenset", "sum", "any", "all", "sorted", "min", "max",
+        "len", "dict", "join", "enumerate", "zip", "reversed")
 
   /** Kernel declaration macros that emit METADATA, not code.
     *
@@ -6278,7 +6286,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       }
       val isGenExp = ks.exists(k => k.isInstanceOf[Call] &&
         k.asInstanceOf[Call].code.contains("<operator>.genExp"))
+      // A comprehension that reached plain `expr` has nowhere to put its loop: the
+      // prelude-aware positions (`valueOf`, `exprV`) lower it, this one can only name it.
       if (isGenExp) hole("expr:genExp")
+      else if (comprehensionParts(b).isDefined) hole("expr:comprehension-position")
       else if (bad.nonEmpty) hole(bad)
       else substNames(expr(ks.last), subst) match {
         case o: ujson.Obj => o
@@ -7723,6 +7734,129 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     }
   }
 
+  /** A Python comprehension, as pysrc2cpg lowers it.
+    *
+    * `[e for x in xs if p]` arrives as a BLOCK of exactly three statements:
+    *
+    *     tmp0 = <operator>.listLiteral()        -- the container, empty
+    *     { iter = xs.__iter__(); while ...: x = iter.__next__(); if p: tmp0.append(e) }
+    *     tmp0                                   -- the value
+    *
+    * A dict comprehension initialises with `<operator>.dictLiteral` and fills by indexed
+    * store, a set comprehension with `<operator>.setLiteral` and `.add`, a generator
+    * expression with `<operator>.genExp`. The middle statement is the ordinary `for`
+    * lowering `forPattern` already recovers (with an `if` around the body per filter),
+    * so the whole thing is one assignment, one loop and one read -- every piece of which
+    * Core has. Returns the temporary's name, the container kind and the loop node. */
+  def comprehensionParts(b: Block): Option[(String, String, AstNode)] = {
+    val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    ks match {
+      case (init: Call) :: loop :: (out: Identifier) :: Nil
+          if callName(init) == "<operator>.assignment" &&
+             (loop.isInstanceOf[Block] || loop.isInstanceOf[ControlStructure]) =>
+        kidsOf(init) match {
+          case (t: Identifier) :: (rhs: Call) :: Nil if t.name == out.name =>
+            val kind = callName(rhs) match {
+              case "<operator>.listLiteral" if kidsOf(rhs).isEmpty => Some("list")
+              case "<operator>.dictLiteral" if kidsOf(rhs).isEmpty => Some("dict")
+              case "<operator>.setLiteral"  if kidsOf(rhs).isEmpty => Some("set")
+              case n if n == "<operator>.genExp" || rhs.code.contains("<operator>.genExp") => Some("gen")
+              case _ => None
+            }
+            kind.map(k => (t.name, k, loop))
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
+  /** The names a rendered term reads. */
+  def jsonNames(v: ujson.Value): Set[String] = v match {
+    case o: ujson.Obj if o.value.get("k").exists(_.str == "name") => Set(o("v").str)
+    case o: ujson.Obj => o.value.values.flatMap(jsonNames).toSet
+    case a: ujson.Arr => a.value.flatMap(jsonNames).toSet
+    case _            => Set.empty
+  }
+
+  /** A rendered `seq` chain as a flat list, for scanning a loop body statement by statement. */
+  def seqStmts(v: ujson.Value): List[ujson.Obj] = v match {
+    case o: ujson.Obj if o.value.get("k").exists(_.str == "seq") => seqStmts(o("a")) ++ seqStmts(o("b"))
+    case o: ujson.Obj => List(o)
+    case _            => Nil
+  }
+
+  /** The synthetic spelling of a comprehension variable: `$comp$x`. No source language can
+    * write `$` in an identifier here, so it can shadow nothing and be read by nothing
+    * outside the comprehension -- which is exactly Python 3's scoping rule for it. */
+  def compName(x: String): String = "$comp$" + x
+
+  /** Rename every read of, and every `assign` to, a name in `bound`. `substNames` renames
+    * reads only; a destructured target (`for k, v in pairs`) is bound by `assign`s the
+    * frontend emits after `__next__`, and those have to move with the loop variable. */
+  def renameBound(v: ujson.Value, bound: Set[String]): ujson.Value = v match {
+    case o: ujson.Obj if o.value.get("k").exists(_.str == "name") && bound.contains(o("v").str) =>
+      ujson.Obj("k" -> "name", "v" -> compName(o("v").str))
+    case o: ujson.Obj if o.value.get("k").exists(_.str == "assign") && bound.contains(o("x").str) =>
+      ujson.Obj("k" -> "assign", "x" -> compName(o("x").str), "e" -> renameBound(o("e"), bound))
+    case o: ujson.Obj => ujson.Obj.from(o.value.map { case (k, x) => k -> renameBound(x, bound) }.toSeq)
+    case a: ujson.Arr => ujson.Arr.from(a.value.map(renameBound(_, bound)))
+    case other        => other
+  }
+
+  /** Python 3 gives a comprehension its own scope: `x = 1; [x for x in xs]; x` is still
+    * `1`. Core's `forIn` binds into the enclosing environment, so left alone the loop
+    * variable would LEAK -- a later read of an outer `x` would see the last element, a
+    * silent wrong answer. Every `forIn` the lowering produced is therefore rebound to
+    * `compName` and its body renamed to match; names bound in the body from the loop
+    * variable (the frontend's destructuring `k = $comp$x[0]`) follow it. The first
+    * loop's iterable is left alone: Python evaluates it in the enclosing scope. Nested
+    * generators share one scope in Python too, so a rebound inner `x` mapping to the same
+    * synthetic name is the faithful reading, not a collision. */
+  def renameCompBinders(v: ujson.Value): ujson.Value = v match {
+    case o: ujson.Obj if o.value.get("k").exists(_.str == "forIn") =>
+      val x = o("x").str
+      var bound = Set(x)
+      seqStmts(o("body")).foreach { st =>
+        if (st.value.get("k").exists(_.str == "assign") &&
+            (jsonNames(st("e")) intersect bound).nonEmpty) bound += st("x").str
+      }
+      ujson.Obj("k" -> "forIn", "x" -> compName(x), "e" -> o("e"),
+                "body" -> renameBound(renameCompBinders(o("body")), bound))
+    case o: ujson.Obj => ujson.Obj.from(o.value.map { case (k, x) => k -> renameCompBinders(x) }.toSeq)
+    case a: ujson.Arr => ujson.Arr.from(a.value.map(renameCompBinders))
+    case other        => other
+  }
+
+  /** Lower a comprehension block to a prelude and a value: the container temporary is
+    * a fresh boxed list (or dict), the loop fills it through the `append`/indexed-store
+    * calls the frontend already spelled out, and the value is a read of the temporary.
+    * Under `.python` a list literal allocates, so `tmp0.append(e)` writes through the
+    * payload and `tmp0` afterwards IS the comprehension.
+    *
+    * A generator expression is lazy and has no Core representation; lowering it as a
+    * list is observationally equal only when it is consumed at once and in full --
+    * `tuple(g)`, `sum(g)`, `sorted(g)`, `"".join(g)` -- which is what `genExpEager`
+    * marks. Stored or returned (`g = (x for x in xs)`, `return (x for ...)`) it stays
+    * `expr:genExp`: a consumer could observe laziness, or never exhaust it. A set
+    * comprehension stays `expr:setComp`: Core has no set value. */
+  def comprehensionLowering(b: Block, eagerGen: Boolean): Option[(List[ujson.Obj], ujson.Obj)] =
+    comprehensionParts(b).map { case (tmp, kind, loop) =>
+      kind match {
+        case "set"                 => (Nil, hole("expr:setComp"))
+        case "gen" if !eagerGen    => (Nil, hole("expr:genExp"))
+        case _ =>
+          val init =
+            if (kind == "dict") ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
+            else ujson.Obj("k" -> "listE", "items" -> ujson.Arr())
+          renameCompBinders(stmt(loop)) match {
+            case fill: ujson.Obj =>
+              (List(ujson.Obj("k" -> "assign", "x" -> localName(tmp), "e" -> init), fill),
+               ujson.Obj("k" -> "name", "v" -> localName(tmp)))
+            case _ => (Nil, hole("expr:comprehension-shape"))
+          }
+      }
+    }
+
   /** Python's frontend turns statement-expressions (comprehensions, display literals)
     * into a BLOCK whose last child is the value. Split it into prelude statements and
     * the value expression rather than losing it to a hole. */
@@ -7736,10 +7870,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ctorAlloc(all) match {
         case Some(a) => (Nil, a)
         case None =>
-          all match {
+          // A comprehension in a STORED position: `ys = [..]`, `return [..]`. The loop
+          // variable must not leak here either, so this goes through the same lowering.
+          comprehensionLowering(b, eagerGen = false).getOrElse(all match {
             case Nil  => (Nil, hole("expr:empty-block"))
             case ks   => (stmts(ks.init), expr(ks.last))
-          }
+          })
       }
     // `006-reduce-remaining-holes`: an assignment/increment nested anywhere inside
     // this position's own value now threads its prelude out too (research.md §3) --
@@ -8929,6 +9065,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       if (!ok) (Nil, baseline)
       else {
         val argsArr = baseline("args").arr.toList
+        // A generator expression handed to one of these is exhausted at once and in
+        // full, so lowering it as a list is unobservable (`comprehensionLowering`).
+        // `c.name` is the bare callee: `tuple` for `tuple(...)`, `join` for `sep.join(...)`.
+        val savedEager = genExpEager
+        genExpEager = genExpConsumers.contains(c.name)
         val recur = posArgs.map {
           case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
             (List.empty[ujson.Obj], argExpr(sc))
@@ -8936,6 +9077,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             val (pa, ae) = exprV(a)
             (pa, if (pa.isEmpty) argExpr(a) else ae: ujson.Value)
         }
+        genExpEager = savedEager
         val lastEffect = recur.lastIndexWhere(_._1.nonEmpty)
         if (lastEffect < 0) (Nil, baseline)
         // Expanding an iterable can itself fail or read mutable state. Saving
@@ -9008,6 +9150,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     bareType(staticTypeOf(kidsOf(c)(0))) == "void" &&
                     !pureExpr(kidsOf(c)(1)) =>
       exprV(kidsOf(c)(1))
+    // A comprehension in a prelude-aware position -- most often a call's argument, where
+    // `genExpEager` says whether a generator expression may be lowered as a list.
+    case b: Block =>
+      comprehensionLowering(b, eagerGen = genExpEager).getOrElse((Nil, expr(b)))
     case other => (Nil, expr(other))
   }
 
