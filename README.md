@@ -254,7 +254,7 @@ Every link is mechanically checked, and each check is a different kind of oracle
 |---|---|---|
 | semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **245 agree, 0 divergences, 315 INCONCLUSIVE** on `cachetools` v7.1.7 re-exported by the current exporter (basis `python-exception-guards-v3`); 219/0/306 before the object-protocol work, 209/0/256 on the previous artifact. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on `Autoform/Generated/Cachetools.lean`, 10 survivors all analysed; **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution working (`mutation-Imp.json`) |
-| proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only; declaration count lives in `audit.json` (6,785 at the last recorded run, 2026-09-21; re-measure with `scripts/audit_all.py --strict`) |
+| proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only; declaration count lives in `audit.json` (6,887 at the last recorded run, 2026-09-21; re-measure with `scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 3 holes, all named |
 | every AST names the exporter that made it | `scripts/check_provenance.py` | **0 violations**; 0 of 14 tracked ASTs attributed, all 14 named in `provenance/unattributed.json` with a reason |
