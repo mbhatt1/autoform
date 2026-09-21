@@ -544,3 +544,22 @@ def test_js_indexed_native_conformance(subject, tmp_path, numeric_env, monkeypat
     # would silently change their aliasing, identity and truthiness semantics.
     monkeypatch.setitem(CASES, "js", [(subject, [1, 2]), (subject, [-3, 7])])
     test_joern_native_numeric("js", tmp_path, numeric_env)
+
+
+def test_python_negative_shift_raises_valueerror_by_name():
+    """A trap's string is read downstream as the raised exception's CLASS NAME.
+
+    `numToE` turns `.trap r` into `.exn (.str r)`, and Python `except` dispatch compares
+    that against `Stdlib.excNames`. The shift-count trap carried its prose reason, so
+    Core raised `.exn (.str "negative shift count")` where CPython raises `ValueError` --
+    no handler could ever match it, and the exporter's dispatch holed instead of
+    catching. The table in `Numeric.lean` said `ValueError` all along; the implementation
+    did not.
+    """
+    numeric = (ROOT / 'Autoform/Lang/Core/Numeric.lean').read_text()
+    assert 'shiftCountFault := some "ValueError"' in numeric, (
+        'the python config must name the exception its shift-count trap raises')
+    assert '.trap (c.shiftCountFault.getD "negative shift count")' in numeric
+    # Other dialects keep the prose reason: C's negative shift is undefined, not a
+    # trap that names an exception, and nothing should start calling it ValueError.
+    assert 'shiftCountFault  : Option String := none' in numeric

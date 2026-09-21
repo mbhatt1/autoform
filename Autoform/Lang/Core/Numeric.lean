@@ -198,6 +198,14 @@ structure NumConfig where
   onSignedOverflow : Policy        := .wrap
   /-- Shift count negative, or ≥ width. -/
   onShiftCount     : Policy        := .undefined
+  /-- When `onShiftCount = .trap`, the name of the exception the source language
+  raises. `numToE` turns a trap into `.exn (.str r)`, so `r` is read downstream as the
+  *class name* of the raised exception — Python's `try`/`except` dispatch compares it
+  against `Stdlib.excNames`. Leaving the prose reason there produced
+  `.exn (.str "negative shift count")` where CPython raises `ValueError`, so no handler
+  could match it and the exporter's dispatch holed instead. `none` keeps the prose,
+  which is right for a language that traps without naming an exception. -/
+  shiftCountFault  : Option String := none
   /-- `>>` applied to a negative value. -/
   negRightShift    : ShiftSemantics := .arithmetic
   divRound         : DivRound      := .trunc
@@ -207,7 +215,8 @@ namespace NumConfig
 
 /-- Python: bignums, floor division, negative shift counts raise `ValueError`. -/
 def python : NumConfig :=
-  { type := .unbounded, onShiftCount := .trap, divRound := .floor }
+  { type := .unbounded, onShiftCount := .trap, divRound := .floor,
+    shiftCountFault := some "ValueError" }
 
 /-- C `int` as the standard defines it: signed overflow, `INT_MIN / -1` and over-wide
 shifts are **undefined**, and this config says so out loud. -/
@@ -424,7 +433,7 @@ def shiftCount (c : NumConfig) (k : Int) : NumResult :=
         match c.onShiftCount with
         | .wrap      => .ok 0
         | .undefined => .ub "negative shift count"
-        | .trap      => .trap "negative shift count"
+        | .trap      => .trap (c.shiftCountFault.getD "negative shift count")
       else .ok k
   | t =>
       let n : Int := (t.bits : Int)
@@ -433,7 +442,7 @@ def shiftCount (c : NumConfig) (k : Int) : NumResult :=
         match c.onShiftCount with
         | .wrap      => .ok (k % n)                 -- Java / x86: mask to log2(width) bits
         | .undefined => .ub "shift count out of range"
-        | .trap      => .trap "shift count out of range"
+        | .trap      => .trap (c.shiftCountFault.getD "shift count out of range")
 
 /-- `a << k`. The count is normalised first, then the value is shifted exactly and put
 through the overflow policy — C makes a signed left shift that loses bits undefined,
@@ -666,7 +675,7 @@ example : NumConfig.c32Wrapv.mul 100000 100000 = .ok 1410065408 := by decide
 #eval NumConfig.c32.shl 1 32                      -- ub "shift count out of range"
 #eval NumConfig.java32.shl 1 32                   -- ok 1 (count masked to 0)
 #eval NumConfig.python.shl 1 40                   -- ok 1099511627776
-#eval NumConfig.python.shl 1 (-1)                 -- trap "negative shift count"
+#eval NumConfig.python.shl 1 (-1)                 -- trap "ValueError" (CPython raises it)
 #eval NumConfig.java32.shr (-8) 1                 -- ok (-4)   arithmetic
 #eval ({ NumConfig.java32 with negRightShift := .logical } : NumConfig).shr (-8) 1
                                                   -- ok 2147483644  (Java >>>)
