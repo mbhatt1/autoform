@@ -209,6 +209,45 @@ and regenerated specs — and any spec whose truth depended on the old literal v
 will legitimately change. Until then, treat a tracked AST as evidence about the
 exporter that produced it, not about the exporter in the tree.
 
+### Re-exporting today would cost more coverage than the staleness costs
+
+The obvious remedy — re-export and land fresh artifacts — was tried against
+`ast-Cachetools.json` and **should not be applied**. Not because it is hard, but because
+of what it produces. Measured, on cachetools v7.1.7 (the revision identified above) with
+the pinned Joern and the committed exporter:
+
+| | committed AST | fresh export |
+|---|---|---|
+| holes | 26, across 25 functions | **134, across 111 functions** |
+
+86 functions that currently translate would become holes. The growth is entirely in
+labels that did not exist when this artifact was made: `call:python-defaults` (53),
+`control:TRY-exception-representation` (27), `call:python-receiver-signature` (24),
+`function:python-default-evaluation` (9), `op:raise-cause` (6).
+
+**None of that is a bug.** Every one of those is the exporter declining to model a Python
+construct it cannot model faithfully — default-argument evaluation, the receiver
+signature of a method, the representation of a caught exception — and holing it instead
+of guessing. That is the design commitment working as intended. But it means the current
+exporter is substantially more conservative about Python than the one that produced the
+tracked corpus, and re-exporting trades a stale artifact for a much emptier one.
+
+The proof obligations follow the coverage. Landing the fresh export breaks 98 theorems:
+2 in `Autoform/Contracts.lean`, 22 in `Autoform/Specs/CachetoolsSpec.lean`, 74 in
+`Autoform/SpecsGen/Cachetools.lean`. The `SpecsGen` file regenerates, and a handful of
+the others are mechanical — a `signatureRejected` side condition that
+`signatureRejected_legacy` used to discharge, and one genuine domain correction
+(`methodkey` requires `self`, so `fun _ => True` is no longer its domain). The rest are
+not fixable at all: they are theorems about functions that have become holes, and the
+honest form of such a "fix" is deletion.
+
+So the staleness recorded above stands, and stands *deliberately*. A tracked AST is
+evidence about the exporter that produced it; replacing it today would produce a
+different, worse artifact rather than a refreshed one. What would make re-export the
+right move is closing the Python gaps the new labels name — then the fresh export would
+dominate the stale one on both counts, and the theorems would survive it. Until then,
+re-export is a coverage regression wearing the costume of an integrity fix.
+
 The guard for exactly this existed and was switched off. `scripts/provenance.py
 record` writes `exporter_sha256` (the hash of the `.sc` that produced an AST) next to
 `joern_version`, and its docstring calls that the field that "earns its keep without
