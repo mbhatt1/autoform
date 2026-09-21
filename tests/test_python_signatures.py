@@ -34,7 +34,7 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        staticMethod=False, property=False, nonlocalUses=[], nonlocalDefines=[],
+        staticMethod=False, property=False, classMethod=False, nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
     # holes the definition. A LITERAL default is modelled, so it clears the flag and
@@ -483,3 +483,120 @@ class TestModuleAttributeDefaults:
         src = (ROOT / 'cartographer/export_ast.sc').read_text()
         assert 'externalModule(value("v").str, "external")' in src
         assert 'def externalModule(path: String, why: String)' in src
+
+
+class TestClassMethodBinding:
+    """`@classmethod` receives the CLASS as its first argument.
+
+    `@staticmethod` was the decorator whose entire meaning is "bind no receiver".
+    `@classmethod` is the other one with no residue: "the receiver is the class". Core
+    implements it without a new receiver mechanism at all — the receiving parameter
+    (`cls`, by convention, but any name) is KEPT in `params` instead of being stripped
+    like `self`, and every `.mcall` site passes the class value as the first positional
+    with no separate receiver. That is exactly how an unbound method reached through the
+    class was already called, so `applyFunc` is untouched.
+
+    Both call paths must agree with CPython, which passes `cls = C` for each:
+
+        class C:
+            @classmethod
+            def make(cls, n): return cls(n)
+        C.make(3)        # via the class value
+        C(1).make(3)     # via an instance -- the class is rebuilt from the method's name
+    """
+
+    def test_a_class_method_keeps_its_receiver_parameter(self):
+        source = ('class C:\n'
+                  '    @classmethod\n'
+                  '    def make(cls, n):\n'
+                  '        return cls(n)\n')
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['classMethod'] is True
+        assert sig['isMethod'] is True          # still lexically a method: dispatch finds it
+        assert sig['decorated'] is False        # the decorator has no residue left to model
+        assert sig['staticMethod'] is False
+        # `cls` is an ordinary first positional, not a stripped receiver.
+        assert sig['parameters'] == ['cls', 'n']
+        assert sig['required'] == ['cls', 'n']
+        assert sig['firstPositional'] == 'cls'
+
+    def test_classmethod_alongside_another_decorator_still_holes(self):
+        """The exemption is for a decorator with no residue. Two decorators have one."""
+        source = ('class C:\n'
+                  '    @classmethod\n'
+                  '    @other\n'
+                  '    def make(cls):\n'
+                  '        return cls\n')
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['classMethod'] is False
+        assert sig['decorated'] is True
+
+    def test_a_shadowed_classmethod_is_not_the_builtin(self):
+        source = ('classmethod = None\n\n'
+                  'class C:\n'
+                  '    @classmethod\n'
+                  '    def make(cls):\n'
+                  '        return cls\n')
+        sig = [v for v in _decode(source)['signatures'].values() if v['name'] == 'make'][0]
+        assert sig['classMethod'] is False
+        assert sig['decorated'] is True
+
+    def test_a_module_level_classmethod_is_just_a_decorator(self):
+        """Outside a class there is no class to receive, so the directive means nothing
+        and the function is decorated like any other."""
+        source = '@classmethod\ndef f(cls):\n    return cls\n'
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['classMethod'] is False
+        assert sig['decorated'] is True
+        assert sig['isMethod'] is False
+
+    def test_an_ordinary_method_is_unchanged(self):
+        source = 'class C:\n    def f(self, a):\n        return a\n'
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['classMethod'] is False
+        assert sig['isMethod'] is True
+
+    def test_the_exporter_keeps_cls_and_records_the_receiver_kind(self):
+        """Source assertions on the Scala side, since the exporter is not run here: the
+        receiver-stripping filter, the shape check and the gap check all exempt a
+        classmethod, and the emitted signature says what the receiver is."""
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert '.filterNot(p => isMethodDecl && !isClassMethodDecl && p.name == "self")' in src
+        assert '.filterNot(p => isMethodDecl && !isClassMethodDecl && p == "self")' in src
+        assert 'if (isMethodDecl && !isClassMethodDecl &&' in src
+        assert 'List("receiverKind" -> ujson.Str("class"))' in src
+
+    def test_core_passes_the_class_at_every_call_site(self):
+        """Three `.mcall`/`.call` sites, one rule: a classmethod gets its class as the
+        first positional and no receiver. The class is rebuilt from the method's own
+        qualified name when the call comes through an instance."""
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'def Func.isClassMethod (fn : Func) : Bool :=' in sem
+        assert 'def Func.ownerClassValue (fn : Func) : Val :=' in sem
+        # via an instance: class rebuilt from the method name
+        assert 'applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws' in sem
+        # via the class value: the receiver IS the class
+        assert 'applyFunc ctx n h₂ fn none ((.fn g) :: vs) kws' in sem
+        # as a bound value (`f = C.make; f(3)`)
+        assert 'applyFunc ctx n h₁ fn none (fn.ownerClassValue :: vs) kws' in sem
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert 'receiverKind : Option String := none' in syntax
+
+    def test_the_renderer_emits_and_gates_the_receiver_kind(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', ROOT / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        fn = {'name': 'C.make', 'file': 'm.py', 'params': ['cls', 'n'],
+              'body': {'k': 'ret', 'e': {'k': 'name', 'v': 'cls'}},
+              'pythonSignature': {'positionalOnly': [], 'keywordOnly': [],
+                                  'required': ['cls', 'n'], 'isMethod': True,
+                                  'receiverKind': 'class'}}
+        text = '\n'.join(mod.render_func(fn, 'f_make'))
+        assert 'receiverKind := some "class"' in text
+        # The only receiver kind Core knows. Anything else must fail loudly rather than
+        # render as a binding the semantics has no rule for.
+        fn['pythonSignature']['receiverKind'] = 'metaclass'
+        with pytest.raises(ValueError, match='unknown Python receiver kind'):
+            mod.render_func(fn, 'f_make')

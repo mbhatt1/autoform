@@ -856,6 +856,20 @@ def classNameOfValue (g : String) : String :=
   let base := if g.endsWith "<meta>" then g.dropRight 6 else g
   (base.splitOn ".").getLastD base
 
+/-- A `@classmethod`: the recovered signature says the receiver is the class. -/
+def Func.isClassMethod (fn : Func) : Bool :=
+  fn.pythonSignature.bind (·.receiverKind) == some "class"
+
+/-- The class VALUE that owns a method, rebuilt from the method's qualified name.
+
+A classmethod reached through an INSTANCE (`c.make(3)`) still receives the class, and the
+instance's `Obj` only carries the short class name. The method's own name carries the
+qualified one -- `d.py:<module>.C.make` -- so dropping its last dotted segment and adding
+the exporter's `<meta>` marker gives exactly the value `typeValue` emits for `C`. Splitting
+on `.` is safe here because the file part's dots are never the LAST segment. -/
+def Func.ownerClassValue (fn : Func) : Val :=
+  .fn (".".intercalate (fn.name.splitOn ".").dropLast ++ "<meta>")
+
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
@@ -1214,7 +1228,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                             -- `.`-call. `applyFunc` binds the receiver separately, so the head
                             -- has to be split off here, or it lands on `self`'s successor and
                             -- the call reports a spurious arity `TypeError`.
-                            if fn.isMethod && fn.vararg.isNone
+                            -- A `@classmethod` used as a VALUE (`f = C.make; f(3)`) is
+                            -- already bound to its class in Python, so the class is the
+                            -- first positional and there is no receiver to split off.
+                            if fn.isClassMethod then
+                              applyFunc ctx n h₁ fn none (fn.ownerClassValue :: vs) kws
+                            else if fn.isMethod && fn.vararg.isNone
                                && vs.length == fn.params.length + 1 then
                               applyFunc ctx n h₁ fn (some (vs.headD .unit)) vs.tail kws
                             else applyFunc ctx n h₁ fn none vs kws
@@ -1304,7 +1323,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                 | none    => (h₂, .hole s!"module-attr:{m}")
               else (h₂, .hole s!"mcall:{o.cls}.{m}")
             | some fn =>
-              if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+              -- `c.make(3)` on a `@classmethod`: Python passes the CLASS, not `c`, and
+              -- passes it as the first positional (the exporter kept `cls` in `params`),
+              -- so there is no receiver to inject under `self`.
+              if fn.isClassMethod then
+                applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+              else if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
               else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
       | (h₁, .val (.fn g)) =>
         match evalList ctx n h₁ ρ args with
@@ -1328,7 +1352,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           if ctx.classDefines short m then
             match ctx.resolveMethod short m with
             | some fn =>
-                match vs with
+                -- `C.make(3)` on a `@classmethod`: the receiver IS this class value, and
+                -- it goes in as the first positional rather than as `self`. An unbound
+                -- ordinary method keeps the split-off rule below.
+                if fn.isClassMethod then
+                  applyFunc ctx n h₂ fn none ((.fn g) :: vs) kws
+                else match vs with
                 | recv :: rest => applyFunc ctx n h₂ fn (some recv) rest kws
                 | []           => (h₂, .hole s!"mcall:{short}.{m}:no-receiver")
             | none => (h₂, .hole s!"mcall:{m}:non-object")
