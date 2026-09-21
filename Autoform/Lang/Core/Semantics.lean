@@ -262,6 +262,81 @@ def binopNeedsHeap (op : String) (x y : Val) : Bool :=
     (h : isCmpOp op = false) : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, h]
 
+/-! ## JavaScript: `typeof`, `===`, `==`
+
+Three operators whose meaning is fixed by ECMA-262 and which Core used to answer with
+Python's (`===` and `==` were the same `Val.beq`; `typeof` was a hole). Every rule below
+names the specification clause it implements, and every place the rule is WEAKER than the
+clause says so and answers `none`/a hole rather than a guess.
+
+**`null` and `undefined` are one value here.** Core has a single `Val.unit`; JavaScript
+has two distinct primitives. They agree under `==` (§7.2.13 steps 2-3) and disagree under
+`===` (§7.2.14: different types) and `typeof` (`"object"` vs `"undefined"`). Core answers
+as if the value were `undefined`: `x === null` is therefore `true` for an `undefined` `x`,
+and `typeof null` is `"undefined"` where Node says `"object"`. That is a silent
+divergence, recorded in docs/languages.md §16.G with the two idioms it can bite. -/
+
+/-- ECMA-262 §13.5.3 `typeof`, the "typeof Operator Results" table: Undefined →
+`"undefined"`, Null → `"object"`, Boolean → `"boolean"`, Number → `"number"`, String →
+`"string"`, an object with a [[Call]] → `"function"`, any other object → `"object"`.
+Core's `int` and `float` are both JavaScript Numbers; `unit` answers for `undefined` (see
+the module note on `null`). -/
+def jsTypeof : Val → String
+  | .int _ | .float _               => "number"
+  | .str _                          => "string"
+  | .bool _                         => "boolean"
+  | .unit                           => "undefined"
+  | .fn _ | .clos _ _ | .clsClos _ _ => "function"
+  | _                               => "object"
+
+/-- ECMA-262 §7.2.14 IsStrictlyEqual: different types → `false`; Numbers by
+`Number::equal` (`NaN ≠ NaN`, `+0 = -0`, which `FConfig.cmp` implements); otherwise
+SameValueNonNumber -- strings by code units, booleans by value, `undefined`/`null` with
+themselves, objects by identity (a `Val.ref` IS the identity). An `int` and a `float` are
+both Numbers, so they compare numerically (`Fl.cmpIntv`). Functions compare by name,
+which is identity for a corpus function. -/
+def jsStrictEq : Val → Val → Bool
+  | .int x,   .int y   => x == y
+  | .float x, .float y => (Dialect.javascript.toFConfig).eq x y
+  | .int x,   .float y => Fl.cmpIntv x y == some .eq
+  | .float x, .int y   => Fl.cmpIntv y x == some .eq
+  | .str x,   .str y   => x == y
+  | .bool x,  .bool y  => x == y
+  | .unit,    .unit    => true
+  | .ref x,   .ref y   => x == y
+  | .fn x,    .fn y    => x == y
+  | _,        _        => false
+
+/-- `ToNumber` of a String (ECMA-262 §7.1.4.1.1 StringToNumber), for the strings Core can
+decide: whitespace-only is `+0`; a decimal integer literal is that integer. Anything
+else -- a fraction, an exponent, hex, or a non-numeric string (whose answer would be NaN)
+-- is `none`, and the caller holes rather than guess which of those it was. -/
+def jsIntOfStr (s : String) : Option Int :=
+  let t := s.trim
+  if t.isEmpty then some 0 else t.toInt?
+
+/-- ECMA-262 §7.2.13 IsLooselyEqual, the decidable part. Step 1: same type →
+IsStrictlyEqual. Steps 2-4: `null`/`undefined` equal each other and nothing else (one
+value in Core, see the module note). Steps 9-10: a Boolean is compared as `ToNumber` of
+it (`true` → 1, `false` → 0). Steps 5-8: a Number against a String compares against
+`ToNumber(string)`, decided when `jsIntOfStr` decides it. Steps 11-12 (an Object against
+a primitive goes through ToPrimitive) and the BigInt/Symbol steps are `none`: the caller
+holes with the two kinds in the label. -/
+def jsLooseEq (x y : Val) : Option Bool :=
+  let num : Val → Val := fun v => match v with
+    | .bool b => .int (if b then 1 else 0)
+    | v       => v
+  match num x, num y with
+  | .unit,    .unit    => some true
+  | .unit,    _        => some false
+  | _,        .unit    => some false
+  | .int a,   .str s   => (jsIntOfStr s).map (· == a)
+  | .str s,   .int a   => (jsIntOfStr s).map (· == a)
+  | .float a, .str s   => (jsIntOfStr s).map (fun n => Fl.cmpIntv n a == some .eq)
+  | .str s,   .float a => (jsIntOfStr s).map (fun n => Fl.cmpIntv n a == some .eq)
+  | a,        b        => if a.kind == b.kind || (a.kind ≤ 3 && b.kind ≤ 3)
+                          then some (jsStrictEq a b) else none
+
 /-- Explicit language operators for newly exported terms. Keeping this dispatch
 separate also keeps reduction of the legacy integer operators inexpensive. -/
 def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
@@ -290,6 +365,25 @@ def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "js:%", _, _ => match d with
                   | .javascript => flBinop .javascript "%" a b
                   | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  -- JavaScript equality (see the `jsStrictEq`/`jsLooseEq` notes for the clauses).
+  -- Emitted by the exporter for `.js`/`.ts` files only; outside `.javascript` they are
+  -- refused like the arithmetic `js:` operators above.
+  | "js:===", x, y => match d with
+                     | .javascript => .val (.bool (jsStrictEq x y))
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:!==", x, y => match d with
+                     | .javascript => .val (.bool (!jsStrictEq x y))
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:==", x, y  => match d with
+                     | .javascript => match jsLooseEq x y with
+                                     | some r => .val (.bool r)
+                                     | none   => .hole s!"js:loose-eq:{x.kind}-{y.kind}"
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:!=", x, y  => match d with
+                     | .javascript => match jsLooseEq x y with
+                                     | some r => .val (.bool (!r))
+                                     | none   => .hole s!"js:loose-eq:{x.kind}-{y.kind}"
+                     | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
   | "py:/", _, _ => flBinop .python "/" a b
   | _, _, _ => match d with
                -- Python never reaches a typed operator (the exporter emits none for it,
@@ -309,6 +403,10 @@ source dialect: Python gets bignums, C-like gets 32-bit two's-complement. -/
 def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   let nc := d.toNumConfig
   match op, a, b with
+  -- JavaScript equality is decided on the VALUES' kinds by `languageBinop`, before the
+  -- numeric arms below: `1 === 1.0` has an `int` and a `float` operand, which the
+  -- `flBinop` arms would otherwise claim for an operator they do not know.
+  | "js:===", _, _ | "js:!==", _, _ | "js:==", _, _ | "js:!=", _, _ => languageBinop d op a b
   | "+",  .int x,   .int y   => numToE (nc.add x y)
   -- Item 6: a C `char*` is not a Python `str`. In C, `+` on pointers is POINTER
   -- ARITHMETIC and `<`/`>`/`==` compare ADDRESSES, not contents. Core has one `Val.str`
@@ -591,6 +689,10 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- where "subtract from zero" would not be (`0.0 - 0.0 = 0.0`, but `-(0.0) = -0.0`).
   | "-", .float f => .val (.float f.neg)
   | "!", x      => .val (.bool (!x.truthy))
+  -- `typeof e`, ECMA-262 §13.5.3 -- `jsTypeof` carries the table and the `null` caveat.
+  | "js:typeof", x => match d with
+                     | .javascript => .val (.str (jsTypeof x))
+                     | _           => .hole "numeric:js-op-outside-javascript:typeof"
   -- `~x` — **bitwise** complement, which is not `!x`. Joern spells the two
   -- `<operator>.not` and `<operator>.logicalNot`; this exporter previously mapped *both*
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
@@ -2151,7 +2253,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                    | .clsClos _ c => c
                    | _            => []
         let (h₂, r) := h₁.alloc { cls := cls, fields := [], captured := cap }
-        match ctx.resolveMethod cls "__init__" with
+        match ctx.resolveMethod cls ctx.dialect.ctorName with
         | none    => (h₂, .val (.ref r))
         | some fn =>
           match applyFunc ctx n h₂ fn (some (.ref r)) vs kws with
@@ -4062,7 +4164,37 @@ private def jsProg : Program :=
       -- `xs = [1, 2]; xs.foo`  -- Node: undefined
     , { name := "arrMiss", params := []
       , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
-                     (.ret (.field (.name "xs") "foo")) } ] }
+                     (.ret (.field (.name "xs") "foo")) }
+      -- `class Pt { constructor(x) { this.x = x } getX() { return this.x } }`
+      -- `new Pt(3).getX()`  -- Node: 3. The exporter renames `this` to `self` and the
+      -- constructor is `<init>` (`Dialect.ctorName`).
+    , { name := "m.js:<module>.Pt.<init>", params := ["x"]
+      , body := .setField (.name "self") "x" (.name "x") }
+    , { name := "m.js:<module>.Pt.getX", params := []
+      , body := .ret (.field (.name "self") "x") }
+    , { name := "newPt", params := []
+      , body := .ret (.mcall (.alloc "Pt" [.lit (.int 3)]) "getX" []) }
+      -- `typeof 1 + typeof "s" + typeof true + typeof undefined + typeof newPt`
+    , { name := "typeofs", params := []
+      , body := .ret (.binop "js:+" (.unop "js:typeof" (.lit (.int 1)))
+                 (.binop "js:+" (.unop "js:typeof" (.lit (.str "s")))
+                 (.binop "js:+" (.unop "js:typeof" (.lit (.bool true)))
+                 (.binop "js:+" (.unop "js:typeof" (.lit .unit))
+                                (.unop "js:typeof" (.fnref "newPt")))))) }
+      -- `[1 === "1", 1 == "1", 0 == false, null == undefined, "" == 0, 1 === 1.0, 2 != "2"]`
+    , { name := "eqs", params := []
+      , body := .ret (.tupleE
+          [ .binop "js:===" (.lit (.int 1)) (.lit (.str "1"))
+          , .binop "js:==" (.lit (.int 1)) (.lit (.str "1"))
+          , .binop "js:==" (.lit (.int 0)) (.lit (.bool false))
+          , .binop "js:==" (.lit .unit) (.lit .unit)
+          , .binop "js:==" (.lit (.str "")) (.lit (.int 0))
+          , .binop "js:===" (.lit (.int 1)) (.lit (.float (Fl.ofBits 0x3FF0000000000000)))
+          , .binop "js:!=" (.lit (.int 2)) (.lit (.str "2")) ]) }
+      -- `1 == {}`: an object against a primitive is ToPrimitive, which Core does not
+      -- model -- a named hole, never a guess.
+    , { name := "eqObj", params := []
+      , body := .ret (.binop "js:==" (.lit (.int 1)) (.dictE [])) } ] }
 
 -- `xs = []; xs.push(1); n = xs.push(2); n + 10 * xs.length`  -- Node: 2 + 20 = 22
 #guard match runFunc jsProg 300 "build" [] with | .val (.int 22) => true | _ => false
@@ -4075,6 +4207,17 @@ private def jsProg : Program :=
 -- property write lands in the literal, not beside it.  -- Node: 121
 #guard match runFunc jsProg 300 "objLit" [] with | .val (.int 121) => true | _ => false
 #guard match runFunc jsProg 300 "arrMiss" [] with | .val .unit => true | _ => false
+-- `new Pt(3).getX()`  -- Node: 3
+#guard match runFunc jsProg 300 "newPt" [] with | .val (.int 3) => true | _ => false
+-- Node: "numberstringbooleanundefinedfunction"
+#guard match runFunc jsProg 300 "typeofs" [] with
+       | .val (.str "numberstringbooleanundefinedfunction") => true | _ => false
+-- Node: [false, true, true, true, true, true, false]
+#guard match runFunc jsProg 300 "eqs" [] with
+       | .val (.tuple [.bool false, .bool true, .bool true, .bool true, .bool true,
+                       .bool true, .bool false]) => true
+       | _ => false
+#guard match runFunc jsProg 300 "eqObj" [] with | .hole l => l.startsWith "js:loose-eq:" | _ => false
 
 -- UTF-16 units: `"😀".length` is 2 and its first unit is a lone surrogate.
 #guard "xy".jsLength == 2

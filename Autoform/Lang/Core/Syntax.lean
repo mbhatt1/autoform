@@ -72,6 +72,15 @@ inductive Dialect where
 
 namespace Dialect
 
+/-- The method `Expr.alloc` runs on a fresh instance. Python's `__init__`; JavaScript's
+`<init>`, which is the name jssrc2cpg gives a class's `constructor(...)` -- ECMA-262
+§13.3.5 (`new MemberExpression Arguments`) → EvaluateNew → Construct → the class's
+[[Construct]], which runs that method with `this` bound to the new object. The exporter
+spells every other dialect's constructor `__init__` on the way out (C++'s `Foo.Foo`). -/
+def ctorName : Dialect → String
+  | .javascript => "<init>"
+  | _           => "__init__"
+
 /-- Do this dialect's container literals allocate — do lists and dicts have IDENTITY?
 
 Python and JavaScript: yes. `a = [1]; b = a; b[0] = 9` changes `a` in both, and two

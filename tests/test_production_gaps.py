@@ -1004,3 +1004,59 @@ class TestExceptBindingAndCorpusClasses:
         assert d['raises']['5:5'] == {'kind': 'name-call', 'name': 'MyErr'}
         assert d['exceptionBases']['KeyError'] == ['LookupError', 'Exception', 'BaseException']
         assert 'KeyError' in d['represented']
+
+class TestJavaScriptObjectsAndEquality:
+    """Slice G of the interpreter-for-every-language pass: `new`, `this`, `typeof`, `===`
+    and `==` under `.javascript`, each rule pinned to the ECMA-262 clause it implements.
+    The behavioural checks are the `jsProg` `#guard`s in `Semantics.lean` (Node's values
+    in the comments); these hold the shape in place."""
+
+    SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
+    SYN = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Syntax.lean').read_text()
+    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+
+    def test_the_constructor_name_is_a_dialect_fact(self):
+        assert 'def ctorName : Dialect → String' in self.SYN
+        assert '| .javascript => "<init>"' in self.SYN
+        assert 'match ctx.resolveMethod cls ctx.dialect.ctorName with' in self.SEM
+        # the fuel-monotonicity proof cases on the same term
+        fm = (Path(__file__).resolve().parents[1] / 'Autoform/FuelMono.lean').read_text()
+        assert 'Ctx.resolveMethod ctx cls ctx.dialect.ctorName' in fm
+
+    def test_typeof_and_equality_cite_the_spec(self):
+        for clause in ('§13.5.3', '§7.2.14 IsStrictlyEqual', '§7.2.13 IsLooselyEqual'):
+            assert clause in self.SEM, clause
+        assert 'def jsTypeof : Val → String' in self.SEM
+        assert 'def jsStrictEq : Val → Val → Bool' in self.SEM
+        assert 'def jsLooseEq (x y : Val) : Option Bool' in self.SEM
+        # the undecidable steps hole rather than guess
+        assert 'js:loose-eq:' in self.SEM
+        # the null/undefined collapse is stated, not hidden
+        assert '`null` and `undefined` are one value here' in self.SEM
+
+    def test_js_equality_is_routed_before_the_numeric_arms(self):
+        i = self.SEM.index('def applyBinop (d : Dialect)')
+        head = self.SEM[i:i + 900]
+        assert '| "js:===", _, _ | "js:!==", _, _ | "js:==", _, _ | "js:!=", _, _ => languageBinop d op a b' in head
+
+    def test_every_rule_has_a_node_checked_guard(self):
+        guards = self.SEM.split('private def jsProg', 1)[1]
+        for subject in ('newPt', 'typeofs', 'eqs', 'eqObj'):
+            assert f'runFunc jsProg 300 "{subject}" []' in guards, subject
+
+    def test_exporter_treats_this_like_cpp_and_reads_the_source_for_strictness(self):
+        assert 'if ((cppFile || jsLikeFile) && n == "this") "self" else n' in self.EXP
+        assert 'filterNot(x => (cppFile || jsLikeFile) && x == "this")' in self.EXP
+        assert 'if (jsLikeFile) None' in self.EXP           # no receiver re-threaded as arg 0
+        assert 'def binopFor(c: Call): String' in self.EXP
+        assert 'c.code.contains("===") || c.code.contains("!==")' in self.EXP
+        # typeof is jssrc2cpg's one-child `<operator>.instanceOf`; two children stay a hole
+        assert '"op" -> "js:typeof"' in self.EXP
+        assert 'hole("op:instanceof:class-hierarchy")' in self.EXP
+
+    def test_new_folds_to_alloc_and_names_what_it_cannot_build(self):
+        assert 'callName(ctor) == "<operator>.new"' in self.EXP
+        assert 'ujson.Obj("k" -> "alloc", "cls" -> i.name,' in self.EXP
+        assert 'hole("op:new:" + i.name)' in self.EXP
+        assert 'hole("op:new:unfolded")' in self.EXP
+        assert 'hole("op:new:computed-constructor")' in self.EXP
