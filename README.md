@@ -217,7 +217,7 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences**, but over **30 of 208** `cachetools` functions — coverage, not agreement, is the limit |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences** on every case the oracle can decide; `conformance.json` records how many it could (`agree`, `inconclusive`, `measurement_basis`) — coverage, not agreement, is the limit |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
@@ -235,9 +235,12 @@ UNSUPPORTED rather than suppressing the equivalent mutants to turn it green.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small: only 30 of 208 `cachetools`
-functions are compared. Everything else is INCONCLUSIVE — a value the harness cannot
-encode, a receiver it cannot build, or a hole. **The limit is reach, not agreement.** A
+It was wrong to say 100%, because the denominator is small. Everything the oracle cannot
+decide is INCONCLUSIVE — a value the harness cannot encode, a receiver it cannot build, an
+unmodelled builtin, or a hole — and `conformance.json` carries the count next to the
+agreements and a `measurement_basis` so two runs are only compared on the same footing.
+The figure is deliberately not repeated here: the last time a number was written into
+this paragraph it was stale within a month. **The limit is reach, not agreement.** A
 conformance rate quoted without its coverage is the self-flattering metric this project
 keeps finding.
 
