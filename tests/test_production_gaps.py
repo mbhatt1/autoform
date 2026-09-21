@@ -750,3 +750,80 @@ class TestValueCallees:
         ledger = (ROOT / 'Autoform/Ledger.lean').read_text()
         assert '| .callValue f as => eCalls f ++ eCallsL as' in ledger
         assert '| .callValue f as => 1 + eRisk f + eRiskL as' in ledger
+
+
+class TestStrReprFormat:
+    """`str()`, `repr()` and f-strings print what CPython prints, or hole by kind.
+
+    The labels `op:stringExpressionList:non-literal-part` (the last three holes on
+    cachetools), `op:formatString:conversion-or-spec` and `op:formatString:escape` stood
+    for "Core cannot turn a value into text". `Stdlib.pyStr`/`pyRepr` can now, for every
+    value whose spelling is a function of the value (int, bool, None, str, list, tuple,
+    dict), and `fmtE` implements the exact subset of the Format Specification
+    Mini-Language; the behavioural check is the `#guard` table in `Stdlib.lean`, taken
+    from CPython 3.11 rather than from memory. These pin the shape in place.
+    """
+
+    STDLIB = (ROOT / 'Autoform/Lang/Core/Stdlib.lean').read_text()
+
+    def test_the_three_names_are_one_table_consulted_first(self):
+        assert 'def strBuiltin (name : String) (args : List Val) : Option EResult :=' in self.STDLIB
+        assert '    match strBuiltin name args with\n    | some r => ok r' in self.STDLIB
+        for name in ('"str", "repr", "format", "int"',):
+            assert name in self.STDLIB          # `format` is a known free builtin
+        assert '| "format"     => [.int 0, .str ">3"]' in self.STDLIB   # completeness witness
+
+    def test_repr_follows_unicode_repr_and_refuses_non_ascii(self):
+        assert "if cs.contains '\\'' && !cs.contains '\"' then '\"' else '\\''" in self.STDLIB
+        assert 'if cs.any (fun c => c.toNat > 0x7f) then none else' in self.STDLIB
+        assert '#guard pyRepr (.str "é") == none' in self.STDLIB
+
+    def test_format_spec_subset_is_exact_and_everything_else_is_a_hole(self):
+        # the spec grammar the parser recognises, and the refusals for what it does not
+        assert "if c == '+' || c == '-' || c == ' ' || c == 'z' || c == '#' || c == '{' then none else" in self.STDLIB
+        assert '#guard fmtHoles (fmtE (.int 42) "x") "format:spec:x"' in self.STDLIB
+        # the documented defaults: numbers right, strings left, `0` means `=`+fill 0 for numbers only
+        assert "let align := sp.align.getD (if sp.zero then '=' else '>')" in self.STDLIB
+        assert "let align := sp.align.getD '<'" in self.STDLIB
+        assert '#guard fmtIs (fmtE (.str "ab") "05") "ab000"' in self.STDLIB
+        # object.__format__: non-empty spec on None/list/tuple/dict is a TypeError
+        assert '| .unit | .list _ | .tuple _ | .dict _ => .exn (.str "TypeError")' in self.STDLIB
+
+    def test_floats_hole_rather_than_approximate(self):
+        assert '#guard pyStr (.float (Fl.ofBits 0x3FF8000000000000)) == none' in self.STDLIB
+        assert '| .float _ => .hole "format:unprintable:float"' in self.STDLIB
+
+    def test_exception_safety_is_a_theorem_not_a_convention(self):
+        for name in ('theorem strE_ne_exn', 'theorem fmtE_excSafe', 'theorem strBuiltin_excSafe'):
+            assert name in self.STDLIB, name
+        assert 'exact strBuiltin_excSafe' in self.STDLIB
+
+    def test_str_falls_back_to_repr_on_an_instance(self):
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert '| "str"  => match pick "__str__" with' in sem
+        assert '| none   => pick "__repr__"' in sem
+        # the pinned f-string residue is gone: CPython's answer, not a hole
+        assert '/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "vx!") -/' in sem
+
+    def test_exporter_reads_conversion_and_spec_off_the_field_text(self):
+        src = EXPORTER.read_text()
+        assert 'def fstringField(c: Call): Either[String, ujson.Obj]' in src
+        assert 'if (rest.startsWith("=")) Left("debug-specifier")' in src
+        assert 'case Some(cv) if cv != \'r\' && cv != \'s\' => Left("conversion-" + cv)' in src
+        assert 'Right(ujson.Obj("k" -> "call", "f" -> "format",' in src
+        # `!r` before the spec: format(repr(x), spec)
+        assert 'case Some(\'r\') => ujson.Obj("k" -> "call", "f" -> "repr", "args" -> ujson.Arr(base))' in src
+
+    def test_exporter_decodes_escapes_and_doubled_braces(self):
+        src = EXPORTER.read_text()
+        assert 'def pyDecodeEscapes(raw: String): Option[String]' in src
+        assert 'pyDecodeEscapes(l.code.replace("{{", "{").replace("}}", "}"))' in src
+        assert "case 'N'  => return None" in src            # \N{name} needs the Unicode database
+        # plain literals decode too, raw ones do not
+        assert 'if (prefix.toLowerCase.contains("r")) Some(body) else pyDecodeEscapes(body)' in src
+
+    def test_adjacent_literals_with_an_fstring_part_concatenate(self):
+        src = EXPORTER.read_text()
+        assert 'case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))' in src
+        assert 'else hole("op:stringExpressionList:non-literal-part")' in src
+

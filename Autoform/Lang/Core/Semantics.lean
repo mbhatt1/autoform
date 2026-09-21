@@ -1287,7 +1287,12 @@ does; everything else names exactly one method. -/
       match f with
       | "len"  => pick "__len__"
       | "hash" => pick "__hash__"
-      | "str"  => pick "__str__"
+      -- Data model § `object.__str__`: "The default implementation defined by the
+      -- built-in type `object` calls `object.__repr__()`", so `str(x)` on a class that
+      -- defines only `__repr__` runs `__repr__`.
+      | "str"  => match pick "__str__" with
+                  | some t => some t
+                  | none   => pick "__repr__"
       | "repr" => pick "__repr__"
       | "bool" => match pick "__bool__" with
                   | some t => some t
@@ -3087,10 +3092,10 @@ def fstrProg : Program :=
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "v3!") -/
 #guard_msgs in #eval runFunc fstrProg 200 "greet" [.int 3]
 
-/-! The residue, named for what actually blocks it. CPython answers `'vx!'`; Core answers
-a hole at `str` rather than a wrong string, and the label points at `Stdlib`'s `str`, not
-at the f-string. -/
-/-- info: Autoform.Core.EResult.hole "call:str" -/
+/-! The former residue. `str` used to decline on a `.str` (it could not tell a string
+from an exception value), so this was the hole `call:str`; `Stdlib.strBuiltin` prints a
+string as itself now, and Core answers exactly what CPython answers: `'vx!'`. -/
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "vx!") -/
 #guard_msgs in #eval runFunc fstrProg 200 "greet" [.str "x"]
 
 /-- `Lit.toVal` is exactly what `evalExpr` produces for a literal.
