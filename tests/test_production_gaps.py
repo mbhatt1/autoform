@@ -208,7 +208,10 @@ def test_failed_clone_leaves_no_temporary_tree(tmp_path):
 # character-range idiom in any parser.
 # --------------------------------------------------------------------------- #
 
-EXPORTER = ROOT / 'cartographer' / 'export_ast.sc'
+EXPORTER = ROOT / "cartographer" / "export_ast.sc"
+SEMANTICS = ROOT / "Autoform" / "Lang" / "Core" / "Semantics.lean"
+SYNTAX = ROOT / "Autoform" / "Lang" / "Core" / "Syntax.lean"
+RENDERER = ROOT / "cartographer" / "render_lean.py"
 
 
 def test_quoted_character_literal_is_not_an_integer_literal():
@@ -916,3 +919,88 @@ class TestIterationProtocol:
         for cite in ('library/functions.html#iter', 'library/functions.html#next',
                      'reference/compound_stmts.html §8.3', '"Iterator Types"'):
             assert cite in self.SEMANTICS, cite
+
+class TestExceptBindingAndCorpusClasses:
+    """`except E as e:` binds, and a class the corpus defines is an exception class.
+
+    Both rules are the Python reference's (§8.4.1: the handler matches "the class or a
+    non-virtual base class of the exception object, or a tuple that contains such a
+    class"; the `as` target is bound to the exception object), applied to Core's
+    representation of an exception as its class NAME. The behavioural checks are the
+    `excClassProg` `#guard`s in `Semantics.lean`, against CPython; these pin the shape.
+    """
+
+    def test_core_accepts_the_programs_own_exception_classes(self):
+        sem = SEMANTICS.read_text()
+        syntax = SYNTAX.read_text()
+        assert 'excClasses : List String := []' in syntax
+        assert 'def pythonRaise (extra : List String) (v : Val) : EResult' in sem
+        assert 'Stdlib.excNames.contains name || extra.contains name' in sem
+        assert 'match pythonRaise ctx.excClasses v with' in sem
+        # the invariant is restated over the program's classes, not weakened away
+        excsafe = (ROOT / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
+        assert 'ExcSafeIn ctx.excClasses v' in excsafe
+        assert 'sorry' not in excsafe.replace('-- sorry', '')
+        stdlib = (ROOT / 'Autoform/Lang/Core/Stdlib.lean').read_text()
+        assert 'def ExcSafeIn (extra : List String) (v : Val) : Prop' in stdlib
+
+    def test_every_guard_names_a_cpython_outcome(self):
+        sem = SEMANTICS.read_text()
+        block = sem.split('private def excClassProg', 1)[1]
+        for subject in ('catchOwn', 'catchBase', 'miss', 'bound', 'reraise', 'notExc'):
+            assert f'#guard match runFunc excClassProg 200 "{subject}" []' in block, subject
+        assert '.exn (.str "TypeError")' in block          # a non-exception name
+        assert '.val (.str "MyErr")' in block               # the binding is the class name
+
+    def test_exporter_closes_the_accepted_set_over_the_corpus_hierarchy(self):
+        src = EXPORTER.read_text()
+        assert 'val pyClassBases: Map[String, String]' in src
+        assert 'def acceptedFor(types: List[String], info: ujson.Value): List[String]' in src
+        assert 'def isCorpusException(name: String, bb: Map[String, List[String]]): Boolean' in src
+        assert 'excAncestors(name, bb).contains("BaseException")' in src
+        # a corpus type that is not an exception class stays the dynamic hole
+        assert 'case "typed" if !corpusTypes.forall(isCorpusException(_, bb)) =>' in src
+        # the module initializer carries the list the renderer turns into Program.excClasses
+        assert 'obj("exceptionClasses") = ujson.Arr.from' in src
+        assert 'extra += ", excClasses := [" + excs + "]"' in RENDERER.read_text()
+
+    def test_binding_is_exact_or_refused_never_a_string_for_an_object(self):
+        src = EXPORTER.read_text()
+        # the decoder's rule
+        assert 'def binding_ok(node):' in src
+        assert "payload_calls = ('isinstance', 'type', 'str', 'repr', 'format')" in src
+        # the exporter's holes for the payload Core does not carry
+        assert 'hole("exception:payload:" + f)' in src
+        assert 'hole("exception:payload:" + c.name)' in src
+        # `isinstance(e, T)` is the dispatch test, not a call
+        assert 'hole("exception:isinstance-type")' in src
+        # re-raise of the bound name and a bare `raise` use `Stmt.raise` directly
+        assert 'kind == "name" && exceptionBindings.contains(info("name").str)' in src
+        assert 'info("label").str == "op:raise-bare" && pendingExceptions.nonEmpty' in src
+
+    def test_decoder_classifies_handlers_and_raises(self):
+        import subprocess, sys, json
+        script = EXPORTER.read_text()
+        decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
+        source = ('class MyErr(Exception):\n    pass\n\n'
+                  'def boom():\n    raise MyErr("x")\n\n'
+                  'def f():\n'
+                  '    try:\n        boom()\n'
+                  '    except (KeyError, MyErr) as e:\n        raise e\n'
+                  '    except Exception as e:\n        return e.args\n'
+                  '    except ValueError as e:\n        return e\n'
+                  '    except os.error:\n        pass\n')
+        r = subprocess.run([sys.executable, '-I', '-S', '-c', decoder], input=source,
+                           text=True, capture_output=True, timeout=30)
+        assert r.returncode == 0, r.stderr
+        d = json.loads(r.stdout)
+        handlers = next(iter(d['tries'].values()))['handlers']
+        assert handlers[0]['kind'] == 'typed'
+        assert handlers[0]['corpusTypes'] == ['MyErr'] and handlers[0]['builtinTypes'] == ['KeyError']
+        assert handlers[0]['bindingOk'] is True          # `raise e`
+        assert handlers[1]['bindingOk'] is True          # `e.args` -> payload hole
+        assert handlers[2]['bindingOk'] is False         # `return e` would leak a string
+        assert handlers[3] == {'binding': None, 'kind': 'hole', 'label': 'control:TRY-handler-type'}
+        assert d['raises']['5:5'] == {'kind': 'name-call', 'name': 'MyErr'}
+        assert d['exceptionBases']['KeyError'] == ['LookupError', 'Exception', 'BaseException']
+        assert 'KeyError' in d['represented']

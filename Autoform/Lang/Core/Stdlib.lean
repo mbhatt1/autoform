@@ -343,6 +343,17 @@ def ExcSafe (v : Val) : Prop := ∃ n, v = .str n ∧ n ∈ excNames
 
 theorem excSafe_str {n : String} (h : n ∈ excNames) : ExcSafe (.str n) := ⟨n, rfl, h⟩
 
+/-- `ExcSafe`, widened by the exception classes a PROGRAM defines (`Ctx.excClasses`): a
+represented name is a builtin's or one of the program's own. -/
+def ExcSafeIn (extra : List String) (v : Val) : Prop :=
+  ∃ n, v = .str n ∧ (n ∈ excNames ∨ n ∈ extra)
+
+theorem ExcSafe.weaken {extra : List String} {v : Val} (h : ExcSafe v) : ExcSafeIn extra v :=
+  let ⟨n, hv, hn⟩ := h; ⟨n, hv, Or.inl hn⟩
+
+theorem excSafeIn_extra {extra : List String} {n : String} (h : n ∈ extra) :
+    ExcSafeIn extra (.str n) := ⟨n, rfl, Or.inr h⟩
+
 /-- `TypeError` is represented. Proved once, by `decide`, and tagged `@[simp]` so no
 proof below ever unfolds the 29-name list -- doing so inside `simp_all` exhausts the
 heartbeat budget. -/

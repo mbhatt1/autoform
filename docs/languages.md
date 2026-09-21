@@ -1002,3 +1002,49 @@ jinja2 does, and its export will name the label) rather than become a silently e
 wrong answer. This is recorded here as the next item, with the two designs and the
 observational argument, so that whoever lands it does not have to rediscover which one is
 honest.
+
+#### 16.C `except ... as e` binding and corpus-defined exception classes
+
+Two labels that dominated the scale corpora's `try` statements are closed, each against
+the Python language reference rather than against an intuition.
+
+**`except E as e:` binds (`control:TRY-handler-binding`: click 11, requests 2).** The
+reference (§8.4.1, "except clause") says the target is bound to the exception object and
+"cleared at the end of the `except` clause". Core's exception value is the class name —
+there is no payload — so the exporter binds `e` to the pending value exactly when every
+use of `e` in the handler is one the class name answers or one the exporter can refuse
+precisely (`binding_ok` in the decoder): re-raising it or `raise ... from e`;
+`isinstance(e, T)`, which is lowered to the same membership test the dispatch uses
+(`inOp e (T's closure)`); `type(e)`; passing `e` to an exception constructor, whose payload
+Core drops anyway; an attribute read `e.args`/`e.errno`, which becomes the hole
+`exception:payload:<attr>` (library reference: `BaseException.args` is "the tuple of
+arguments given to the exception constructor", which Core does not carry); and `str(e)`/
+`repr(e)`/`format(e)`, which become `exception:payload:str`. Any other use — `return e`,
+`x = e`, `e == y`, `f(e)` — would let a string stand in for an object, so the whole handler
+keeps its `control:TRY-handler-binding` hole. The end-of-clause deletion is not modelled:
+a read of `e` after the clause is a `NameError` in CPython and reads the class name here;
+it is recorded rather than fixed because no scale corpus does it.
+
+**Corpus exception classes are catchable and raisable (`control:TRY-handler-type`:
+requests 15, click 8).** The reference matches a raised exception against a handler
+naming "the class or a non-virtual base class of the exception object, or a tuple that
+contains such a class"; the library reference has user code "derive new exceptions from
+the `Exception` class or one of its subclasses". So a class the corpus defines whose base
+chain reaches a builtin exception (`class RequestException(IOError)`) is an exception class
+like any other. The exporter now reads every Python class's single base from the CPG
+(`pyClassBases`), closes each handler's accepted set over both hierarchies —
+`acceptedFor`: the decoder's builtin closure plus every corpus class deriving from a named
+type — and lowers `raise MyErr(args)` to "evaluate the arguments for their effects, raise
+the name `MyErr`". Core accepts the name because the renderer lists every such class in
+`Program.excClasses` and `pythonRaise ctx.excClasses` treats it as represented
+(`Semantics.lean`); `ExcSafe.lean` is restated over `Stdlib.ExcSafeIn ctx.excClasses` —
+every exception Core raises under `.python` names a builtin or one of the program's own
+classes. Tuples of types flatten; an attribute path (`socket.error`), an alias Core cannot
+see, or a name that is not a corpus exception class stays `control:TRY-handler-type`;
+multiple inheritance and a short name bound to two different bases are not guessed at.
+
+Checked on every build by the `excClassProg` `#guard`s in `Semantics.lean`, against
+CPython: catch by own class, by base `Exception` (whose closure contains the corpus class),
+no match on `KeyError` propagates, `except (KeyError, MyErr) as e: return e` yields the
+class name, `raise e` re-raises it, and raising a non-exception name is CPython's
+`TypeError` ("exceptions must derive from BaseException").

@@ -191,6 +191,14 @@ EOFError FloatingPointError ImportError IndentationError IndexError KeyError
 KeyboardInterrupt LookupError MemoryError NameError NotImplementedError OverflowError
 RecursionError ReferenceError RuntimeError StopIteration StopAsyncIteration SyntaxError
 SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'''.split()
+# The builtin exception hierarchy, read off the parser runtime's classes (library
+# reference, "Built-in Exceptions", "Exception hierarchy"): builtin name -> its builtin
+# ancestors' names. Emitted once per file so the exporter can close a handler's accepted
+# set over the corpus's own exception classes -- reference §8.4.1: a handler matches "the
+# class or a non-virtual base class of the exception object, or a tuple that contains such
+# a class", and a class the corpus defines has a base chain like any other.
+exception_bases = {name: [b.__name__ for b in value.__mro__[1:] if b is not object]
+                   for name, value in exceptions.items()}
 tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
 # `(class, name)` for every `@property` getter defined by a decorator inside a class body,
 # and the names of properties Core can NOT dispatch -- `x = property(getx)` at class
@@ -226,18 +234,61 @@ def builtin_name(name, scopes):
     return not any(isinstance(n, ast.ImportFrom) and any(a.name == '*' for a in n.names)
                    for n in ast.walk(tree))
 
+def binding_ok(node):
+    """May `except E as N:` bind `N` to the value Core has -- the exception's CLASS NAME?
+
+    Reference §8.4.1: the target is bound to the exception object and cleared at the end
+    of the clause. Core's exception value is the class name (there is no payload), so the
+    binding is exact for every use that only needs the class -- re-raising it, `raise ...
+    from N`, `isinstance(N, T)`/`type(N)` (lowered on the name), passing it to an exception
+    constructor (whose payload Core drops) -- and for attribute reads and `str`/`repr`,
+    which the exporter turns into `exception:payload:*` holes. Any OTHER use would let a
+    string stand in for an object -- `return N`, `x = N`, `N == y`, `f(N)` -- so the whole
+    handler keeps its `control:TRY-handler-binding` hole.
+    """
+    name = node.name
+    module = ast.Module(body=node.body, type_ignores=[])
+    parents = {}
+    for parent in ast.walk(module):
+        for child in ast.iter_child_nodes(parent):
+            parents[id(child)] = parent
+    payload_calls = ('isinstance', 'type', 'str', 'repr', 'format')
+    for n in ast.walk(module):
+        if not (isinstance(n, ast.Name) and n.id == name):
+            continue
+        if not isinstance(n.ctx, ast.Load):
+            return False
+        p = parents.get(id(n))
+        if isinstance(p, ast.Raise) and (p.exc is n or p.cause is n):
+            continue
+        if isinstance(p, ast.Attribute) and p.value is n:
+            continue
+        if isinstance(p, ast.Call) and (n in p.args or any(k.value is n for k in p.keywords)):
+            f = p.func
+            if isinstance(f, ast.Name) and (f.id in payload_calls or f.id in exceptions):
+                continue
+        return False
+    return True
+
 def handler(node, scopes):
     result = {'binding': node.name}
     if node.type is None:
         return dict(result, kind='bare')
     types = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
-    if not all(isinstance(t, ast.Name) and t.id in exceptions for t in types):
+    # A type that is not a plain name (`socket.error`, `self.Error`, a call) is dynamic.
+    if not all(isinstance(t, ast.Name) for t in types):
         return dict(result, kind='hole', label='control:TRY-handler-type')
-    if not all(builtin_name(t.id, scopes) for t in types):
+    builtin_types = [t.id for t in types if t.id in exceptions]
+    # Not a builtin: a class the corpus may define. The exporter resolves it against the
+    # program's classes and their bases; an unknown name holes there, not here.
+    corpus_types = [t.id for t in types if t.id not in exceptions]
+    if not all(builtin_name(t, scopes) for t in builtin_types):
         return dict(result, kind='hole', label='control:TRY-handler-shadowed')
     accepted = sorted({name for name in represented
-                       if any(issubclass(exceptions[name], exceptions[t.id]) for t in types)})
-    return dict(result, kind='typed', accepted=accepted)
+                       if any(issubclass(exceptions[name], exceptions[t]) for t in builtin_types)})
+    return dict(result, kind='typed', accepted=accepted, builtinTypes=builtin_types,
+                corpusTypes=corpus_types,
+                bindingOk=node.name is not None and binding_ok(node))
 
 # `nonlocal x` write support, via the exporter's existing local-boxing machinery.
 #
@@ -631,6 +682,13 @@ def visit(node, scopes):
             info = {'kind': 'constructor', 'name': value.func.id}
         elif isinstance(value, (ast.Constant, ast.List, ast.Tuple, ast.Dict, ast.Set, ast.JoinedStr)):
             info = {'kind': 'invalid-value'}
+        # `raise MyErr` / `raise MyErr(args)` for a name that is not a builtin: the exporter
+        # decides whether it is one of the corpus's exception classes.
+        elif isinstance(value, ast.Name) and value.id not in exceptions:
+            info = {'kind': 'name', 'name': value.id}
+        elif (isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+              and value.func.id not in exceptions):
+            info = {'kind': 'name-call', 'name': value.func.id}
         else:
             info = {'kind': 'dynamic'}
         raises[f'{node.lineno}:{node.col_offset + 1}'] = info
@@ -649,7 +707,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   'properties': sorted(properties),
                   'propertyPairs': sorted(property_pairs),
                   'propertiesUnmodelled': sorted(properties_unmodelled),
-                  'classAttrSentinels': class_attr_sentinels}, sort_keys=True))
+                  'classAttrSentinels': class_attr_sentinels,
+                  'exceptionBases': exception_bases, 'represented': represented},
+                 sort_keys=True))
 """
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
   def pythonHandlers(file: String): Option[ujson.Value] =
@@ -1059,6 +1119,71 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   val classBasesByFile: Map[String, Map[String, String]] =
     builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
       .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
+
+  // ---- the corpus's own exception classes ------------------------------------------
+  //
+  // Python reference §8.4.1: a raised exception matches an `except` clause naming "the
+  // class or a non-virtual base class of the exception object, or a tuple that contains
+  // such a class". Core dispatches on the class NAME, so for a class the corpus defines
+  // (`class RequestException(IOError)`) the handler's accepted set has to be closed over
+  // the corpus hierarchy here, and `Program.excClasses` has to name every such class so
+  // `Stmt.raise` accepts it (`Semantics.lean`, `pythonRaise`). Single-inheritance only,
+  // and a short name bound to two different bases anywhere is dropped -- a wrong base is
+  // a silent wrong answer, a missing one is the old hole.
+  val pyClassBases: Map[String, String] = {
+    val rows = cpg.typeDecl.isExternal(false).l
+      .filter(td => td.filename.endsWith(".py"))
+      .filter(_.method.name.l.contains("<body>"))
+      .filterNot(_.name.contains("<"))
+      .flatMap { td =>
+        val bases = td.inheritsFromTypeFullName
+          .filterNot(b => b.isEmpty || b == "ANY" || b == "object" || b.endsWith(".object"))
+        if (bases.size != 1) None
+        else Some(td.name -> bases.head.split('.').last.split(':').last)
+      }
+    val conflicting = rows.groupBy(_._1)
+      .collect { case (n, rs) if rs.map(_._2).distinct.size > 1 => n }.toSet
+    rows.filterNot(r => conflicting.contains(r._1)).toMap
+  }
+  /** The builtin hierarchy as the decoder reports it for a file (`exceptionBases`). */
+  def excBasesOf(info: ujson.Value): Map[String, List[String]] =
+    info.obj.get("exceptionBases").map(_.obj.map { case (k, v) => k -> v.arr.map(_.str).toList }.toMap)
+      .getOrElse(Map.empty)
+  def representedOf(info: ujson.Value): List[String] =
+    info.obj.get("represented").map(_.arr.map(_.str).toList).getOrElse(Nil)
+  /** Ancestors of a class: corpus bases first, then the builtin chain. Bounded by the
+    * class count so a cyclic (mis-)declaration terminates. */
+  def excAncestors(name: String, bb: Map[String, List[String]]): List[String] = {
+    var cur = name; var acc = List.empty[String]; var steps = 0
+    while (steps <= pyClassBases.size && pyClassBases.contains(cur)) {
+      val b = pyClassBases(cur); acc = acc :+ b; cur = b; steps += 1
+    }
+    acc ++ bb.getOrElse(cur, Nil)
+  }
+  def isCorpusException(name: String, bb: Map[String, List[String]]): Boolean =
+    pyClassBases.contains(name) && excAncestors(name, bb).contains("BaseException")
+  def corpusExceptionClasses(bb: Map[String, List[String]]): List[String] =
+    pyClassBases.keys.filter(isCorpusException(_, bb)).toList.sorted
+  /** Every represented name -- builtin or corpus -- that is one of `types` or derives from
+    * one: the `except` clause's accepted set, closed over both hierarchies. */
+  def acceptedFor(types: List[String], info: ujson.Value): List[String] = {
+    val bb = excBasesOf(info)
+    val builtin = representedOf(info).filter(n => types.contains(n) || bb.getOrElse(n, Nil).exists(types.contains))
+    val corpus  = corpusExceptionClasses(bb).filter(c => types.contains(c) || excAncestors(c, bb).exists(types.contains))
+    (builtin ++ corpus).distinct.sorted
+  }
+  /** Names bound by an enclosing `except E as name:` while its handler is translated. A
+    * read of `name.attr` or `str(name)` inside is a payload read Core cannot answer. */
+  var exceptionBindings: Set[String] = Set.empty
+  /** The pending-exception temporaries of the `except` handlers currently being
+    * translated, innermost first: what a bare `raise` re-raises (reference §7.8, "The
+    * raise statement": "If no expressions are present, `raise` re-raises the exception
+    * that is currently being handled"). */
+  var pendingExceptions: List[String] = Nil
+  def isExcBinding(n: AstNode): Boolean = n match {
+    case i: Identifier => exceptionBindings.contains(localName(i.name))
+    case _             => false
+  }
 
   // ---- lexical scope analysis ------------------------------------------------
   //
@@ -7070,6 +7195,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ujson.Obj("k" -> "index", "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (fieldOps.contains(mfn))
       resolvedRef(c).map(expr) getOrElse (asField(c) match {
+        // `e.args`, `e.errno`, `e.__class__` on an `except ... as e` binding: the exception
+        // is its class name here and carries no payload (library reference, `BaseException.args`).
+        case Some((r, f)) if pyFile && isExcBinding(r) => hole("exception:payload:" + f)
         case Some((_, f)) if isPythonProperty(f) => hole("call:python-property-access")
         case Some((r, f)) => ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)
         case None         => hole("op:fieldAccess-shape")
@@ -7713,6 +7841,24 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               else if (methodByName.contains(mfn))
                 ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
                           "args" -> argExprs(namedCallReceiver(c).toList ++ args, kwArgs))
+              // `str(e)` / `repr(e)` / `format(e)` on an `except ... as e` binding is the
+              // exception's MESSAGE, which Core does not carry: a payload hole, not the
+              // class name masquerading as a message.
+              else if (pyFile && Set("str", "repr", "format").contains(c.name) &&
+                       args.headOption.exists(isExcBinding))
+                hole("exception:payload:" + c.name)
+              // `isinstance(e, T)` on a binding is the handler test itself (reference
+              // §8.4.1): `T` a builtin or corpus exception class -> membership of the
+              // class name in `T`'s closure; anything else stays a hole.
+              else if (pyFile && c.name == "isinstance" && args.size == 2 && isExcBinding(args(0)))
+                (args(1), pythonHandlers(currentFile)) match {
+                  case (t: Identifier, Some(info))
+                      if excBasesOf(info).contains(t.name) || isCorpusException(t.name, excBasesOf(info)) =>
+                    ujson.Obj("k" -> "inOp", "neg" -> false, "a" -> expr(args(0)),
+                      "b" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr.from(
+                        acceptedFor(List(t.name), info).map(n => ujson.Obj("k" -> "str", "v" -> n)))))
+                  case _ => hole("exception:isinstance-type")
+                }
               else ujson.Obj("k" -> "call", "f" -> c.name, "args" -> argExprs(args, kwArgs))
             }
           }
@@ -9803,7 +9949,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case None => holeS("op:raise-source-metadata")
     case Some(info) =>
       val kind = info("kind").str
-      if (kind == "hole") holeS(info("label").str)
+      // A bare `raise` inside an `except` handler re-raises the exception being handled
+      // (reference §7.8): the handler's pending value, which the dispatch already holds.
+      if (kind == "hole" && info("label").str == "op:raise-bare" && pendingExceptions.nonEmpty)
+        ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "name", "v" -> pendingExceptions.head))
+      else if (kind == "hole") holeS(info("label").str)
+      // `raise e` where `e` is an `except ... as e` binding: the exception's class name,
+      // which `Stmt.raise` accepts as is (`pythonRaise`). The generic `py:raise` operator
+      // below would refuse the bare name as ambiguous, which it is not here.
+      else if (kind == "name" && exceptionBindings.contains(info("name").str))
+        ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "name", "v" -> info("name").str))
       else if (kind == "class")
         ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
           "op" -> ("py:exception:" + info("name").str),
@@ -9812,7 +9967,21 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case None => holeS("op:raise-shape")
         case Some(value) =>
           val (prelude, translated) = valueOf(value)
-          if (kind == "constructor") {
+          val corpusExc = (kind == "name" || kind == "name-call") &&
+            pythonHandlers(currentFile).exists(i => isCorpusException(info("name").str, excBasesOf(i)))
+          if (corpusExc) {
+            // `raise MyErr(a, b)`: CPython evaluates the arguments (they become
+            // `BaseException.args`) and raises an instance whose class is `MyErr`. Core's
+            // exception is the class name, so the arguments are evaluated for their
+            // effects and the NAME is raised; `pythonRaise` accepts it because the
+            // renderer put `MyErr` in `Program.excClasses`.
+            val argEvals =
+              if (kind == "name-call" && translated("k").str == "call")
+                translated("args").arr.toList.map(a => ujson.Obj("k" -> "exprS", "e" -> a))
+              else Nil
+            seqOf(prelude ++ argEvals :+ ujson.Obj("k" -> "raise",
+              "e" -> ujson.Obj("k" -> "str", "v" -> info("name").str)))
+          } else if (kind == "constructor") {
             if (translated("k").str != "call") holeS("op:raise-constructor-shape")
             else seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" ->
               ujson.Obj("k" -> "unop", "op" -> ("py:exception:" + info("name").str),
@@ -9899,11 +10068,35 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               // source order; an exception raised by H never enters a later handler.
               val dispatch = catches.zip(meta("handlers").arr.toList).reverse.foldLeft(
                   ujson.Obj("k" -> "raise", "e" -> pending)) { case (rest, (c, header)) =>
-                val selected = if (header("binding") != ujson.Null)
-                  holeS("control:TRY-handler-binding") else stmt(c)
+                // `except E as name:` binds `name` to the exception (reference §8.4.1) --
+                // here its class name, the value Core has. Allowed only when every use of
+                // `name` in the handler is one the class name answers exactly or one the
+                // exporter holes (`binding_ok` in the decoder); otherwise the handler
+                // keeps its hole rather than let a string stand in for an object.
+                val bindingName =
+                  if (header("binding") != ujson.Null) Some(header("binding").str) else None
+                val bindingOk = header.obj.get("bindingOk").exists(_.bool)
+                pendingExceptions = exception :: pendingExceptions
+                val selected = bindingName match {
+                  case None => stmt(c)
+                  case Some(b) if bindingOk =>
+                    exceptionBindings += b
+                    val body = stmt(c)
+                    exceptionBindings -= b
+                    seqOf(List(ujson.Obj("k" -> "assign", "x" -> b, "e" -> pending), body))
+                  case Some(_) => holeS("control:TRY-handler-binding")
+                }
+                pendingExceptions = pendingExceptions.drop(1)
+                // The corpus's own exception classes named by the clause; a name that is
+                // not one of them (an alias, an import Core cannot see) is dynamic.
+                val corpusTypes = header.obj.get("corpusTypes").map(_.arr.map(_.str).toList).getOrElse(Nil)
+                val builtinTypes = header.obj.get("builtinTypes").map(_.arr.map(_.str).toList).getOrElse(Nil)
+                val bb = excBasesOf(info)
                 header("kind").str match {
                   case "bare" => selected
                   case "hole" => holeS(header("label").str)
+                  case "typed" if !corpusTypes.forall(isCorpusException(_, bb)) =>
+                    holeS("control:TRY-handler-type")
                   case "typed" =>
                     // Dispatch on the class name alone. This used to sit behind a guard,
                     // `pending ∈ <every represented name>`, holing (the
@@ -9915,7 +10108,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     // (`execStmt_exn_excSafe`) proves that under `.python` every value
                     // the interpreter ever raises IS a represented class name. The guard
                     // was checking an invariant the semantics now carry; it can go.
-                    ujson.Obj("k" -> "ifte", "c" -> member(header("accepted")),
+                    // The decoder's `accepted` is the builtin closure; `acceptedFor` adds
+                    // the corpus classes deriving from any named type (reference §8.4.1,
+                    // "or a non-virtual base class").
+                    val accepted = (header("accepted").arr.map(_.str).toList ++
+                      acceptedFor(builtinTypes ++ corpusTypes, info)).distinct.sorted
+                    ujson.Obj("k" -> "ifte",
+                      "c" -> member(ujson.Arr.from(accepted.map(n => ujson.Str(n): ujson.Value))),
                       "t" -> selected, "e" -> rest)
                 }
               }
@@ -11314,6 +11513,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       if (pyFile) pythonHandlers(m.filename).foreach { info =>
         val pairs = info("propertyPairs").arr
         if (pairs.nonEmpty) obj("classProperties") = ujson.Arr.from(pairs.toList)
+        // The corpus's exception classes, for `Program.excClasses` -- computed once over
+        // the whole CPG, so every initializer carries the same list and the renderer
+        // deduplicates.
+        val exc = corpusExceptionClasses(excBasesOf(info))
+        if (exc.nonEmpty) obj("exceptionClasses") = ujson.Arr.from(exc.map(n => ujson.Str(n): ujson.Value))
       }
     }
     // Emitted only when present, so an AST with no variadic parameters renders exactly

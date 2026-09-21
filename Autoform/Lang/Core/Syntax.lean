@@ -830,6 +830,15 @@ structure Program where
   property", and absence from a list is `decide`-able while absence from a suffix-matched
   table is a `String` scan the kernel will not reduce. -/
   properties : List (String × String) := []
+  /-- Short names of the classes THIS PROGRAM defines that are exceptions -- classes
+  whose base chain reaches a builtin exception. The Python reference (§8.4.1, "except
+  clause") matches a raised exception against a handler naming "the class or a non-virtual
+  base class of the exception object"; the library reference ("Built-in Exceptions")
+  says user code should "derive new exceptions from the `Exception` class or one of its
+  subclasses". So a corpus class is a legitimate exception exactly when it is on this list,
+  and `Stmt.raise` accepts its name as it accepts `Stdlib.excNames`; the exporter expands
+  every handler's accepted set over the corpus hierarchy (`docs/languages.md` §16.C). -/
+  excClasses : List String := []
   deriving Repr, Inhabited
 
 namespace Expr

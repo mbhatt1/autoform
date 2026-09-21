@@ -43,22 +43,26 @@ and leaf-lemma discharges in turn.
 
 namespace Autoform.Core
 
-open Stdlib (ExcSafe excSafe_str)
+open Stdlib (ExcSafe ExcSafeIn excSafe_str)
 
 /-! ## `Stmt.raise` -/
 
 /-- `pythonRaise` raises only represented names: a represented `.str` passes through
 unchanged, and everything else is classified by `raiseValue`. -/
-theorem pythonRaise_excSafe {u v : Val} : pythonRaise u = .exn v → ExcSafe v := by
+theorem pythonRaise_excSafe {extra : List String} {u v : Val} :
+    pythonRaise extra u = .exn v → ExcSafeIn extra v := by
   intro h
   unfold pythonRaise at h
   split at h
   · split at h
     · rename_i hc
       cases h
-      exact excSafe_str (List.contains_iff_mem.mp hc)
-    · exact Stdlib.raiseValue_excSafe h
-  · exact Stdlib.raiseValue_excSafe h
+      simp only [Bool.or_eq_true] at hc
+      rcases hc with h1 | h1
+      · exact ⟨_, rfl, Or.inl (List.contains_iff_mem.mp h1)⟩
+      · exact ⟨_, rfl, Or.inr (List.contains_iff_mem.mp h1)⟩
+    · exact (Stdlib.raiseValue_excSafe h).weaken
+  · exact (Stdlib.raiseValue_excSafe h).weaken
 
 /-! ## Integer operators
 
@@ -370,32 +374,32 @@ applies as `ihE _ hd hy` whatever the arguments were. -/
 private def ExcStep (k : Nat) : Prop :=
   (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {e : Expr} {h' : Heap} {v : Val},
-      evalExpr ctx k h ρ e = (h', .exn v) → ExcSafe v)
+      evalExpr ctx k h ρ e = (h', .exn v) → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {fn : Func} {self? : Option Val} {vs : List Val}
         {kws : List (String × Val)} {h' : Heap} {v : Val},
-      applyFunc ctx k h fn self? vs kws = (h', .exn v) → ExcSafe v)
+      applyFunc ctx k h fn self? vs kws = (h', .exn v) → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {fn : Func} {cap : List (String × Val)} {vs : List Val}
         {kws : List (String × Val)} {h' : Heap} {v : Val},
-      applyClosure ctx k h fn cap vs kws = (h', .exn v) → ExcSafe v)
+      applyClosure ctx k h fn cap vs kws = (h', .exn v) → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {es : List Expr} {h' : Heap} {v : Val},
-      evalList ctx k h ρ es = (h', .inl (.exn v)) → ExcSafe v)
+      evalList ctx k h ρ es = (h', .inl (.exn v)) → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {ps : List (Expr × Expr)} {h' : Heap} {v : Val},
-      evalPairs ctx k h ρ ps = (h', .inl (.exn v)) → ExcSafe v)
+      evalPairs ctx k h ρ ps = (h', .inl (.exn v)) → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {s : Stmt} {h' : Heap} {v : Val} {ρ' : Env},
-      execStmt ctx k h ρ s = (h', .exn v ρ') → ExcSafe v)
+      execStmt ctx k h ρ s = (h', .exn v ρ') → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {x : String} {vs : List Val} {body : Stmt} {h' : Heap}
         {v : Val} {ρ' : Env},
-      execFor ctx k h ρ x vs body = (h', .exn v ρ') → ExcSafe v)
+      execFor ctx k h ρ x vs body = (h', .exn v ρ') → ExcSafeIn ctx.excClasses v)
   ∧ (∀ (ctx : Ctx), ctx.dialect = .python →
       ∀ {h : Heap} {ρ : Env} {x : String} {r : Ref} {i ver : Nat} {body : Stmt}
         {h' : Heap} {v : Val} {ρ' : Env},
-      execForRef ctx k h ρ x r i ver body = (h', .exn v ρ') → ExcSafe v)
+      execForRef ctx k h ρ x r i ver body = (h', .exn v ρ') → ExcSafeIn ctx.excClasses v)
 
 /-! Close one leaf of the induction. `hy` is the (already case-split) result equation,
 `hd` the dialect hypothesis, `ihE`..`ihRef` the eight induction hypotheses; hygiene is
@@ -412,7 +416,7 @@ off so the macro can name them. The alternatives, in order:
 set_option hygiene false in
 macro "exc_close" : tactic => `(tactic| first
   | (cases hy; done)
-  | (cases hy; exact excSafe_str (by decide))
+  | (cases hy; exact (excSafe_str (by decide)).weaken)
   | exact ihE _ hd hy
   | exact ihF _ hd hy
   | exact ihC _ hd hy
@@ -421,8 +425,8 @@ macro "exc_close" : tactic => `(tactic| first
   | exact ihS _ hd hy
   | exact ihR _ hd hy
   | exact ihRef _ hd hy
-  | exact applyBinop_excSafe hd _ _ _ (Prod.mk.inj hy).2
-  | exact applyUnop_excSafe hd _ _ (Prod.mk.inj hy).2
+  | exact (applyBinop_excSafe hd _ _ _ (Prod.mk.inj hy).2).weaken
+  | exact (applyUnop_excSafe hd _ _ (Prod.mk.inj hy).2).weaken
   | exact (allocBuiltin_ne_exn _ _ _ _ (Prod.mk.inj hy).2).elim
   | (cases hy; exact ihE _ hd (by assumption))
   | (cases hy; exact ihF _ hd (by assumption))
@@ -433,13 +437,13 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact ihR _ hd (by assumption))
   | (cases hy; exact ihRef _ hd (by assumption))
   | (cases hy; exact pythonRaise_excSafe (by assumption))
-  | (cases hy; exact Stdlib.builtin_excSafe hd _ _ _ _ _ (by assumption))
-  | (cases hy; exact Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption))
+  | (cases hy; exact (Stdlib.builtin_excSafe hd _ _ _ _ _ (by assumption)).weaken)
+  | (cases hy; exact (Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
-  | (cases hy; exact listSetSlice_excSafe (by assumption))
-  | exact builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2
+  | (cases hy; exact (listSetSlice_excSafe (by assumption)).weaken)
+  | exact (builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))
@@ -511,33 +515,33 @@ private theorem excStep : ∀ k, ExcStep k := by
 /-- **Every exception an expression raises under Python is a represented class name.** -/
 theorem evalExpr_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ : Env} {e : Expr} {v : Val}
-    (he : evalExpr ctx k h ρ e = (h', .exn v)) : ExcSafe v :=
+    (he : evalExpr ctx k h ρ e = (h', .exn v)) : ExcSafeIn ctx.excClasses v :=
   (excStep k).1 ctx hd he
 
 /-- `applyFunc` version. -/
 theorem applyFunc_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {fn : Func} {self? : Option Val} {vs : List Val}
     {kws : List (String × Val)} {v : Val}
-    (he : applyFunc ctx k h fn self? vs kws = (h', .exn v)) : ExcSafe v :=
+    (he : applyFunc ctx k h fn self? vs kws = (h', .exn v)) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.1 ctx hd he
 
 /-- `applyClosure` version. -/
 theorem applyClosure_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {fn : Func} {cap : List (String × Val)} {vs : List Val}
     {kws : List (String × Val)} {v : Val}
-    (he : applyClosure ctx k h fn cap vs kws = (h', .exn v)) : ExcSafe v :=
+    (he : applyClosure ctx k h fn cap vs kws = (h', .exn v)) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.1 ctx hd he
 
 /-- `evalList` version; its exception is spelled `Sum.inl (EResult.exn v)`. -/
 theorem evalList_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ : Env} {es : List Expr} {v : Val}
-    (he : evalList ctx k h ρ es = (h', .inl (.exn v))) : ExcSafe v :=
+    (he : evalList ctx k h ρ es = (h', .inl (.exn v))) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.2.1 ctx hd he
 
 /-- `evalPairs` version. -/
 theorem evalPairs_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ : Env} {ps : List (Expr × Expr)} {v : Val}
-    (he : evalPairs ctx k h ρ ps = (h', .inl (.exn v))) : ExcSafe v :=
+    (he : evalPairs ctx k h ρ ps = (h', .inl (.exn v))) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.2.2.1 ctx hd he
 
 /-- **Every exception a statement raises under Python is a represented class name.**
@@ -545,27 +549,29 @@ This is the theorem the exporter's `try`/`except` lowering now relies on in plac
 `control:TRY-exception-representation` guard. -/
 theorem execStmt_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ ρ' : Env} {s : Stmt} {v : Val}
-    (he : execStmt ctx k h ρ s = (h', .exn v ρ')) : ExcSafe v :=
+    (he : execStmt ctx k h ρ s = (h', .exn v ρ')) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.2.2.2.1 ctx hd he
 
 /-- `execFor` version. -/
 theorem execFor_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ ρ' : Env} {x : String} {vs : List Val} {body : Stmt} {v : Val}
-    (he : execFor ctx k h ρ x vs body = (h', .exn v ρ')) : ExcSafe v :=
+    (he : execFor ctx k h ρ x vs body = (h', .exn v ρ')) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.2.2.2.2.1 ctx hd he
 
 /-- `execForRef` version. -/
 theorem execForRef_exn_excSafe {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ ρ' : Env} {x : String} {r : Ref} {i ver : Nat} {body : Stmt} {v : Val}
-    (he : execForRef ctx k h ρ x r i ver body = (h', .exn v ρ')) : ExcSafe v :=
+    (he : execForRef ctx k h ρ x r i ver body = (h', .exn v ρ')) : ExcSafeIn ctx.excClasses v :=
   (excStep k).2.2.2.2.2.2.2 ctx hd he
 
 /-- The form the exporter's dispatch actually needs: the pending exception, read as a
-string, is one of the represented names it compares against. -/
+string, is one of the represented names it compares against -- a builtin's, or one of the
+program's own exception classes (`Program.excClasses`), which is exactly the set the
+exporter closes each handler's accepted names over (docs/languages.md §16.C). -/
 theorem execStmt_exn_name {ctx : Ctx} (hd : ctx.dialect = .python) {k : Nat}
     {h h' : Heap} {ρ ρ' : Env} {s : Stmt} {v : Val}
     (he : execStmt ctx k h ρ s = (h', .exn v ρ')) :
-    ∃ n, v = .str n ∧ n ∈ Stdlib.excNames :=
+    ∃ n, v = .str n ∧ (n ∈ Stdlib.excNames ∨ n ∈ ctx.excClasses) :=
   execStmt_exn_excSafe hd he
 
 -- Axiom audit: these must list only `propext`, `Classical.choice`, `Quot.sound`.
