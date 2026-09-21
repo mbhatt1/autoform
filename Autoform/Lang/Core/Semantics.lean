@@ -1837,24 +1837,28 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               -- is dropped — which is exactly what CPython does for an attribute that is
               -- a plain function rather than a class attribute.
               --
-              -- Restricted to module objects on purpose. The same rule is *also* correct
-              -- for an ordinary instance attribute holding a function (`self.cb(x)` does
-              -- not pass `self` in CPython), and today that is the hole `mcall:C.cb`. But
-              -- that is a claim about every class in every corpus, and it is not what
-              -- this change is about; it stays a hole until it is measured on its own.
-              if o.cls.startsWith "<module>" then
-                match o.fields.find? (·.1 == m) with
-                | some (_, .fn g)      =>
-                    match ctx.resolve g with
-                    | some fn => applyFunc ctx n h₂ fn none vs kws
-                    | none    => (h₂, .hole s!"call:{g}")
-                | some (_, .clos g cap) =>
-                    match ctx.resolve g with
-                    | some fn => applyClosure ctx n h₂ fn cap vs kws
-                    | none    => (h₂, .hole s!"call:{g}")
-                | some _  => (h₂, .hole s!"module-call:{m}:not-a-function")
-                | none    => (h₂, .hole s!"module-attr:{m}")
-              else (h₂, .hole s!"mcall:{o.cls}.{m}")
+              -- The same rule holds for an ORDINARY instance whose attribute holds a
+              -- function or closure: `self.cb(x)` does not pass `self` in CPython
+              -- either. It was kept module-only "until measured on its own"; the
+              -- differential oracle measured it on click 8.2.1 (`FuncParamType.convert`,
+              -- `self.func(value)`: three divergences, docs/languages.md §10.9), so the
+              -- lookup now runs for every object and only the hole LABELS still tell a
+              -- module object from an instance.
+              match o.fields.find? (·.1 == m) with
+              | some (_, .fn g)      =>
+                  match ctx.resolve g with
+                  | some fn => applyFunc ctx n h₂ fn none vs kws
+                  | none    => (h₂, .hole s!"call:{g}")
+              | some (_, .clos g cap) =>
+                  match ctx.resolve g with
+                  | some fn => applyClosure ctx n h₂ fn cap vs kws
+                  | none    => (h₂, .hole s!"call:{g}")
+              | some _  =>
+                  if o.cls.startsWith "<module>" then (h₂, .hole s!"module-call:{m}:not-a-function")
+                  else (h₂, .hole s!"mcall:{o.cls}.{m}:field-not-callable")
+              | none    =>
+                  if o.cls.startsWith "<module>" then (h₂, .hole s!"module-attr:{m}")
+                  else (h₂, .hole s!"mcall:{o.cls}.{m}")
             | some fn =>
               -- `c.make(3)` on a `@classmethod`: Python passes the CLASS, not `c`, and
               -- passes it as the first positional (the exporter kept `cls` in `params`),
@@ -3166,7 +3170,15 @@ private def valueCallProg : Program :=
                (.ret (.callValue (.index (.name "d") (.lit (.str "k"))) [.lit (.int 3)])) }
     -- `5(1)`: not callable.
     , { name := "notCallable", params := []
-      , body := .ret (.callValue (.lit (.int 5)) [.lit (.int 1)]) } ] }
+      , body := .ret (.callValue (.lit (.int 5)) [.lit (.int 1)]) }
+    -- `o = Box(); o.cb = twice; o.cb(21)`: a callable held in an INSTANCE FIELD is called
+    -- through the attribute with no receiver, as CPython does (click's
+    -- `FuncParamType.convert`, docs/languages.md §10.9).
+    , { name := "fieldCall", params := []
+      , body :=
+          .seq (.assign "o" (.alloc "Box" []))
+          (.seq (.setField (.name "o") "cb" (.fnref "twice"))
+                (.ret (.mcall (.name "o") "cb" [.lit (.int 21)]))) } ] }
 
 -- mk(10)(2)  -- CPython 12
 #guard match runFunc valueCallProg 200 "chained" [] with | .val (.int 12) => true | _ => false
@@ -3175,6 +3187,8 @@ private def valueCallProg : Program :=
 -- 5(1)       -- CPython TypeError; Core: a named hole, never a value
 #guard match runFunc valueCallProg 200 "notCallable" [] with
        | .hole "call:value:not-callable" => true | _ => false
+-- o.cb = twice; o.cb(21)  -- CPython 42: the field's function, no receiver passed
+#guard match runFunc valueCallProg 200 "fieldCall" [] with | .val (.int 42) => true | _ => false
 
 /-! ## Boxed containers, step 3: `setIndex` on a heap payload
 

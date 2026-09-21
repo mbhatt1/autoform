@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-Jinja2.json",
+ "artifact_bytes": 6491674,
+ "artifact_sha256": "5a3fdf3ccafd361896f5d255838ad31d3d08ad7a3b9811ffbbf564ea73cb81e2",
+ "command": "scripts/reland_corpus.sh /private/tmp/corp_jinja2 Jinja2",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "b82b43eae510fdcb4d6a9b949ebe8c56cb1c86119fec9f0edf0d5bcc39e4b310",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/corp_jinja2",
+ "source_revision": "tree-sha256:7449c52c1ef913abe97c05e1a5ff95285be0cc2a49ee927b1d946dc8504e4984:26files"
+}

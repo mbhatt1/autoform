@@ -678,6 +678,39 @@ an instance needs `__next__` state, a generator-shaped frame (Milestone 4). `in`
   `bindParams` allocate would give it a heap argument -- the `applyBinop` re-typing
   problem -- so it is recorded here rather than done.
 
+#### 10.9 What the oracle found on `click` 8.2.1 (2026-09-21)
+
+The first scale corpus run with the differential oracle after the object-protocol work:
+**189/196 agree, 7 divergences, 404 inconclusive**
+(`.autoform-work/reland/Click/conformance.json`; reproduce with
+`scripts/differential.py ast-Click.json <click-src-root> Click 5`). The seven are three
+distinct gaps, none of them oracle noise:
+
+1. **A missing instance attribute answers `unit`; CPython raises `AttributeError`**
+   (`ShellComplete.source_vars`, 3 cases). This is §13's documented choice — a `.field`
+   miss after the instance, its captures, its properties and its class attributes is
+   `Val.unit` — and the oracle now prices it: it is a silent wrong answer on any code
+   that relies on the exception. Closing it means the final arm of the `.field` chain
+   raising `AttributeError` (represented in `excNames`; `ExcSafe` extends) and the
+   accessor lemmas in `SpecsGen/Basis.lean` carrying "the field exists" as a premise
+   instead of returning `unit` on a miss.
+2. **A callable held in an instance field is not callable through the attribute**
+   (`FuncParamType.convert`: `self.func(value)`, 3 cases). `Expr.mcall` on a `ref`
+   dispatches by CLASS method; when the class has no such method but the instance has a
+   field of that name holding a function or closure, Python calls the field. Closing it is
+   one more arm in `.mcall`'s `ref` case, routed through the value-call machinery
+   `Expr.callValue` already has.
+3. **A module-level variable read through a global returns `unit`**
+   (`get_completion_class`: `_available_shells.get(shell)`, 1 case) — the same family as
+   the `import:member-not-found` label that dominates `requests` (66 of 148 holes): a
+   module object carries functions and classes but not its module-level VARIABLES, so a
+   dict built at import time is invisible. This is the largest single lever left on the
+   scale corpora and needs module objects to carry their globals frame.
+
+Until (1)–(3) land, `scripts/synth_specs.py --conformance-only` refuses the click
+observations (it will not state a conformance theorem next to a recorded divergence), so
+`SpecsGen/Click` does not exist yet; that is the gate working as designed.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:

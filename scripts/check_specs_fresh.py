@@ -68,6 +68,14 @@ SPECS = {
     "SpecsGen/V8BaseSample": "V8BaseSample",
     "Specs/V8Spec": "V8BaseSample",
     "Specs/CachetoolsSpec": "Cachetools",
+    # The scale corpora (docs/scale.md), re-landed 2026-09-21 with provenance.
+    "SpecsGen/Requests": "Requests",
+    "SpecsGen/Click": "Click",
+    "SpecsGen/Jinja2": "Jinja2",
+    "SpecsGen/Sqlparse": "Sqlparse",
+    "SpecsGen/Flask": "Flask",
+    "SpecsGen/Rich": "Rich",
+    "SpecsGen/Django": "Django",
 }
 
 
