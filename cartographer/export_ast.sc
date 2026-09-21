@@ -9471,7 +9471,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                 ujson.Obj("k" -> "inOp", "neg" -> false, "a" -> pending,
                   "b" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr.from(
                     names.arr.map(n => ujson.Obj("k" -> "str", "v" -> n.str)))))
-              val known = member(info("exceptions"))
               // A single catch surrounds B. Dispatch inside its handler preserves
               // source order; an exception raised by H never enters a later handler.
               val dispatch = catches.zip(meta("handlers").arr.toList).reverse.foldLeft(
@@ -9482,12 +9481,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   case "bare" => selected
                   case "hole" => holeS(header("label").str)
                   case "typed" =>
-                    val choice = ujson.Obj("k" -> "ifte", "c" -> member(header("accepted")),
+                    // Dispatch on the class name alone. This used to sit behind a guard,
+                    // `pending ∈ <every represented name>`, holing (the
+                    // `TRY-exception-representation` label) when the pending value was
+                    // not one of them -- because nothing stopped `Stmt.raise` from
+                    // raising an arbitrary value, and comparing an object against names
+                    // would invent a miss. `Stmt.raise` now routes Python values through
+                    // `pythonRaise`, and `Autoform/Lang/Core/ExcSafe.lean`
+                    // (`execStmt_exn_excSafe`) proves that under `.python` every value
+                    // the interpreter ever raises IS a represented class name. The guard
+                    // was checking an invariant the semantics now carry; it can go.
+                    ujson.Obj("k" -> "ifte", "c" -> member(header("accepted")),
                       "t" -> selected, "e" -> rest)
-                    // Exception objects and payloads have no faithful representation
-                    // yet. Comparing them as unrelated strings would invent a miss.
-                    ujson.Obj("k" -> "ifte", "c" -> known, "t" -> choice,
-                      "e" -> holeS("control:TRY-exception-representation"))
                 }
               }
               if (elses.isEmpty)

@@ -337,16 +337,41 @@ exception value in Core is now a theorem rather than an assumption:
 that `ExcSafe` is stated over `excNames` itself, not a restatement that could drift from
 the list the exporter's dispatch actually compares to.
 
-**The guard stays**, and the reason is exact: `Stmt.raise` raises its operand's evaluated
-value directly, without passing it through `raiseValue`, so nothing in the *semantics*
-stops an arbitrary `Val` becoming an exception. The Python exporter only ever emits
-`Stmt.raise` with a `py:exception:<Name>` constructor or a re-raise of an already-caught
-value, so the programs it produces are safe — but that is a property of the exporter, and
-the guard stands in for the missing proof. Removing it needs a well-formedness predicate
-on programs plus a preservation argument over the interpreter; the re-raise case makes
-that an environment invariant, not a syntactic check. Until then the dispatch holes,
-which is the conservative direction: it refuses to catch rather than catching the wrong
-thing.
+**The guard is gone.** What blocked removing it was `Stmt.raise`: `execStmt` raised its
+operand's evaluated value directly, so nothing in the semantics prevented an arbitrary
+`Val` from becoming an exception, and the exporter's guard stood in for the missing
+proof. Two changes close that:
+
+* `Stmt.raise` under `.python` now classifies its operand through `pythonRaise`
+  (`Semantics.lean`). A value that already IS an exception in Core's encoding — a `.str`
+  naming a represented class, which is what the `py:exception:<Name>` constructor
+  produces and what a re-raised caught exception holds — is raised as-is. Anything else
+  goes through `Stdlib.raiseValue`: a class reference instantiates, a non-exception string
+  is a `TypeError` as in CPython, an object holes. Other dialects are untouched; Java and
+  C++ throw arbitrary objects and Core has no representation to check them against.
+* Typed numeric operators (`num:<family>:...`) are refused under `.python`
+  (`numeric:typed-op-in-python`). Their traps name themselves in the family's own terms
+  — `panic:negative shift amount`, `ArithmeticException` — which are not Python classes,
+  and the exporter never emits one for a Python file anyway. The JavaScript operators
+  (`js:+` … `js:%`) are gated the same way, on `.javascript`: outside it they could only
+  reach the typed fallthrough, and no source program of another language spells them.
+
+With those, `Autoform/Lang/Core/ExcSafe.lean` states the invariant the guard was
+checking and proves it by simultaneous induction over the interpreter's eight mutually
+recursive functions, the same shape as `FuelMono.lean`: `evalExpr_exn_excSafe` and
+`execStmt_exn_excSafe` say that under `.python`, every `.exn v` the interpreter produces
+has `v` a represented class name. The leaves are `makeException_excSafe`,
+`raiseValue_excSafe`, `pythonRaise_excSafe`, `python_shiftCount_trap`, per-operator
+lemmas showing the unbounded Python `NumConfig` never traps except on a shift count,
+the `Float.lean` lemmas pinning float arithmetic to `ZeroDivisionError`/`OverflowError`
+(`div_exn`, `fmod_exn`, `pyMod_exn`, `ofInt_exn`), and `Stdlib`'s scans of the builtin
+and container-method tables (`builtin_excSafe`, `method_pure_excSafe`,
+`method_mutating_not_exn`).
+
+`cartographer/export_ast.sc`'s typed-handler dispatch is now `ifte (pending ∈ accepted)
+selected rest` with no outer guard: the 29–34 `control:TRY-exception-representation` holes
+on a cachetools export come off, and what stands behind that is a theorem rather than a
+belief that every exception is obviously a name.
 
 #### 10.2 A Python trap named itself in prose
 

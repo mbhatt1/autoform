@@ -613,3 +613,29 @@ class TestJavaScriptContainers:
         assert 'def _root_.String.utf16Units' in syntax
         assert 'def _root_.String.utf16At' in syntax
         assert 'index:js-lone-surrogate' in sem
+
+
+def test_try_dispatch_guard_is_gone_and_the_invariant_is_a_theorem():
+    """`control:TRY-exception-representation` was a guard standing in for a proof.
+
+    The exporter compared the pending exception against every represented class name and
+    holed when it was not one of them, because `Stmt.raise` could raise an arbitrary
+    value. `Stmt.raise` now classifies Python values through `pythonRaise`, and
+    `ExcSafe.lean` proves by simultaneous induction over the interpreter that under
+    `.python` every raised value names a represented class. The guard is removed on the
+    strength of that theorem, so both facts are asserted together: if either the guard
+    comes back or the theorem disappears, this notices.
+    """
+    exporter = (ROOT / 'cartographer/export_ast.sc').read_text()
+    assert 'control:TRY-exception-representation' not in exporter
+    semantics = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+    assert 'def pythonRaise (v : Val) : EResult' in semantics
+    assert 'match pythonRaise v with' in semantics
+    excsafe = (ROOT / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
+    for name in ('theorem pythonRaise_excSafe', 'theorem evalExpr_exn_excSafe',
+                 'theorem execStmt_exn_excSafe'):
+        assert name in excsafe, name
+    # The proof is only worth the guard's removal if it is a proof.
+    assert 'sorry' not in excsafe.replace('-- sorry', '')
+    root = (ROOT / 'Autoform.lean').read_text()
+    assert 'import Autoform.Lang.Core.ExcSafe' in root

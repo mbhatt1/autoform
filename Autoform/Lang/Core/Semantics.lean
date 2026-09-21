@@ -232,7 +232,9 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- `x ** y` on floats is `pow`, which IEEE does define, but which this model does not
   -- implement. See `Float.lean`'s "what is deliberately NOT modelled".
   | "**" => .hole "float:pow"
-  | _    => TypedNumeric.binary op a b
+  | _    => match d with
+            | .python => .hole s!"numeric:typed-op-in-python:{op}"
+            | _       => TypedNumeric.binary op a b
 
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
@@ -253,7 +255,7 @@ def binopNeedsHeap (op : String) (x y : Val) : Bool :=
 
 /-- Explicit language operators for newly exported terms. Keeping this dispatch
 separate also keeps reduction of the legacy integer operators inexpensive. -/
-def languageBinop (op : String) (a b : Val) : EResult :=
+def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   match op, a, b with
   -- New exports distinguish Python true division from the legacy floor-division
   -- spelling in previously generated terms. Round the ratio once, including big
@@ -264,13 +266,25 @@ def languageBinop (op : String) (a b : Val) : EResult :=
         let q := Format.binary64.round (xor (x < 0) (y < 0)) x.natAbs y.natAbs
         if q.isInf then .exn (.str "OverflowError") else .val (.float q)
   | "js:+", .str x, .str y => .val (.str (x ++ y))
-  | "js:+", _, _ => flBinop .javascript "+" a b
-  | "js:-", _, _ => flBinop .javascript "-" a b
-  | "js:*", _, _ => flBinop .javascript "*" a b
-  | "js:/", _, _ => flBinop .javascript "/" a b
-  | "js:%", _, _ => flBinop .javascript "%" a b
+  | "js:+", _, _ => match d with
+                  | .javascript => flBinop .javascript "+" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:-", _, _ => match d with
+                  | .javascript => flBinop .javascript "-" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:*", _, _ => match d with
+                  | .javascript => flBinop .javascript "*" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:/", _, _ => match d with
+                  | .javascript => flBinop .javascript "/" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
+  | "js:%", _, _ => match d with
+                  | .javascript => flBinop .javascript "%" a b
+                  | _           => .hole s!"numeric:js-op-outside-javascript:{op}"
   | "py:/", _, _ => flBinop .python "/" a b
-  | _, _, _ => TypedNumeric.binary op a b
+  | _, _, _ => match d with
+               | .python => .hole s!"numeric:typed-op-in-python:{op}"
+               | _       => TypedNumeric.binary op a b
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
@@ -412,7 +426,7 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   -- of the expression is the RIGHT operand under value semantics.
   | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
   | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => languageBinop op a b
+  | _, _, _              => languageBinop d op a b
 
 /-!
 ### Operator equations
@@ -577,7 +591,13 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
         else match a with
           | .tuple args => Stdlib.makeException (op.drop "py:exception:".length).toString args
           | _ => .hole "exception:argument-shape"
-      else TypedNumeric.unary op a
+      -- A typed operator carries its own language family and its traps name
+      -- themselves in that language's terms (`panic:...`), not as Python exception
+      -- classes. The exporter never emits one for a Python file; refusing it here is
+      -- what makes `applyUnop_excSafe` a theorem rather than a convention.
+      else match d with
+        | .python => .hole s!"numeric:typed-op-in-python:{op}"
+        | _       => TypedNumeric.unary op a
 
 /-- `static_cast<uint8_t>` is reduction mod 256, stated against `IntType.wrap` rather
 than against `applyUnop`'s own definition. -/
@@ -1013,6 +1033,34 @@ def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : 
         | .str,   .str t    => .val (.bobj cls (.str t))
         | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
     | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
+
+/-- What a Python `raise e` does with the value `e` evaluated to.
+
+Two kinds of value reach `Stmt.raise` from the exporter, and they must be told apart:
+
+* a value produced by the `py:exception:<Name>` constructor operator, or an
+  already-caught exception being re-raised. In Core's encoding an exception IS the `.str`
+  naming its class, so such a value is `.str name` with `name ∈ Stdlib.excNames`, and
+  raising it means raising exactly that -- `.exn v`;
+* anything else, which `Stdlib.raiseValue` classifies: a builtin class reference
+  instantiates, a string that is not an exception name is a `TypeError` as in CPython,
+  and an object Core cannot model holes.
+
+`raiseValue` deliberately holes on a `.str` that IS an exception name ("ambiguous"): at
+a dynamic `raise <expr>` site, which the exporter routes through the `py:raise` unop, a
+bare string equal to `"ValueError"` cannot be told from the exception. At `Stmt.raise`
+the exporter has already made that distinction -- it emits this statement only on the
+constructor path and the re-raise path -- so the represented-name case short-circuits
+before `raiseValue` would call it ambiguous. The two paths are separated by the
+EXPORTER; the value alone cannot separate them, and this comment is where that lives.
+
+Either way every exception this produces names a represented class
+(`pythonRaise_excSafe`, `Autoform/Lang/Core/ExcSafe.lean`), which is the invariant that
+lets the try/except lowering drop `control:TRY-exception-representation`. -/
+def pythonRaise (v : Val) : EResult :=
+  match v with
+  | .str name => if Stdlib.excNames.contains name then .exn v else Stdlib.raiseValue v
+  | _         => Stdlib.raiseValue v
 
 mutual
 
@@ -1813,7 +1861,17 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .raise e =>
       match evalExpr ctx n h ρ e with
-      | (h₁, .val v)     => (h₁, .exn v ρ)
+      | (h₁, .val v)     =>
+          -- Python classifies the raised value (`pythonRaise`). Every other dialect throws
+          -- whatever it was given: Java and C++ throw arbitrary objects, and Core has no
+          -- exception-object representation to check them against.
+          if ctx.dialect == .python then
+            match pythonRaise v with
+            | .exn w     => (h₁, .exn w ρ)
+            | .hole l    => (h₁, .hole l)
+            | .val _     => (h₁, .hole "raise:non-exception-value")
+            | .outOfFuel => (h₁, .outOfFuel)
+          else (h₁, .exn v ρ)
       | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
