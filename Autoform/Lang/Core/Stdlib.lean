@@ -244,6 +244,80 @@ def raiseValue : Val → EResult
   | .ref _ | .iref _ _ | .clos _ _ | .clsClos _ _ => .hole "raise:unmodelled-object"
   | _ => raiseE "TypeError"
 
+/-! ## Every exception Core constructs names a class Core represents
+
+The exporter's Python `try`/`except` lowering dispatches by comparing the pending
+exception against `excNames` as a **string**, and holes
+(`control:TRY-exception-representation`) when it is not one of them. Whether that hole is
+reachable is a question about this file: if every exception value Core can construct is a
+represented name, the guard is dead code and 29 holes on a cachetools export come off.
+
+The lemmas below settle it for every producer in this file. They are stated rather than
+argued because the argument is exactly the kind that reads as obviously true and is not:
+`numToE` used to turn a shift-count trap into `.exn (.str "negative shift count")`, which
+is not a class name at all, and nothing noticed until it was compared against CPython.
+
+What they do NOT cover, and what therefore still blocks removing the guard, is
+`Stmt.raise`: `execStmt` raises its operand's value directly without passing it through
+`raiseValue`, so a well-formedness condition on the *program* is needed as well. That is
+named in `docs/languages.md` rather than left implicit here. -/
+
+/-- An exception value Core is willing to reason about: the name of a represented class.
+
+Stated with `∈` because that is what `simp` normalises `makeException`'s own
+`contains` guard into, so each proof closes by reusing the guard it already split on. -/
+def ExcSafe (v : Val) : Prop := ∃ n, v = .str n ∧ n ∈ excNames
+
+theorem excSafe_str {n : String} (h : n ∈ excNames) : ExcSafe (.str n) := ⟨n, rfl, h⟩
+
+/-- `TypeError` is represented. Proved once, by `decide`, and tagged `@[simp]` so no
+proof below ever unfolds the 29-name list -- doing so inside `simp_all` exhausts the
+heartbeat budget. -/
+@[simp] theorem typeError_mem_excNames : "TypeError" ∈ excNames := by decide
+
+/-- `makeException` either holes, or produces a represented name — as a value on the
+success path and as a `TypeError` on the argument-validation path. -/
+theorem makeException_excSafe {name : String} {args : List Val} {v : Val} :
+    makeException name args = .val v ∨ makeException name args = .exn v → ExcSafe v := by
+  intro h
+  unfold makeException raiseE at h
+  repeat' split at h
+  all_goals rcases h with h | h
+  all_goals (try subst_eqs)
+  all_goals simp_all [ExcSafe]
+
+set_option maxHeartbeats 1000000 in
+/-- `raiseValue` never raises anything but a represented name: raising a string is a
+`TypeError` exactly as in CPython, an object holes, and a builtin class reference is
+routed through `makeException`. -/
+theorem raiseValue_excSafe {u v : Val} : raiseValue u = .exn v → ExcSafe v := by
+  intro h
+  cases u
+  case fn name =>
+    -- The only branch here that can produce an exception is the one routed through
+    -- `makeException`, so reuse its lemma rather than unfolding it: evaluating
+    -- `makeException` in `whnf` is what exhausts the heartbeat budget.
+    simp only [raiseValue] at h
+    split at h
+    · cases hm : makeException ((name.drop "$pythonExceptionClass$".length).toString) [] with
+      | val value =>
+          rw [hm] at h
+          injection h with hv
+          subst hv
+          exact makeException_excSafe (Or.inl hm)
+      | exn w =>
+          rw [hm] at h
+          injection h with hv
+          subst hv
+          exact makeException_excSafe (Or.inr hm)
+      | hole _ => rw [hm] at h; simp at h
+      | outOfFuel => rw [hm] at h; simp at h
+    · simp at h
+  all_goals simp only [raiseValue, raiseE] at h
+  all_goals repeat' split at h
+  all_goals (try subst_eqs)
+  all_goals simp_all [ExcSafe]
+
 /-! ## Free builtins -/
 
 /-- Builtin *type* names `isinstance` can decide against. -/

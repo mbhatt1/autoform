@@ -563,3 +563,22 @@ def test_python_negative_shift_raises_valueerror_by_name():
     # Other dialects keep the prose reason: C's negative shift is undefined, not a
     # trap that names an exception, and nothing should start calling it ValueError.
     assert 'shiftCountFault  : Option String := none' in numeric
+
+
+def test_every_exception_producer_in_core_is_pinned_by_a_theorem():
+    """The `control:TRY-exception-representation` guard rests on these.
+
+    Python `except` dispatch compares the pending exception against `excNames` as a
+    string. Whether the guard's else-branch is reachable is a question about Core's
+    exception producers, and each is now pinned. One of them was genuinely unsafe when
+    checked -- the shift-count trap named itself in prose -- so these are theorems rather
+    than a comment asserting the obvious.
+    """
+    stdlib = (ROOT / 'Autoform/Lang/Core/Stdlib.lean').read_text()
+    numeric = (ROOT / 'Autoform/Lang/Core/Numeric.lean').read_text()
+    assert 'theorem makeException_excSafe' in stdlib
+    assert 'theorem raiseValue_excSafe' in stdlib
+    assert 'theorem python_shiftCount_trap' in numeric
+    # The predicate must stay a statement about `excNames`, not about some other list
+    # that could drift away from the one the exporter's dispatch actually compares to.
+    assert 'def ExcSafe (v : Val) : Prop := ∃ n, v = .str n ∧ n ∈ excNames' in stdlib

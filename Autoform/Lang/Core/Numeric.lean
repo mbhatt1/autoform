@@ -524,6 +524,22 @@ def lt (c : NumConfig) (a b : Int) : Bool := c.cast a < c.cast b
 def le (c : NumConfig) (a b : Int) : Bool := c.cast a ≤ c.cast b
 def eq (c : NumConfig) (a b : Int) : Bool := c.cast a == c.cast b
 
+/-- Every trap the Python config can produce names a class Core represents.
+
+`numToE` turns `.trap r` into `.exn (.str r)`, and Python `except` dispatch reads that
+string as the exception's CLASS NAME. This used to be the prose `"negative shift count"`,
+so `except ValueError:` could not match it. The table at the top of this file said
+`ValueError` the whole time and nothing compared the two, which is why a theorem is worth
+more here than a comment: the shift path is the only way `NumConfig.python` can trap
+(`type := .unbounded` rules out an overflow trap, and division by zero is `.divZero`, not
+a trap), so this covers it. -/
+theorem python_shiftCount_trap {k : Int} {r : String} :
+    NumConfig.python.shiftCount k = .trap r → r = "ValueError" := by
+  intro h
+  unfold NumConfig.shiftCount NumConfig.python at h
+  repeat' split at h
+  all_goals simp_all
+
 end NumConfig
 
 /-! ## Lemmas about the operations

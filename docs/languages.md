@@ -307,6 +307,37 @@ change. Recorded as a known defect rather than silently carried.
 * Java `char` arithmetic (16-bit unsigned) under a 32-bit signed config.
 * Go `&^` (and-not) and unsigned `uint` arithmetic under a signed config.
 
+### 10. Python `except` dispatch holes on an exception it cannot name
+
+`cartographer/export_ast.sc` lowers Python `try`/`except` into a dispatch that compares
+the pending exception against `Stdlib.excNames` **as a string**, and holes
+(`control:TRY-exception-representation`) when it is not one of them. That is 29 holes on
+a fresh `cachetools` export — the largest single Python hole class after literal defaults.
+
+The guard looks redundant, and establishing whether it is was worth doing properly,
+because "obviously every exception is one of those names" is exactly the sort of claim
+this project keeps finding to be false. Every producer of an exception value in
+`Autoform/Lang/Core/Stdlib.lean` is now pinned by a theorem:
+
+* `makeException_excSafe` — holes on any name outside `excNames`, and otherwise yields
+  that name (or a `TypeError` from argument validation).
+* `raiseValue_excSafe` — raising a string is a `TypeError` as in CPython, an object
+  holes, and a builtin class reference is routed through `makeException`.
+* `python_shiftCount_trap` (`Numeric.lean`) — the one exit that was **not** safe. A
+  numeric trap becomes `.exn (.str r)`, and the Python shift-count trap carried the prose
+  `"negative shift count"`, so `except ValueError:` could not match it. Fixed; the
+  theorem is what keeps it fixed.
+
+**What still blocks removing the guard** is `Stmt.raise`. `execStmt` raises its operand's
+evaluated value directly, without passing it through `raiseValue`, so nothing in the
+semantics prevents an arbitrary `Val` becoming an exception. Today the Python exporter
+only ever emits `Stmt.raise` with a `py:exception:<Name>` constructor or a re-raise of an
+already-caught value, so the programs it produces are safe — but that is a property of
+the *exporter*, not of Core, and the guard is what stands in for the missing proof.
+Removing it needs a well-formedness predicate on programs plus a preservation argument
+over the interpreter. Until then the dispatch holes, which is the conservative direction:
+it refuses to catch rather than catching the wrong thing.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
