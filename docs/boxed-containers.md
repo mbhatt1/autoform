@@ -1,8 +1,7 @@
 # Boxed containers for Core
 
-**Status: steps 1, 3 and 4 landed (3 and 4 INERT); step 2 landed in half; the `Val.eqPy`
-half of step 2 and step 5 unimplemented. The switchover — making `[1,2]` allocate — is not
-started and is the step that moves every number.** Read this before changing
+**Status: steps 1-4 landed (3 and 4 INERT); step 5 unimplemented. The switchover —
+making `[1,2]` allocate — is attempted-and-reverted, and priced below.** Read this before changing
 `Syntax.lean` or `Semantics.lean`.
 
 `Stmt.setIndex`, the new `Stmt.delIndex`, and the `MethodResult.mutating` wiring in
@@ -28,6 +27,15 @@ depend on the fuel budget, which breaks `evalExpr_pure_fuel_indep` outright -- t
 fragment includes `binop`. `Val.eqFuel h = h.length + 64` is derived from the heap, which is
 equal across two runs differing only in evaluator fuel because the pure fragment is
 heap-inert.
+
+**Correction: the `Val.eqPy` half IS landed.** The paragraph below says it is not, and
+that was true when it was written. `Val.eqPy`/`eqPyL`/`eqPyP` are defined in `Syntax.lean`
+and diverted to from the one `evalExpr` call site behind `binopNeedsHeap`, exactly as the
+header describes. It handles `.ref` operands through `Heap.payload`, with reference
+identity short-circuiting first, and is checked against CPython: two distinct refs with
+equal payloads are `==`, unequal payloads are not, and `a == a` is true without
+descending. So the largest mechanical cost this document anticipated has already been
+paid, and what remains before the switchover is smaller than the text below implies.
 
 Step 2 splits into two halves that are NOT equally separable. `Val.identical` (the `is` half,
 section 5) is landed: it is total, heap-free, and touches one call site, and it made `is`
@@ -412,6 +420,42 @@ layer wants independently of boxing — `Expr.alloc` already extends the heap �
 migration cost that buys something.
 
 ---
+
+## 6b. The switchover, attempted and priced
+
+Making `.listE`/`.dictE` allocate was tried end to end and reverted. It is smaller than
+this document expects in one way and blocked in exactly the way it predicts in another.
+
+**Three things it needs that are not written down here.**
+
+1. **Boxing must be dialect-gated.** A C aggregate initializer is a value — `int a[] =
+   {7,8,9}` has no identity to share, and `Dialect.fieldsOnDicts` reads it by field name.
+   Boxing unconditionally makes C wrong in the commit that makes Python right. The C
+   tests in `Semantics.lean` caught this immediately.
+2. **Splatting has to look through the box.** `*xs` and `**kw` inspect `Val.iterable` and
+   `strKeyed` structurally, which silently stop seeing a container once it is a `Val.ref`.
+   A `Val.unbox` view fixes it, and `FuelMono`'s two splat cases follow.
+3. **An attribute read on a boxed container must hole.** `{'a': 1}.a` is an
+   `AttributeError` in Python and was a hole before the switchover; afterwards the
+   receiver IS an object, so the missing field falls through to the `unit` fallback
+   (docs/languages.md §13) and the switchover introduces a silent wrong answer in the
+   commit that removes several. Holing it restores the old behaviour with a sharper
+   label.
+
+**What blocks it**, measured rather than estimated: **163 errors across 34 files, all but
+one in generated `SpecsGen` specs** (`Cachetools` plus 33 `V8Base` parts). The single
+cause is item 3. `applyFunc_ret_field_self` and its documented twin claim "an accessor
+returns the field it names" for every receiver, and a boxed container is now a receiver
+that answers a hole instead. Excluding it is one hypothesis — `hbox : ∀ o, h.get r = some
+o → o.payload = .none` — and two lines of proof. Every *generated* spec that uses those
+lemmas then has to carry the same conjunct in its `MRefines` domain, which means changing
+`scripts/synth_specs.py` and regenerating, which means re-stating what those theorems
+claim.
+
+That is the "cannot be sliced into a piece that leaves the corpora verifying" this
+document warns about, arrived at from the other direction. The remaining work is not
+semantics — all of it above compiles and agrees with CPython — it is regenerating 163
+specifications under a changed domain.
 
 ## 7. Migration cost, measured
 
