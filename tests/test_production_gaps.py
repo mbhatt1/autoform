@@ -1060,3 +1060,61 @@ class TestJavaScriptObjectsAndEquality:
         assert 'hole("op:new:" + i.name)' in self.EXP
         assert 'hole("op:new:unfolded")' in self.EXP
         assert 'hole("op:new:computed-constructor")' in self.EXP
+
+class TestSliceDPythonLabels:
+    """Slice D of the arbitrary-codebases goal: the Python labels that were still holes on
+    click 8.2.1 / requests 2.32.5 -- `op:logicalAnd`/`Or` (n-ary chains), `op:assert`,
+    `op:setLiteral`, `expr:BLOCK-impure` -- and the one deliberately kept (`lit:bytes`).
+    Every rule cites the Python Language Reference section it implements; the behavioural
+    checks are the `sliceDProg` `#guard`s in `Semantics.lean` against CPython.
+    """
+
+    SEMANTICS = (ROOT / 'Autoform' / 'Lang' / 'Core' / 'Semantics.lean').read_text()
+    STDLIB = (ROOT / 'Autoform' / 'Lang' / 'Core' / 'Stdlib.lean').read_text()
+
+    def test_an_and_or_chain_folds_left_as_the_grammar_is_left_recursive(self):
+        src = EXPORTER.read_text()
+        assert '(mfn == "<operator>.logicalAnd" || mfn == "<operator>.logicalOr") && kids.size > 2' in src
+        assert 'kids.map(expr).reduceLeft((a, b) =>' in src
+        assert 'Python Language Reference §6.11 (Boolean operations)' in src
+
+    def test_assert_lowers_to_the_reference_equivalence(self):
+        src = EXPORTER.read_text()
+        assert 'callName(c) == "<operator>.assert" && kidsOf(c).nonEmpty' in src
+        assert '"op" -> "py:exception:AssertionError"' in src
+        assert 'Python Language Reference §7.3 (The assert statement)' in src
+        # the message is evaluated only on failure: it sits in the else-branch
+        assert '"c" -> expr(ks.head), "t" -> skip,' in src
+
+    def test_a_set_display_is_a_unit_valued_dict_with_distinct_keys(self):
+        src = EXPORTER.read_text()
+        assert 'pyFile && mfn == "<operator>.setLiteral" && kids.nonEmpty' in src
+        assert 'ujson.Arr(expr(k), ujson.Obj("k" -> "unit"))' in src
+        assert 'def dictOfPairs' in self.STDLIB
+        assert 'Stdlib.dictOfPairs ps' in self.SEMANTICS
+        for method in ('"add"', '"discard"'):
+            assert method in self.STDLIB.split('def methodNames', 1)[1].split(']', 1)[0], method
+        assert '| .dict kvs, "remove", [x] =>' in self.STDLIB
+
+    def test_read_only_builtins_see_through_a_boxed_container(self):
+        assert 'def unboxesArgs (name : String) : Bool :=' in self.STDLIB
+        assert 'if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs' in self.SEMANTICS
+
+    def test_impure_block_preludes_are_hoisted_only_where_a_prelude_exists(self):
+        src = EXPORTER.read_text()
+        assert 'def blockExprV(b: Block)' in src
+        assert 'comprehensionLowering(b, eagerGen = genExpEager).getOrElse(blockExprV(b))' in src
+        # plain `expr` still has no slot and keeps the label
+        assert 'if (bad.isEmpty) bad = "expr:BLOCK-impure"' in src
+
+    def test_bytes_stay_a_hole_with_the_reference_cited(self):
+        src = EXPORTER.read_text()
+        assert 'hole("lit:bytes")' in src
+        assert 'Python Language Reference §2.5.5' in src
+
+    def test_every_rule_has_a_cpython_guard(self):
+        guards = self.SEMANTICS.split('private def sliceDProg', 1)[1]
+        for subject in ('setLen', 'setIn', 'setAdd', 'setRemoveMissing', 'dictDup',
+                        'andChain', 'assertFails', 'assertPasses'):
+            assert f'#guard match runFunc sliceDProg 200 "{subject}" []' in guards, subject
+

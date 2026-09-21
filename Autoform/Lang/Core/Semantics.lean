@@ -1891,7 +1891,11 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalPairs ctx n h ρ kvs with
       | (h₁, .inr ps) =>
           if ctx.dialect.boxesContainers then
-            let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
+            -- Python §6.2.8: a repeated key keeps its first position and takes the last
+            -- value; a set display (§6.2.7, lowered to unit-valued pairs) holds
+            -- DISTINCT elements. `Stdlib.dictOfPairs` is that fold. A C aggregate
+            -- initializer (the unboxed branch) has no repeated keys to reconcile.
+            let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict (Stdlib.dictOfPairs ps) }
             (h₂, .val (.ref r))
           else (h₁, .val (.dict ps))
       | (h₁, .inl r)  => (h₁, r)
@@ -1978,7 +1982,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
-              match Stdlib.builtin ctx.dialect h₁ f vs with
+              -- A READ-ONLY builtin sees through a boxed container: `len(xs)` on a list
+              -- that allocates is `len` of its payload (`Val.unbox`), and the answer is a
+              -- scalar, so no identity is created or lost. Builtins that hand back a
+              -- container (`list`, `sorted`, ...) are deliberately NOT unboxed here: their
+              -- result would have to allocate to keep the identity model honest.
+              let vs' := if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs
+              match Stdlib.builtin ctx.dialect h₁ f vs' with
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
@@ -3579,6 +3589,70 @@ private def excClassProg : Program :=
 #guard match runFunc excClassProg 200 "bound" [] with | .val (.str "MyErr") => true | _ => false
 #guard match runFunc excClassProg 200 "reraise" [] with | .exn (.str "MyErr") => true | _ => false
 #guard match runFunc excClassProg 200 "notExc" [] with | .exn (.str "TypeError") => true | _ => false
+
+/-! ## Slice D: sets as unit-valued dicts, dict-display deduplication, n-ary `and`/`or`,
+`assert` (docs/languages.md §16.D)
+
+Every expectation is CPython's; the reference sections are cited next to each rule. -/
+private def sliceDProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ -- `s = {1, 2, 1}; len(s)`  -- §6.2.7: distinct elements; CPython 2
+      { name := "setLen", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit), (.lit (.int 2), .lit .unit),
+                                             (.lit (.int 1), .lit .unit)]))
+                     (.ret (.call "len" [.name "s"])) }
+      -- `2 in {1, 2}` / `3 in {1, 2}`  -- CPython True / False
+    , { name := "setIn", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit), (.lit (.int 2), .lit .unit)]))
+                     (.ret (.tupleE [.inOp false (.lit (.int 2)) (.name "s"),
+                                     .inOp false (.lit (.int 3)) (.name "s")])) }
+      -- `s = {1}; s.add(2); s.add(1); s.discard(9); len(s)`  -- CPython 2
+    , { name := "setAdd", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit)]))
+               (.seq (.expr (.mcall (.name "s") "add" [.lit (.int 2)]))
+               (.seq (.expr (.mcall (.name "s") "add" [.lit (.int 1)]))
+               (.seq (.expr (.mcall (.name "s") "discard" [.lit (.int 9)]))
+                     (.ret (.call "len" [.name "s"]))))) }
+      -- `{1}.remove(9)`  -- CPython KeyError
+    , { name := "setRemoveMissing", params := []
+      , body := .seq (.assign "s" (.dictE [(.lit (.int 1), .lit .unit)]))
+                     (.expr (.mcall (.name "s") "remove" [.lit (.int 9)])) }
+      -- `d = {1: "a", 2: "b", 1: "c"}; (len(d), d[1])`  -- §6.2.8: CPython (2, "c")
+    , { name := "dictDup", params := []
+      , body := .seq (.assign "d" (.dictE [(.lit (.int 1), .lit (.str "a")), (.lit (.int 2), .lit (.str "b")),
+                                             (.lit (.int 1), .lit (.str "c"))]))
+                     (.ret (.tupleE [.call "len" [.name "d"], .index (.name "d") (.lit (.int 1))])) }
+      -- `1 and 2 and 3`, `1 and 0 and 3`, `0 or "" or "x"`  -- §6.11: the last evaluated
+      -- operand, left-associated as the grammar (`and_test: and_test "and" not_test`) is
+    , { name := "andChain", params := []
+      , body := .ret (.tupleE
+          [ .binop "&&" (.binop "&&" (.lit (.int 1)) (.lit (.int 2))) (.lit (.int 3))
+          , .binop "&&" (.binop "&&" (.lit (.int 1)) (.lit (.int 0))) (.lit (.int 3))
+          , .binop "||" (.binop "||" (.lit (.int 0)) (.lit (.str ""))) (.lit (.str "x")) ]) }
+      -- `assert False, "boom"` as the exporter lowers it (§7.3: `if not e: raise
+      -- AssertionError(msg)`); `assert True` runs on
+    , { name := "assertFails", params := []
+      , body := .ifte (.lit (.bool false)) .skip
+                  (.raise (.unop "py:exception:AssertionError" (.tupleE [.lit (.str "boom")]))) }
+    , { name := "assertPasses", params := []
+      , body := .seq (.ifte (.lit (.bool true)) .skip
+                        (.raise (.unop "py:exception:AssertionError" (.tupleE []))))
+                     (.ret (.lit (.int 7))) } ] }
+
+#guard match runFunc sliceDProg 200 "setLen" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc sliceDProg 200 "setIn" [] with
+       | .val (.tuple [.bool true, .bool false]) => true | _ => false
+#guard match runFunc sliceDProg 200 "setAdd" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc sliceDProg 200 "setRemoveMissing" [] with
+       | .exn (.str "KeyError") => true | _ => false
+#guard match runFunc sliceDProg 200 "dictDup" [] with
+       | .val (.tuple [.int 2, .str "c"]) => true | _ => false
+#guard match runFunc sliceDProg 200 "andChain" [] with
+       | .val (.tuple [.int 3, .int 0, .str "x"]) => true | _ => false
+#guard match runFunc sliceDProg 200 "assertFails" [] with
+       | .exn (.str "AssertionError") => true | _ => false
+#guard match runFunc sliceDProg 200 "assertPasses" [] with | .val (.int 7) => true | _ => false
 
 /-! ## Boxed containers, step 3: `setIndex` on a heap payload
 

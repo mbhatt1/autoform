@@ -1095,3 +1095,55 @@ position (`op:assignment` -- jssrc2cpg's `_tmp = this.#f` lowering, not yet unpi
 builtins other than `Map` (`op:new:<Name>`). The tracked `ast-LangJS.json`/`ast-LangTS.json`
 predate this exporter and today's `throw`/`catch`/`void`/`x!`/`++` lowerings; their counts
 are re-measured by a re-export, not by this document.
+
+#### 16.D `assert`, sets, `bytes`, `and`/`or` chains, impure blocks (2026-09-21)
+
+Measured on click 8.2.1 and requests 2.32.5 (`scripts/lang_matrix.py ast-Click.json
+ast-Requests.json`); each rule cites the Python Language Reference it implements and
+is checked against CPython by the `sliceDProg` `#guard`s in `Semantics.lean`.
+
+* **`op:logicalAnd` / `op:logicalOr` (23+3 / 8+1) -- closed.** pysrc2cpg flattens
+  `a and b and c` into ONE call with three operands, and the exporter only lowered the
+  two-operand shape. §6.11: `x and y` "first evaluates x; if x is false, its value is
+  returned; otherwise, y is evaluated and the resulting value is returned" -- the
+  operators "return the last evaluated argument". The chain folds left (the grammar is
+  `and_test: and_test "and" not_test`) onto Core's short-circuit value operator.
+* **`op:assert` (13+6) -- closed.** §7.3: `assert e` "is equivalent to
+  `if __debug__: if not e: raise AssertionError`", `assert e, m` to
+  `... raise AssertionError(m)`. Lowered to exactly that with the existing `ifte` and
+  `raise` of the `py:exception:AssertionError` constructor; the message is in the
+  else-branch, so it is evaluated only on failure, as in CPython. `__debug__` is taken
+  as `True` -- the oracle's CPython runs without `-O`.
+* **`op:setLiteral` (7) -- closed, by a stated model.** §6.2.7: a set display's
+  "elements are evaluated from left to right and added to the set object"; a set is "an
+  unordered collection of distinct hashable objects" (library reference, Set Types).
+  Core has no set value; a set display is a boxed dict whose values are all `unit`.
+  `in`, `len` and iteration are the dict's own on its keys; `add`, `discard` and
+  `remove` (KeyError when absent) are `Stdlib.method` arms; distinctness comes from
+  `dictE` deduplicating keys. What the model does NOT give: set operators (`|`, `&`,
+  `-`, `^` still hole at the operator), `==` between a set and a dict of `unit`s (a dict
+  literal of `unit` values is indistinguishable -- no corpus does this), and
+  `set()`/`frozenset()` calls.
+* **Dict displays deduplicate (§6.2.8).** Found while modelling sets: "you can specify
+  the same key multiple times in the dict item list, and the final dictionary's value
+  for that key will be the last one given". `dictE` now folds its pairs through
+  `Stdlib.dictSet` (first position, last value); it used to keep both entries and
+  answer `len` 2 for `{1: "a", 1: "c"}`.
+* **`len`/`sum`/`min`/`max`/`bool`/`any`/`all` see through a boxed container.** Found
+  by the set guards: `len(xs)` on a list that allocates was the hole `call:len`, because
+  `Stdlib.builtin` matched the raw `Val.ref`. Read-only, scalar-returning builtins now
+  unbox their arguments first (`Stdlib.unboxesArgs`); container-returning ones do not,
+  because their result would have to allocate.
+* **`expr:BLOCK-impure` (31+12) / `expr:BLOCK-prelude` (2+2) -- closed where a prelude
+  exists.** In a prelude-aware position (`exprV`: an argument, an assigned value) the
+  frontend's `tmpN = e` bindings are hoisted into the prelude in order instead of being
+  substituted, so an impure binding is evaluated once and in order relative to the rest
+  of its block. In plain `expr` position there is still no slot and the labels stay.
+  The caveat is `exprV`'s own: a hoisted prelude runs before sibling arguments to its
+  left are read, which Python (§6.16, evaluation order: "operands are evaluated from
+  left to right") would evaluate first.
+* **`lit:bytes` (7+5) -- kept as a hole.** §2.5.5: bytes literals "produce an instance
+  of the bytes type instead of the str type". Encoding one as a `Val.str` would be a
+  wrong type (`b'a' == 'a'` is `False`); a `Val.bytes` touches every exhaustive match
+  over `Val` in `FuelMono`, `ExcSafe`, `Ledger` and `Basis`, and is not done here.
+

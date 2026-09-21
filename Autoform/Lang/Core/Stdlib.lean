@@ -107,6 +107,17 @@ def dictSet : List (Val × Val) → Val → Val → List (Val × Val)
   | (k', v') :: ps, k, v =>
       if Val.beq k' k then (k, v) :: ps else (k', v') :: dictSet ps k v
 
+/-- A dict display's pairs, deduplicated the way the language reference says:
+"they are evaluated from left to right to define the entries of the dictionary: each key
+object is used as a key into the dictionary to store the corresponding value. This means
+that you can specify the same key multiple times in the dict item list, and the final
+dictionary's value for that key will be the last one given" (Python Language Reference
+§6.2.8, Dictionary displays). `dictSet` keeps the FIRST occurrence's position and takes
+the LAST value, which is also CPython's insertion-order behaviour. The same fold gives a
+set display its "distinct" elements (§6.2.7) when the values are all `unit`. -/
+def dictOfPairs (ps : List (Val × Val)) : List (Val × Val) :=
+  ps.foldl (fun acc kv => dictSet acc kv.1 kv.2) []
+
 /-- Delete every binding of a key. Keys are unique in a well-formed dict, so this
 removes at most one. -/
 def dictDel : List (Val × Val) → Val → List (Val × Val)
@@ -491,6 +502,15 @@ def knowsFree (d : Dialect) (name : String) : Bool :=
   | .cLike | .javascript | .java | .go => false
   | .python => freeNames.contains name
 
+/-- The free builtins whose arguments the interpreter reads THROUGH a boxed container
+(`Val.unbox`) before calling `builtin`. All of them return a scalar computed from the
+container's contents -- `len(s)` is "the length (the number of items) of an object"
+(library reference, Built-in Functions) -- so unboxing neither creates nor destroys an
+identity. A builtin that returns a container is not on this list on purpose. -/
+@[simp] def unboxesArgs (name : String) : Bool :=
+  name == "len" || name == "sum" || name == "min" || name == "max" ||
+  name == "bool" || name == "any" || name == "all"
+
 /-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
 guard that keeps the ledger honest. -/
 def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
@@ -691,6 +711,19 @@ def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : Lis
     | .dict kvs, "items",  [] => pv (.list (kvs.map (fun kv => .tuple [kv.1, kv.2])))
     | .dict kvs, "copy",   [] => pv (.dict kvs)
     -- ── dict, mutating ─────────────────────────────────────────────────────────
+    -- A Python SET is modelled as a dict whose values are all `unit` (the exporter
+    -- lowers a set display `{a, b}` to that, `docs/languages.md` §16.D). The library
+    -- reference (Set Types -- set, frozenset): "A set object is an unordered collection
+    -- of distinct hashable objects"; `add(elem)` "Add element elem to the set";
+    -- `remove(elem)` "Remove element elem from the set. Raises KeyError if elem is not
+    -- contained in the set"; `discard(elem)` "Remove element elem from the set if it is
+    -- present". Membership, `len` and iteration are the dict's own, on the keys.
+    | .dict kvs, "add", [x] => m (.val .unit) (.dict (dictSet kvs x .unit))
+    | .dict kvs, "discard", [x] => m (.val .unit) (.dict (dictDel kvs x))
+    | .dict kvs, "remove", [x] =>
+        match dictGet kvs x with
+        | some _ => m (.val .unit) (.dict (dictDel kvs x))
+        | none   => p (raiseE "KeyError")
     | .dict kvs, "pop", [k] =>
         match dictGet kvs k with
         | some x => m (.val x) (.dict (dictDel kvs k))
@@ -755,7 +788,7 @@ def methodCore (d : Dialect) (h : Heap) (recv : Val) (name : String) (args : Lis
 def methodNames : List String :=
   [ "get", "keys", "values", "items", "copy", "count", "index"
   , "append", "insert", "extend", "clear", "remove", "pop", "popitem"
-  , "setdefault", "update" ]
+  , "setdefault", "update", "add", "discard" ]
 
 /-- The JavaScript array methods `methodCore` answers. Separate from `methodNames`
 because the two tables genuinely differ: `push` returns the new length, `pop` of an
@@ -1011,6 +1044,8 @@ private def methodWitness : String → Val × List Val
   | "popitem"    => (.dict [], [])
   | "setdefault" => (.dict [], [.unit])
   | "update"     => (.dict [], [.dict []])
+  | "add"        => (.dict [], [.unit])
+  | "discard"    => (.dict [], [.unit])
   | _            => (.unit, [])
 
 /-- Every name `knowsFree` accepts is genuinely answered by `builtin`. With
