@@ -389,7 +389,8 @@ class TestFunctionReferenceDefaults:
                   'def f(a, g=C.pick):\n'
                   '    return g(a, a)\n')
         recs = {v['name']: v for v in _decode(source)['signatures'].values()}
-        assert recs['f']['defaultValues'] == [['g', {'k': 'dotted', 'v': 'C.pick'}]]
+        assert recs['f']['defaultValues'] == [
+            ['g', {'k': 'dotted', 'v': 'C.pick', 'moduleBase': False}]]
         # `defaults` is the "cannot be modelled" flag: a dotted name is a candidate, so
         # it does not set it. The exporter still holes if resolution is not unique.
         assert recs['f']['defaults'] is False
@@ -415,3 +416,35 @@ class TestFunctionReferenceDefaults:
         assert '| lit   : Lit → DefaultValue' in syntax
         assert '| fnref : String → DefaultValue' in syntax
         assert 'defaults : List (String × DefaultValue) := []' in syntax
+
+
+class TestModuleAttributeDefaults:
+    """`timer=time.monotonic` — an attribute of an imported module.
+
+    The value is a function object Core cannot model, but the BINDING exists, and that
+    distinction is already `absentModule`'s: bind an opaque marker, and let every use of
+    it — a call, an attribute read — hole locally. Holing the whole signature instead
+    takes out every other default in it, including the literals, which is how
+    `TTLCache.__init__` lost `getsizeof=None` to `timer=time.monotonic`.
+    """
+
+    def test_a_module_attribute_default_is_marked(self):
+        source = 'import time\n\ndef f(a, timer=time.monotonic):\n    return a\n'
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['f']['defaultValues'] == [
+            ['timer', {'k': 'dotted', 'v': 'time.monotonic', 'moduleBase': True}]]
+
+    def test_a_non_module_base_is_not_marked(self):
+        """`someobj.attr` is an attribute of a value, not of a module: its identity is
+        not established by an import and re-reading it is not the same thing."""
+        source = 'def f(a, g=someobj.attr):\n    return a\n'
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['f']['defaultValues'] == [
+            ['g', {'k': 'dotted', 'v': 'someobj.attr', 'moduleBase': False}]]
+
+    def test_the_marker_is_the_one_absentModule_uses(self):
+        """One representation for "the binding exists and its value is unmodellable",
+        not two that can drift apart."""
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert 'externalModule(value("v").str, "external")' in src
+        assert 'def externalModule(path: String, why: String)' in src

@@ -153,6 +153,18 @@ tree = ast.parse(source)
 # way to read one back -- which makes the assignment unobservable, but only if nothing
 # tries to observe it. Checked rather than assumed: if this module touches any of the
 # chaining attributes, every `raise ... from ...` in it keeps holing.
+# Module names bound by an import in this file. A dotted default whose base is one of
+# these is a module attribute -- `timer=time.monotonic` -- and the exporter may bind it to
+# the same opaque marker `absentModule` uses, rather than holing the whole signature.
+_imported_modules = set()
+for _n in ast.walk(tree):
+    if isinstance(_n, ast.Import):
+        for _a in _n.names:
+            _imported_modules.add((_a.asname or _a.name).split('.')[0])
+    elif isinstance(_n, ast.ImportFrom):
+        for _a in _n.names:
+            _imported_modules.add(_a.asname or _a.name)
+
 # `id(func) -> enclosing function`, for the `nonlocal` box analysis.
 _parent_function = {}
 def _index_parents(node, current):
@@ -329,7 +341,10 @@ def _default_value(node):
     if lit is not None:
         return lit
     dotted = dotted_name(node)
-    return {'k': 'dotted', 'v': dotted} if dotted else None
+    if dotted is None:
+        return None
+    return {'k': 'dotted', 'v': dotted,
+            'moduleBase': dotted.split('.')[0] in _imported_modules}
 
 
 def constant_literal(node):
@@ -10703,6 +10718,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   resolveDotted(value("v").str) match {
                     case Some(full) =>
                       ujson.Arr(d.arr(0), ujson.Obj("k" -> "fnref", "v" -> full))
+                    // `timer=time.monotonic`: an attribute of an imported module, so the
+                    // binding exists and its value is something Core cannot model. That
+                    // is what `absentModule`'s opaque marker already says, and it says it
+                    // the same way -- the name binds, and every USE of it (a call, an
+                    // attribute read) holes LOCALLY. Holing the whole signature instead
+                    // would take out every other default in it, including the literals.
+                    case None if value.obj.get("moduleBase").exists(_.bool) =>
+                      ujson.Arr(d.arr(0), externalModule(value("v").str, "external"))
                     case None => defaultsUnresolved = true; d
                   }
                 else d
