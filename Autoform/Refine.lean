@@ -1125,7 +1125,7 @@ theorem poly_refines :
   refine forall_ge_of_forall_add (N := 9) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf,
         CMathProgram, Marshal.toVal, applyBinop_c_mul h1, applyBinop_c_add h2,
         applyBinop_c_sub h3]
 
@@ -1143,7 +1143,7 @@ theorem poly_overflows (k : Nat) :
     runFunc CMathProgram (k + 9) "poly" [.int 100000, .int 100000, .int 0]
       = .val (.int 1409965408) := by
   rw [runFunc_of_resolve _ _ _ _ f_poly rfl]
-  simp only [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
+  simp only [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_poly, ctxOf, CMathProgram]
   rfl
 
 /-- No fuel bound makes `poly` refine its mathematical model on the full domain. -/
@@ -1177,13 +1177,13 @@ theorem clamp_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_clamp rfl]
   by_cases h1 : x < lo
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, h1]
   · by_cases h2 : hi < x
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_clamp, ctxOf,
             CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt, applyBinop_int_gt,
             h1, h2]
 
@@ -1204,9 +1204,9 @@ theorem cdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_cdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_cdiv, ctxOf,
           CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_c_div hb hdom, hb]
 
@@ -1223,7 +1223,7 @@ theorem add_refines :
   refine forall_ge_of_forall_add (N := 8) ?_
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__add rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_lib_py__module__add, ctxOf,
         SampleProgram, Marshal.toVal]
 
 /-! ### Python: `absval` from `ops.py` -/
@@ -1237,10 +1237,10 @@ theorem absval_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__absval rfl]
   by_cases h1 : x < 0
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
           f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
 
@@ -1255,14 +1255,14 @@ theorem cmpchain_refines :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__cmpchain rfl]
   by_cases h1 : x < y
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, applyUnop_int_neg,
           f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
           applyBinop_int_lt, h1]
   · by_cases h2 : y < x
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
-    · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
+    · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get,
             f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
             applyBinop_int_lt, applyBinop_int_gt, h1, h2]
 
@@ -1283,9 +1283,9 @@ theorem fmod_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fmod rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fmod, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_mod a b hb, hb]
 
@@ -1308,9 +1308,9 @@ theorem fdiv_refines :
   rw [runFunc_of_resolve _ _ _ _ f_ops_py__module__fdiv rfl]
   by_cases hb : b = 0
   · subst hb
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind]
-  · simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
+  · simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, Env.get, f_ops_py__module__fdiv, ctxOf,
           StressProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq, binopNeedsHeap, Val.kind,
           applyBinop_py_div a b hb, hb]
 
@@ -1331,7 +1331,7 @@ theorem sample_id_reaches_hole (k : Nat) :
     runFunc SampleProgram (k + 10) "lib.py:<module>.sample_id" []
       = .hole "lit:unquoted" := by
   rw [runFunc_of_resolve _ _ _ _ f_lib_py__module__sample_id rfl]
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, evalList, Env.set,
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, evalList, Env.set,
         f_lib_py__module__sample_id, ctxOf, SampleProgram]
 
 /-- No shallow specification refines `sample_id`, at any fuel bound, on any domain that
@@ -1556,7 +1556,7 @@ theorem sumto_run (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
         hret]
   rw [triN_closed hn] at hbody
   simp only [f_sumto, ctxC] at hbody
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_sumto, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, f_sumto, Env.set, hbody]
 
 theorem sumto_refines :
     Refines₁ (α := Int) (β := Int)
@@ -1705,7 +1705,7 @@ theorem gcdish_run (a b : Int) (ha : 0 ≤ a) (hb : 0 ≤ b) (fuel : Nat)
         execStmt_seq_normal ctxS (G+3) [] _ hskip,
         hret]
   simp only [f_ops_py__module__gcdish, ctxS] at hbody
-  simp [applyFunc, bindParams, Func.posParams, kwargsRejected, f_ops_py__module__gcdish, Env.set, hbody]
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, f_ops_py__module__gcdish, Env.set, hbody]
 
 theorem gcdish_refines :
     Refines₂ (α := Int) (β := Int) (γ := Int)

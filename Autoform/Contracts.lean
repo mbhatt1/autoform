@@ -793,7 +793,7 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
@@ -829,7 +829,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   intro k
   -- As in the value theorem: the plainness clause of `Consistent` is what lets a fact
   -- about `evalExpr e` become a fact about the argument list `[e]`.
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
@@ -912,7 +912,7 @@ theorem methodkey_refines :
   intro args _
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
@@ -941,7 +941,7 @@ set_option maxHeartbeats 1000000 in
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, bindParams, Func.posParams, kwargsRejected, posRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,

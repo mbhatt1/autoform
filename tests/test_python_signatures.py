@@ -21,6 +21,8 @@ async def asynchronous(a=1): pass
 def positional(a, /): pass
 def keyword(*, a): pass
 def keyword_default(*, a=1): pass
+def computed(a=len("x")): pass
+def mixed(a=1, b=len("x")): pass
 mapper = lambda a=2: a
 '''
     script = (ROOT / 'cartographer/export_ast.sc').read_text()
@@ -29,12 +31,23 @@ mapper = lambda a=2: a
                             input=source, text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr
     records = {row['name']: row for row in json.loads(result.stdout)['signatures'].values()}
-    assert records['ordinary'] == dict(name='ordinary', defaults=False,
+    assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
         positionalOnly=[], keywordOnly=[], required=['a'])
-    assert {name for name, row in records.items() if row['defaults']} == {
-        'default', 'asynchronous', 'keyword_default', 'lambda'}
+    # `defaults` means "carries a default this pipeline cannot model", which is what
+    # holes the definition. A LITERAL default is modelled, so it clears the flag and
+    # appears in `defaultValues` instead -- binding it at call time is indistinguishable
+    # from binding it when the `def` ran, which is the only reason function-object state
+    # is not needed.
+    assert {name for name, row in records.items() if row['defaults']} == {'computed', 'mixed'}
+    assert records['default']['defaultValues'] == [['a', {'k': 'unit'}]]
+    assert records['asynchronous']['defaultValues'] == [['a', {'k': 'int', 'v': '1'}]]
+    assert records['keyword_default']['defaultValues'] == [['a', {'k': 'int', 'v': '1'}]]
+    assert records['lambda']['defaultValues'] == [['a', {'k': 'int', 'v': '2'}]]
+    # All or nothing: `mixed` has one literal and one call, and emitting the literal
+    # half would bind some defaults while silently dropping the other.
+    assert records['mixed']['defaultValues'] == []
     assert {name for name, row in records.items() if row['positional_only']} == {'positional'}
     assert {name for name, row in records.items() if row['keyword_only']} == {'keyword', 'keyword_default'}
 

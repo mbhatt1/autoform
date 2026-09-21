@@ -703,6 +703,17 @@ def Func.keywordParams (fn : Func) : List String :=
   | some signature => fn.params.filter fun p =>
       fn.vararg != some p && fn.kwarg != some p && !signature.positionalOnly.contains p
 
+/-- The parameters of `fn` that have a literal default, and that default.
+
+Named rather than inlined into `bindParams` so that a caller can state "this function has
+no defaults" as a rewritable hypothesis. Proofs about a specific rendered function
+discharge it by `rfl`; without a name they would have to rewrite under a `match` on
+`pythonSignature`, which `simp` will not do reliably. -/
+def Func.literalDefaults (fn : Func) : List (String × Lit) :=
+  match fn.pythonSignature with
+  | some sig => sig.defaults
+  | none     => []
+
 /-- Bind a call's arguments into the callee's environment.
 
 Argument validation happens in `applyFunc` and `applyClosure` before execution.
@@ -721,6 +732,13 @@ legacy metadata (`pythonSignature = none`) retain their historical binding behav
 this helper alone is not a Python call validator. -/
 def bindParams (fn : Func) (base : Env) (vs : List Val)
     (kws : List (String × Val)) : Env :=
+  -- Literal defaults are seeded FIRST, so any argument actually supplied overwrites
+  -- them. Ordering it this way keeps the rule "a default applies exactly when the
+  -- parameter was not passed" without needing to ask whether each name is already
+  -- bound. For a function with no defaults the list is empty and this `foldl` reduces
+  -- to `base`, so every previously rendered corpus keeps the term it had.
+  let base  := fn.literalDefaults.foldl
+                  (fun (e : Env) (d : String × Lit) => Env.set e d.1 d.2.toVal) base
   let ps    := fn.posParams
   let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
   let rest  := vs.drop ps.length
@@ -810,7 +828,7 @@ theorem bindParams_plain {fn : Func} (base : Env) (vs : List Val)
       (fn.params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base := by
   have : (List.filter (fun p => none != some p) fn.params) = fn.params := by
     simp [List.filter_eq_self]
-  simp [bindParams, Func.posParams, Func.keywordParams, h1, h2, h3, this]
+  simp [bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, h1, h2, h3, this]
 
 /-- The same equation in the shape a rendered corpus actually presents: a `Func` literal
 with both variadic fields at their `none` defaults. Stated separately because the
@@ -2190,5 +2208,18 @@ a hole at `str` rather than a wrong string, and the label points at `Stdlib`'s `
 at the f-string. -/
 /-- info: Autoform.Core.EResult.hole "call:str" -/
 #guard_msgs in #eval runFunc fstrProg 200 "greet" [.str "x"]
+
+/-- `Lit.toVal` is exactly what `evalExpr` produces for a literal.
+
+`Syntax.lean` claims this where `Lit.toVal` is defined, and the claim is load-bearing:
+`bindParams` uses `Lit.toVal` to bind a literal default without going through `evalExpr`,
+so if the two ever disagreed, a default would bind a different value than the same
+literal written out at the call site. That is a silent wrong answer, not a hole, which is
+the failure class this project spends its oracles on. Stated here rather than left to
+inspection so that a new `Lit` constructor cannot be added to one and not the other. -/
+@[simp] theorem Lit.toVal_agrees_with_evalExpr
+    (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (l : Lit) :
+    evalExpr ctx (n + 1) h ρ (.lit l) = (h, .val l.toVal) := by
+  cases l <;> rfl
 
 end Autoform.Core

@@ -218,8 +218,8 @@ theorem uconst_cachetools___init___py__module___DefaultSize___getitem :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize___getitem__ rfl]
   first
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize___getitem__, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___DefaultSize___setitem : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.int (1), Val.int (1)] }, expected := EResult.val (Val.unit) },
@@ -464,8 +464,8 @@ theorem uconst_cachetools___init___py__module___DefaultSize_pop :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___DefaultSize_pop rfl]
   first
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module___DefaultSize_pop, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___DefaultSize_clear : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_DefaultSize", fields := [] }], self := (some (Val.ref (base + 0))), args := [] }, expected := EResult.val (Val.unit) }]
@@ -906,7 +906,7 @@ theorem uproj_cachetools___init___py__module__Cache_maxsize :
     simpa [Nat.add_comm, Nat.add_left_comm] using
       applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod
   | cons a as =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
 
 def dom_conform_cachetools___init___py__module__Cache_currsize : List Obs :=
@@ -1059,7 +1059,7 @@ theorem uproj_cachetools___init___py__module__Cache_currsize :
     simpa [Nat.add_comm, Nat.add_left_comm] using
       applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod
   | cons a as =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
 
 def dom_conform_cachetools___init___py__module__Cache_getsizeof : List Obs :=
@@ -1192,8 +1192,8 @@ theorem uconst_cachetools___init___py__module__Cache_getsizeof :
   intro k
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module__Cache_getsizeof rfl]
   first
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
-    | simp [applyFunc, bindParams, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom, Nat.not_lt.mpr hdom]
+    | simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt, evalExpr, Env.set, f_cachetools___init___py__module__Cache_getsizeof, ctxOf, P, hdom]
 
 def dom_conform_cachetools___init___py__module___TimedCache__Timer___init : List Obs :=
   [{ case := { heap := h0 ++ [{ cls := "_Timer", fields := [] }], self := (some (Val.ref (base + 0))), args := [Val.fn "monotonic"] }, expected := EResult.val (Val.unit) },
@@ -1574,7 +1574,7 @@ theorem uproj_cachetools___init___py__module___TimedCache_timer :
     simpa [Nat.add_comm, Nat.add_left_comm] using
       applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod
   | cons a as =>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module___TimedCache_timer]
 
 def dom_conform_cachetools___init___py__module__TTLCache__Link___init : List Obs :=

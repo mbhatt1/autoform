@@ -324,10 +324,11 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
-    (hsig : signatureRejected fn args [] = false := by rfl) :
+    (hsig : signatureRejected fn args [] = false := by rfl)
+    (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
-    simp [bindParams, Func.posParams, hp, hv, hkw]
+    simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
@@ -352,10 +353,11 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
-    (hsig : signatureRejected fn args [] = false := by rfl) :
+    (hsig : signatureRejected fn args [] = false := by rfl)
+    (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
-    simp [bindParams, Func.posParams, hp, hv, hkw]
+    simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
     execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]

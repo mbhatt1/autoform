@@ -345,6 +345,19 @@ inductive Lit where
   | unit  : Lit
   deriving Repr, Inhabited, DecidableEq
 
+/-- The value a literal denotes. Total and effect-free by construction, which is the
+property that lets a literal default be bound at call time rather than at definition
+time. Kept in agreement with `evalExpr`'s `.lit` cases by
+`Lit.toVal_agrees_with_evalExpr` in `Semantics.lean`; a literal form that evaluated
+differently here than there would be a silent divergence of exactly the kind the
+differential oracle exists to find, so the two are pinned to each other. -/
+def Lit.toVal : Lit → Val
+  | .int i   => .int i
+  | .str s   => .str s
+  | .bool b  => .bool b
+  | .float f => .float f
+  | .unit    => .unit
+
 /-- Expressions. `call` is by name: the CPG gives us resolved callee names. -/
 inductive Expr where
   | lit    : Lit → Expr
@@ -563,6 +576,22 @@ structure PythonSignature where
   positionalOnly : List String := []
   keywordOnly : List String := []
   required : List String := []
+  /-- Parameters with a **literal** default, and that default.
+
+  Python evaluates a default expression once, when the `def` executes, and stores the
+  result on the function object. Core has no function-object state, so in general a
+  default cannot be modelled and the exporter holes the definition
+  (`call:python-defaults`). A *literal* default is the case where that machinery is not
+  needed: its value does not depend on when it is evaluated and evaluating it has no
+  effect, so binding it at call time is indistinguishable from binding it at definition
+  time. Restricting the field to `Lit` is what makes that argument checkable by the type
+  rather than by convention — a default that is a name, an attribute or any other
+  expression cannot be written here, and still holes.
+
+  Empty for every function without defaults, which is why every already-rendered corpus
+  keeps its meaning: `bindParams` folds an empty list into the base environment and
+  reduces to exactly the term it had before. -/
+  defaults : List (String × Lit) := []
   /-- Lexical method classification from Python source. `none` retains the
   historical naming heuristic for models without this information. -/
   isMethod : Option Bool := none

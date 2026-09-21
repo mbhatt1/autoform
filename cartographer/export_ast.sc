@@ -145,7 +145,7 @@ import scala.annotation.tailrec
   // execute the target. Keep it embedded so direct Joern invocations and installed
   // workspaces use exactly the same decoder without a working-directory dependency.
   val pythonHandlerDecoder = """
-import ast, builtins, json, symtable, sys
+import ast, builtins, json, struct, symtable, sys
 source = sys.stdin.read()
 tree = ast.parse(source)
 symbols = symtable.symtable(source, '<source>', 'exec')
@@ -198,6 +198,52 @@ def handler(node, scopes):
                        if any(issubclass(exceptions[name], exceptions[t.id]) for t in types)})
     return dict(result, kind='typed', accepted=accepted)
 
+# Parameter defaults, but only when EVERY default is a literal.
+#
+# Python evaluates a default once, when the `def` runs, and stores it on the function
+# object. Core has no function-object state, so a default in general cannot be modelled
+# and the definition holes (`call:python-defaults`). A literal is the case where that
+# state is not needed: its value does not depend on when it is evaluated and evaluating
+# it has nothing to observe, so binding it at call time and at definition time cannot be
+# told apart.
+#
+# All-or-nothing on purpose. A function with one literal and one `Attribute` default
+# (`math.inf`, `time.monotonic`) must still hole: emitting the literal half would give a
+# function that binds some defaults and silently ignores others, which is a wrong answer
+# rather than a missing one.
+def literal_defaults(node):
+    positional = list(zip([a.arg for a in [*node.args.posonlyargs, *node.args.args]]
+                          [len(node.args.posonlyargs) + len(node.args.args)
+                           - len(node.args.defaults):], node.args.defaults))
+    keyword = [(a.arg, v) for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults)
+               if v is not None]
+    defaults = positional + keyword
+    if not defaults:
+        return {'defaults': False, 'defaultValues': []}
+    values = [(name, constant_literal(d)) for name, d in defaults]
+    if any(lit is None for _, lit in values):
+        return {'defaults': True, 'defaultValues': []}
+    return {'defaults': False, 'defaultValues': [[name, lit] for name, lit in values]}
+
+
+# The on-disk literal for an `ast.Constant`, or None if it is not one we model.
+def constant_literal(node):
+    if not isinstance(node, ast.Constant):
+        return None
+    v = node.value
+    if v is None:
+        return {'k': 'unit'}
+    if isinstance(v, bool):
+        return {'k': 'bool', 'v': v}
+    if isinstance(v, int):
+        return {'k': 'int', 'v': str(v)}
+    if isinstance(v, str):
+        return {'k': 'str', 'v': v}
+    if isinstance(v, float):
+        return {'k': 'float', 'v': str(struct.unpack('<Q', struct.pack('<d', v))[0])}
+    return None
+
+
 def inner_scope(node, name, scopes):
     children = [s for s in scopes[-1].get_children()
                 if s.get_name() == name and s.get_lineno() == node.lineno]
@@ -226,7 +272,8 @@ def visit(node, scopes):
             'keywordOnly': [a.arg for a in node.args.kwonlyargs],
             'required': [a.arg for a in [*node.args.posonlyargs, *node.args.args]
                 [:len(node.args.posonlyargs) + len(node.args.args) - len(node.args.defaults)]] +
-                [a.arg for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults) if v is None]}
+                [a.arg for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults) if v is None],
+            **literal_defaults(node)}
         # Defaults and decorators belong to the defining scope. The function's
         # parameters and local assignments only shadow names inside its body.
         for value in [*node.args.defaults, *node.args.kw_defaults,
@@ -10417,10 +10464,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           // wrong TypeError for a call the native callable would accept. The same
           // boundary protects decorated functions and private-parameter mangling.
           refuseBinding(bindingGap.get)
-        } else obj("pythonSignature") = ujson.Obj.from(
-          List("positionalOnly", "keywordOnly", "required").map { key =>
-            key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
-          } :+ ("isMethod" -> signature("isMethod")))
+        } else {
+          // Literal defaults ride along with the rest of the signature. `defaults` (the
+          // boolean) is false exactly when every default was a literal, which is what
+          // kept `pythonSignatureGap` from holing this definition; anything else has
+          // already been refused above, so an entry here can only be a literal.
+          val literalDefaults: ujson.Value = signature.obj.get("defaultValues") match {
+            case Some(v) => ujson.Arr.from(
+              v.arr.filter(d => exportedParams.contains(d.arr(0).str)).toList)
+            case None => ujson.Arr()
+          }
+          obj("pythonSignature") = ujson.Obj.from(
+            List("positionalOnly", "keywordOnly", "required").map { key =>
+              key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
+            } ++ List("isMethod" -> signature("isMethod")) ++
+              (if (literalDefaults.arr.nonEmpty) List("defaults" -> literalDefaults) else Nil))
+        }
       }
     }
     obj

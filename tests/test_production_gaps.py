@@ -269,3 +269,71 @@ def test_exported_char_literal_is_its_codepoint(tmp_path):
         f"got {sorted(literals)}")
     assert 0 not in literals and 9 not in literals, (
         f"a digit character literal still exported as its value: {sorted(literals)}")
+
+
+class TestLiteralParameterDefaults:
+    """Python defaults, for the case where Core does not need function-object state.
+
+    `def f(x, n=1)` used to hole the whole definition as `call:python-defaults`, because
+    Python evaluates a default once when the `def` runs and stores it on the function
+    object, which Core has no representation for. That is the right answer for
+    `n=time.monotonic` and the wrong one for `n=1`: a literal's value does not depend on
+    when it is evaluated and evaluating it has nothing to observe, so binding it at call
+    time is indistinguishable from binding it at definition time. Only literals qualify,
+    and a function mixing a literal with anything else still holes in full -- binding
+    half the defaults and silently dropping the rest is a wrong answer, not a missing one.
+    """
+
+    def render(self, signature, params, name='f'):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', Path(__file__).resolve().parents[1] / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return '\n'.join(mod.render_func({
+            'name': name, 'file': 'm.py', 'params': params,
+            'body': {'k': 'ret', 'e': {'k': 'name', 'v': params[0]}},
+            'pythonSignature': signature}, 'f_test'))
+
+    def test_a_literal_default_reaches_the_rendered_signature(self):
+        text = self.render(
+            {'positionalOnly': [], 'keywordOnly': [], 'required': ['a'], 'isMethod': False,
+             'defaults': [['b', {'k': 'int', 'v': '1'}], ['c', {'k': 'str', 'v': 'hi'}],
+                          ['d', {'k': 'bool', 'v': True}], ['e', {'k': 'unit'}]]},
+            ['a', 'b', 'c', 'd', 'e'])
+        assert 'defaults := [("b", (.int 1)), ("c", (.str "hi")), ("d", (.bool true)), ("e", .unit)]' in text
+
+    def test_a_non_literal_default_is_refused_by_the_renderer(self):
+        """The exporter is supposed to have holed this. If it ever does not, the
+        renderer must fail loudly rather than emit something that looks like a default."""
+        with pytest.raises(ValueError, match='not a literal'):
+            self.render(
+                {'positionalOnly': [], 'keywordOnly': [], 'required': ['a'],
+                 'defaults': [['b', {'k': 'name', 'v': 'math'}]]},
+                ['a', 'b'])
+
+    def test_a_default_on_a_required_parameter_is_refused(self):
+        """`required` means "has no default". The two fields disagreeing about one
+        parameter is a corrupt signature, not something to pick a winner for."""
+        with pytest.raises(ValueError, match='invalid Python defaults'):
+            self.render(
+                {'positionalOnly': [], 'keywordOnly': [], 'required': ['a', 'b'],
+                 'defaults': [['b', {'k': 'int', 'v': '1'}]]},
+                ['a', 'b'])
+
+    def test_the_exporter_holes_a_mixed_default_list(self):
+        """All-or-nothing, asserted on the exporter source: the literal half of a mixed
+        signature must not be emitted on its own."""
+        source = EXPORTER.read_text()
+        assert 'if any(lit is None for _, lit in values):' in source
+        assert "return {'defaults': True, 'defaultValues': []}" in source
+
+    def test_core_binds_defaults_before_arguments(self):
+        """Ordering is the rule "a default applies exactly when the parameter was not
+        passed". Seeding first and letting real arguments overwrite is what implements
+        it; reversing it would make every default win over its own argument."""
+        semantics = (Path(__file__).resolve().parents[1]
+                     / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        seed = semantics.index('fn.literalDefaults.foldl')
+        positional = semantics.index('let ps    := fn.posParams', seed)
+        assert seed < positional

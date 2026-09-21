@@ -41,7 +41,7 @@ not a statement about sampled inputs or about one budget. -/
 theorem signedMod32_zero_divisor (lhs : Int) (k : Nat) :
     (applyFunc C (k+9) [] smod32 none [.int lhs, .int 0] []).2 = .val (.int 0) := by
   simp [applyFunc, smod32, f_v8_base_bits_SignedMod32_int32_t_int32_t_int32_t_,
-        bindParams, Func.posParams, kwargsRejected, Env.set,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, Env.set,
         execStmt, evalExpr, applyBinop, Val.truthy, Val.beq, C,
         -- `==`/`!=` now consults `binopNeedsHeap` first. On `.int` operands it is `false`
         -- and the heap-free path is taken, but `simp` has to be able to see that.

@@ -116,6 +116,26 @@ def _field(n, key, kind):
         raise ValueError(f"{kind} node {n.get('k')!r} is missing required field {key!r}")
     return n[key]
 
+def lean_lit(n):
+    """A `Lit` from the same on-disk literal shapes `expr_shape` accepts.
+
+    Used only for literal parameter defaults. Deliberately narrow: anything that is not
+    one of the five literal forms is not a literal default, and the exporter is supposed
+    to have holed the definition rather than reach here. Raising keeps a silent
+    mistranslation from being the failure mode if it ever does.
+    """
+    if not isinstance(n, dict):
+        raise ValueError(f"default is not an object: {n!r}")
+    k = n.get("k")
+    f = lambda key: _field(n, key, "literal default")
+    if k == "int":   return f"(.int {lean_int(f('v'))})"
+    if k == "str":   return f"(.str {lean_str(f('v'))})"
+    if k == "bool":  return f"(.bool {lean_bool(f('v'))})"
+    if k == "unit":  return ".unit"
+    if k == "float": return f"(.float (Fl.ofBits {lean_float_bits(f('v'))}))"
+    raise ValueError(f"parameter default is not a literal: {k!r}")
+
+
 def expr_shape(n):
     if not isinstance(n, dict):
         raise ValueError(f"expression node is not an object: {n!r}")
@@ -564,7 +584,7 @@ def render_func(f, nm) -> list:
         signature = f['pythonSignature']
         keys = ('positionalOnly', 'keywordOnly', 'required')
         if (not isinstance(signature, dict) or not set(keys) <= set(signature)
-                or set(signature) - set(keys) - {'isMethod'}):
+                or set(signature) - set(keys) - {'isMethod', 'defaults'}):
             raise ValueError('invalid Python signature fields')
         if 'isMethod' in signature and type(signature['isMethod']) is not bool:
             raise ValueError('invalid Python method classification')
@@ -580,6 +600,22 @@ def render_func(f, nm) -> list:
                            for key in keys)
         if 'isMethod' in signature:
             fields += ', isMethod := some ' + str(signature['isMethod']).lower()
+        defaults = signature.get('defaults') or []
+        if defaults:
+            # A default names an ordinary parameter, names it once, and never names a
+            # required one -- "required" is defined as "has no default", so an overlap
+            # would mean the two fields disagree about the same parameter.
+            if not isinstance(defaults, list):
+                raise ValueError('invalid Python defaults')
+            names = [d[0] for d in defaults]
+            if (not all(isinstance(d, list) and len(d) == 2 and isinstance(d[0], str)
+                        for d in defaults)
+                    or len(set(names)) != len(names)
+                    or not set(names) <= ordinary
+                    or set(names) & set(signature['required'])):
+                raise ValueError('invalid Python defaults')
+            rendered = ', '.join(f'({lean_str(nm)}, {lean_lit(lit)})' for nm, lit in defaults)
+            fields += ', defaults := [' + rendered + ']'
         variadic.append('  , pythonSignature := some { ' + fields + ' }')
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",
