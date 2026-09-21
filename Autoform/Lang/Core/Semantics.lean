@@ -640,6 +640,11 @@ structure Ctx where
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
   outlive any single call, so they live on the heap rather than in `Env`. -/
   globals : Ref := 0
+  /-- `(class, name)` of every `@property` -- see `Program.properties`. Every `Ctx` built
+  from a `Program` (`ctxOf`, `runFunc`, `initGlobals`, `runMain`, `ctx_fold`) must pass it
+  through, or the contexts disagree and every proof that folds one into the other breaks:
+  that disagreement is what a `Ctx` field costs, and it is confined to those sites. -/
+  properties : List (String × String) := []
 
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -1133,6 +1138,19 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                              -- of their specs need to say so.
                              else if ctx.dialect == .python && o.payload.toVal.isSome then
                                (h₁, .hole s!"field:{f}:on-container")
+                             -- A `@property`: the attribute read IS a call, so run the
+                             -- getter on the receiver. Keyed by `(o.cls, f)` against
+                             -- `ctx.properties`, and consulted only after the ordinary
+                             -- field and capture lookups have missed -- Python's own
+                             -- order, so an instance attribute shadowing a property is
+                             -- not this case. Python only: a property is a Python
+                             -- construct, and the gate is what keeps every `.cLike`
+                             -- corpus, and every accessor theorem about one, untouched.
+                             else if ctx.dialect == .python &&
+                                     ctx.properties.any (fun p => p.1 == o.cls && p.2 == f) then
+                               match ctx.resolveMethod o.cls f with
+                               | some fn => applyFunc ctx n h₁ fn (some (.ref r)) [] []
+                               | none    => (h₁, .hole s!"property:{f}:unresolved")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1885,7 +1903,7 @@ for a self-contained function, and keeping it stable keeps the refinement layer'
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -1899,7 +1917,7 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -1921,7 +1939,7 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases, properties := p.properties }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)

@@ -699,6 +699,20 @@ structure Program where
   represented; the exporter drops such a name entirely rather than guessing, which
   degrades to the pre-existing opaque-reference behaviour. -/
   builtinBases : List (String × BuiltinBase) := []
+  /-- `(class, name)` for every `@property` getter in the program, by the **short** class
+  name `Expr.alloc` stores in `Obj.cls`.
+
+  Python reaches a property getter by attribute ACCESS, not by a call: `c.currsize` runs
+  `Cache.currsize`. Core has no descriptor protocol, and this list is the whole of one --
+  consulted by `evalExpr`'s `.field` case only after an ordinary field lookup has missed,
+  which is Python's own order. Empty by default, so a corpus rendered before the exporter
+  recorded properties reads its attributes exactly as it did.
+
+  A list on `Program`/`Ctx` rather than a marker name in the function table, because the
+  accessor theorems in `SpecsGen/Basis.lean` must be able to say "this field is not a
+  property", and absence from a list is `decide`-able while absence from a suffix-matched
+  table is a `String` scan the kernel will not reduce. -/
+  properties : List (String × String) := []
   deriving Repr, Inhabited
 
 namespace Expr

@@ -582,6 +582,25 @@ def infer_dialect(funcs) -> str:
                          % dialects)
     return dialects[0]
 
+def program_properties(funcs) -> str:
+    """The `Program.properties` literal: every `(class, name)` a `@property` getter was
+    recorded under, aggregated across the module initializers, deduplicated and sorted.
+
+    Keyed by class as well as name, so two classes with a same-named property are not a
+    conflict -- `evalExpr` dispatches on `(o.cls, f)` and picks the right one. Contrast
+    `builtinBases`, which is keyed by class name alone and therefore has to drop a class
+    recorded with two different bases.
+    """
+    pairs = set()
+    for f in funcs:
+        for pair in (f.get("classProperties") or []):
+            if (not isinstance(pair, list) or len(pair) != 2
+                    or not all(isinstance(x, str) for x in pair)):
+                raise ValueError(f"render_lean: malformed classProperties entry {pair!r}")
+            pairs.add((pair[0], pair[1]))
+    return ", ".join("({}, {})".format(lean_str(c), lean_str(n)) for c, n in sorted(pairs))
+
+
 def render_func(f, nm) -> list:
     params = ", ".join(lean_str(p) for p in f.get("params", []))
     body = render(f["body"], "s", 10)  # "  , body := " is 12 wide; 10 keeps a margin
@@ -745,17 +764,26 @@ def _run_main():
                          "Core.BuiltinBase has no constructor for them".format(unknown))
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
+    props = program_properties(funcs)
 
+    extra = ""
+    notes = []
     if bb:
+        extra += ", builtinBases := [" + bb + "]"
+        notes.append("`builtinBases` lists the classes whose base is a builtin type, so that")
+        notes.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`.")
+    if props:
+        extra += ", properties := [" + props + "]"
+        notes.append("`properties` lists every `@property` as `(class, name)`, so that an")
+        notes.append("attribute read of one runs the getter instead of missing the field.")
+    if notes:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
         out.append("")
-        out.append("`builtinBases` lists the classes whose base is a builtin type, so that")
-        out.append("`Expr.alloc` builds a `Val.bobj` and not an opaque `Val.ref`. -/")
-        out.append("def program : Program := { dialect := " + dialect
-                   + ", builtinBases := [" + bb + "], funcs := [")
+        out.extend(notes[:-1])
+        out.append(notes[-1] + " -/")
     else:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
-        out.append("def program : Program := { dialect := " + dialect + ", funcs := [")
+    out.append("def program : Program := { dialect := " + dialect + extra + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
     out.append("")

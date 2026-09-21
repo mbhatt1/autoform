@@ -319,6 +319,22 @@ Signature-aware calls additionally require `signatureRejected fn args [] = false
 The generated proof establishes this by kernel reduction; it cannot infer call
 validity merely from the body shape.
 -/
+/-- If no property in the list has the name `f`, then no `(cls, f)` pair is in it for any
+class. This is the bridge from the side condition an accessor theorem can `decide` on a
+concrete program -- which mentions only `f` -- to the `(o.cls, f)` test `evalExpr` makes,
+which mentions a receiver the theorem quantifies over. -/
+private theorem props_any_false_of_all_ne {ps : List (String × String)} {c f : String}
+    (h : ps.all (fun p => p.2 != f) = true) :
+    ps.any (fun p => p.1 == c && p.2 == f) = false := by
+  induction ps with
+  | nil => rfl
+  | cons p ps ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at h
+    have hne : (p.2 == f) = false := by
+      have := h.1
+      cases hb : (p.2 == f) <;> simp_all [bne]
+    simp [List.any_cons, hne, ih h.2]
+
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
@@ -330,6 +346,12 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- obligation is conditional on the dialect and the default discharges it outright
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
     (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+      intro hc; exact absurd hc (by decide))
+    -- A `@property` of this name turns the attribute read into a CALL, so the accessor
+    -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
+    -- so a concrete program can `decide` it, and the default discharges it outright for
+    -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
+    (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
@@ -345,7 +367,8 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd,
+                props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
@@ -370,6 +393,12 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
     (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
+    -- A `@property` of this name turns the attribute read into a CALL, so the accessor
+    -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
+    -- so a concrete program can `decide` it, and the default discharges it outright for
+    -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
+    (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
+      intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
@@ -384,7 +413,8 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd,
+                props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]

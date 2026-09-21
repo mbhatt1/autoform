@@ -905,7 +905,7 @@ theorem uproj_cachetools___init___py__module__Cache_maxsize :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (fun _ => by decide)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
@@ -1059,7 +1059,7 @@ theorem uproj_cachetools___init___py__module__Cache_currsize :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (fun _ => by decide)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
@@ -1575,7 +1575,7 @@ theorem uproj_cachetools___init___py__module___TimedCache_timer :
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (fun _ => by decide)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module___TimedCache_timer]

@@ -34,7 +34,7 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        staticMethod=False, nonlocalUses=[], nonlocalDefines=[],
+        staticMethod=False, property=False, nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
     # holes the definition. A LITERAL default is modelled, so it clears the flag and
@@ -260,40 +260,75 @@ class TestStaticMethodBinding:
         assert sig['staticMethod'] is False
 
 
-class TestPropertyAccessHoles:
-    """A `@property` read was a SILENT WRONG ANSWER, not a missing feature.
+class TestPropertyDispatch:
+    """A `@property` read runs its getter, from `Program.properties`.
 
-    `c.currsize` in Python calls the getter. Core has no descriptor protocol, so the
-    exporter lowered it to a plain field read — and `Cache.__init__` stores the
-    name-mangled `_Cache__currsize`, so the field `currsize` does not exist. `evalExpr`
-    answers a missing field on an ordinary object with `unit`, silently, with no hole:
-
-        CPython  c.currsize -> 1
-        Core     c.currsize -> unit
-
-    That is in the tracked corpus, and the ledger counted the enclosing functions as
-    hole-free. Holing the access costs coverage and buys back the thing coverage is for.
+    `c.currsize` calls the getter in Python. Core used to lower it to a field read of a
+    field that does not exist (`Cache.__init__` stores the mangled `_Cache__currsize`),
+    and a missing field on an ordinary object evaluated to `unit` SILENTLY -- a wrong
+    answer in the tracked corpus (docs/languages.md §12). Holing the access fixed the
+    wrong answer; recording `(class, name)` and dispatching on a field miss makes it
+    right. The extractor is authoritative because the frontend does not keep decorators.
     """
 
-    def test_a_property_read_is_a_hole(self):
+    def test_a_sole_property_getter_is_a_method_with_its_pair_recorded(self):
         source = ('class C:\n'
                   '    @property\n'
                   '    def n(self):\n'
                   '        return 1\n\n'
                   'def use(c):\n'
                   '    return c.n\n')
-        assert _decode(source)['properties'] == ['n']
+        out = _decode(source)
+        assert out['propertyPairs'] == [['C', 'n']]
+        assert out['propertiesUnmodelled'] == []
+        sig = [v for v in out['signatures'].values() if v['name'] == 'n'][0]
+        assert sig['property'] is True
+        assert sig['isMethod'] is True        # receiver under `self`, like any method
+        assert sig['decorated'] is False      # no residue left for Core to refuse
 
-    def test_an_ordinary_attribute_is_not_a_property(self):
-        source = 'class C:\n    def m(self):\n        return self.other\n'
-        assert _decode(source)['properties'] == []
+    def test_a_property_with_company_stays_unmodelled(self):
+        """A setter stack changes what a WRITE means too; Core has only the read."""
+        source = ('class C:\n'
+                  '    @property\n'
+                  '    @other\n'
+                  '    def n(self):\n'
+                  '        return 1\n')
+        out = _decode(source)
+        assert out['propertyPairs'] == []
+        assert out['propertiesUnmodelled'] == ['n']
+        sig = [v for v in out['signatures'].values() if v['name'] == 'n'][0]
+        assert sig['property'] is False and sig['decorated'] is True
 
-    def test_both_lowering_paths_refuse_it(self):
-        """`callExpr` and `exprV` both build field reads. A plain `return c.prop` goes
-        through `exprV`, so patching only `callExpr` left the bug in place — which is
-        exactly what happened first."""
+    def test_a_property_built_by_call_at_class_level_stays_unmodelled(self):
+        """`x = property(getx)`: the getter is not syntactically a method of the class,
+        so there is no `(class, name)` for Core to dispatch to. Its reads keep holing
+        rather than falling back to the silent `unit`."""
+        source = ('class C:\n'
+                  '    def getx(self):\n'
+                  '        return 1\n'
+                  '    x = property(getx)\n')
+        out = _decode(source)
+        assert out['propertyPairs'] == []
+        assert out['propertiesUnmodelled'] == ['x']
+
+    def test_a_shadowed_property_is_not_the_builtin(self):
+        source = ('property = None\n\n'
+                  'class C:\n'
+                  '    @property\n'
+                  '    def n(self):\n'
+                  '        return 1\n')
+        out = _decode(source)
+        assert out['propertyPairs'] == []
+        sig = [v for v in out['signatures'].values() if v['name'] == 'n'][0]
+        assert sig['property'] is False and sig['decorated'] is True
+
+    def test_only_unmodelled_properties_hole_at_the_access(self):
+        """Both lowering paths -- `callExpr` and `exprV` -- consult the same rule, and
+        that rule now reads `propertiesUnmodelled`, not every property name."""
         src = (ROOT / 'cartographer/export_ast.sc').read_text()
         assert src.count('call:python-property-access') == 2
+        assert '_("propertiesUnmodelled").arr.exists(_.str == f)' in src
+        assert 'obj("classProperties") = ujson.Arr.from(pairs.toList)' in src
 
 
 class TestNonlocalBoxing:

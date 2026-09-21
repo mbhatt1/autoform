@@ -1117,7 +1117,7 @@ PROOF_PROJ = """theorem %(id)s :
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod (fun _ => hbox) (hsig := by rfl)
+      hmod (fun _ => hbox) (fun _ => by decide) (hsig := by rfl)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
@@ -1134,7 +1134,7 @@ PROOF_PROJ_DOC = """theorem %(id)s :
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod (fun _ => hbox) (hsig := by rfl)
+      [] rfl hmod (fun _ => hbox) (fun _ => by decide) (hsig := by rfl)
 """
 
 def select_proof_fuel(cands, module):

@@ -337,12 +337,55 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   | (cases hy; exact absurd rfl hne)
                   | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
         | field a f =>
+            -- A `@property` read is a CALL (`Program.properties`), so this case recurses
+            -- now. Every other outcome is still fuel-free and closes by `exact hy`; only
+            -- the property branch needs an induction hypothesis. `cases hx :` substitutes
+            -- into the goal, so each equation is rewritten in `hy` alone.
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
             rw [hA] at hy
-            cases r₁ <;> first
-              | (cases hy; exact absurd rfl hne)
-              | (rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy)
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val v =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                cases v
+                case ref r =>
+                    dsimp only at hy ⊢
+                    cases hg : h₁.get r with
+                    | none => rw [hg] at hy; exact hy
+                    | some o =>
+                        rw [hg] at hy
+                        dsimp only at hy ⊢
+                        cases hf : o.fields.find? (fun x => x.1 == f) with
+                        | some _ => rw [hf] at hy; exact hy
+                        | none =>
+                            rw [hf] at hy
+                            dsimp only at hy ⊢
+                            cases hc : o.captured.find? (fun x => x.1 == f) with
+                            | some _ => rw [hc] at hy; exact hy
+                            | none =>
+                                rw [hc] at hy
+                                dsimp only at hy ⊢
+                                by_cases hm : o.cls.startsWith "<module>" = true
+                                · rw [if_pos hm] at hy ⊢; exact hy
+                                · rw [if_neg hm] at hy ⊢
+                                  by_cases hpay :
+                                      (ctx.dialect == Dialect.python && o.payload.toVal.isSome) = true
+                                  · rw [if_pos hpay] at hy ⊢; exact hy
+                                  · rw [if_neg hpay] at hy ⊢
+                                    by_cases hpr :
+                                        (ctx.dialect == Dialect.python &&
+                                          ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = true
+                                    · rw [if_pos hpr] at hy ⊢
+                                      cases hrm : Ctx.resolveMethod ctx o.cls f with
+                                      | some fn =>
+                                          rw [hrm] at hy
+                                          exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                      | none => rw [hrm] at hy; exact hy
+                                    · rw [if_neg hpr] at hy ⊢; exact hy
+                all_goals exact hy
         | listE es =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalList ctx k h ρ es with ⟨h₁, s⟩

@@ -383,3 +383,43 @@ class TestBoxedContainerExporterWiring:
         assert 'mfn == "<operator>.stringExpressionList"' in src
         assert 'parts.nonEmpty && parts.forall(_.isDefined)' in src
         assert 'hole("op:stringExpressionList:non-literal-part")' in src
+
+
+class TestProgramProperties:
+    """`Program.properties` is rendered from the `classProperties` the exporter puts on
+    each module initializer, aggregated across files -- the same route `builtinBases`
+    takes. Unlike bases it is keyed by class AND name, so a same-named property on two
+    classes is two entries, not a conflict to drop: `evalExpr` dispatches on `(o.cls, f)`.
+    """
+
+    def _mod(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', Path(__file__).resolve().parents[1] / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_pairs_are_aggregated_deduplicated_and_sorted(self):
+        mod = self._mod()
+        funcs = [{'name': 'a.py:<module>', 'classProperties': [['Cache', 'maxsize'], ['Cache', 'currsize']]},
+                 {'name': 'b.py:<module>', 'classProperties': [['Cache', 'currsize'], ['TTL', 'timer']]},
+                 {'name': 'a.py:<module>.f'}]
+        assert mod.program_properties(funcs) == \
+            '("Cache", "currsize"), ("Cache", "maxsize"), ("TTL", "timer")'
+
+    def test_same_name_on_two_classes_is_two_entries_not_a_conflict(self):
+        mod = self._mod()
+        funcs = [{'name': 'm', 'classProperties': [['A', 'size'], ['B', 'size']]}]
+        assert mod.program_properties(funcs) == '("A", "size"), ("B", "size")'
+
+    def test_no_properties_renders_nothing(self):
+        """An AST with no properties must render byte-identically to before this field
+        existed: `properties` is only written when non-empty."""
+        mod = self._mod()
+        assert mod.program_properties([{'name': 'm'}]) == ''
+
+    def test_a_malformed_entry_is_refused_not_guessed(self):
+        mod = self._mod()
+        with pytest.raises(ValueError, match='malformed classProperties'):
+            mod.program_properties([{'name': 'm', 'classProperties': [['onlyone']]}])
