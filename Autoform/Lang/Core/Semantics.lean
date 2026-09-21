@@ -1046,7 +1046,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
           -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
-          match c.unbuiltin, k with
+          -- `.unbox` is the boxed-container case: after the switchover `xs[0]` reads
+          -- through a `Val.ref`, and without it a subscript of a list literal holes.
+          match (c.unbox h₂).unbuiltin, k with
           | .list vs, .int i | .tuple vs, .int i =>
               -- Python indexes relative to the end for negative integers.
               -- Check the signed bound before toNat, which otherwise clamps a
@@ -1122,6 +1124,15 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
+                             -- A boxed container has no `__dict__` to miss into:
+                             -- `{'a': 1}.a` is an AttributeError in Python and was a hole
+                             -- before boxing. Answering `unit` would let the commit that
+                             -- boxes containers introduce a silent wrong answer while
+                             -- removing others. Gated on the dialect because only Python
+                             -- boxes, so no `.cLike` corpus can reach a payload and none
+                             -- of their specs need to say so.
+                             else if ctx.dialect == .python && o.payload.toVal.isSome then
+                               (h₁, .hole s!"field:{f}:on-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1142,7 +1153,15 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- shape we do not model and it says so.
   | n+1, h, ρ, .listE es =>
       match evalList ctx n h ρ es with
-      | (h₁, .inr (vs, []))  => (h₁, .val (.list vs))
+      -- THE SWITCHOVER. A Python list literal allocates: Python's lists are objects
+      -- with identity. PYTHON ONLY -- a C aggregate initializer is a value, has no
+      -- identity to share, and `Dialect.fieldsOnDicts` reads it by field name, so
+      -- boxing it would make C wrong in the commit that makes Python right.
+      | (h₁, .inr (vs, []))  =>
+          if ctx.dialect == .python then
+            let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }
+            (h₂, .val (.ref r))
+          else (h₁, .val (.list vs))
       | (h₁, .inr (_,  _))   => (h₁, .hole "op:keyword-in-literal")
       | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .tupleE es =>
@@ -1152,7 +1171,11 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inl r)         => (h₁, r)
   | n+1, h, ρ, .dictE kvs =>
       match evalPairs ctx n h ρ kvs with
-      | (h₁, .inr ps) => (h₁, .val (.dict ps))
+      | (h₁, .inr ps) =>
+          if ctx.dialect == .python then
+            let (h₂, r) := h₁.alloc { cls := "dict", fields := [], payload := .dict ps }
+            (h₂, .val (.ref r))
+          else (h₁, .val (.dict ps))
       | (h₁, .inl r)  => (h₁, r)
   | n+1, h, ρ, .call f args =>
       match evalList ctx n h ρ args with
@@ -1498,7 +1521,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .starred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
+        match (v.unbox h₁).iterable with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some xs =>
           match evalList ctx n h₁ ρ as with
@@ -1515,7 +1538,7 @@ def evalList (ctx : Ctx) : Nat → Heap → Env → List Expr →
   | n+1, h, ρ, .dstarred e :: as =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match strKeyed v with
+        match strKeyed (v.unbox h₁) with
         | none    => (h₁, .inl (.exn (.str "TypeError")))
         | some ks =>
           match evalList ctx n h₁ ρ as with
@@ -2224,8 +2247,10 @@ private def pyDesig : Program := { cBits with dialect := .python }
 /-- info: Autoform.Core.EResult.hole "field:cra_flags:absent-from-aggregate" -/
 #guard_msgs in #eval runFunc cBits 200 "ns.desigMissing" []
 -- The dialect split. `{'cra_priority': 100}.cra_priority` is an `AttributeError` in
--- Python, so under `.python` the same term is the hole it has always been.
-/-- info: Autoform.Core.EResult.hole "field:cra_priority:non-object" -/
+-- Python, so under `.python` the same term is the hole it has always been. The label
+-- sharpened when dicts became objects: the receiver IS an object now, just one whose
+-- payload is a container and which therefore has no `__dict__` to miss into.
+/-- info: Autoform.Core.EResult.hole "field:cra_priority:on-container" -/
 #guard_msgs in #eval runFunc pyDesig 200 "ns.desig" []
 -- The `for` with `continue`: `s = 27`, `i = 10` — cc: `forcont s=27 i=10`.
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2710) -/
@@ -2420,6 +2445,9 @@ Every expectation below was taken from CPython, not from the design document —
 pseudocode also has the evaluation order wrong. It shows the target evaluated first;
 CPython evaluates the RHS first, and `execStmt` follows CPython. -/
 private def setIdxCtx : Ctx := { dialect := .python, table := [] }
+/-- The same probes under a non-Python dialect, where a container literal is a VALUE and
+must stay one: a C aggregate has no identity to share. -/
+private def setIdxCtxC : Ctx := { dialect := .cLike, table := [] }
 private def setIdxEnv : Env :=
   [("xs", .ref 0), ("d", .ref 1), ("t", .ref 2), ("o", .ref 3)]
 private def setIdxHeap : Heap :=
@@ -2477,8 +2505,11 @@ private def delIdx (tgt idx : Expr) : Heap × Ctl :=
 #guard match (delIdx (.name "t") (.lit (.int 0))).2 with
        | .exn (.str "TypeError") _ => true | _ => false
 
--- Unboxed container value: still ignorance, still a hole.
+-- A boxed literal deletes; a C aggregate value still holes.
 #guard match (delIdx (.listE [.lit (.int 1)]) (.lit (.int 0))).2 with
+       | .normal _ => true | _ => false
+#guard match (execStmt setIdxCtxC 50 setIdxHeap setIdxEnv
+                (.delIndex (.listE [.lit (.int 1)]) (.lit (.int 0)))).2 with
        | .hole "delIndex:immutable-containers" => true | _ => false
 
 private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × EResult :=
@@ -2527,9 +2558,70 @@ private def shrinkLoop : Heap × Ctl :=
                   (.setIndex (.name "d") (.lit (.str "c")) (.lit (.int 3))))).2 with
        | .exn (.str "RuntimeError") _ => true | _ => false
 
--- An unboxed `Val.list` still holes. That case is ignorance -- the container is a value
--- with no identity to mutate -- and removing it is the rest of this migration.
+-- THE POINT OF THE WHOLE MIGRATION: a Python list literal is boxed, so `[1][0] = 9`
+-- assigns instead of holing. Under a non-Python dialect the literal is still a value and
+-- still holes, which is correct -- a C aggregate has no identity.
 #guard match (setIdx (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9))).2 with
+       | .normal _ => true | _ => false
+#guard match (execStmt setIdxCtxC 50 setIdxHeap setIdxEnv
+                (.setIndex (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9)))).2 with
        | .hole "setIndex:immutable-containers" => true | _ => false
+
+/-! ## The switchover: containers have identity
+
+`docs/boxed-containers.md`. A Python list or dict literal now allocates, so two names can
+refer to one container and a write through either is visible through the other. This is
+the whole point of the migration, and it is the case Core could not express at all
+before: `Val.list` was a value, so `b = a` copied it and `b[0] = 9` was a hole.
+
+Every expectation is CPython's, executed. -/
+private def aliasProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "alias", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1), .lit (.int 2)]))
+          (.seq (.assign "b" (.name "a"))
+          (.seq (.setIndex (.name "b") (.lit (.int 0)) (.lit (.int 9)))
+                (.ret (.index (.name "a") (.lit (.int 0)))))) }
+    , { name := "appendThroughAlias", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.name "a"))
+          (.seq (.expr (.mcall (.name "b") "append" [.lit (.int 7)]))
+                (.ret (.index (.name "a") (.lit (.int 1)))))) }
+    , { name := "dictAlias", params := []
+      , body :=
+          .seq (.assign "d" (.dictE []))
+          (.seq (.assign "e" (.name "d"))
+          (.seq (.setIndex (.name "e") (.lit (.str "k")) (.lit (.int 5)))
+                (.ret (.index (.name "d") (.lit (.str "k")))))) }
+    , { name := "equalButNotIdentical", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.listE [.lit (.int 1)]))
+                (.ret (.binop "==" (.name "a") (.name "b")))) }
+    , { name := "identity", params := []
+      , body :=
+          .seq (.assign "a" (.listE [.lit (.int 1)]))
+          (.seq (.assign "b" (.listE [.lit (.int 1)]))
+                (.ret (.isOp false (.name "a") (.name "b")))) } ] }
+
+-- `a = [1,2]; b = a; b[0] = 9; a[0]`  -- CPython 9
+#guard match runFunc aliasProg 400 "alias" [] with
+       | .val (.int 9) => true | _ => false
+-- `a = [1]; b = a; b.append(7); a[1]`  -- CPython 7
+#guard match runFunc aliasProg 400 "appendThroughAlias" [] with
+       | .val (.int 7) => true | _ => false
+-- `d = {}; e = d; e["k"] = 5; d["k"]`  -- CPython 5
+#guard match runFunc aliasProg 400 "dictAlias" [] with
+       | .val (.int 5) => true | _ => false
+-- Two distinct lists with equal contents are `==` (this is `Val.eqPy` through the heap)
+-- but not `is`. Before boxing Core could not tell these apart -- the case
+-- `STRATEGY.md` §31/§34 records against `_HashedTuple`.
+#guard match runFunc aliasProg 400 "equalButNotIdentical" [] with
+       | .val (.bool true) => true | _ => false
+#guard match runFunc aliasProg 400 "identity" [] with
+       | .val (.bool false) => true | _ => false
 
 end Autoform.Core

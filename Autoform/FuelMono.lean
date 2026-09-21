@@ -689,7 +689,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | val v =>
                     rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                     dsimp only at hy ⊢
-                    cases hit : Val.iterable v with
+                    cases hit : Val.iterable (v.unbox h₁) with
                     | none => rw [hit] at hy; exact hy
                     | some xs =>
                         rw [hit] at hy
@@ -713,7 +713,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | val v =>
                     rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                     dsimp only at hy ⊢
-                    cases hit : strKeyed v with
+                    cases hit : strKeyed (v.unbox h₁) with
                     | none => rw [hit] at hy; exact hy
                     | some ks =>
                         rw [hit] at hy

@@ -324,6 +324,13 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    -- After the switchover a Python receiver can be a boxed container, which has no
+    -- `__dict__` to read a field out of and answers a hole. "An accessor returns the
+    -- field it names" is a claim about ordinary instances. Only Python boxes, so the
+    -- obligation is conditional on the dialect and the default discharges it outright
+    -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
+    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+      intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
@@ -331,13 +338,16 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
-    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+    execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+      · by_cases hd : ctx.dialect = .python
+        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hd]
+      · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
@@ -353,6 +363,13 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
     (r : Ref) (args : List Val) (hpos : posRejected fn args = false)
     (hmod : ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+    -- After the switchover a Python receiver can be a boxed container, which has no
+    -- `__dict__` to read a field out of and answers a hole. "An accessor returns the
+    -- field it names" is a claim about ordinary instances. Only Python boxes, so the
+    -- obligation is conditional on the dialect and the default discharges it outright
+    -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
+    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+      intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
@@ -360,13 +377,16 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
   unfold applyFunc
   simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig,
-    execStmt, evalExpr, Env.set, fieldOf, List.zip_nil_left]
+    execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf, List.zip_nil_left]
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩ <;>
-        simp [hgr, hf, hc, hm]
+    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+      · by_cases hd : ctx.dialect = .python
+        · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal]
+        · simp [hgr, hf, hc, hm, hd]
+      · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
 /-! ## 3b. Fuel independence

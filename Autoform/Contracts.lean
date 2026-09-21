@@ -797,7 +797,7 @@ theorem methodkey_refinesUnder_value :
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
-    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, evalList,
+    f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
 
 set_option maxHeartbeats 2000000 in
@@ -834,7 +834,7 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, hpost]
+    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
 
 /-- The contract-relative theorem plus its satisfiability proof, which is the pair a
 reader is entitled to demand. Stated as one declaration so the two cannot drift apart. -/
@@ -917,7 +917,7 @@ theorem methodkey_refines :
   simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
-    applyFunc, execStmt, evalExpr, evalList, Env.set, Env.get, Val.truthy,
+    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, Env.set, Env.get, Val.truthy,
     Val.iterable, strKeyed, Heap.get, Heap.alloc]
 
 /-- The unconditional theorem needs no satisfiability obligation — there is nothing to
@@ -947,7 +947,7 @@ theorem methodkey_holes (k : Nat) (args : List Val) :
     f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
-    applyFunc, execStmt, evalExpr, evalList, ctxOf, Env.set, Env.get, Val.truthy,
+    applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, Env.get, Val.truthy,
     Heap.get, Heap.alloc]
 
 /-- **An unconstrained contract proves nothing.**

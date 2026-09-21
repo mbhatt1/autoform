@@ -351,6 +351,17 @@ def setPayload (h : Heap) (r : Ref) (p : Payload) : Heap :=
 
 end Heap
 
+/-- The container a value presents, looking through a box.
+
+After the switchover a list literal is a `Val.ref`, so everything that inspected a
+`Val.list` structurally -- splatting `*xs`, `**kw` -- has to look through the reference or
+it silently sees "not a container". Non-refs and refs without a payload are returned
+unchanged, so this is the identity on every value Core built before boxing. -/
+def Val.unbox (h : Heap) : Val → Val
+  | .ref r => (h.payload r).toVal.getD (.ref r)
+  | v      => v
+
+
 /-- Literals as they appear in source. -/
 inductive Lit where
   | int   : Int → Lit

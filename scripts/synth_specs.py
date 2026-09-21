@@ -1106,33 +1106,35 @@ PROOF_CONST = """theorem %(id)s :
 PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
+        ∀ o, h.get r = some o → o.payload = .none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod (hsig := by rfl)
+      hmod (fun _ => hbox) (hsig := by rfl)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
-        ∀ o, h.get r = some o → o.cls.startsWith "<module>" = false)
+        (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
+        ∀ o, h.get r = some o → o.payload = .none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod (hsig := by rfl)
+      [] rfl hmod (fun _ => hbox) (hsig := by rfl)
 """
 
 def select_proof_fuel(cands, module):
