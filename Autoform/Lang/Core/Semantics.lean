@@ -2222,4 +2222,39 @@ inspection so that a new `Lit` constructor cannot be added to one and not the ot
     evalExpr ctx (n + 1) h ρ (.lit l) = (h, .val l.toVal) := by
   cases l <;> rfl
 
+/-! ## A closure cell, from primitives Core already has
+
+`cartographer/export_ast.sc` holes every `nonlocal` write as `scope:nonlocal-write`, and
+its comment gives the reason: `Expr.closure` captures the environment **by value**, so a
+write can never be observed by the frame that owns the variable, and emitting an `assign`
+would produce a program that runs and quietly computes the wrong answer.
+
+That reason is correct about `assign` and wrong about Core. Capturing a `Val.ref` by value
+still shares the object it points at, which is exactly how a compiler implements a closure
+cell: `boxNew` allocates it, `field`/`setField` read and write through it. The program
+below is the `hits += 1` shape from `cachetools/_cached.py` -- two calls through a closure,
+and the owning frame sees both writes.
+
+So `scope:nonlocal-write` is **not** blocked on the trusted semantics. It is blocked on the
+exporter, which translates one method at a time, while converting a variable to a cell is a
+whole-scope rewrite: box it where it is defined, then rewrite every read and write of it in
+that scope and in every nested one. Missing a single read site yields a stale value with no
+hole marking it -- which is why this is still a hole and not a translation. -/
+private def cellProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "bump", params := []
+      , body := .setField (.name "cell") "v"
+                  (.binop "+" (.field (.name "cell") "v") (.lit (.int 1))) }
+    , { name := "outer", params := []
+      , body :=
+          .seq (.assign "cell" (.boxNew (.lit (.int 0))))
+          (.seq (.assign "f" (.closure "bump"))
+          (.seq (.expr (.call "f" []))
+          (.seq (.expr (.call "f" []))
+                (.ret (.field (.name "cell") "v"))))) } ] }
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2) -/
+#guard_msgs in #eval runFunc cellProg 200 "outer" []
+
 end Autoform.Core

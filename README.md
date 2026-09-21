@@ -278,7 +278,7 @@ holes across 91 of 209 functions, and they are not evenly distributed:
 | `control:TRY-exception-representation` | 29 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter — every *other* exception producer in Core is already pinned by a theorem ([§10](docs/languages.md)) |
 | `call:python-defaults` | 30 | function-object state. The literal defaults are done; these are `Attribute` causes (`math.inf`, `time.monotonic`) evaluated once at `def` time |
 | `call:python-receiver-signature` | 24 | descriptor/decorator binding, and receivers not named `self` |
-| `scope:nonlocal-write` | 8 | the "cross-scope writes" named above, counted |
+| `scope:nonlocal-write` | 8 | an exporter rewrite, **not** new semantics — Core's `boxNew`/`setField` already give closure cells ([demonstrated](Autoform/Lang/Core/Semantics.lean)); boxing a variable is a whole-scope change and the exporter translates one method at a time |
 | `function:python-default-evaluation` | 4 | follows `call:python-defaults` |
 
 Each is a feature, not a fix. Two things this table is for: it is the reason

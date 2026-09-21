@@ -338,6 +338,27 @@ Removing it needs a well-formedness predicate on programs plus a preservation ar
 over the interpreter. Until then the dispatch holes, which is the conservative direction:
 it refuses to catch rather than catching the wrong thing.
 
+### 11. `nonlocal` is an exporter gap, not a semantics gap
+
+`scope:nonlocal-write` holes every `nonlocal` write — 8 on a cachetools export, all of
+them the `hits += 1` counters in `_cached.py`. The exporter comment explains that
+`Expr.closure` captures by value, so a write cannot reach the frame owning the variable,
+and emitting an `assign` would compute the wrong answer silently.
+
+That is right about `assign` and wrong about what Core can express. Capturing a `Val.ref`
+by value still shares the object behind it, which is precisely a closure cell: `boxNew`
+allocates, `field`/`setField` read and write. `Autoform/Lang/Core/Semantics.lean` carries
+the worked program as a `#guard_msgs` — two calls through a closure, owning frame observes
+both writes, `2`. It is checked on every build rather than asserted here, because "the
+semantics can already do this" is the kind of claim that rots.
+
+What actually blocks it is the exporter's shape. Converting a variable to a cell is a
+whole-scope rewrite — box it at its definition, then rewrite every read and write in that
+scope and all nested ones — and the exporter translates one method at a time. A missed read
+site produces a stale value with no hole marking it, which is worse than the hole that is
+there now. So the remedy is an exporter pass, and the reason it has not been written is
+cost and risk, not expressiveness.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
