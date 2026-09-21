@@ -393,6 +393,41 @@ Two consequences worth stating plainly:
   `evalExpr`'s field case, and it needs the receiver's class. That is a Core change on the
   hottest path in the interpreter, and it is not what this entry did.
 
+### 13. The `@property` bug is an instance; the general case is priced
+
+Item 12 is one symptom of a rule in `evalExpr`: a missing field on an **ordinary** object
+evaluates to `unit`. Python does not do that.
+
+| | `c.missing` where `c` has no such attribute |
+|---|---|
+| CPython | `AttributeError: 'C' object has no attribute 'missing'` |
+| Core | `unit` |
+
+Module objects already hole here (`module-attr:<f>`), and the comment beside that case
+says ordinary objects keep `unit` "so no existing corpus changes" — which is exactly the
+reason to check what changing it costs rather than leave it at a comment.
+
+**Measured.** Making an ordinary missing field hole (`attr:<f>`) breaks **171 declarations
+across 36 files, 136 of them in generated `SpecsGen` specs** (every `V8Base` part plus
+`Cachetools`). The direct cause is `applyFunc_ret_field_self` and its documented twin in
+`SpecsGen/Basis.lean`: they state "an accessor returns the field it names" for *every*
+heap, including receivers that do not have the field, where the claim today is that the
+accessor returns `unit`. Restricting them to receivers that actually have the field — two
+lines, and a better theorem — is not the expensive part; re-stating the 136 generated
+specs that depend on the unrestricted form is, and that means changing `synth_specs.py`
+and regenerating them.
+
+So the general case is **not** closed here, and the cost is on record rather than guessed
+at. Two notes for whoever takes it:
+
+* Holing is the conservative option, not the faithful one. If Core's object model is
+  complete for a translated program then `AttributeError` is the *correct* answer and a
+  hole understates what is known; if it is not complete, a hole is right and
+  `AttributeError` would be a fresh wrong answer. Deciding that is the real work, and it
+  is a decision about what the project claims, not a refactor.
+* The instance that was actually observed — `@property` — is fixed at the exporter (§12),
+  which needed no Core change and no spec regeneration.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
