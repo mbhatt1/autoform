@@ -102,3 +102,34 @@ redistributed beyond the CLI package. See [THIRD_PARTY.md](../THIRD_PARTY.md).
 Publishing is a separate action described in [packaging.md](packaging.md).
 Passing local checks prepares a candidate; it does not publish it or establish
 that every release gate has run.
+
+## Re-landing a corpus
+
+A tracked `ast-<Module>.json` is evidence about the exporter that produced it, not about
+the exporter in the tree. When the exporter has moved far enough that a fresh export
+should replace the tracked artifact — see [`docs/integrity.md`](integrity.md) for how to
+decide that, and why it is a coverage question before it is an integrity one — the
+replacement is a cascade, not a copy: AST, render, manifest pins, provenance record,
+conformance evidence, generated specs and ledger all move together or every gate stays
+green while agreeing on a mixture of old and new.
+
+`scripts/reland_corpus.sh <source-dir> <Module>` performs that cascade in the documented
+order, from a clean tree, and stops at the first failure. It records real provenance for
+the new artifact and retires its `provenance/unattributed.json` entry, re-pins the
+manifest, rebuilds, re-runs the conformance oracle, regenerates the specs and the ledger,
+and then lists the gates that still have to be run by hand (`check_docs`, `check_render`,
+`audit_all --strict`, the mutation gate). It does not commit.
+
+Expect theorems to break. A spec whose truth depended on the old rendering will fail on
+the first `lake build`; for `Cachetools` each theorem in `Autoform/Specs/CachetoolsSpec.lean`
+carries a `RELAND:` annotation saying whether it survives, breaks because its subject is
+now a hole, or breaks because its subject is *no longer* a hole and the negative result it
+proved has become false in the good direction. A broken theorem is a finding to be read,
+not a build error to be silenced: the honest fix is a restated domain or a deleted claim,
+never a re-recorded hash.
+
+The corpus source must be available at the identified revision. `cachetools` is the
+upstream repository at tag `v7.1.7`, with `src/` as the export root (the tracked AST
+records paths as `cachetools/…`). `V8Base` cannot be re-landed here: its source revision
+is unrecorded, which is the gap its provenance entry names.
+

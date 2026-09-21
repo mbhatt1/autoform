@@ -756,9 +756,16 @@ uniform over all implementations meeting the contract, which is the strongest fo
 mechanism can deliver — and here it happens to be available, because `_HashedTuple` has no
 `__init__` in the translated program, so the unpacked arguments are not observable in the
 result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
+/-! **Re-land note (cachetools v7.1.7, current exporter).** These theorems used to claim
+`methodkey` for *every* argument list (`fun _ => True`). That was never its domain:
+`methodkey(self, *args, **kwargs)` requires `self`, and CPython raises `TypeError` for
+`methodkey()`. The old render carried `pythonSignature = none`, so `signatureRejected_legacy`
+discharged the check by `rfl` and the over-broad domain was invisible. The fresh export
+records the signature (`required = ["self"]`), and the theorems are stated for `args ≠ []`
+-- the domain they always had. -/
 theorem methodkey_refinesUnder_value :
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) := by
+      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) := by
   intro σ hc ht
   have hmem : pureValueContract "op:starredUnpack" ∈ [pureValueContract "op:starredUnpack"] := by
     simp
@@ -780,7 +787,8 @@ theorem methodkey_refinesUnder_value :
     exact Prod.ext h1 h2
   rw [onProgram_keysProgramHoled he] at hvf
   have hplain : e.plainArg = true := hc.2.2 _ _ he
-  intro args _
+  intro args hargs
+  obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
   rw [onProgram_keysProgramHoled he]
@@ -795,7 +803,7 @@ theorem methodkey_refinesUnder_value :
         show (k+7)+1 = k+8 from rfl, hvf (k+8) h ρ (by omega)]
   -- Everything from here is evaluation of the interpreter on a concrete AST. The only
   -- non-mechanical step is `hvf`, which is exactly where the contract is used.
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, ctx_fold, resolve_methodkey, resolve_hashkey, resolve_kwargs,
     resolveMethod_hashedTuple_init, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal,
     Env.set, Env.get, Val.truthy, Heap.get, Heap.alloc, hvl, hvf]
@@ -813,7 +821,7 @@ because they are relative to different `Γ`s. Reading either one without its `Γ
 it wrong. -/
 theorem methodkey_refinesUnder_raise (payload : Val) :
     RefinesUnder [raisesContract "op:starredUnpack" payload] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .raise payload) := by
+      (fun args => args ≠ []) (fun _ => .raise payload) := by
   intro σ hc ht
   have hmem : raisesContract "op:starredUnpack" payload ∈
       [raisesContract "op:starredUnpack" payload] := by simp
@@ -826,12 +834,13 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
     he, f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
   have hplain : e.plainArg = true := hc.2.2 _ _ he
-  intro args _
+  intro args hargs
+  obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
   -- As in the value theorem: the plainness clause of `Consistent` is what lets a fact
   -- about `evalExpr e` become a fact about the argument list `[e]`.
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgramWith, evalList_singleton _ _ _ _ hplain, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     substS, substE, substEL, he, Ctx.resolve, Ctx.resolve.go, String.endsWith, Program.table,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, ctxOf, Env.set, hpost]
@@ -841,7 +850,7 @@ reader is entitled to demand. Stated as one declaration so the two cannot drift 
 theorem methodkey_value_result :
     Satisfiable [pureValueContract "op:starredUnpack"] keysProgramHoled ∧
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) :=
+      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) :=
   ⟨satisfiable_pureValue, methodkey_refinesUnder_value⟩
 
 /-- The raising contract, paired with the payload for which satisfiability is proved.
@@ -910,11 +919,12 @@ translated `_HashedTuple` has no `__init__`. That is the builtin-base-class gap
 STRATEGY.md §31/§34 records, and it is unchanged by this theorem. -/
 theorem methodkey_refines :
     Refines keysProgram "cachetools/keys.py:<module>.methodkey" 14
-      (fun _ => True) (fun _ => .ret (.ref 0)) := by
-  intro args _
+      (fun args => args ≠ []) (fun _ => .ret (.ref 0)) := by
+  intro args hargs
+  obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs
   apply forall_ge_of_forall_add
   intro k
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, builtinBase_keysProgram, ctx_fold,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, builtinBase_keysProgram, ctx_fold,
     resolve_methodkey', resolve_hashkey', resolveMethod_hashedTuple_init',
     f_cachetools_keys_py__module__hashkey, f_cachetools_keys_py__module__methodkey,
     applyFunc, execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, evalList, Val.unbox, Heap.payload, Payload.toVal, Env.set, Env.get, Val.truthy,
@@ -924,7 +934,7 @@ theorem methodkey_refines :
 satisfy. Recorded as a declaration so the contrast with `methodkey_value_result` is
 mechanical rather than a matter of reading the prose. -/
 theorem methodkey_unconditional : RefinesUnder [] keysProgram
-    "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True) (fun _ => .ret (.ref 0)) :=
+    "cachetools/keys.py:<module>.methodkey" 14 (fun args => args ≠ []) (fun _ => .ret (.ref 0)) :=
   (refinesUnder_nil_iff _ _ _ _ _).mpr methodkey_refines
 
 /-! ### The negative result
@@ -943,7 +953,7 @@ set_option maxHeartbeats 1000000 in
 whole file exists to improve on. -/
 theorem methodkey_holes (k : Nat) (args : List Val) :
     runFunc keysProgramHoled (k + 14) "cachetools/keys.py:<module>.methodkey" args = .hole "op:starredUnpack" := by
-  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
+  simp +decide [runFunc, bindParams, Func.literalDefaults, Func.posParams, Func.keywordParams, kwargsRejected, posRejected, signatureRejected, keysProgramHoled, keysProgramWith, methodkeyWith,
     f_cachetools_keys_py__module__hashkey,
     f_cachetools_keys_py__module__methodkey, Ctx.resolve, Ctx.resolve.go, String.endsWith,
     Program.table,
