@@ -4,8 +4,9 @@
 4-5 and the `Val.eqPy` half of step 2 unimplemented.** Read this before changing
 `Syntax.lean` or `Semantics.lean`.
 
-`Stmt.setIndex` and the new `Stmt.delIndex` now implement §2 for a receiver that is a
-`Val.ref` whose `Obj` carries a `.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
+`Stmt.setIndex`, the new `Stmt.delIndex`, and the `MethodResult.mutating` wiring in
+`.mcall` now implement §2 for a receiver that is a `Val.ref` whose `Obj` carries a
+`.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
 any translated program and cost zero proof churn beyond one case in `FuelMono.lean` —
 `setIndex` used to be a constant hole and now recurses, so it needs the three-level
 unfolding `setDerefIref` uses. Landed inert for the same reason step 1 was: the semantics
@@ -222,7 +223,13 @@ already exist in `Stdlib.lean`.
 
 ### `list.append`, `dict.pop`, and the rest of `MethodResult.mutating`
 
-**`Stdlib.lean` does not change at all.** It already returns `.mutating result newRecv`.
+**Landed, and `Stdlib.lean` did not change at all** — as predicted. It already returns
+`.mutating result newRecv`, and the adapters `Payload.toVal`/`Payload.ofVal` are the whole
+interface. The precedence is the one §1 specifies: the user class is consulted first and
+only a miss reaches the payload. A mutating builtin whose new receiver is not a container
+holes (`mcall:<m>:payload-kind-changed`) rather than changing what the object is, and a
+keyword call to a builtin keeps the existing refusal.
+
 The wiring in `evalExpr`'s `.mcall` case becomes:
 
 ```

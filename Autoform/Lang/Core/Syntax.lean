@@ -276,6 +276,25 @@ inductive Payload where
   | tuple : List Val → Payload
   deriving Repr, Inhabited
 
+/-- The `Val` a payload presents to `Stdlib.method`, which speaks `Val.list`/`Val.dict`.
+
+An adapter rather than a rewrite of `Stdlib.lean` against `Payload`, deliberately:
+`Stdlib` is 700 lines with its own evidence and none of it is about aliasing
+(`docs/boxed-containers.md` §2). `.none` has no container to present. -/
+def Payload.toVal : Payload → Option Val
+  | .none     => Option.none
+  | .list vs  => some (.list vs)
+  | .dict ps  => some (.dict ps)
+  | .tuple vs => some (.tuple vs)
+
+/-- The payload a mutating builtin's new receiver becomes. `none` for a non-container,
+which the caller must refuse rather than guess at. -/
+def Payload.ofVal : Val → Option Payload
+  | .list vs  => some (.list vs)
+  | .dict ps  => some (.dict ps)
+  | .tuple vs => some (.tuple vs)
+  | _         => Option.none
+
 /-- A heap object: its class and its mutable fields. -/
 structure Obj where
   cls    : String

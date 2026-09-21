@@ -1215,6 +1215,28 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | some o =>
             match ctx.resolveMethod o.cls m with
             | none    =>
+              -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). The user class
+              -- has already been consulted and lost, so a container payload gets the
+              -- builtin behaviour -- on the payload, writing any mutation back through
+              -- `setPayload` so aliases observe it. Inert until something constructs a
+              -- payload; `Payload.toVal` is `none` for every object Core builds today.
+              match o.payload.toVal with
+              | some pay =>
+                  if kws.isEmpty then
+                    match Stdlib.method ctx.dialect h₂ pay m vs with
+                    | some (h₃, .pure res) => (h₃, res)
+                    | some (h₃, .mutating res nv) =>
+                        match Payload.ofVal nv with
+                        | some np => (h₃.setPayload r np, res)
+                        -- A mutating builtin whose new receiver is not a container.
+                        -- Writing it back would change what the object IS.
+                        | Option.none => (h₃, .hole s!"mcall:{m}:payload-kind-changed")
+                    | Option.none => (h₂, .hole s!"mcall:{o.cls}.{m}")
+                  -- Same refusal the unboxed path makes: `Stdlib.method` has no keyword
+                  -- calling convention, and dropping keywords silently is the bug the
+                  -- varargs work fixed.
+                  else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+              | Option.none =>
               -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
               -- `resolveMethod` finds nothing; what it has is a *field* holding a
               -- function value, and a module-level function takes no receiver. Calling
@@ -2394,6 +2416,31 @@ private def delIdx (tgt idx : Expr) : Heap × Ctl :=
 -- Unboxed container value: still ignorance, still a hole.
 #guard match (delIdx (.listE [.lit (.int 1)]) (.lit (.int 0))).2 with
        | .hole "delIndex:immutable-containers" => true | _ => false
+
+private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × EResult :=
+  evalExpr setIdxCtx 60 setIdxHeap setIdxEnv (.mcall recv m args)
+
+-- `xs.append(3)` mutates the payload in place, and aliases see it.  CPython [1,2,3]
+#guard match (mcallOn (.name "xs") "append" [.lit (.int 3)]).1[0]!.payload with
+       | .list [.int 1, .int 2, .int 3] => true | _ => false
+
+-- ... and bumps the version, so an iterator can tell.
+#guard (mcallOn (.name "xs") "append" [.lit (.int 3)]).1[0]!.version == 1
+
+-- `xs.pop()` returns the element AND shortens the receiver.  CPython 2, [1]
+#guard match (mcallOn (.name "xs") "pop" []).2 with
+       | .val (.int 2) => true | _ => false
+#guard match (mcallOn (.name "xs") "pop" []).1[0]!.payload with
+       | .list [.int 1] => true | _ => false
+
+-- A pure builtin leaves the payload alone.
+#guard match (mcallOn (.name "d") "get" [.lit (.str "a")]).2 with
+       | .val (.int 1) => true | _ => false
+#guard (mcallOn (.name "d") "get" [.lit (.str "a")]).1[1]!.version == 0
+
+-- An ordinary instance has no payload, so nothing changed for it.
+#guard match (mcallOn (.name "o") "append" [.lit (.int 3)]).2 with
+       | .hole "mcall:Plain.append" => true | _ => false
 
 -- An unboxed `Val.list` still holes. That case is ignorance -- the container is a value
 -- with no identity to mutate -- and removing it is the rest of this migration.
