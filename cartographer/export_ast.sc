@@ -168,7 +168,7 @@ EOFError FloatingPointError ImportError IndentationError IndexError KeyError
 KeyboardInterrupt LookupError MemoryError NameError NotImplementedError OverflowError
 RecursionError ReferenceError RuntimeError StopIteration StopAsyncIteration SyntaxError
 SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'''.split()
-tries, raises, class_refs, signatures = {}, {}, {}, {}
+tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
 
 def builtin_name(name, scopes):
     # A local assignment anywhere in a function hides the builtin. Global and
@@ -277,6 +277,13 @@ def visit(node, scopes):
             *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
             *([node.args.kwarg] if node.args.kwarg else [])]]
         class_scopes = [scope for scope in scopes if scope.get_type() == 'class']
+        # A `@property` getter is reached by attribute ACCESS, not by a call. Core has
+        # no descriptor protocol, so `c.currsize` lowers to a plain field read of a
+        # field that does not exist -- and a missing field on an ordinary object
+        # evaluates to `unit` SILENTLY. Recording the names lets the exporter hole the
+        # access instead of computing with `unit`.
+        if any(isinstance(d, ast.Name) and d.id == 'property' for d in decorators):
+            properties.add(node.name)
         signatures[f'{node.lineno}:{node.col_offset + 1}'] = {
             'name': 'lambda' if isinstance(node, ast.Lambda) else node.name,
             'defaults': bool(node.args.defaults or any(v is not None for v in node.args.kw_defaults)),
@@ -372,7 +379,8 @@ def visit(node, scopes):
 visit(tree, [symbols])
 print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   'signatures': signatures,
-                  'exceptions': sorted(represented)}, sort_keys=True))
+                  'exceptions': sorted(represented),
+                  'properties': sorted(properties)}, sort_keys=True))
 """
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
   def pythonHandlers(file: String): Option[ujson.Value] =
@@ -1204,6 +1212,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     signature <- source("signatures").obj.get(s"$line:$column")
     if signature("name").str == (if (m.name.startsWith("<lambda>")) "lambda" else m.name)
   } yield signature
+
+  /** Is `f` the name of a `@property` in the file being translated?
+    *
+    * Core has no descriptor protocol: `c.currsize` lowers to a field read, the field
+    * does not exist because the getter is a method, and `evalExpr` answers `unit` for a
+    * missing field on an ordinary object -- silently, with no hole. Against CPython,
+    * `c.currsize` is `1` and Core's is `unit`, and nothing marks the difference. Holing
+    * the access is strictly better than computing with `unit`; it costs coverage and
+    * buys back the guarantee the ledger is supposed to give.
+    *
+    * Conservative by name, not by receiver type: if any class in the file defines a
+    * property called `f`, every `_.f` in that file holes. Over-holing is the safe
+    * direction, and Python attribute access is not statically resolvable in general. */
+  def isPythonProperty(f: String): Boolean =
+    pythonHandlers(currentFile)
+      .exists(_("properties").arr.exists(_.str == f))
 
   def pythonSignatureGap(m: Method): Option[String] = {
     if (!m.filename.toLowerCase.endsWith(".py") ||
@@ -6637,6 +6661,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ujson.Obj("k" -> "index", "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (fieldOps.contains(mfn))
       resolvedRef(c).map(expr) getOrElse (asField(c) match {
+        case Some((_, f)) if isPythonProperty(f) => hole("call:python-property-access")
         case Some((r, f)) => ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f)
         case None         => hole("op:fieldAccess-shape")
       })
@@ -8516,7 +8541,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     asField(c).isDefined =>
       val (r, f) = asField(c).get
       val (pr, re) = exprV(r)
-      (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> f))
+      // Same refusal as `callExpr`'s field branch: a `@property` is reached by
+      // attribute access, Core has no descriptor protocol, and a missing field on an
+      // ordinary object is `unit` rather than a hole. This is the path a plain
+      // `return c.prop` actually takes.
+      if (isPythonProperty(f)) (pr, hole("call:python-property-access"))
+      else (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> f))
     // An ordinary named call's positional arguments (research.md §3, point 2,
     // "function-call arguments"). Delegates the actual call classification to
     // `expr`/`callExpr` unchanged (ctor/mcall/`<fakeNew>`/class-body and every other

@@ -257,3 +257,39 @@ class TestStaticMethodBinding:
         assert sig['isMethod'] is True
         assert sig['decorated'] is False
         assert sig['staticMethod'] is False
+
+
+class TestPropertyAccessHoles:
+    """A `@property` read was a SILENT WRONG ANSWER, not a missing feature.
+
+    `c.currsize` in Python calls the getter. Core has no descriptor protocol, so the
+    exporter lowered it to a plain field read — and `Cache.__init__` stores the
+    name-mangled `_Cache__currsize`, so the field `currsize` does not exist. `evalExpr`
+    answers a missing field on an ordinary object with `unit`, silently, with no hole:
+
+        CPython  c.currsize -> 1
+        Core     c.currsize -> unit
+
+    That is in the tracked corpus, and the ledger counted the enclosing functions as
+    hole-free. Holing the access costs coverage and buys back the thing coverage is for.
+    """
+
+    def test_a_property_read_is_a_hole(self):
+        source = ('class C:\n'
+                  '    @property\n'
+                  '    def n(self):\n'
+                  '        return 1\n\n'
+                  'def use(c):\n'
+                  '    return c.n\n')
+        assert _decode(source)['properties'] == ['n']
+
+    def test_an_ordinary_attribute_is_not_a_property(self):
+        source = 'class C:\n    def m(self):\n        return self.other\n'
+        assert _decode(source)['properties'] == []
+
+    def test_both_lowering_paths_refuse_it(self):
+        """`callExpr` and `exprV` both build field reads. A plain `return c.prop` goes
+        through `exprV`, so patching only `callExpr` left the bug in place — which is
+        exactly what happened first."""
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert src.count('call:python-property-access') == 2

@@ -359,6 +359,40 @@ site produces a stale value with no hole marking it, which is worse than the hol
 there now. So the remedy is an exporter pass, and the reason it has not been written is
 cost and risk, not expressiveness.
 
+### 12. A `@property` read was a silent wrong answer, and is now a hole
+
+`c.currsize` calls a getter in Python. Core has no descriptor protocol, so the exporter
+lowered it to a plain field read — and `Cache.__init__` stores the name-mangled
+`_Cache__currsize`, so a field called `currsize` does not exist. `evalExpr` answers a
+missing field on an ordinary object with `unit`, **silently**, with no hole:
+
+| | `c.currsize` |
+|---|---|
+| CPython | `1` |
+| Core | `unit` |
+
+Both confirmed by execution, not by reading. This is the failure class the whole project
+is organised against — well-typed, hole-free, and wrong — and it was inside the tracked
+corpus, where `make_info` reads `cache.currsize` and `cache.maxsize`, and the ledger
+counted the enclosing functions as translated.
+
+The exporter now holes any attribute read whose name is a `@property` anywhere in the same
+file (`call:python-property-access`). Conservative by name rather than by receiver type,
+because Python attribute access is not statically resolvable in general and over-holing is
+the safe direction. On cachetools this *raises* the hole count, 108 to 126 across 18 read
+sites — which is the point: the coverage was never real, and a number that drops when a
+silent wrong answer is corrected was measuring the wrong thing.
+
+Two consequences worth stating plainly:
+
+* **The tracked corpus still has the defect.** `ast-Cachetools.json` was exported before
+  this change, so its `make_info` still reads `currsize` as a field and still computes with
+  `unit`. The fix lands in future exports only, which is one more entry on the list of
+  reasons the tracked ASTs are evidence about the exporter that produced them.
+* Closing the hole properly — making `c.prop` call the getter — is descriptor dispatch in
+  `evalExpr`'s field case, and it needs the receiver's class. That is a Core change on the
+  hottest path in the interpreter, and it is not what this entry did.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
