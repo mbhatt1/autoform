@@ -116,6 +116,18 @@ def _field(n, key, kind):
         raise ValueError(f"{kind} node {n.get('k')!r} is missing required field {key!r}")
     return n[key]
 
+def lean_default(n):
+    """A `DefaultValue` from the on-disk shapes a parameter default may take.
+
+    Two forms, both time-invariant: a literal, and a reference to an in-program
+    function. Anything else is not a default Core can bind at call time, and the
+    exporter is supposed to have holed the definition rather than reach here.
+    """
+    if isinstance(n, dict) and n.get("k") == "fnref":
+        return f"(.fnref {lean_str(_field(n, 'v', 'default function reference'))})"
+    return f"(.lit {lean_lit(n)})"
+
+
 def lean_lit(n):
     """A `Lit` from the same on-disk literal shapes `expr_shape` accepts.
 
@@ -614,7 +626,7 @@ def render_func(f, nm) -> list:
                     or not set(names) <= ordinary
                     or set(names) & set(signature['required'])):
                 raise ValueError('invalid Python defaults')
-            rendered = ', '.join(f'({lean_str(nm)}, {lean_lit(lit)})' for nm, lit in defaults)
+            rendered = ', '.join(f'({lean_str(nm)}, {lean_default(v)})' for nm, v in defaults)
             fields += ', defaults := [' + rendered + ']'
         variadic.append('  , pythonSignature := some { ' + fields + ' }')
     return [

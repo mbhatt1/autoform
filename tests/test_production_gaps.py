@@ -301,7 +301,11 @@ class TestLiteralParameterDefaults:
              'defaults': [['b', {'k': 'int', 'v': '1'}], ['c', {'k': 'str', 'v': 'hi'}],
                           ['d', {'k': 'bool', 'v': True}], ['e', {'k': 'unit'}]]},
             ['a', 'b', 'c', 'd', 'e'])
-        assert 'defaults := [("b", (.int 1)), ("c", (.str "hi")), ("d", (.bool true)), ("e", .unit)]' in text
+        # `.lit` is the `DefaultValue` constructor: the field also admits `.fnref` for a
+        # default whose value is an in-program function, which is time-invariant for the
+        # same reason a literal is.
+        assert ('defaults := [("b", (.lit (.int 1))), ("c", (.lit (.str "hi"))), '
+                '("d", (.lit (.bool true))), ("e", (.lit .unit))]') in text
 
     def test_a_non_literal_default_is_refused_by_the_renderer(self):
         """The exporter is supposed to have holed this. If it ever does not, the

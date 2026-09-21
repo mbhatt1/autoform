@@ -270,17 +270,16 @@ See [the source-language measurements](docs/languages.md) and
 for the scope of the remaining work.
 
 **The Python gaps, measured rather than listed.** A gap list without counts invites
-picking the easy one. Exporting `cachetools` v7.1.7 with the current exporter gives 118
-holes across 95 of 209 functions, and they are not evenly distributed:
+picking the easy one. Exporting `cachetools` v7.1.7 with the current exporter gives 99
+holes across 76 of 209 functions, and they are not evenly distributed:
 
 | label | holes | what would close it |
 |---|---|---|
 | `control:TRY-exception-representation` | 29 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter — every *other* exception producer in Core is already pinned by a theorem ([§10](docs/languages.md)) |
-| `call:python-defaults` | 30 | function-object state. The literal defaults are done; these are `Attribute` defaults (`math.inf`, `time.monotonic`) evaluated once at `def` time |
+| `call:python-defaults` | 4 | literal and in-program-function defaults are done. What is left needs a value that is *not* time-invariant — a call, or a name that can be rebound — which is where function-object state becomes unavoidable |
 | `call:python-property-access` | 18 | descriptor dispatch. **This count went up on purpose**: those 18 reads used to lower to a field that does not exist, which Core answers with `unit` *silently* — a wrong answer where a hole belongs ([§12](docs/languages.md)) |
 | `call:python-receiver-signature` | 23 | descriptor binding. `@staticmethod` is done — its whole meaning is "bind no receiver". 12 of the rest are `@property`, which turns an attribute *access* into a call |
 | `scope:nonlocal-write` | 0 | **done.** The enclosing scope boxes the name, the closure shares the cell. Refused unless the binding dominates the capture — bound at top level before the first nested `def` — because a box that does not exist yet cannot be captured ([§11](docs/languages.md)) |
-| `function:python-default-evaluation` | 4 | follows `call:python-defaults` |
 
 Each is a feature, not a fix. Two things this table is for: it is the reason
 [re-exporting the tracked corpora is currently a coverage regression rather than an

@@ -709,7 +709,7 @@ Named rather than inlined into `bindParams` so that a caller can state "this fun
 no defaults" as a rewritable hypothesis. Proofs about a specific rendered function
 discharge it by `rfl`; without a name they would have to rewrite under a `match` on
 `pythonSignature`, which `simp` will not do reliably. -/
-def Func.literalDefaults (fn : Func) : List (String × Lit) :=
+def Func.literalDefaults (fn : Func) : List (String × DefaultValue) :=
   match fn.pythonSignature with
   | some sig => sig.defaults
   | none     => []
@@ -738,7 +738,7 @@ def bindParams (fn : Func) (base : Env) (vs : List Val)
   -- bound. For a function with no defaults the list is empty and this `foldl` reduces
   -- to `base`, so every previously rendered corpus keeps the term it had.
   let base  := fn.literalDefaults.foldl
-                  (fun (e : Env) (d : String × Lit) => Env.set e d.1 d.2.toVal) base
+                  (fun (e : Env) (d : String × DefaultValue) => Env.set e d.1 d.2.toVal) base
   let ps    := fn.posParams
   let ρ₀    := (ps.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base
   let rest  := vs.drop ps.length

@@ -317,13 +317,21 @@ def literal_defaults(node):
     defaults = positional + keyword
     if not defaults:
         return {'defaults': False, 'defaultValues': []}
-    values = [(name, constant_literal(d)) for name, d in defaults]
+    values = [(name, _default_value(d)) for name, d in defaults]
     if any(lit is None for _, lit in values):
         return {'defaults': True, 'defaultValues': []}
     return {'defaults': False, 'defaultValues': [[name, lit] for name, lit in values]}
 
 
 # The on-disk literal for an `ast.Constant`, or None if it is not one we model.
+def _default_value(node):
+    lit = constant_literal(node)
+    if lit is not None:
+        return lit
+    dotted = dotted_name(node)
+    return {'k': 'dotted', 'v': dotted} if dotted else None
+
+
 def constant_literal(node):
     if not isinstance(node, ast.Constant):
         return None
@@ -339,6 +347,22 @@ def constant_literal(node):
     if isinstance(v, float):
         return {'k': 'float', 'v': str(struct.unpack('<Q', struct.pack('<d', v))[0])}
     return None
+
+
+# A dotted name used as a default -- `keys.hashkey`, `Cache.__getitem__`. The VALUE is a
+# function object, which is time-invariant in the same way a literal is: `def f(k=g)`
+# stores `g` itself, and `g` is the same object whenever it is looked up. Only the source
+# text is recorded here; resolving it to a CPG full name is the exporter's job, and it
+# refuses unless exactly one method matches.
+def dotted_name(node):
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name) or not parts:
+        return None
+    parts.append(node.id)
+    return '.'.join(reversed(parts))
 
 
 def inner_scope(node, name, scopes):
@@ -10651,12 +10675,42 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           // boolean) is false exactly when every default was a literal, which is what
           // kept `pythonSignatureGap` from holing this definition; anything else has
           // already been refused above, so an entry here can only be a literal.
+          // A dotted default (`keys.hashkey`) becomes a function reference, but only
+          // when the program contains EXACTLY ONE method whose full name ends with it.
+          // Two classes defining `__getitem__` make the source text ambiguous, and
+          // picking one would be a silent wrong answer; an unresolved or ambiguous name
+          // drops the whole signature back to the `call:python-defaults` hole below,
+          // because binding some defaults and skipping others is worse than binding none.
+          def resolveDotted(path: String): Option[String] = {
+            def unique(sfx: String): Option[String] = {
+              val ms = methodByName.keys.filter(_.endsWith(sfx)).toList
+              if (ms.size == 1) Some(ms.head) else None
+            }
+            // `Cache.__getitem__` matches `...:<module>.Cache.__getitem__` directly.
+            // `keys.hashkey` does not: the module is a FILE in the full name
+            // (`cachetools/keys.py:<module>.hashkey`), so the qualifier is dropped and
+            // the bare attribute is matched instead -- still requiring exactly one
+            // method in the whole program to match, so an ambiguous name holes.
+            unique("." + path).orElse(unique("." + path.split('.').last))
+          }
+          var defaultsUnresolved = false
           val literalDefaults: ujson.Value = signature.obj.get("defaultValues") match {
-            case Some(v) => ujson.Arr.from(
-              v.arr.filter(d => exportedParams.contains(d.arr(0).str)).toList)
+            case Some(v) =>
+              val kept = v.arr.filter(d => exportedParams.contains(d.arr(0).str)).toList
+              ujson.Arr.from(kept.map { d =>
+                val value = d.arr(1)
+                if (value.obj.get("k").exists(_.str == "dotted"))
+                  resolveDotted(value("v").str) match {
+                    case Some(full) =>
+                      ujson.Arr(d.arr(0), ujson.Obj("k" -> "fnref", "v" -> full))
+                    case None => defaultsUnresolved = true; d
+                  }
+                else d
+              })
             case None => ujson.Arr()
           }
-          obj("pythonSignature") = ujson.Obj.from(
+          if (defaultsUnresolved) refuseBinding("call:python-defaults")
+          else obj("pythonSignature") = ujson.Obj.from(
             List("positionalOnly", "keywordOnly", "required").map { key =>
               key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
             } ++ List("isMethod" -> signature("isMethod")) ++

@@ -365,3 +365,53 @@ class TestNonlocalBoxing:
         src = (ROOT / 'cartographer/export_ast.sc').read_text()
         assert 'val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.map' in src
         assert 'capturedBoxes' in src
+
+
+class TestFunctionReferenceDefaults:
+    """`def f(k=keys.hashkey)` — a default whose value is an in-program function.
+
+    Same time-invariance argument as a literal: `def f(k=g)` stores `g` itself, and `g`
+    is the same object whenever it is looked up, so binding it at call time cannot be
+    told apart from binding it when the `def` ran. That is what lets Core do this without
+    the function-object state it does not have.
+
+    Resolution is the risk, and it is why the rule requires uniqueness: the source says
+    `Cache.__getitem__`, the CPG says
+    `cachetools/__init__.py:<module>.Cache.__getitem__`, and two classes defining
+    `__getitem__` would make the source text ambiguous. Picking one would be a silent
+    wrong answer.
+    """
+
+    def test_a_dotted_default_is_recorded_for_resolution(self):
+        source = ('class C:\n'
+                  '    def pick(self, x):\n'
+                  '        return x\n\n'
+                  'def f(a, g=C.pick):\n'
+                  '    return g(a, a)\n')
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['f']['defaultValues'] == [['g', {'k': 'dotted', 'v': 'C.pick'}]]
+        # `defaults` is the "cannot be modelled" flag: a dotted name is a candidate, so
+        # it does not set it. The exporter still holes if resolution is not unique.
+        assert recs['f']['defaults'] is False
+
+    def test_a_call_default_is_still_unmodellable(self):
+        source = 'def f(a, g=len("x")):\n    return a\n'
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['f']['defaults'] is True
+        assert recs['f']['defaultValues'] == []
+
+    def test_resolution_requires_exactly_one_match(self):
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert 'if (ms.size == 1) Some(ms.head) else None' in src
+        # An unresolved name must drop the WHOLE signature to the hole: binding some
+        # defaults and skipping others is worse than binding none.
+        assert 'if (defaultsUnresolved) refuseBinding("call:python-defaults")' in src
+
+    def test_core_takes_a_closed_two_constructor_default(self):
+        """`DefaultValue` is `lit | fnref` and nothing else, so a default that is not
+        time-invariant cannot be written into a rendered corpus at all."""
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert 'inductive DefaultValue where' in syntax
+        assert '| lit   : Lit → DefaultValue' in syntax
+        assert '| fnref : String → DefaultValue' in syntax
+        assert 'defaults : List (String × DefaultValue) := []' in syntax

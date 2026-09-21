@@ -605,6 +605,26 @@ inductive Stmt where
   | hole     : String → Stmt
   deriving Repr, Inhabited
 
+/-- A parameter default Core can bind without function-object state.
+
+Both forms are **time-invariant**: their value does not depend on when they are
+evaluated and evaluating them has no effect, which is the property that lets a default be
+bound at call time rather than at definition time. A literal is obvious; a reference to an
+in-program function is the same argument -- `def f(k=keys.hashkey)` stores the function
+object, and that object is the same whenever it is looked up.
+
+Anything else -- a call, a mutable literal, an attribute of something that can be
+rebound -- is NOT time-invariant and the definition still holes. Keeping this a closed
+two-constructor type is what makes that checkable by the type rather than by convention. -/
+inductive DefaultValue where
+  | lit   : Lit → DefaultValue
+  | fnref : String → DefaultValue
+  deriving Repr, Inhabited
+
+def DefaultValue.toVal : DefaultValue → Val
+  | .lit l   => l.toVal
+  | .fnref f => .fn f
+
 /-- Python parameter kinds recovered from the source definition. Default values
 are not stored here: evaluating and retaining them requires function-object state.
 `required` names parameters without defaults, excluding `*args` and `**kwargs`. -/
@@ -627,7 +647,7 @@ structure PythonSignature where
   Empty for every function without defaults, which is why every already-rendered corpus
   keeps its meaning: `bindParams` folds an empty list into the base environment and
   reduces to exactly the term it had before. -/
-  defaults : List (String × Lit) := []
+  defaults : List (String × DefaultValue) := []
   /-- Lexical method classification from Python source. `none` retains the
   historical naming heuristic for models without this information. -/
   isMethod : Option Bool := none
