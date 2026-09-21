@@ -407,20 +407,27 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 by_cases hm : o.cls.startsWith "<module>" = true
                                 · rw [if_pos hm] at hy ⊢; exact hy
                                 · rw [if_neg hm] at hy ⊢
-                                  by_cases hpay :
-                                      (ctx.dialect == Dialect.python && o.payload.toVal.isSome) = true
-                                  · rw [if_pos hpay] at hy ⊢; exact hy
-                                  · rw [if_neg hpay] at hy ⊢
-                                    by_cases hpr :
-                                        (ctx.dialect == Dialect.python &&
-                                          ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = true
-                                    · rw [if_pos hpr] at hy ⊢
-                                      cases hrm : Ctx.resolveMethod ctx o.cls f with
-                                      | some fn =>
-                                          rw [hrm] at hy
-                                          exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
-                                      | none => rw [hrm] at hy; exact hy
-                                    · rw [if_neg hpr] at hy ⊢; exact hy
+                                  -- JS `xs.length`, the boxed-container hole and the
+                                  -- class-attribute fallback do not recurse, so `hy` is
+                                  -- the goal verbatim there; only the property getter does.
+                                  by_cases hlen :
+                                      (ctx.dialect == Dialect.javascript && f == "length") = true
+                                  · rw [if_pos hlen] at hy ⊢; exact hy
+                                  · rw [if_neg hlen] at hy ⊢
+                                    by_cases hpay :
+                                        (ctx.dialect.boxesContainers && o.payload.toVal.isSome) = true
+                                    · rw [if_pos hpay] at hy ⊢; exact hy
+                                    · rw [if_neg hpay] at hy ⊢
+                                      by_cases hpr :
+                                          (ctx.dialect == Dialect.python &&
+                                            ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = true
+                                      · rw [if_pos hpr] at hy ⊢
+                                        cases hrm : Ctx.resolveMethod ctx o.cls f with
+                                        | some fn =>
+                                            rw [hrm] at hy
+                                            exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
+                                        | none => rw [hrm] at hy; exact hy
+                                      · rw [if_neg hpr] at hy ⊢; exact hy
                 all_goals exact hy
         | listE es =>
             simp only [evalExpr] at hy ⊢

@@ -800,9 +800,9 @@ the vacuity `STRATEGY.md` §14 and the mutation gate exist to catch. -/
 @[simp] theorem method_cLike_none (h : Heap) (r : Val) (n : String) (as : List Val) :
     method .cLike h r n as = none := rfl
 
-/-- Likewise for methods, under JavaScript. -/
-@[simp] theorem method_javascript_none (h : Heap) (r : Val) (n : String) (as : List Val) :
-    method .javascript h r n as = none := rfl
+/-! JavaScript DOES have a method table now (`jsMethodNames`: array `push`/`pop`/…), so
+the `method_javascript_none` that stood here is false and is gone; `knowsMethod_javascript`
+below is the exact statement that replaced it. -/
 
 
 /-! ### The name predicates the ledger consumes

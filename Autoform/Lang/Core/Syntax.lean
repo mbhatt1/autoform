@@ -1212,8 +1212,9 @@ def _root_.String.utf16Units (s : String) : List Nat :=
       let m := n - 0x10000
       [0xD800 + m / 0x400, 0xDC00 + m % 0x400]
 
-/-- `s.length` in JavaScript. -/
-def _root_.String.utf16Length (s : String) : Nat := s.utf16Units.length
+/-- `s.length` in JavaScript: the UTF-16 unit count. Not `utf16Length`, which Lean's own LSP
+module already declares under `String`. -/
+def _root_.String.jsLength (s : String) : Nat := s.utf16Units.length
 
 /-- The code unit at UTF-16 index `i`, or `none` when out of range — which is what
 JavaScript's `undefined` result for `s[i]` becomes. A negative index is out of range. -/

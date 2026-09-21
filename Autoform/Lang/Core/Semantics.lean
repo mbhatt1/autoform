@@ -1325,7 +1325,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           else (h₁, .hole s!"field:{f}:non-object")
       -- JavaScript: `s.length` is the number of UTF-16 code units, not codepoints.
       | (h₁, .val (.str s)) =>
-          if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.utf16Length))
+          if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.jsLength))
           else (h₁, .hole s!"field:{f}:non-object")
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
@@ -3034,8 +3034,8 @@ private def jsProg : Program :=
 #guard match runFunc jsProg 300 "strLen" [] with | .val (.int 2) => true | _ => false
 
 -- UTF-16 units: `"😀".length` is 2 and its first unit is a lone surrogate.
-#guard "xy".utf16Length == 2
-#guard "😀".utf16Length == 2
+#guard "xy".jsLength == 2
+#guard "😀".jsLength == 2
 #guard "xy".utf16At 0 == some 120
 #guard "xy".utf16At 5 == none
 #guard "xy".utf16At (-1) == none
