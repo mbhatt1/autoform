@@ -881,7 +881,9 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     -- `cls` is an ordinary class, not one with a builtin base: those allocate a
     -- `Val.bobj` and never reach `__init__` (see `Semantics.allocBuiltin`).
     (hbb : ctx.builtinBase cls = none)
-    (hm : ctx.resolveMethod cls "__init__" = some fn)
+    -- `__init__` under Python, `<init>` under JavaScript (`Dialect.ctorName`); a concrete
+    -- `ctx` reduces this to the literal, so existing call sites pass `"__init__"` proofs.
+    (hm : ctx.resolveMethod cls ctx.dialect.ctorName = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
         (some (.ref h₁.length)) vs kws = (h₃, .val w)) :
     evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by

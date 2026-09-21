@@ -893,7 +893,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 case clsClos cname cvs =>
                     rw [hcap] at hy
                     dsimp only at hy ⊢
-                    cases hrm : Ctx.resolveMethod ctx cls "__init__" with
+                    cases hrm : Ctx.resolveMethod ctx cls ctx.dialect.ctorName with
                     | none => rw [hrm] at hy; exact hy
                     | some fn =>
                         rw [hrm] at hy
@@ -908,7 +908,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 all_goals
                   (rw [hcap] at hy
                    dsimp only at hy ⊢
-                   cases hrm : Ctx.resolveMethod ctx cls "__init__" with
+                   cases hrm : Ctx.resolveMethod ctx cls ctx.dialect.ctorName with
                    | none => rw [hrm] at hy; exact hy
                    | some fn =>
                        rw [hrm] at hy

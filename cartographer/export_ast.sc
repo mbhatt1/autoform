@@ -78,6 +78,18 @@ import scala.annotation.tailrec
     "<operator>.shiftLeft" -> "<<"
   )
   val rightShiftOps = Set("<operator>.arithmeticShiftRight", "<operator>.logicalShiftRight")
+
+  /** The Core operator for a binary call. JavaScript equality is the one place the CPG
+    * operator name is not enough: `===` and `==` are both `<operator>.equals`, and they
+    * are different algorithms (ECMA-262 §7.2.14 IsStrictlyEqual vs §7.2.13
+    * IsLooselyEqual). The call's `code` still carries the source spelling. */
+  def binopFor(c: Call): String = {
+    val o = binops(callName(c))
+    if (jsLikeFile && (o == "==" || o == "!=")) {
+      val strict = c.code.contains("===") || c.code.contains("!==")
+      if (o == "==") (if (strict) "js:===" else "js:==") else (if (strict) "js:!==" else "js:!=")
+    } else o
+  }
   val assignRightShiftOps = Set("<operator>.assignmentArithmeticShiftRight",
                                 "<operator>.assignmentLogicalShiftRight")
 
@@ -5836,7 +5848,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       case _              => None
     }
   }
-  def localName(n: String): String = if (cppFile && n == "this") "self" else n
+  def localName(n: String): String = if ((cppFile || jsLikeFile) && n == "this") "self" else n
 
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
@@ -6231,6 +6243,31 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * the object would be allocated with no fields and every later `p->f` would read
     * `unit` — allocated, well-typed, and silently empty. */
   def ctorAlloc(ks: List[AstNode]): Option[ujson.Obj] = ks match {
+    // JavaScript `new C(args)` -- ECMA-262 §13.3.5 EvaluateNew: the constructor is the
+    // class named by the receiver of `<operator>.new`. A corpus class allocates and
+    // runs its `<init>` (`Dialect.ctorName`); `new Map()` is an empty boxed dict, which
+    // is what a Map IS to Core (keys → values, identity); any other constructor -- a
+    // builtin Core has no model for, `new Promise(executor)`, a computed expression --
+    // is a hole that names it, so the count says what is missing.
+    case (asg: Call) :: (ctor: Call) :: (last: Identifier) :: Nil
+        if jsLikeFile && callName(asg) == "<operator>.assignment" &&
+           callName(ctor) == "<operator>.new" =>
+      for {
+        (tgt, rhs) <- kidsOf(asg) match {
+                        case (i: Identifier) :: r :: Nil => Some((i, r))
+                        case _                           => None
+                      }
+        if tgt.name == last.name
+        if isOp(rhs, "<operator>.alloc") && kidsOf(rhs).isEmpty
+      } yield kidsOf(ctor).find(aidx(_) == 0) match {
+        case Some(i: Identifier) if classNames.contains(i.name) =>
+          ujson.Obj("k" -> "alloc", "cls" -> i.name,
+                    "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1)))
+        case Some(i: Identifier) if i.name == "Map" && kidsOf(ctor).count(aidx(_) >= 1) == 0 =>
+          ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
+        case Some(i: Identifier) => hole("op:new:" + i.name)
+        case _                   => hole("op:new:computed-constructor")
+      }
     case (asg: Call) :: (ctor: Call) :: (last: Identifier) :: Nil
         if callName(asg) == "<operator>.assignment" =>
       for {
@@ -6902,7 +6939,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         cStringUnsafe.contains(mfn) && !isNullCheck)
       hole(cStringUnsafe(mfn))
     else if (binops.contains(mfn) && kids.size == 2)
-      typedBinop(binops(mfn), kids(0), kids(1), expr(kids(0)), expr(kids(1)))
+      typedBinop(binopFor(c), kids(0), kids(1), expr(kids(0)), expr(kids(1)))
     else if (rightShiftOps.contains(mfn) && kids.size == 2)
       sourceRightShift(c) match {
         case Some(op) => typedBinop(op, kids(0), kids(1), expr(kids(0)), expr(kids(1)))
@@ -7535,6 +7572,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // pure, because `expr` has no prelude to sequence it into (`exprV` does, below).
     else if (jsLikeFile && mfn == "<operator>.notNullAssert" && kids.size == 1)
       expr(kids(0))
+    // `typeof e` -- ECMA-262 §13.5.3. jssrc2cpg names the unary operator
+    // `<operator>.instanceOf` (one child); a binary `a instanceof B` has two children
+    // and is the class-hierarchy question Core does not answer yet (§13.10.2
+    // InstanceofOperator), so it keeps a hole under its own name.
+    else if (jsLikeFile && mfn == "<operator>.instanceOf" && kids.size == 1)
+      ujson.Obj("k" -> "unop", "op" -> "js:typeof", "a" -> expr(kids(0)))
+    else if (jsLikeFile && mfn == "<operator>.instanceOf" && kids.size == 2)
+      hole("op:instanceof:class-hierarchy")
+    // `new X(...)` outside the block shape `ctorAlloc` folds: never a call to a function
+    // named `<operator>.new` (which resolved to nothing and holed only at run time).
+    else if (jsLikeFile && mfn == "<operator>.new")
+      hole("op:new:unfolded")
     else if (jsLikeFile && mfn == "<operator>.void" && kids.size == 1)
       (if (pureNode(kids(0))) ujson.Obj("k" -> "unit") else hole("op:void:impure-operand"))
     else if (mfn.startsWith("<operator>"))
@@ -8813,7 +8862,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // dropping it shifts every explicit argument into the preceding parameter.
   // Method/constructor calls retain their separate receiver convention.
   def namedCallReceiver(c: Call): Option[AstNode] =
-    if (numericFamily == "js" && methodByName.get(c.methodFullName).exists(
+    // `this` is no longer a parameter of the exported function (see `exportName`'s
+    // `params`), so argument 0 must NOT be threaded in as a positional any more: it
+    // would land on the first real parameter. A named call in JavaScript binds no
+    // receiver (`this` is `undefined` in strict mode / the global object otherwise --
+    // ECMA-262 §10.2.1.2 OrdinaryCallBindThis), and Core's `applyFunc … none` is that.
+    if (jsLikeFile) None
+    else if (numericFamily == "js" && methodByName.get(c.methodFullName).exists(
           _.parameter.exists(p => p.index == 0 && p.name == "this")))
       kidsOf(c).find(aidx(_) == 0)
     else None
@@ -11086,15 +11141,17 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       "name"   -> exportName(m),
       "file"   -> m.filename,
       "sourceName" -> m.name,
-      "paramTypes" -> ujson.Arr.from(ps.filterNot(p => cppFile && p.name == "this").map(_.typeFullName)),
+      "paramTypes" -> ujson.Arr.from(ps.filterNot(p => (cppFile || jsLikeFile) && p.name == "this").map(_.typeFullName)),
       "returnType" -> currentReturnType,
-      "paramIntegerTypes" -> ujson.Arr.from(ps.filterNot(p => cppFile && p.name == "this")
+      "paramIntegerTypes" -> ujson.Arr.from(ps.filterNot(p => (cppFile || jsLikeFile) && p.name == "this")
         .map(p => primitiveInt(p.typeFullName).getOrElse(""))),
       "returnIntegerType" -> primitiveInt(currentReturnType).getOrElse(""),
       // `ps` is already sorted and self-filtered (needed for `*args`/`**kwargs`
       // detection). `this` leaves the list for the same reason `self` does: `applyFunc`
       // binds the receiver itself, under the name the body now uses.
-      "params" -> ujson.Arr.from(ps.map(_.name).filterNot(x => cppFile && x == "this")),
+      // JavaScript: jssrc2cpg keeps `this` as parameter 0 of EVERY function; it leaves
+      // for the same reason C++'s does, and `namedCallReceiver` stops re-supplying it.
+      "params" -> ujson.Arr.from(ps.map(_.name).filterNot(x => (cppFile || jsLikeFile) && x == "this")),
       "body"   -> body
     )
     // Builtin bases ride on the module *initializer* entry — the function that runs the
