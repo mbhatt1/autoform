@@ -1181,6 +1181,20 @@ def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : 
         | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
     | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
 
+/-- A JavaScript property read on a boxed container. An object literal's own keys are
+its properties (`{a: 1}.a`), an array's `length` is its element count, and any other
+name is `undefined` -- never an exception, which is what makes `jsContainerField_ne_exn`
+in `ExcSafe.lean` one line. `.none` is unreachable from the caller (it is gated on
+`Payload.toVal.isSome`) and stays a hole so the gate can never be quietly weakened. -/
+def jsContainerField (p : Payload) (f : String) : EResult :=
+  match p with
+  | .list vs  => if f == "length" then .val (.int vs.length) else .val .unit
+  | .dict kvs => match Stdlib.dictGet kvs (.str f) with
+                 | some v => .val v
+                 | none   => .val .unit
+  | .tuple _  => .val .unit
+  | .none     => .hole s!"field:{f}:on-container"
+
 /-- What a Python `raise e` does with the value `e` evaluated to.
 
 Two kinds of value reach `Stmt.raise` from the exporter, and they must be told apart:
@@ -1587,15 +1601,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                              -- removing others. Gated on the dialect because only Python
                              -- boxes, so no `.cLike` corpus can reach a payload and none
                              -- of their specs need to say so.
-                             -- JavaScript: `xs.length` on a boxed array is a PROPERTY,
-                             -- not a method, so it is answered here on the field path.
-                             -- The dict case is deliberately absent: a JS object literal's
-                             -- own keys are its fields (`{a: 1}.a`), which Core does not
-                             -- yet model as a payload lookup and so stays the hole below.
-                             else if ctx.dialect == .javascript && f == "length" then
-                               match o.payload with
-                               | .list vs => (h₁, .val (.int vs.length))
-                               | _        => (h₁, .hole s!"field:{f}:on-container")
+                             -- JavaScript: a property read on a boxed container is
+                             -- answered on the field path -- `xs.length` on an array, a
+                             -- key on an object literal (`{a: 1}.a`), `undefined` for
+                             -- anything else. `jsContainerField` is the whole table.
+                             else if ctx.dialect == .javascript && o.payload.toVal.isSome then
+                               (h₁, jsContainerField o.payload f)
                              else if ctx.dialect.boxesContainers && o.payload.toVal.isSome then
                                (h₁, .hole s!"field:{f}:on-container")
                              -- A `@property`: the attribute read IS a call, so run the
@@ -2167,7 +2178,16 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       match evalExpr ctx n h ρ r with
       | (h₁, .val (.ref addr)) =>
         match evalExpr ctx n h₁ ρ v with
-        | (h₂, .val vv)    => (h₂.setField addr f vv, .normal ρ)
+        -- JavaScript: `o.k = v` on an object literal writes the KEY of its boxed dict
+        -- (`jsContainerField` is the matching read); on anything else it is a field
+        -- write exactly as in Python. `setPayload` bumps the version, as every payload
+        -- write must.
+        | (h₂, .val vv)    =>
+            if ctx.dialect == .javascript then
+              match h₂.payload addr with
+              | .dict kvs => (h₂.setPayload addr (.dict (Stdlib.dictSet kvs (.str f) vv)), .normal ρ)
+              | _         => (h₂.setField addr f vv, .normal ρ)
+            else (h₂.setField addr f vv, .normal ρ)
         | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
@@ -3565,7 +3585,20 @@ private def jsProg : Program :=
     , { name := "strIdx", params := []
       , body := .ret (.index (.lit (.str "xy")) (.lit (.int 0))) }
     , { name := "strLen", params := []
-      , body := .ret (.field (.lit (.str "xy")) "length") } ] }
+      , body := .ret (.field (.lit (.str "xy")) "length") }
+      -- `o = {a: 1}; o.b = 2; o.a + o.b * 10 + (o.c === undefined ? 100 : 0)`  -- Node: 121
+    , { name := "objLit", params := []
+      , body :=
+          .seq (.assign "o" (.dictE [(.lit (.str "a"), .lit (.int 1))]))
+          (.seq (.setField (.name "o") "b" (.lit (.int 2)))
+                (.ret (.binop "+" (.field (.name "o") "a")
+                         (.binop "+" (.binop "*" (.field (.name "o") "b") (.lit (.int 10)))
+                            (.cond (.binop "==" (.field (.name "o") "c") (.lit .unit))
+                               (.lit (.int 100)) (.lit (.int 0))))))) }
+      -- `xs = [1, 2]; xs.foo`  -- Node: undefined
+    , { name := "arrMiss", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
+                     (.ret (.field (.name "xs") "foo")) } ] }
 
 -- `xs = []; xs.push(1); n = xs.push(2); n + 10 * xs.length`  -- Node: 2 + 20 = 22
 #guard match runFunc jsProg 300 "build" [] with | .val (.int 22) => true | _ => false
@@ -3574,6 +3607,10 @@ private def jsProg : Program :=
 -- `"xy"[0]` is `"x"`; `"xy".length` is 2.
 #guard match runFunc jsProg 300 "strIdx" [] with | .val (.str "x") => true | _ => false
 #guard match runFunc jsProg 300 "strLen" [] with | .val (.int 2) => true | _ => false
+-- An object literal's own keys are its properties; a missing one is `undefined`, and a
+-- property write lands in the literal, not beside it.  -- Node: 121
+#guard match runFunc jsProg 300 "objLit" [] with | .val (.int 121) => true | _ => false
+#guard match runFunc jsProg 300 "arrMiss" [] with | .val .unit => true | _ => false
 
 -- UTF-16 units: `"😀".length` is 2 and its first unit is a lone surrogate.
 #guard "xy".jsLength == 2

@@ -353,10 +353,6 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
-    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
-    -- accessor named `length` would not be "the field it names" there. Decidable at every
-    -- call site: the dialect and the field name are both concrete.
-    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
@@ -393,8 +389,11 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
             simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
         · by_cases hbx : ctx.dialect.boxesContainers = true
-          · simp [hgr, hf, hc, hm, hlen, hbox hbx o hgr, Payload.toVal, hd]
-          · simp [hgr, hf, hc, hm, hlen, hd, hbx]
+          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · -- JavaScript boxes containers, so a dialect that does not box is not it and
+            -- the JS property path (`jsContainerField`) is not taken.
+            have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
+            simp [hgr, hf, hc, hm, hd, hbx, hjs]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
@@ -424,10 +423,6 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
-    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
-    -- accessor named `length` would not be "the field it names" there. Decidable at every
-    -- call site: the dialect and the field name are both concrete.
-    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
@@ -464,8 +459,11 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
             simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
         · by_cases hbx : ctx.dialect.boxesContainers = true
-          · simp [hgr, hf, hc, hm, hlen, hbox hbx o hgr, Payload.toVal, hd]
-          · simp [hgr, hf, hc, hm, hlen, hd, hbx]
+          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · -- JavaScript boxes containers, so a dialect that does not box is not it and
+            -- the JS property path (`jsContainerField`) is not taken.
+            have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
+            simp [hgr, hf, hc, hm, hd, hbx, hjs]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 

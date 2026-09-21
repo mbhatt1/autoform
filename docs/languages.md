@@ -48,12 +48,12 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
-| TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
-| JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| TypeScript | yes | yes | yes | `.javascript` ✅ | 86 | 44 (51%) | 18 (20%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
+| JavaScript | yes | yes | yes | `.javascript` ✅ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | Node backend present; nothing to compare until it translates |
 | Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
 | Kotlin (toy) | yes | yes | yes | `.java` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
-| `.tsx` / `.jsx` | yes | yes | yes | **`.python` ❌ WRONG** | — | — | — | — | none |
+| `.tsx` / `.jsx` | yes | yes | yes | `.javascript` ✅ (was `.python` ❌, §2) | — | — | — | — | none |
 
 **On the "Differential oracle" column.** `scripts/differential.py` now carries a runtime
 backend for Node (JS/TS), the JVM (Java, and Kotlin through a `@JvmStatic` thunk) and Go,
@@ -157,7 +157,19 @@ This is wrong for the language the project has measured most. It survived becaus
 that is observed; lodash uses 355 `&&` and 196 `||`, mostly as values. Verdict: **wrong**,
 not a hole.
 
-### 2. `.tsx` / `.jsx` sources get the **Python** dialect — NEW, and it is the original §12 bug reappearing
+### 2. `.tsx` / `.jsx` sources got the **Python** dialect — FIXED; the record stands
+
+**Fixed.** `render_lean.py`'s `DIALECT` table now maps `.js .ts .tsx .jsx .mjs .cjs` to
+`.javascript` and `.cc .cxx .hh .hpp` to `.cLike`, and an extension it does not know is a
+**refusal** (`infer_dialect` raises), not a Python default.
+`tests/test_render_lean.py` (`test_dialect_inference`, `test_unknown_extension_is_refused_not_defaulted`) pins the table
+entry by entry and the refusal. The measurement below is kept as the record of what the
+bug looked like. Still open for JavaScript: `await` (a suspended frame Core has no
+representation for) stays a counted `op:await` hole; `throw`, single-`catch (e)`,
+`void`, TS `x!` and object-literal properties (`{a: 1}.a`, `o.b = 2`) lower under the
+`.javascript` dialect (`jsLikeFile` in the exporter, `jsContainerField` in
+`Semantics.lean`).
+
 
 `render_lean.py`'s `DIALECT` map keys off the file extension and lists
 `.py .c .h .cpp .java .js .ts .kt .go`. Anything else casts no vote, and `infer_dialect`

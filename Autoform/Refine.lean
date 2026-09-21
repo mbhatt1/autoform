@@ -842,9 +842,19 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
-    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w)) :
+    (he : evalExpr ctx k h₁ ρ e = (h₂, .val w))
+    -- Under JavaScript a property write on an OBJECT LITERAL lands in its boxed dict, not
+    -- in a field (`jsContainerField` is the read side); this equation is about the field
+    -- write, so it asks that the receiver is not one. Decided outright for every other
+    -- dialect, which is every corpus that uses it today.
+    (hjs : ctx.dialect = .javascript → ∀ kvs, h₂.payload r ≠ .dict kvs := by
+      intro hc; exact absurd hc (by decide)) :
     execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r f w, .normal ρ) := by
-  simp [execStmt, ha, he]
+  by_cases hd : ctx.dialect = .javascript
+  · -- With `hnd` in context, `simp` reduces the payload `match` to its default arm itself.
+    have hnd := hjs hd
+    simp [execStmt, ha, he, hd]
+  · simp [execStmt, ha, he, hd]
 
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}

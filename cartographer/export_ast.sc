@@ -5742,6 +5742,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * the standing reminder of what an ungated language-specific helper costs. */
   def pyFile: Boolean = currentFile.toLowerCase.endsWith(".py")
 
+  /** JavaScript and TypeScript, every extension `render_lean.py`'s dialect table sends
+    * to `.javascript`. Gates the JS-only lowerings (`throw`, `catch (e)`, `void`, `x!`)
+    * for the same reason `pyFile` gates Python's: another frontend can emit the same
+    * operator name with another meaning. */
+  def jsLikeFile: Boolean =
+    List(".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs").exists(currentFile.toLowerCase.endsWith)
+
   /** `007-reduce-remaining-holes-2` US4: Go's `switch` does NOT fall through between
     * cases by default (unlike C/C++/Java/JS/TS, which all share `switchStmt`'s
     * fallthrough-by-threading-into-the-next-segment design) -- a `case` implicitly
@@ -7523,6 +7530,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         ujson.Obj("k" -> "str", "v" -> parts.map(_.get).mkString)
       else hole("op:stringExpressionList:non-literal-part")
     }
+    // TypeScript `x!` asserts a type; at run time it is `x`. JavaScript `void e` evaluates
+    // `e` for its effect and is `undefined`; in expression position the operand must be
+    // pure, because `expr` has no prelude to sequence it into (`exprV` does, below).
+    else if (jsLikeFile && mfn == "<operator>.notNullAssert" && kids.size == 1)
+      expr(kids(0))
+    else if (jsLikeFile && mfn == "<operator>.void" && kids.size == 1)
+      (if (pureNode(kids(0))) ujson.Obj("k" -> "unit") else hole("op:void:impure-operand"))
     else if (mfn.startsWith("<operator>"))
       hole("op:" + opLabel(mfn))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
@@ -8994,6 +9008,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case c: Call if unops.contains(callName(c)) && kidsOf(c).size == 1 =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, typedUnop(unops(callName(c)), kidsOf(c).head, ae))
+    // TS `x!` is `x`; JS `void e` runs `e` in the prelude and is `undefined`.
+    case c: Call if jsLikeFile && callName(c) == "<operator>.notNullAssert" && kidsOf(c).size == 1 =>
+      exprV(kidsOf(c).head)
+    case c: Call if jsLikeFile && callName(c) == "<operator>.void" && kidsOf(c).size == 1 =>
+      val (pa, ae) = exprV(kidsOf(c).head)
+      (pa :+ ujson.Obj("k" -> "exprS", "e" -> ae), ujson.Obj("k" -> "unit"))
     // `006-reduce-remaining-holes`, Story 5: `a[i]`, `a` a recognized boxed array
     // -- mirrors `callExpr`'s own matching case exactly (this file's `exprV`
     // never routes an `indexOps` call through `callExpr`, so without this the
@@ -9505,6 +9525,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case "CONTINUE" => ujson.Obj("k" -> "cont")
         case "ELSE" | "CATCH" | "FINALLY" => seqOf(kids.map(stmt))
         case "TRY"      => tryStmt(cs)
+        // JavaScript/TypeScript `throw e`: `Stmt.raise`. Under `.javascript` Core throws
+        // the value AS IS (`Semantics.lean`'s `.raise`, the non-Python path) -- JS can
+        // throw anything, and `catch (e)` below binds whatever it was. Prelude-aware, so
+        // `throw new Error(f())` sequences `f()` before the raise.
+        case "THROW" if jsLikeFile && kids.size == 1 =>
+          val (prelude, value) = exprV(kids.head)
+          seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" -> value))
+        case "THROW" if jsLikeFile => holeS("control:THROW:shape")
         case t          => holeS("control:" + t)
       }
     case i: Identifier => ujson.Obj("k" -> "exprS", "e" -> expr(i))
@@ -9589,6 +9617,33 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       }
   }
 
+  /** JavaScript `try { body } catch (e) { handler }`: one handler, no type test, so it is
+    * `Stmt.tryCatch` directly -- the handler binds `e` to whatever was thrown, which is
+    * exactly Core's `tryCatch` binding. The binding name is read from the CPG, not from
+    * source text: jssrc2cpg puts the parameter first in the CATCH's block (or as a
+    * sibling of it). A `catch {` with no binding (optional catch binding) gets a fresh
+    * name nobody can refer to. Any other shape is a hole, because a handler that reads
+    * `e` unbound would silently see `undefined`. */
+  def jsTryCatch(body: ujson.Obj, c: ControlStructure): ujson.Obj = {
+    val bound: Option[(Option[String], List[AstNode])] = kidsOf(c) match {
+      case (i: Identifier) :: (b: Block) :: Nil => Some((Some(i.name), kidsOf(b)))
+      case (b: Block) :: Nil =>
+        kidsOf(b) match {
+          case (i: Identifier) :: rest => Some((Some(i.name), rest))
+          case rest if c.code.trim.matches("""(?s)catch\s*\{.*""") => Some((None, rest))
+          case _ => None
+        }
+      case _ => None
+    }
+    bound match {
+      case None => holeS("control:TRY-catch-binding")
+      case Some((param, handlerKids)) =>
+        ujson.Obj("k" -> "tryCatch", "body" -> body,
+                  "x" -> param.getOrElse(freshExprVTemp()),
+                  "handler" -> seqOf(handlerKids.map(stmt)))
+    }
+  }
+
   /** Python try / except / else / finally. Headers come from the original source;
     * CPG CATCH nodes contain only bodies. Builtin exception inheritance is expanded
     * into dispatch over Core's named exception representation. Unsupported dynamic
@@ -9608,6 +9663,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val inner =
         if (catches.isEmpty && elses.isEmpty) body
         else if (catches.isEmpty) holeS("control:TRY-else-without-except")
+        else if (jsLikeFile && catches.size == 1 && elses.isEmpty) jsTryCatch(body, catches.head)
         else if (!pyFile) holeS("control:TRY-handler-language")
         else {
           val recovered = for {

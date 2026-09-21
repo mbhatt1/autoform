@@ -454,7 +454,7 @@ theorem Timer_init_mrefines :
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl]
   simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P]
+        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P, P_dialect]
 
 /-- Both fields are actually written, with the right values in the right places. -/
 -- RELAND: survives.
@@ -468,7 +468,7 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
-    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
+    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
           f_cachetools___init___py__module___TimedCache__Timer___init__]
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
@@ -486,7 +486,7 @@ theorem TTLLink_init_mrefines :
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link___init__ rfl]
   simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P]
+        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P, P_dialect]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
 

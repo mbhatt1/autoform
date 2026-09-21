@@ -469,10 +469,10 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                   -- JS `xs.length`, the boxed-container hole and the
                                   -- class-attribute fallback do not recurse, so `hy` is
                                   -- the goal verbatim there; only the property getter does.
-                                  by_cases hlen :
-                                      (ctx.dialect == Dialect.javascript && f == "length") = true
-                                  · rw [if_pos hlen] at hy ⊢; exact hy
-                                  · rw [if_neg hlen] at hy ⊢
+                                  by_cases hjs :
+                                      (ctx.dialect == Dialect.javascript && o.payload.toVal.isSome) = true
+                                  · rw [if_pos hjs] at hy ⊢; exact hy
+                                  · rw [if_neg hjs] at hy ⊢
                                     by_cases hpay :
                                         (ctx.dialect.boxesContainers && o.payload.toVal.isSome) = true
                                     · rw [if_pos hpay] at hy ⊢; exact hy

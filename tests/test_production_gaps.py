@@ -667,3 +667,54 @@ class TestValueDunders:
         refine = (ROOT / 'Autoform/Refine.lean').read_text()
         assert '(hop : isCmpOp op = false)' in refine
 
+
+
+class TestJavaScriptLowering:
+    """Milestone 8 (docs/GOAL-arbitrary-codebases.md): the JS/TS control and operator
+    forms that used to be the top `ledger-LangJS/LangTS.json` labels now lower, gated on
+    the file kind exactly as Python's lowerings are gated on `pyFile`. Source-level pins;
+    the end-to-end check is the Joern-backed numeric suite."""
+
+    def _src(self):
+        return (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+
+    def test_js_like_files_are_the_dialect_tables_extensions(self):
+        src = self._src()
+        assert 'def jsLikeFile: Boolean =' in src
+        for ext in ('.js', '.ts', '.tsx', '.jsx', '.mjs', '.cjs'):
+            assert f'"{ext}"' in src.split('def jsLikeFile', 1)[1].split('\n\n', 1)[0], ext
+
+    def test_throw_is_a_raise_under_javascript_only(self):
+        src = self._src()
+        assert 'case "THROW" if jsLikeFile && kids.size == 1 =>' in src
+        assert 'case "THROW" if jsLikeFile => holeS("control:THROW:shape")' in src
+        # the generic control hole is still the fallthrough for every other language
+        assert 'case t          => holeS("control:" + t)' in src
+
+    def test_single_catch_binds_the_thrown_value(self):
+        src = self._src()
+        assert 'def jsTryCatch(body: ujson.Obj, c: ControlStructure): ujson.Obj' in src
+        assert 'jsLikeFile && catches.size == 1 && elses.isEmpty) jsTryCatch(body, catches.head)' in src
+        # a handler whose binding cannot be seen is a hole, never an unbound `e`
+        assert 'holeS("control:TRY-catch-binding")' in src
+
+    def test_void_and_non_null_assertion(self):
+        src = self._src()
+        assert 'mfn == "<operator>.notNullAssert" && kids.size == 1' in src
+        assert 'mfn == "<operator>.void" && kids.size == 1' in src
+        assert 'hole("op:void:impure-operand")' in src
+        assert 'callName(c) == "<operator>.void" && kidsOf(c).size == 1' in src
+
+    def test_await_is_still_a_counted_hole(self):
+        """No lowering claims `await`: it needs suspended frames Core does not have."""
+        src = self._src()
+        assert '"<operator>.await"' not in src
+
+    def test_object_literal_properties_are_payload_keys(self):
+        sem = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'def jsContainerField (p : Payload) (f : String) : EResult :=' in sem
+        assert 'if ctx.dialect == .javascript && o.payload.toVal.isSome then' in sem
+        assert 'Stdlib.dictSet kvs (.str f) vv' in sem
+        assert 'runFunc jsProg 300 "objLit" []' in sem
+        excsafe = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
+        assert 'theorem jsContainerField_ne_exn' in excsafe
