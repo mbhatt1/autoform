@@ -1,21 +1,22 @@
 # Boxed containers for Core
 
-**Status: steps 1-4 and THE SWITCHOVER are landed.** A Python list or dict literal
-allocates, containers have identity, and aliasing works — `a = [1,2]; b = a; b[0] = 9`
-makes `a[0]` nine, as in CPython. The `Val.eqPy` half of step 2 was already landed (see
-the correction below). What remains is §8's named exclusions — slices — and the
-`(Ref, Nat)` iterator refinements beyond §4. Read this before changing
-`Syntax.lean` or `Semantics.lean`.
+**Status: steps 1-5 and THE SWITCHOVER are landed; the migration this document
+describes is complete.** Under the `.python` dialect a list or dict literal allocates
+into the heap, containers have identity, `setIndex`/`delIndex` and every
+`MethodResult.mutating` builtin write through the payload, iteration re-reads the
+container and a dict raises `RuntimeError` when it changes mid-loop, and `==`/`is`
+distinguish equal contents from the same object. Aliasing works — `a = [1,2]; b = a;
+b[0] = 9` makes `a[0]` nine, as in CPython — and each of those claims is a `#guard` in
+`Semantics.lean` (`aliasProg`, `setIdx*`, `delIdx*`, `mcallOn`, `shrinkLoop`), checked on
+every build. Under every other dialect a container literal is still a value, on purpose:
+a C aggregate initializer has no identity to share. Read this before changing
+`Syntax.lean` or `Semantics.lean`; the history below explains why each piece has the
+shape it has, and §6b records the two ways it nearly went wrong.
 
-`Stmt.setIndex`, the new `Stmt.delIndex`, and the `MethodResult.mutating` wiring in
-`.mcall` now implement §2 for a receiver that is a `Val.ref` whose `Obj` carries a
-`.list`/`.dict`/`.tuple` payload. Nothing constructs a payload, so it is unreachable from
-any translated program and cost zero proof churn beyond one case in `FuelMono.lean` —
-`setIndex` used to be a constant hole and now recurses, so it needs the three-level
-unfolding `setDerefIref` uses. Landed inert for the same reason step 1 was: the semantics
-can be checked against CPython before the switchover moves a measured number. An unboxed
-`Val.list` still holes; that case is ignorance and is what the rest of the migration
-removes.
+What remains is §9's named exclusions — slices, `del xs[a:b]` — and the exporter's side
+of `op:delete-index`, which is deliberately still a hole (§2). The switchover's effect
+on the oracle was measured and is recorded in §6c: byte-identical, and that is the
+result.
 
 Step 2 landed WITHOUT re-typing `applyBinop`, which this document proposed and which is the
 wrong trade: 155 call sites, and it destroys the reducible scalar path that `Refine.lean`'s
@@ -657,3 +658,55 @@ step 4 and must not be attributed to step 1.
 
 Step 3 is the one that can regress the conformance number while being correct. Report
 before/after per step rather than a single delta, as §17 requires.
+
+In the event the order was 1, the `is` half of 2, 3 (`setIndex`/`delIndex`/mutating,
+inert), 4 (iteration, inert), then the switchover — and the `==` half of 2 turned out to
+have been landed already. Every inert step was verified on a hand-built heap before
+anything could reach it, which is what made the switchover's diff small enough to read.
+
+## 11. How to extend
+
+Two extensions people will want, and the shape each one has.
+
+### Adding a container method
+
+`Stdlib.method` speaks `Val.list`/`Val.dict`/`Val.tuple` and returns either
+`.pure result` or `.mutating result newReceiver`. It does not know about boxes, and it
+should not learn: the adapters `Payload.toVal` and `Payload.ofVal` in `Syntax.lean` are
+the whole interface, and `.mcall`'s payload branch in `Semantics.lean` is the only place
+that uses them. So a new method is:
+
+1. a case in `Stdlib.methodCore`, returning `.mutating` iff it changes the receiver, with
+   the new receiver as a container `Val` of the **same** kind — a `.list` in, a `.list`
+   out. `Payload.ofVal` refuses anything else (`mcall:<m>:payload-kind-changed`), because
+   writing back a different kind would change what the object *is*;
+2. nothing in `.mcall`, `FuelMono` or the adapters — they are generic over the method;
+3. a `#guard` beside `mcallOn` in `Semantics.lean` with CPython's answer, and, if the
+   method is reachable from a corpus, a differential case.
+
+The precedence is fixed and is Python's: the user class is consulted first and only a
+miss reaches the payload, so a `dict` subclass overriding `pop` keeps winning. A method
+that needs keyword arguments still holes (`keyword-to-builtin`); `Stdlib.method` has no
+keyword convention and silently dropping keywords is a bug this project has already fixed
+once.
+
+### Adding a dialect whose containers are reference types
+
+JavaScript is the live case (`docs/typed-numerics.md`: the `indexSnapshot` xfail). There
+are exactly **two gates**, both in `Semantics.lean`, both currently `ctx.dialect ==
+.python`:
+
+* the allocation in `.listE`/`.dictE` — admit the dialect and its literals become
+  `Val.ref`s with a payload;
+* the container-attribute rule in `.field` — admit it there too, or `arr.foo` on a boxed
+  array falls through to the `unit` fallback and the dialect gains a silent wrong answer
+  in the same change that gives it identity (this is item 3 of §6b).
+
+Then three things that are not gates: `Val.unbox` is already dialect-independent, so
+splatting and indexing work unchanged; every accessor theorem in `SpecsGen/Basis.lean`
+carries `hbox : ctx.dialect = .python → …`, whose default tactic discharges it for any
+dialect that does not box, so admitting a new one moves that obligation onto that
+dialect's specs; and `Stdlib.methodCore` returns `none` for `.javascript`, so the
+container methods need their own semantics — `push` returns the new **length**, not
+`None`, and routing it to Python's `append` because the shapes match would be wrong.
+Measure the oracle before and after, per §17.

@@ -159,6 +159,11 @@ not match the runtime — caught automatically rather than by inspection.
 | `cartographer/render_lean.py` | 3 | Neutral AST → Lean. Infers dialect from file extension. |
 | `scripts/differential.py` | 2 | Conformance oracle vs CPython / `cc`. |
 | `Demo.lean` | — | Refutation gate, axiom audit, vacuity detection, ledger. |
+| `Autoform/Lang/Core/Syntax.lean` — `Payload`, `Val.unbox`, `DefaultValue` | 3 | Boxed containers (`Obj.payload`, `Obj.version`); the view through a box that splatting and indexing read; and the closed two-constructor type of parameter defaults Core can bind without function-object state. |
+| `Autoform/Lang/Core/Semantics.lean` — `execForRef` | 2 | Live iteration over a boxed container: a list re-reads its payload per step, a dict raises `RuntimeError` when `Obj.version` moves, as CPython's iterators do. |
+| `Autoform/FuelMono.lean` | 2 | Eight-way simultaneous fuel-monotonicity induction over the interpreter. Every recursive branch needs a clause; a new one announces itself here. |
+| `scripts/check_provenance.py` | 6 | Every tracked AST is attributed to a Joern build + exporter hash, or named in `provenance/unattributed.json` with a reason. Required CI gate. |
+| `scripts/synth_specs.py` | 4 | Layer-4 specification synthesis from observations; emits `Autoform/SpecsGen/*`. |
 
 ## Design commitments
 
@@ -210,6 +215,36 @@ not match the runtime — caught automatically rather than by inspection.
 - **Static hole-freedom does not imply the program runs.** An untranslated callee is
   invisible in the AST, so the ledger reports hole-free, call-closed, and dynamic-hole
   risk as three separate numbers.
+- **A Python trap named itself in prose.** `1 << -1` raised `.exn (.str "negative
+  shift count")` where CPython raises `ValueError`, so `except ValueError:` could not
+  catch it. `Numeric.lean`'s own dialect table had said `ValueError` all along; nothing
+  compared the table to the code. Fixed, and `python_shiftCount_trap` keeps it fixed.
+- **A `@property` read computed `unit`, silently, in the tracked corpus.** `c.currsize`
+  calls a getter; the exporter lowered it to a field read; the field is name-mangled, so
+  it does not exist; `evalExpr` answered `unit` with no hole. CPython says `1`. The read
+  now holes, which *raised* the hole count by 18 — a metric that falls when a silent wrong
+  answer is corrected is measuring the wrong thing (STRATEGY.md §57.6).
+- **Re-exporting the stale corpus would have cost 86 functions.** 26 holes committed,
+  134 in a fresh export, none of them bugs — the exporter had learned to refuse what it
+  cannot model. The remedy everyone reaches for was measured and not applied
+  ([integrity](docs/integrity.md)).
+- **`nonlocal` was filed under "needs new semantics"; Core already expressed it.**
+  Capturing a `Val.ref` by value shares the object behind it, which is a closure cell.
+  The blocker was in the exporter, and the fix reused the boxing machinery built for C
+  address-taken locals (STRATEGY.md §57.7).
+- **163 became 3.** The container switchover broke 163 declarations across 34 files and
+  was nearly abandoned as needing a corpus nobody has. 33 of the files were a `.cLike`
+  corpus, only Python boxes, and one dialect gate removed them all. Same measurement,
+  wrong inference, caught (STRATEGY.md §57.8).
+- **The switchover left the oracle byte-identical.** Boxing every list and dict literal
+  moved not one compared case on `cachetools`, because its inconclusive cases are
+  unmodelled builtins, not containers. A capability can be verified against the runtime
+  and leave every headline exactly where it was.
+- **Cheaper to write is not cheaper to prove.** Property dispatch by a name marker needs
+  no new `Ctx` field, and its side condition needs a proof that a name is *absent* from a
+  209-entry table — which neither `rfl` nor `simp` can do. The `Ctx` field that cost 289
+  declarations makes absence `[] = []`. Which design is cheap is not visible until the
+  proof is attempted (STRATEGY.md §57.10).
 
 ## Trust chain
 
@@ -217,11 +252,12 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences**, but over **30 of 208** `cachetools` functions — coverage, not agreement, is the limit |
-| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
-| proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **209 agree, 0 divergences, 256 INCONCLUSIVE** on `cachetools` (basis `python-exception-guards-v3`); byte-identical before and after the container switchover. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
+| specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on `Autoform/Generated/Cachetools.lean`, 10 survivors all analysed; **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution working (`mutation-Imp.json`) |
+| proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only; declaration count lives in `audit.json` (6,786 at the last recorded run; re-measure with `scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
 | untranslated code is declared | hole counting + SACM assumptions | 26 holes, all named |
+| every AST names the exporter that made it | `scripts/check_provenance.py` | **0 violations**; 0 of 14 tracked ASTs attributed, all 14 named in `provenance/unattributed.json` with a reason |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
 not a property of the specifications: `scripts/mutate.py`'s `error_lines` regex matched
@@ -235,11 +271,14 @@ UNSUPPORTED rather than suppressing the equivalent mutants to turn it green.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small: only 30 of 208 `cachetools`
-functions are compared. Everything else is INCONCLUSIVE — a value the harness cannot
-encode, a receiver it cannot build, or a hole. **The limit is reach, not agreement.** A
-conformance rate quoted without its coverage is the self-flattering metric this project
-keeps finding.
+It was wrong to say 100%, because the denominator is small: `conformance.json` compares
+cases, not functions, and 256 of them are INCONCLUSIVE — a value the harness cannot
+encode (`skip_unencodable_ret`), a receiver it cannot build (`skip_no_instance`), or a
+hole reached during the run (`call:set`, `call:type`, `mcall:warnings.warn`,
+`expr:genExp` are the current ones). **The limit is reach, not agreement.** A conformance
+rate quoted without its coverage is the self-flattering metric this project keeps
+finding — and the byte-identical result after the container switchover is the same
+lesson from the other side: a real capability can leave the number exactly where it was.
 
 It was then briefly wrong in the other direction: an intermediate run reported 5
 divergences, and this file attributed them to `class _HashedTuple(tuple)`. That
@@ -286,20 +325,32 @@ See [the source-language measurements](docs/languages.md) and
 for the scope of the remaining work.
 
 **The Python gaps, measured rather than listed.** A gap list without counts invites
-picking the easy one. Exporting `cachetools` v7.1.7 with the current exporter gives 97
-holes across 74 of 209 functions, and they are not evenly distributed:
+picking the easy one. The table below is a **snapshot to re-measure, not a current
+figure**: passes close labels concurrently, and a count in prose is stale the day it is
+written. Last measured 2026-09-21 on `cachetools` v7.1.7 with the exporter at that
+commit: **97 holes across 74 of 209 functions**, down from 134 across 111 at the start of
+the pass — of which 18 were *added*, because they had been concealing a wrong answer.
+Reproduce it before quoting it:
 
-| label | holes | what would close it |
+```sh
+# from a checkout of cachetools v7.1.7 with src/cachetools as the export root
+./autoform.sh /path/to/src Cachetools          # stage 3 leaves ast-Cachetools.json
+python3 scripts/lang_matrix.py ast-Cachetools.json   # holes by cause, per corpus
+```
+
+| label | holes (snapshot) | what would close it |
 |---|---|---|
-| `control:TRY-exception-representation` | 29 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter — every *other* exception producer in Core is already pinned by a theorem ([§10](docs/languages.md)) |
-| `call:python-defaults` | 1 | literals, in-program functions and module attributes all bind. The last one is `Cache.pop(default=__marker)` — a class-attribute sentinel, which needs a heap read at bind time and so is the case that really does want function-object state |
-| `call:python-property-access` | 18 | descriptor dispatch. **This count went up on purpose**: those 18 reads used to lower to a field that does not exist, which Core answers with `unit` *silently* — a wrong answer where a hole belongs ([§12](docs/languages.md)) |
-| `call:python-receiver-signature` | 23 | descriptor binding. `@staticmethod` is done — its whole meaning is "bind no receiver". 12 of the rest are `@property`, which turns an attribute *access* into a call |
-| `scope:nonlocal-write` | 0 | **done.** The enclosing scope boxes the name, the closure shares the cell. Refused unless the binding dominates the capture — bound at top level before the first nested `def` — because a box that does not exist yet cannot be captured ([§11](docs/languages.md)) |
+| `control:TRY-exception-representation` | 34 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter. Every *other* exception producer in Core is already pinned by a theorem; `Stmt.raise` is the one exit ([§10](docs/languages.md)). Grew from 29 as whole-function holes stopped masking it |
+| `call:python-receiver-signature` | 23 | descriptor binding. `@staticmethod` is **done** — its whole meaning is "bind no receiver". 12 of the rest are `@property`, which turns an attribute *access* into a call; the remainder are `@classmethod` and receivers not named `self` |
+| `call:python-property-access` | 21 | running the getter. **This count went up on purpose**: those reads used to lower to a field that does not exist, which Core answered with `unit` *silently*. The dispatch is implemented and proved fuel-monotone; what blocks landing it is one side condition on the accessor theorems ([§10](docs/languages.md), STRATEGY.md §57.10) |
+| `call:computed-callee`, `op:delete-index`, `op:stringExpressionList`, other | 18 | `delIndex` exists in Core and is deliberately not yet emitted for unboxed receivers; the rest are individually small |
+| `call:python-defaults` | 1 | literals, in-program functions and module attributes all bind (**53 → 1**). The last is `Cache.pop(default=__marker)`, a class-attribute sentinel: reading it needs the heap at bind time, and that is the one default that genuinely wants function-object state |
+| `scope:nonlocal-write` | 0 | **done.** The enclosing scope boxes the name, the closure shares the cell. Refused unless the binding dominates the capture — bound at top level before the first nested `def` — because a box that does not exist yet cannot be captured ([§10](docs/languages.md)) |
 
 Each is a feature, not a fix. Two things this table is for: it is the reason
-[re-exporting the tracked corpora is currently a coverage regression rather than an
-integrity fix](docs/integrity.md), and it is the order to work in.
+[re-exporting the tracked corpora was measured as a coverage regression rather than an
+integrity fix](docs/integrity.md) — at 134 holes it was; at 97 it is closer — and it is
+the order to work in.
 
 ## Dependencies
 
