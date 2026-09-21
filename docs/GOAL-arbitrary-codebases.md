@@ -5,9 +5,10 @@ about what the tree does today; `README.md`'s hole table, `docs/scale.md` and th
 ledgers are. This is the bar the project is aiming at, written so that an agent (or a
 person) can be pointed at it and know when they are done — every milestone names the
 artifact that proves it and the gate that fails if it regresses. It was written on
-2026-09-21, after the cachetools v7.1.7 re-land (189/209 hole-free, 97 in the
-verifiable core once the ledger's call analysis was made exhaustive, 219 agree / 0
-diverge vs CPython), which is the point of departure.
+2026-09-21, after the cachetools v7.1.7 re-land (207/209 hole-free, 107 in the
+verifiable core with the ledger's call analysis made exhaustive, 245 agree / 0
+diverge vs CPython, after the same day's object-protocol, value-callee, receiver and
+comprehension work), which is the point of departure.
 
 It is written in the imperative because it is meant to be pasted into a goal-directed
 session verbatim. The rules at the end are the ones `CONTRIBUTING.md`, `STRATEGY.md`

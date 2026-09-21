@@ -2229,9 +2229,15 @@ revision. This section states the current values and what moved.
 cachetools v7.1.7 (`provenance/ast-Cachetools.json.prov.json`):**
 
     functions        209
-    hole-free        189
-    verifiable core  97
-    holes            22
+    hole-free        207
+    verifiable core  107
+    holes            3
+
+(Later the same day -- object protocol on user instances, value-callees, receiver-then-
+collectors binding, comprehension lowering -- took the 22 holes to 3, all three the
+f-strings with non-literal parts in `_DescriptorBase`, and moved `Cache.get`/`pop`/
+`setdefault` into the core; conformance 245 agree / 0 diverge. The 97 below is the figure
+the exhaustive call analysis produced on the morning's artifact.)
 
 (97, not 108: on the same day the ledger's call analysis was found to have a wildcard arm
 that skipped `tryFinally` -- every Python `with` block -- so calls inside one were

@@ -413,7 +413,7 @@
      }
     }
    },
-   "x": "$exprV$100",
+   "x": "$exprV$104",
    "handler": {
     "k": "ifte",
     "c": {
@@ -421,7 +421,7 @@
      "neg": false,
      "a": {
       "k": "name",
-      "v": "$exprV$100"
+      "v": "$exprV$104"
      },
      "b": {
       "k": "tupleE",
@@ -454,7 +454,7 @@
      "k": "raise",
      "e": {
       "k": "name",
-      "v": "$exprV$100"
+      "v": "$exprV$104"
      }
     }
    }
@@ -2033,7 +2033,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "$exprV$102",
+       "x": "$exprV$106",
        "e": {
         "k": "bool",
         "v": true
@@ -2067,12 +2067,12 @@
           ]
          }
         },
-        "x": "$exprV$101",
+        "x": "$exprV$105",
         "handler": {
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "$exprV$102",
+          "x": "$exprV$106",
           "e": {
            "k": "bool",
            "v": false
@@ -2085,7 +2085,7 @@
            "neg": false,
            "a": {
             "k": "name",
-            "v": "$exprV$101"
+            "v": "$exprV$105"
            },
            "b": {
             "k": "tupleE",
@@ -2135,7 +2135,7 @@
            "k": "raise",
            "e": {
             "k": "name",
-            "v": "$exprV$101"
+            "v": "$exprV$105"
            }
           }
          }
@@ -2145,7 +2145,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "$exprV$102"
+         "v": "$exprV$106"
         },
         "t": {
          "k": "ret",
@@ -4443,7 +4443,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "$exprV$104",
+       "x": "$exprV$108",
        "e": {
         "k": "bool",
         "v": true
@@ -4477,12 +4477,12 @@
           ]
          }
         },
-        "x": "$exprV$103",
+        "x": "$exprV$107",
         "handler": {
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "$exprV$104",
+          "x": "$exprV$108",
           "e": {
            "k": "bool",
            "v": false
@@ -4495,7 +4495,7 @@
            "neg": false,
            "a": {
             "k": "name",
-            "v": "$exprV$103"
+            "v": "$exprV$107"
            },
            "b": {
             "k": "tupleE",
@@ -4545,7 +4545,7 @@
            "k": "raise",
            "e": {
             "k": "name",
-            "v": "$exprV$103"
+            "v": "$exprV$107"
            }
           }
          }
@@ -4555,7 +4555,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "$exprV$104"
+         "v": "$exprV$108"
         },
         "t": {
          "k": "ret",
@@ -4758,7 +4758,7 @@
        }
       }
      },
-     "x": "$exprV$105",
+     "x": "$exprV$109",
      "handler": {
       "k": "ifte",
       "c": {
@@ -4766,7 +4766,7 @@
        "neg": false,
        "a": {
         "k": "name",
-        "v": "$exprV$105"
+        "v": "$exprV$109"
        },
        "b": {
         "k": "tupleE",
@@ -4800,7 +4800,7 @@
        "k": "raise",
        "e": {
         "k": "name",
-        "v": "$exprV$105"
+        "v": "$exprV$109"
        }
       }
      }
@@ -5437,7 +5437,7 @@
       "k": "seq",
       "a": {
        "k": "assign",
-       "x": "$exprV$107",
+       "x": "$exprV$111",
        "e": {
         "k": "bool",
         "v": true
@@ -5469,12 +5469,12 @@
           ]
          }
         },
-        "x": "$exprV$106",
+        "x": "$exprV$110",
         "handler": {
          "k": "seq",
          "a": {
           "k": "assign",
-          "x": "$exprV$107",
+          "x": "$exprV$111",
           "e": {
            "k": "bool",
            "v": false
@@ -5487,7 +5487,7 @@
            "neg": false,
            "a": {
             "k": "name",
-            "v": "$exprV$106"
+            "v": "$exprV$110"
            },
            "b": {
             "k": "tupleE",
@@ -5537,7 +5537,7 @@
            "k": "raise",
            "e": {
             "k": "name",
-            "v": "$exprV$106"
+            "v": "$exprV$110"
            }
           }
          }
@@ -5547,7 +5547,7 @@
         "k": "ifte",
         "c": {
          "k": "name",
-         "v": "$exprV$107"
+         "v": "$exprV$111"
         },
         "t": {
          "k": "ret",
@@ -6795,11 +6795,157 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "manager_tmp0",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "_TimedCache__timer"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "enter_tmp0",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "manager_tmp0"
+       },
+       "f": "__enter__"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "exit_tmp0",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "manager_tmp0"
+        },
+        "f": "__exit__"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "value_tmp0",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "manager_tmp0"
+         },
+         "m": "__enter__",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "tryFinally",
+        "body": {
+         "k": "ret",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "Cache"
+          },
+          "m": "get",
+          "args": [
+           {
+            "k": "name",
+            "v": "self"
+           },
+           {
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
+           }
+          ]
+         }
+        },
+        "fin": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "manager_tmp0"
+          },
+          "m": "__exit__",
+          "args": []
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.pop",
@@ -6820,11 +6966,157 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "manager_tmp0",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "_TimedCache__timer"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "enter_tmp0",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "manager_tmp0"
+       },
+       "f": "__enter__"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "exit_tmp0",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "manager_tmp0"
+        },
+        "f": "__exit__"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "value_tmp0",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "manager_tmp0"
+         },
+         "m": "__enter__",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "tryFinally",
+        "body": {
+         "k": "ret",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "Cache"
+          },
+          "m": "pop",
+          "args": [
+           {
+            "k": "name",
+            "v": "self"
+           },
+           {
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
+           }
+          ]
+         }
+        },
+        "fin": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "manager_tmp0"
+          },
+          "m": "__exit__",
+          "args": []
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.setdefault",
@@ -6845,11 +7137,157 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "manager_tmp0",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "_TimedCache__timer"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "enter_tmp0",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "manager_tmp0"
+       },
+       "f": "__enter__"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "exit_tmp0",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "manager_tmp0"
+        },
+        "f": "__exit__"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "value_tmp0",
+        "e": {
+         "k": "mcall",
+         "recv": {
+          "k": "name",
+          "v": "manager_tmp0"
+         },
+         "m": "__enter__",
+         "args": []
+        }
+       },
+       "b": {
+        "k": "tryFinally",
+        "body": {
+         "k": "ret",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "Cache"
+          },
+          "m": "setdefault",
+          "args": [
+           {
+            "k": "name",
+            "v": "self"
+           },
+           {
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
+           }
+          ]
+         }
+        },
+        "fin": {
+         "k": "exprS",
+         "e": {
+          "k": "mcall",
+          "recv": {
+           "k": "name",
+           "v": "manager_tmp0"
+          },
+          "m": "__exit__",
+          "args": []
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "skip"
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/__init__.py:<module>._TimedCache.clear",
@@ -7392,7 +7830,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "$exprV$109",
+     "x": "$exprV$113",
      "e": {
       "k": "bool",
       "v": true
@@ -7421,12 +7859,12 @@
         }
        }
       },
-      "x": "$exprV$108",
+      "x": "$exprV$112",
       "handler": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "$exprV$109",
+        "x": "$exprV$113",
         "e": {
          "k": "bool",
          "v": false
@@ -7439,7 +7877,7 @@
          "neg": false,
          "a": {
           "k": "name",
-          "v": "$exprV$108"
+          "v": "$exprV$112"
          },
          "b": {
           "k": "tupleE",
@@ -7462,7 +7900,7 @@
          "k": "raise",
          "e": {
           "k": "name",
-          "v": "$exprV$108"
+          "v": "$exprV$112"
          }
         }
        }
@@ -7472,7 +7910,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "$exprV$109"
+       "v": "$exprV$113"
       },
       "t": {
        "k": "ret",
@@ -7541,7 +7979,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "$exprV$111",
+     "x": "$exprV$115",
      "e": {
       "k": "bool",
       "v": true
@@ -7569,12 +8007,12 @@
         ]
        }
       },
-      "x": "$exprV$110",
+      "x": "$exprV$114",
       "handler": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "$exprV$111",
+        "x": "$exprV$115",
         "e": {
          "k": "bool",
          "v": false
@@ -7587,7 +8025,7 @@
          "neg": false,
          "a": {
           "k": "name",
-          "v": "$exprV$110"
+          "v": "$exprV$114"
          },
          "b": {
           "k": "tupleE",
@@ -7611,7 +8049,7 @@
          "k": "raise",
          "e": {
           "k": "name",
-          "v": "$exprV$110"
+          "v": "$exprV$114"
          }
         }
        }
@@ -7621,7 +8059,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "$exprV$111"
+       "v": "$exprV$115"
       },
       "t": {
        "k": "assign",
@@ -7887,7 +8325,7 @@
      "k": "seq",
      "a": {
       "k": "assign",
-      "x": "$exprV$113",
+      "x": "$exprV$117",
       "e": {
        "k": "bool",
        "v": true
@@ -7915,12 +8353,12 @@
          ]
         }
        },
-       "x": "$exprV$112",
+       "x": "$exprV$116",
        "handler": {
         "k": "seq",
         "a": {
          "k": "assign",
-         "x": "$exprV$113",
+         "x": "$exprV$117",
          "e": {
           "k": "bool",
           "v": false
@@ -7933,7 +8371,7 @@
           "neg": false,
           "a": {
            "k": "name",
-           "v": "$exprV$112"
+           "v": "$exprV$116"
           },
           "b": {
            "k": "tupleE",
@@ -8000,7 +8438,7 @@
           "k": "raise",
           "e": {
            "k": "name",
-           "v": "$exprV$112"
+           "v": "$exprV$116"
           }
          }
         }
@@ -8010,7 +8448,7 @@
        "k": "ifte",
        "c": {
         "k": "name",
-        "v": "$exprV$113"
+        "v": "$exprV$117"
        },
        "t": {
         "k": "exprS",
@@ -9604,7 +10042,7 @@
              "k": "seq",
              "a": {
               "k": "assign",
-              "x": "$exprV$115",
+              "x": "$exprV$119",
               "e": {
                "k": "bool",
                "v": true
@@ -9638,12 +10076,12 @@
                  ]
                 }
                },
-               "x": "$exprV$114",
+               "x": "$exprV$118",
                "handler": {
                 "k": "seq",
                 "a": {
                  "k": "assign",
-                 "x": "$exprV$115",
+                 "x": "$exprV$119",
                  "e": {
                   "k": "bool",
                   "v": false
@@ -9656,7 +10094,7 @@
                   "neg": false,
                   "a": {
                    "k": "name",
-                   "v": "$exprV$114"
+                   "v": "$exprV$118"
                   },
                   "b": {
                    "k": "tupleE",
@@ -9706,7 +10144,7 @@
                   "k": "raise",
                   "e": {
                    "k": "name",
-                   "v": "$exprV$114"
+                   "v": "$exprV$118"
                   }
                  }
                 }
@@ -9716,7 +10154,7 @@
                "k": "ifte",
                "c": {
                 "k": "name",
-                "v": "$exprV$115"
+                "v": "$exprV$119"
                },
                "t": {
                 "k": "ret",
@@ -10364,7 +10802,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "$exprV$117",
+     "x": "$exprV$121",
      "e": {
       "k": "bool",
       "v": true
@@ -10393,12 +10831,12 @@
         }
        }
       },
-      "x": "$exprV$116",
+      "x": "$exprV$120",
       "handler": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "$exprV$117",
+        "x": "$exprV$121",
         "e": {
          "k": "bool",
          "v": false
@@ -10411,7 +10849,7 @@
          "neg": false,
          "a": {
           "k": "name",
-          "v": "$exprV$116"
+          "v": "$exprV$120"
          },
          "b": {
           "k": "tupleE",
@@ -10434,7 +10872,7 @@
          "k": "raise",
          "e": {
           "k": "name",
-          "v": "$exprV$116"
+          "v": "$exprV$120"
          }
         }
        }
@@ -10444,7 +10882,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "$exprV$117"
+       "v": "$exprV$121"
       },
       "t": {
        "k": "ret",
@@ -10513,7 +10951,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "$exprV$119",
+     "x": "$exprV$123",
      "e": {
       "k": "bool",
       "v": true
@@ -10541,12 +10979,12 @@
         ]
        }
       },
-      "x": "$exprV$118",
+      "x": "$exprV$122",
       "handler": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "$exprV$119",
+        "x": "$exprV$123",
         "e": {
          "k": "bool",
          "v": false
@@ -10559,7 +10997,7 @@
          "neg": false,
          "a": {
           "k": "name",
-          "v": "$exprV$118"
+          "v": "$exprV$122"
          },
          "b": {
           "k": "tupleE",
@@ -10583,7 +11021,7 @@
          "k": "raise",
          "e": {
           "k": "name",
-          "v": "$exprV$118"
+          "v": "$exprV$122"
          }
         }
        }
@@ -10593,7 +11031,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "$exprV$119"
+       "v": "$exprV$123"
       },
       "t": {
        "k": "assign",
@@ -10950,7 +11388,7 @@
        "v": true
       }
      },
-     "x": "$exprV$120",
+     "x": "$exprV$124",
      "handler": {
       "k": "ifte",
       "c": {
@@ -10958,7 +11396,7 @@
        "neg": false,
        "a": {
         "k": "name",
-        "v": "$exprV$120"
+        "v": "$exprV$124"
        },
        "b": {
         "k": "tupleE",
@@ -10977,7 +11415,7 @@
        "k": "raise",
        "e": {
         "k": "name",
-        "v": "$exprV$120"
+        "v": "$exprV$124"
        }
       }
      }
@@ -11869,70 +12307,64 @@
                "b": {
                 "k": "seq",
                 "a": {
-                 "k": "skip"
+                 "k": "forIn",
+                 "x": "$comp$item",
+                 "e": {
+                  "k": "name",
+                  "v": "order"
+                 },
+                 "body": {
+                  "a": {
+                   "c": {
+                    "a": {
+                     "a": {
+                      "a": {
+                       "k": "name",
+                       "v": "$comp$item"
+                      },
+                      "f": "removed",
+                      "k": "field"
+                     },
+                     "op": "!",
+                     "k": "unop"
+                    },
+                    "op": "!",
+                    "k": "unop"
+                   },
+                   "t": {
+                    "k": "cont"
+                   },
+                   "e": {
+                    "k": "skip"
+                   },
+                   "k": "ifte"
+                  },
+                  "b": {
+                   "e": {
+                    "args": [
+                     {
+                      "k": "name",
+                      "v": "$comp$item"
+                     }
+                    ],
+                    "recv": {
+                     "v": "tmp0",
+                     "k": "name"
+                    },
+                    "k": "mcall",
+                    "m": "append"
+                   },
+                   "k": "exprS"
+                  },
+                  "k": "seq"
+                 }
                 },
                 "b": {
-                 "k": "seq",
-                 "a": {
-                  "k": "forIn",
-                  "x": "item",
-                  "e": {
-                   "k": "name",
-                   "v": "order"
-                  },
-                  "body": {
-                   "k": "seq",
-                   "a": {
-                    "k": "ifte",
-                    "c": {
-                     "k": "unop",
-                     "op": "!",
-                     "a": {
-                      "k": "unop",
-                      "op": "!",
-                      "a": {
-                       "k": "field",
-                       "a": {
-                        "k": "name",
-                        "v": "item"
-                       },
-                       "f": "removed"
-                      }
-                     }
-                    },
-                    "t": {
-                     "k": "cont"
-                    },
-                    "e": {
-                     "k": "skip"
-                    }
-                   },
-                   "b": {
-                    "k": "exprS",
-                    "e": {
-                     "k": "mcall",
-                     "recv": {
-                      "k": "name",
-                      "v": "tmp0"
-                     },
-                     "m": "append",
-                     "args": [
-                      {
-                       "k": "name",
-                       "v": "item"
-                      }
-                     ]
-                    }
-                   }
-                  }
-                 },
-                 "b": {
-                  "k": "assign",
-                  "x": "tmp2",
-                  "e": {
-                   "k": "name",
-                   "v": "tmp0"
-                  }
+                 "k": "assign",
+                 "x": "tmp2",
+                 "e": {
+                  "k": "name",
+                  "v": "tmp0"
                  }
                 }
                }
@@ -12397,7 +12829,7 @@
              "k": "seq",
              "a": {
               "k": "assign",
-              "x": "$exprV$122",
+              "x": "$exprV$126",
               "e": {
                "k": "bool",
                "v": true
@@ -12431,12 +12863,12 @@
                  ]
                 }
                },
-               "x": "$exprV$121",
+               "x": "$exprV$125",
                "handler": {
                 "k": "seq",
                 "a": {
                  "k": "assign",
-                 "x": "$exprV$122",
+                 "x": "$exprV$126",
                  "e": {
                   "k": "bool",
                   "v": false
@@ -12449,7 +12881,7 @@
                   "neg": false,
                   "a": {
                    "k": "name",
-                   "v": "$exprV$121"
+                   "v": "$exprV$125"
                   },
                   "b": {
                    "k": "tupleE",
@@ -12499,7 +12931,7 @@
                   "k": "raise",
                   "e": {
                    "k": "name",
-                   "v": "$exprV$121"
+                   "v": "$exprV$125"
                   }
                  }
                 }
@@ -12509,7 +12941,7 @@
                "k": "ifte",
                "c": {
                 "k": "name",
-                "v": "$exprV$122"
+                "v": "$exprV$126"
                },
                "t": {
                 "k": "ret",
@@ -12851,7 +13283,7 @@
     "k": "seq",
     "a": {
      "k": "assign",
-     "x": "$exprV$124",
+     "x": "$exprV$128",
      "e": {
       "k": "bool",
       "v": true
@@ -12887,12 +13319,12 @@
         "v": true
        }
       },
-      "x": "$exprV$123",
+      "x": "$exprV$127",
       "handler": {
        "k": "seq",
        "a": {
         "k": "assign",
-        "x": "$exprV$124",
+        "x": "$exprV$128",
         "e": {
          "k": "bool",
          "v": false
@@ -12905,7 +13337,7 @@
          "neg": false,
          "a": {
           "k": "name",
-          "v": "$exprV$123"
+          "v": "$exprV$127"
          },
          "b": {
           "k": "tupleE",
@@ -12924,7 +13356,7 @@
          "k": "raise",
          "e": {
           "k": "name",
-          "v": "$exprV$123"
+          "v": "$exprV$127"
          }
         }
        }
@@ -12934,7 +13366,7 @@
       "k": "ifte",
       "c": {
        "k": "name",
-       "v": "$exprV$124"
+       "v": "$exprV$128"
       },
       "t": {
        "k": "exprS",
@@ -14536,7 +14968,7 @@
               }
              }
             },
-            "x": "$exprV$125",
+            "x": "$exprV$129",
             "handler": {
              "k": "ifte",
              "c": {
@@ -14544,7 +14976,7 @@
               "neg": false,
               "a": {
                "k": "name",
-               "v": "$exprV$125"
+               "v": "$exprV$129"
               },
               "b": {
                "k": "tupleE",
@@ -14604,7 +15036,7 @@
               "k": "raise",
               "e": {
                "k": "name",
-               "v": "$exprV$125"
+               "v": "$exprV$129"
               }
              }
             }
@@ -14736,7 +15168,7 @@
                   "v": "v"
                  }
                 },
-                "x": "$exprV$126",
+                "x": "$exprV$130",
                 "handler": {
                  "k": "ifte",
                  "c": {
@@ -14744,7 +15176,7 @@
                   "neg": false,
                   "a": {
                    "k": "name",
-                   "v": "$exprV$126"
+                   "v": "$exprV$130"
                   },
                   "b": {
                    "k": "tupleE",
@@ -14763,7 +15195,7 @@
                   "k": "raise",
                   "e": {
                    "k": "name",
-                   "v": "$exprV$126"
+                   "v": "$exprV$130"
                   }
                  }
                 }
@@ -15846,7 +16278,7 @@
                }
               }
              },
-             "x": "$exprV$127",
+             "x": "$exprV$131",
              "handler": {
               "k": "ifte",
               "c": {
@@ -15854,7 +16286,7 @@
                "neg": false,
                "a": {
                 "k": "name",
-                "v": "$exprV$127"
+                "v": "$exprV$131"
                },
                "b": {
                 "k": "tupleE",
@@ -15894,7 +16326,7 @@
                "k": "raise",
                "e": {
                 "k": "name",
-                "v": "$exprV$127"
+                "v": "$exprV$131"
                }
               }
              }
@@ -16032,7 +16464,7 @@
                    ]
                   }
                  },
-                 "x": "$exprV$128",
+                 "x": "$exprV$132",
                  "handler": {
                   "k": "ifte",
                   "c": {
@@ -16040,7 +16472,7 @@
                    "neg": false,
                    "a": {
                     "k": "name",
-                    "v": "$exprV$128"
+                    "v": "$exprV$132"
                    },
                    "b": {
                     "k": "tupleE",
@@ -16063,7 +16495,7 @@
                    "k": "raise",
                    "e": {
                     "k": "name",
-                    "v": "$exprV$128"
+                    "v": "$exprV$132"
                    }
                   }
                  }
@@ -16874,7 +17306,7 @@
           }
          }
         },
-        "x": "$exprV$129",
+        "x": "$exprV$133",
         "handler": {
          "k": "ifte",
          "c": {
@@ -16882,7 +17314,7 @@
           "neg": false,
           "a": {
            "k": "name",
-           "v": "$exprV$129"
+           "v": "$exprV$133"
           },
           "b": {
            "k": "tupleE",
@@ -16922,7 +17354,7 @@
           "k": "raise",
           "e": {
            "k": "name",
-           "v": "$exprV$129"
+           "v": "$exprV$133"
           }
          }
         }
@@ -16982,7 +17414,7 @@
               "v": "v"
              }
             },
-            "x": "$exprV$130",
+            "x": "$exprV$134",
             "handler": {
              "k": "ifte",
              "c": {
@@ -16990,7 +17422,7 @@
               "neg": false,
               "a": {
                "k": "name",
-               "v": "$exprV$130"
+               "v": "$exprV$134"
               },
               "b": {
                "k": "tupleE",
@@ -17009,7 +17441,7 @@
               "k": "raise",
               "e": {
                "k": "name",
-               "v": "$exprV$130"
+               "v": "$exprV$134"
               }
              }
             }
@@ -17799,7 +18231,7 @@
              }
             }
            },
-           "x": "$exprV$131",
+           "x": "$exprV$135",
            "handler": {
             "k": "ifte",
             "c": {
@@ -17807,7 +18239,7 @@
              "neg": false,
              "a": {
               "k": "name",
-              "v": "$exprV$131"
+              "v": "$exprV$135"
              },
              "b": {
               "k": "tupleE",
@@ -17840,7 +18272,7 @@
              "k": "raise",
              "e": {
               "k": "name",
-              "v": "$exprV$131"
+              "v": "$exprV$135"
              }
             }
            }
@@ -17967,7 +18399,7 @@
                 "v": "v"
                }
               },
-              "x": "$exprV$132",
+              "x": "$exprV$136",
               "handler": {
                "k": "ifte",
                "c": {
@@ -17975,7 +18407,7 @@
                 "neg": false,
                 "a": {
                  "k": "name",
-                 "v": "$exprV$132"
+                 "v": "$exprV$136"
                 },
                 "b": {
                  "k": "tupleE",
@@ -17994,7 +18426,7 @@
                 "k": "raise",
                 "e": {
                  "k": "name",
-                 "v": "$exprV$132"
+                 "v": "$exprV$136"
                 }
                }
               }
@@ -18676,7 +19108,7 @@
              }
             }
            },
-           "x": "$exprV$133",
+           "x": "$exprV$137",
            "handler": {
             "k": "ifte",
             "c": {
@@ -18684,7 +19116,7 @@
              "neg": false,
              "a": {
               "k": "name",
-              "v": "$exprV$133"
+              "v": "$exprV$137"
              },
              "b": {
               "k": "tupleE",
@@ -18703,7 +19135,7 @@
              "k": "raise",
              "e": {
               "k": "name",
-              "v": "$exprV$133"
+              "v": "$exprV$137"
              }
             }
            }
@@ -18841,7 +19273,7 @@
                  ]
                 }
                },
-               "x": "$exprV$134",
+               "x": "$exprV$138",
                "handler": {
                 "k": "ifte",
                 "c": {
@@ -18849,7 +19281,7 @@
                  "neg": false,
                  "a": {
                   "k": "name",
-                  "v": "$exprV$134"
+                  "v": "$exprV$138"
                  },
                  "b": {
                   "k": "tupleE",
@@ -18872,7 +19304,7 @@
                  "k": "raise",
                  "e": {
                   "k": "name",
-                  "v": "$exprV$134"
+                  "v": "$exprV$138"
                  }
                 }
                }
@@ -19259,7 +19691,7 @@
         }
        }
       },
-      "x": "$exprV$135",
+      "x": "$exprV$139",
       "handler": {
        "k": "ifte",
        "c": {
@@ -19267,7 +19699,7 @@
         "neg": false,
         "a": {
          "k": "name",
-         "v": "$exprV$135"
+         "v": "$exprV$139"
         },
         "b": {
          "k": "tupleE",
@@ -19286,7 +19718,7 @@
         "k": "raise",
         "e": {
          "k": "name",
-         "v": "$exprV$135"
+         "v": "$exprV$139"
         }
        }
       }
@@ -19346,7 +19778,7 @@
             "v": "v"
            }
           },
-          "x": "$exprV$136",
+          "x": "$exprV$140",
           "handler": {
            "k": "ifte",
            "c": {
@@ -19354,7 +19786,7 @@
             "neg": false,
             "a": {
              "k": "name",
-             "v": "$exprV$136"
+             "v": "$exprV$140"
             },
             "b": {
              "k": "tupleE",
@@ -19373,7 +19805,7 @@
             "k": "raise",
             "e": {
              "k": "name",
-             "v": "$exprV$136"
+             "v": "$exprV$140"
             }
            }
           }
@@ -20700,11 +21132,31 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "raise",
+    "e": {
+     "k": "unop",
+     "op": "py:exception:NotImplementedError",
+     "a": {
+      "k": "tupleE",
+      "items": []
+     }
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache_clear",
@@ -21157,7 +21609,7 @@
           }
          }
         },
-        "x": "$exprV$137",
+        "x": "$exprV$141",
         "handler": {
          "k": "ifte",
          "c": {
@@ -21165,7 +21617,7 @@
           "neg": false,
           "a": {
            "k": "name",
-           "v": "$exprV$137"
+           "v": "$exprV$141"
           },
           "b": {
            "k": "tupleE",
@@ -21239,7 +21691,7 @@
            "neg": false,
            "a": {
             "k": "name",
-            "v": "$exprV$137"
+            "v": "$exprV$141"
            },
            "b": {
             "k": "tupleE",
@@ -21310,7 +21762,7 @@
            "k": "raise",
            "e": {
             "k": "name",
-            "v": "$exprV$137"
+            "v": "$exprV$141"
            }
           }
          }
@@ -21538,11 +21990,67 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "call",
+     "f": "cachetools/_cachedmethod.py:<module>._warn_classmethod",
+     "args": [
+      {
+       "k": "kwargE",
+       "n": "stacklevel",
+       "a": {
+        "k": "int",
+        "v": "3"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "mcall",
+      "recv": {
+       "k": "name",
+       "v": "self"
+      },
+      "m": "_DeprecatedDescriptorBase__wrapper",
+      "args": [
+       {
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
+       }
+      ]
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear",
@@ -21919,11 +22427,747 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "cache",
+    "e": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "cache"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "lock",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "cache_lock"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "cond",
+      "e": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "cache_condition"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "key",
+       "e": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "self"
+        },
+        "m": "cache_key",
+        "args": [
+         {
+          "k": "starred",
+          "a": {
+           "k": "name",
+           "v": "args"
+          }
+         },
+         {
+          "k": "dstarred",
+          "a": {
+           "k": "name",
+           "v": "kwargs"
+          }
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "manager_tmp0",
+         "e": {
+          "k": "name",
+          "v": "lock"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "enter_tmp0",
+          "e": {
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "manager_tmp0"
+           },
+           "f": "__enter__"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "exit_tmp0",
+           "e": {
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "manager_tmp0"
+            },
+            "f": "__exit__"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "value_tmp0",
+            "e": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "manager_tmp0"
+             },
+             "m": "__enter__",
+             "args": []
+            }
+           },
+           "b": {
+            "k": "tryFinally",
+            "body": {
+             "k": "seq",
+             "a": {
+              "k": "exprS",
+              "e": {
+               "k": "mcall",
+               "recv": {
+                "k": "name",
+                "v": "cond"
+               },
+               "m": "wait_for",
+               "args": [
+                {
+                 "k": "closure",
+                 "f": "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0"
+                }
+               ]
+              }
+             },
+             "b": {
+              "k": "tryCatch",
+              "body": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "result",
+                "e": {
+                 "k": "index",
+                 "a": {
+                  "k": "name",
+                  "v": "cache"
+                 },
+                 "b": {
+                  "k": "name",
+                  "v": "key"
+                 }
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "self"
+                 },
+                 "f": "_Wrapper__hits",
+                 "v": {
+                  "k": "binop",
+                  "op": "+",
+                  "a": {
+                   "k": "field",
+                   "a": {
+                    "k": "name",
+                    "v": "self"
+                   },
+                   "f": "_Wrapper__hits"
+                  },
+                  "b": {
+                   "k": "int",
+                   "v": "1"
+                  }
+                 }
+                },
+                "b": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "result"
+                 }
+                }
+               }
+              },
+              "x": "$exprV$142",
+              "handler": {
+               "k": "ifte",
+               "c": {
+                "k": "inOp",
+                "neg": false,
+                "a": {
+                 "k": "name",
+                 "v": "$exprV$142"
+                },
+                "b": {
+                 "k": "tupleE",
+                 "items": [
+                  {
+                   "k": "str",
+                   "v": "KeyError"
+                  }
+                 ]
+                }
+               },
+               "t": {
+                "k": "seq",
+                "a": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "tmp0",
+                  "e": {
+                   "k": "field",
+                   "a": {
+                    "k": "name",
+                    "v": "self"
+                   },
+                   "f": "_Wrapper__pending"
+                  }
+                 },
+                 "b": {
+                  "k": "exprS",
+                  "e": {
+                   "k": "mcall",
+                   "recv": {
+                    "k": "name",
+                    "v": "tmp0"
+                   },
+                   "m": "add",
+                   "args": [
+                    {
+                     "k": "name",
+                     "v": "key"
+                    }
+                   ]
+                  }
+                 }
+                },
+                "b": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "self"
+                 },
+                 "f": "_Wrapper__misses",
+                 "v": {
+                  "k": "binop",
+                  "op": "+",
+                  "a": {
+                   "k": "field",
+                   "a": {
+                    "k": "name",
+                    "v": "self"
+                   },
+                   "f": "_Wrapper__misses"
+                  },
+                  "b": {
+                   "k": "int",
+                   "v": "1"
+                  }
+                 }
+                }
+               },
+               "e": {
+                "k": "raise",
+                "e": {
+                 "k": "name",
+                 "v": "$exprV$142"
+                }
+               }
+              }
+             }
+            },
+            "fin": {
+             "k": "exprS",
+             "e": {
+              "k": "mcall",
+              "recv": {
+               "k": "name",
+               "v": "manager_tmp0"
+              },
+              "m": "__exit__",
+              "args": []
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "tryFinally",
+         "body": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "val",
+           "e": {
+            "k": "call",
+            "f": "method",
+            "args": [
+             {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "self"
+              },
+              "f": "_obj"
+             },
+             {
+              "k": "starred",
+              "a": {
+               "k": "name",
+               "v": "args"
+              }
+             },
+             {
+              "k": "dstarred",
+              "a": {
+               "k": "name",
+               "v": "kwargs"
+              }
+             }
+            ]
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "manager_tmp1",
+            "e": {
+             "k": "name",
+             "v": "lock"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "enter_tmp1",
+             "e": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "manager_tmp1"
+              },
+              "f": "__enter__"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "exit_tmp1",
+              "e": {
+               "k": "field",
+               "a": {
+                "k": "name",
+                "v": "manager_tmp1"
+               },
+               "f": "__exit__"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "value_tmp1",
+               "e": {
+                "k": "mcall",
+                "recv": {
+                 "k": "name",
+                 "v": "manager_tmp1"
+                },
+                "m": "__enter__",
+                "args": []
+               }
+              },
+              "b": {
+               "k": "tryFinally",
+               "body": {
+                "k": "seq",
+                "a": {
+                 "k": "tryCatch",
+                 "body": {
+                  "k": "setIndex",
+                  "r": {
+                   "k": "name",
+                   "v": "cache"
+                  },
+                  "i": {
+                   "k": "name",
+                   "v": "key"
+                  },
+                  "v": {
+                   "k": "name",
+                   "v": "val"
+                  }
+                 },
+                 "x": "$exprV$143",
+                 "handler": {
+                  "k": "ifte",
+                  "c": {
+                   "k": "inOp",
+                   "neg": false,
+                   "a": {
+                    "k": "name",
+                    "v": "$exprV$143"
+                   },
+                   "b": {
+                    "k": "tupleE",
+                    "items": [
+                     {
+                      "k": "str",
+                      "v": "ValueError"
+                     }
+                    ]
+                   }
+                  },
+                  "t": {
+                   "k": "skip"
+                  },
+                  "e": {
+                   "k": "raise",
+                   "e": {
+                    "k": "name",
+                    "v": "$exprV$143"
+                   }
+                  }
+                 }
+                },
+                "b": {
+                 "k": "ret",
+                 "e": {
+                  "k": "name",
+                  "v": "val"
+                 }
+                }
+               },
+               "fin": {
+                "k": "exprS",
+                "e": {
+                 "k": "mcall",
+                 "recv": {
+                  "k": "name",
+                  "v": "manager_tmp1"
+                 },
+                 "m": "__exit__",
+                 "args": []
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fin": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "manager_tmp2",
+           "e": {
+            "k": "name",
+            "v": "lock"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "enter_tmp2",
+            "e": {
+             "k": "field",
+             "a": {
+              "k": "name",
+              "v": "manager_tmp2"
+             },
+             "f": "__enter__"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "exit_tmp2",
+             "e": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "manager_tmp2"
+              },
+              "f": "__exit__"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "value_tmp2",
+              "e": {
+               "k": "mcall",
+               "recv": {
+                "k": "name",
+                "v": "manager_tmp2"
+               },
+               "m": "__enter__",
+               "args": []
+              }
+             },
+             "b": {
+              "k": "tryFinally",
+              "body": {
+               "k": "seq",
+               "a": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "tmp1",
+                 "e": {
+                  "k": "field",
+                  "a": {
+                   "k": "name",
+                   "v": "self"
+                  },
+                  "f": "_Wrapper__pending"
+                 }
+                },
+                "b": {
+                 "k": "exprS",
+                 "e": {
+                  "k": "mcall",
+                  "recv": {
+                   "k": "name",
+                   "v": "tmp1"
+                  },
+                  "m": "remove",
+                  "args": [
+                   {
+                    "k": "name",
+                    "v": "key"
+                   }
+                  ]
+                 }
+                }
+               },
+               "b": {
+                "k": "exprS",
+                "e": {
+                 "k": "mcall",
+                 "recv": {
+                  "k": "name",
+                  "v": "cond"
+                 },
+                 "m": "notify_all",
+                 "args": []
+                }
+               }
+              },
+              "fin": {
+               "k": "exprS",
+               "e": {
+                "k": "mcall",
+                "recv": {
+                 "k": "name",
+                 "v": "manager_tmp2"
+                },
+                "m": "__exit__",
+                "args": []
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "skip"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "skip"
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "skip"
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "skip"
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "skip"
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "skip"
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "skip"
+                             },
+                             "b": {
+                              "k": "skip"
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0",
@@ -22601,11 +23845,517 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "cache",
+    "e": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "cache"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "lock",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "cache_lock"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "key",
+      "e": {
+       "k": "mcall",
+       "recv": {
+        "k": "name",
+        "v": "self"
+       },
+       "m": "cache_key",
+       "args": [
+        {
+         "k": "starred",
+         "a": {
+          "k": "name",
+          "v": "args"
+         }
+        },
+        {
+         "k": "dstarred",
+         "a": {
+          "k": "name",
+          "v": "kwargs"
+         }
+        }
+       ]
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "manager_tmp0",
+        "e": {
+         "k": "name",
+         "v": "lock"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "enter_tmp0",
+         "e": {
+          "k": "field",
+          "a": {
+           "k": "name",
+           "v": "manager_tmp0"
+          },
+          "f": "__enter__"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "exit_tmp0",
+          "e": {
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "manager_tmp0"
+           },
+           "f": "__exit__"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "value_tmp0",
+           "e": {
+            "k": "mcall",
+            "recv": {
+             "k": "name",
+             "v": "manager_tmp0"
+            },
+            "m": "__enter__",
+            "args": []
+           }
+          },
+          "b": {
+           "k": "tryFinally",
+           "body": {
+            "k": "tryCatch",
+            "body": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "result",
+              "e": {
+               "k": "index",
+               "a": {
+                "k": "name",
+                "v": "cache"
+               },
+               "b": {
+                "k": "name",
+                "v": "key"
+               }
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "self"
+               },
+               "f": "_Wrapper__hits",
+               "v": {
+                "k": "binop",
+                "op": "+",
+                "a": {
+                 "k": "field",
+                 "a": {
+                  "k": "name",
+                  "v": "self"
+                 },
+                 "f": "_Wrapper__hits"
+                },
+                "b": {
+                 "k": "int",
+                 "v": "1"
+                }
+               }
+              },
+              "b": {
+               "k": "ret",
+               "e": {
+                "k": "name",
+                "v": "result"
+               }
+              }
+             }
+            },
+            "x": "$exprV$144",
+            "handler": {
+             "k": "ifte",
+             "c": {
+              "k": "inOp",
+              "neg": false,
+              "a": {
+               "k": "name",
+               "v": "$exprV$144"
+              },
+              "b": {
+               "k": "tupleE",
+               "items": [
+                {
+                 "k": "str",
+                 "v": "KeyError"
+                }
+               ]
+              }
+             },
+             "t": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "self"
+              },
+              "f": "_Wrapper__misses",
+              "v": {
+               "k": "binop",
+               "op": "+",
+               "a": {
+                "k": "field",
+                "a": {
+                 "k": "name",
+                 "v": "self"
+                },
+                "f": "_Wrapper__misses"
+               },
+               "b": {
+                "k": "int",
+                "v": "1"
+               }
+              }
+             },
+             "e": {
+              "k": "raise",
+              "e": {
+               "k": "name",
+               "v": "$exprV$144"
+              }
+             }
+            }
+           },
+           "fin": {
+            "k": "exprS",
+            "e": {
+             "k": "mcall",
+             "recv": {
+              "k": "name",
+              "v": "manager_tmp0"
+             },
+             "m": "__exit__",
+             "args": []
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "val",
+         "e": {
+          "k": "call",
+          "f": "method",
+          "args": [
+           {
+            "k": "field",
+            "a": {
+             "k": "name",
+             "v": "self"
+            },
+            "f": "_obj"
+           },
+           {
+            "k": "starred",
+            "a": {
+             "k": "name",
+             "v": "args"
+            }
+           },
+           {
+            "k": "dstarred",
+            "a": {
+             "k": "name",
+             "v": "kwargs"
+            }
+           }
+          ]
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "seq",
+           "a": {
+            "k": "assign",
+            "x": "manager_tmp1",
+            "e": {
+             "k": "name",
+             "v": "lock"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "enter_tmp1",
+             "e": {
+              "k": "field",
+              "a": {
+               "k": "name",
+               "v": "manager_tmp1"
+              },
+              "f": "__enter__"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "exit_tmp1",
+              "e": {
+               "k": "field",
+               "a": {
+                "k": "name",
+                "v": "manager_tmp1"
+               },
+               "f": "__exit__"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "value_tmp1",
+               "e": {
+                "k": "mcall",
+                "recv": {
+                 "k": "name",
+                 "v": "manager_tmp1"
+                },
+                "m": "__enter__",
+                "args": []
+               }
+              },
+              "b": {
+               "k": "tryFinally",
+               "body": {
+                "k": "tryCatch",
+                "body": {
+                 "k": "ret",
+                 "e": {
+                  "k": "mcall",
+                  "recv": {
+                   "k": "name",
+                   "v": "cache"
+                  },
+                  "m": "setdefault",
+                  "args": [
+                   {
+                    "k": "fnref",
+                    "v": "cachetools/_cachedmethod.py:<module>._WrapperBase.cache"
+                   },
+                   {
+                    "k": "name",
+                    "v": "key"
+                   },
+                   {
+                    "k": "name",
+                    "v": "val"
+                   }
+                  ]
+                 }
+                },
+                "x": "$exprV$145",
+                "handler": {
+                 "k": "ifte",
+                 "c": {
+                  "k": "inOp",
+                  "neg": false,
+                  "a": {
+                   "k": "name",
+                   "v": "$exprV$145"
+                  },
+                  "b": {
+                   "k": "tupleE",
+                   "items": [
+                    {
+                     "k": "str",
+                     "v": "ValueError"
+                    }
+                   ]
+                  }
+                 },
+                 "t": {
+                  "k": "ret",
+                  "e": {
+                   "k": "name",
+                   "v": "val"
+                  }
+                 },
+                 "e": {
+                  "k": "raise",
+                  "e": {
+                   "k": "name",
+                   "v": "$exprV$145"
+                  }
+                 }
+                }
+               },
+               "fin": {
+                "k": "exprS",
+                "e": {
+                 "k": "mcall",
+                 "recv": {
+                  "k": "name",
+                  "v": "manager_tmp1"
+                 },
+                 "m": "__exit__",
+                 "args": []
+                }
+               }
+              }
+             }
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "skip"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "skip"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "skip"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "skip"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "skip"
+                      },
+                      "b": {
+                       "k": "skip"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_clear",
@@ -23212,11 +24962,294 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "cache",
+    "e": {
+     "k": "field",
+     "a": {
+      "k": "name",
+      "v": "self"
+     },
+     "f": "cache"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "key",
+     "e": {
+      "k": "mcall",
+      "recv": {
+       "k": "name",
+       "v": "self"
+      },
+      "m": "cache_key",
+      "args": [
+       {
+        "k": "starred",
+        "a": {
+         "k": "name",
+         "v": "args"
+        }
+       },
+       {
+        "k": "dstarred",
+        "a": {
+         "k": "name",
+         "v": "kwargs"
+        }
+       }
+      ]
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "tryCatch",
+      "body": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "result",
+        "e": {
+         "k": "index",
+         "a": {
+          "k": "name",
+          "v": "cache"
+         },
+         "b": {
+          "k": "name",
+          "v": "key"
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "self"
+         },
+         "f": "_Wrapper__hits",
+         "v": {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "self"
+           },
+           "f": "_Wrapper__hits"
+          },
+          "b": {
+           "k": "int",
+           "v": "1"
+          }
+         }
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "name",
+          "v": "result"
+         }
+        }
+       }
+      },
+      "x": "$exprV$146",
+      "handler": {
+       "k": "ifte",
+       "c": {
+        "k": "inOp",
+        "neg": false,
+        "a": {
+         "k": "name",
+         "v": "$exprV$146"
+        },
+        "b": {
+         "k": "tupleE",
+         "items": [
+          {
+           "k": "str",
+           "v": "KeyError"
+          }
+         ]
+        }
+       },
+       "t": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "self"
+        },
+        "f": "_Wrapper__misses",
+        "v": {
+         "k": "binop",
+         "op": "+",
+         "a": {
+          "k": "field",
+          "a": {
+           "k": "name",
+           "v": "self"
+          },
+          "f": "_Wrapper__misses"
+         },
+         "b": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "e": {
+        "k": "raise",
+        "e": {
+         "k": "name",
+         "v": "$exprV$146"
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "val",
+        "e": {
+         "k": "call",
+         "f": "method",
+         "args": [
+          {
+           "k": "field",
+           "a": {
+            "k": "name",
+            "v": "self"
+           },
+           "f": "_obj"
+          },
+          {
+           "k": "starred",
+           "a": {
+            "k": "name",
+            "v": "args"
+           }
+          },
+          {
+           "k": "dstarred",
+           "a": {
+            "k": "name",
+            "v": "kwargs"
+           }
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "tryCatch",
+          "body": {
+           "k": "setIndex",
+           "r": {
+            "k": "name",
+            "v": "cache"
+           },
+           "i": {
+            "k": "name",
+            "v": "key"
+           },
+           "v": {
+            "k": "name",
+            "v": "val"
+           }
+          },
+          "x": "$exprV$147",
+          "handler": {
+           "k": "ifte",
+           "c": {
+            "k": "inOp",
+            "neg": false,
+            "a": {
+             "k": "name",
+             "v": "$exprV$147"
+            },
+            "b": {
+             "k": "tupleE",
+             "items": [
+              {
+               "k": "str",
+               "v": "ValueError"
+              }
+             ]
+            }
+           },
+           "t": {
+            "k": "skip"
+           },
+           "e": {
+            "k": "raise",
+            "e": {
+             "k": "name",
+             "v": "$exprV$147"
+            }
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "ret",
+            "e": {
+             "k": "name",
+             "v": "val"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "skip"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_clear",
@@ -23731,7 +25764,7 @@
               }
              }
             },
-            "x": "$exprV$144",
+            "x": "$exprV$148",
             "handler": {
              "k": "ifte",
              "c": {
@@ -23739,7 +25772,7 @@
               "neg": false,
               "a": {
                "k": "name",
-               "v": "$exprV$144"
+               "v": "$exprV$148"
               },
               "b": {
                "k": "tupleE",
@@ -23772,7 +25805,7 @@
               "k": "raise",
               "e": {
                "k": "name",
-               "v": "$exprV$144"
+               "v": "$exprV$148"
               }
              }
             }
@@ -23914,7 +25947,7 @@
                   "v": "v"
                  }
                 },
-                "x": "$exprV$145",
+                "x": "$exprV$149",
                 "handler": {
                  "k": "ifte",
                  "c": {
@@ -23922,7 +25955,7 @@
                   "neg": false,
                   "a": {
                    "k": "name",
-                   "v": "$exprV$145"
+                   "v": "$exprV$149"
                   },
                   "b": {
                    "k": "tupleE",
@@ -23941,7 +25974,7 @@
                   "k": "raise",
                   "e": {
                    "k": "name",
-                   "v": "$exprV$145"
+                   "v": "$exprV$149"
                   }
                  }
                 }
@@ -24745,11 +26778,59 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "wrapper",
+     "args": [
+      {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_obj"
+      },
+      {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_Wrapper__pending"
+      },
+      {
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.cache_clear",
@@ -25086,7 +27167,7 @@
                }
               }
              },
-             "x": "$exprV$146",
+             "x": "$exprV$150",
              "handler": {
               "k": "ifte",
               "c": {
@@ -25094,7 +27175,7 @@
                "neg": false,
                "a": {
                 "k": "name",
-                "v": "$exprV$146"
+                "v": "$exprV$150"
                },
                "b": {
                 "k": "tupleE",
@@ -25113,7 +27194,7 @@
                "k": "raise",
                "e": {
                 "k": "name",
-                "v": "$exprV$146"
+                "v": "$exprV$150"
                }
               }
              }
@@ -25261,7 +27342,7 @@
                    ]
                   }
                  },
-                 "x": "$exprV$147",
+                 "x": "$exprV$151",
                  "handler": {
                   "k": "ifte",
                   "c": {
@@ -25269,7 +27350,7 @@
                    "neg": false,
                    "a": {
                     "k": "name",
-                    "v": "$exprV$147"
+                    "v": "$exprV$151"
                    },
                    "b": {
                     "k": "tupleE",
@@ -25292,7 +27373,7 @@
                    "k": "raise",
                    "e": {
                     "k": "name",
-                    "v": "$exprV$147"
+                    "v": "$exprV$151"
                    }
                   }
                  }
@@ -25714,11 +27795,51 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "wrapper",
+     "args": [
+      {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_obj"
+      },
+      {
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.cache_clear",
@@ -25984,7 +28105,7 @@
           }
          }
         },
-        "x": "$exprV$148",
+        "x": "$exprV$152",
         "handler": {
          "k": "ifte",
          "c": {
@@ -25992,7 +28113,7 @@
           "neg": false,
           "a": {
            "k": "name",
-           "v": "$exprV$148"
+           "v": "$exprV$152"
           },
           "b": {
            "k": "tupleE",
@@ -26011,7 +28132,7 @@
           "k": "raise",
           "e": {
            "k": "name",
-           "v": "$exprV$148"
+           "v": "$exprV$152"
           }
          }
         }
@@ -26075,7 +28196,7 @@
               "v": "v"
              }
             },
-            "x": "$exprV$149",
+            "x": "$exprV$153",
             "handler": {
              "k": "ifte",
              "c": {
@@ -26083,7 +28204,7 @@
               "neg": false,
               "a": {
                "k": "name",
-               "v": "$exprV$149"
+               "v": "$exprV$153"
               },
               "b": {
                "k": "tupleE",
@@ -26102,7 +28223,7 @@
               "k": "raise",
               "e": {
                "k": "name",
-               "v": "$exprV$149"
+               "v": "$exprV$153"
               }
              }
             }
@@ -26329,11 +28450,51 @@
    "kwargs"
   ],
   "body": {
-   "k": "holeS",
-   "label": "call:python-receiver-signature"
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "call",
+     "f": "wrapper",
+     "args": [
+      {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "_obj"
+      },
+      {
+       "k": "starred",
+       "a": {
+        "k": "name",
+        "v": "args"
+       }
+      },
+      {
+       "k": "dstarred",
+       "a": {
+        "k": "name",
+        "v": "kwargs"
+       }
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
   },
-  "vararg": "<unmodelled-signature-args>",
-  "kwarg": "<unmodelled-signature-keywords>"
+  "vararg": "args",
+  "kwarg": "kwargs",
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true,
+   "receiverName": "self"
+  }
  },
  {
   "name": "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.cache_clear",
@@ -27170,8 +29331,52 @@
      "k": "assign",
      "x": "wrapper",
      "e": {
-      "k": "hole",
-      "label": "call:computed-callee"
+      "k": "callV",
+      "f": {
+       "k": "call",
+       "f": "cachetools/__init__.py:<module>.cached",
+       "args": [
+        {
+         "k": "kwargE",
+         "n": "cache",
+         "a": {
+          "k": "name",
+          "v": "cache"
+         }
+        },
+        {
+         "k": "kwargE",
+         "n": "key",
+         "a": {
+          "k": "name",
+          "v": "key"
+         }
+        },
+        {
+         "k": "kwargE",
+         "n": "condition",
+         "a": {
+          "k": "alloc",
+          "cls": "Condition",
+          "args": []
+         }
+        },
+        {
+         "k": "kwargE",
+         "n": "info",
+         "a": {
+          "k": "bool",
+          "v": true
+         }
+        }
+       ]
+      },
+      "args": [
+       {
+        "k": "name",
+        "v": "func"
+       }
+      ]
      }
     },
     "b": {
@@ -27425,8 +29630,37 @@
        "t": {
         "k": "ret",
         "e": {
-         "k": "hole",
-         "label": "call:computed-callee"
+         "k": "callV",
+         "f": {
+          "k": "call",
+          "f": "cachetools/func.py:<module>._cache",
+          "args": [
+           {
+            "k": "alloc",
+            "cls": "FIFOCache",
+            "args": [
+             {
+              "k": "int",
+              "v": "128"
+             }
+            ]
+           },
+           {
+            "k": "int",
+            "v": "128"
+           },
+           {
+            "k": "name",
+            "v": "typed"
+           }
+          ]
+         },
+         "args": [
+          {
+           "k": "name",
+           "v": "maxsize"
+          }
+         ]
         }
        },
        "e": {
@@ -27581,8 +29815,37 @@
        "t": {
         "k": "ret",
         "e": {
-         "k": "hole",
-         "label": "call:computed-callee"
+         "k": "callV",
+         "f": {
+          "k": "call",
+          "f": "cachetools/func.py:<module>._cache",
+          "args": [
+           {
+            "k": "alloc",
+            "cls": "LFUCache",
+            "args": [
+             {
+              "k": "int",
+              "v": "128"
+             }
+            ]
+           },
+           {
+            "k": "int",
+            "v": "128"
+           },
+           {
+            "k": "name",
+            "v": "typed"
+           }
+          ]
+         },
+         "args": [
+          {
+           "k": "name",
+           "v": "maxsize"
+          }
+         ]
         }
        },
        "e": {
@@ -27737,8 +30000,37 @@
        "t": {
         "k": "ret",
         "e": {
-         "k": "hole",
-         "label": "call:computed-callee"
+         "k": "callV",
+         "f": {
+          "k": "call",
+          "f": "cachetools/func.py:<module>._cache",
+          "args": [
+           {
+            "k": "alloc",
+            "cls": "LRUCache",
+            "args": [
+             {
+              "k": "int",
+              "v": "128"
+             }
+            ]
+           },
+           {
+            "k": "int",
+            "v": "128"
+           },
+           {
+            "k": "name",
+            "v": "typed"
+           }
+          ]
+         },
+         "args": [
+          {
+           "k": "name",
+           "v": "maxsize"
+          }
+         ]
         }
        },
        "e": {
@@ -27896,8 +30188,41 @@
        "t": {
         "k": "ret",
         "e": {
-         "k": "hole",
-         "label": "call:computed-callee"
+         "k": "callV",
+         "f": {
+          "k": "call",
+          "f": "cachetools/func.py:<module>._cache",
+          "args": [
+           {
+            "k": "alloc",
+            "cls": "RRCache",
+            "args": [
+             {
+              "k": "int",
+              "v": "128"
+             },
+             {
+              "k": "name",
+              "v": "choice"
+             }
+            ]
+           },
+           {
+            "k": "int",
+            "v": "128"
+           },
+           {
+            "k": "name",
+            "v": "typed"
+           }
+          ]
+         },
+         "args": [
+          {
+           "k": "name",
+           "v": "maxsize"
+          }
+         ]
         }
        },
        "e": {
@@ -28079,8 +30404,45 @@
        "t": {
         "k": "ret",
         "e": {
-         "k": "hole",
-         "label": "call:computed-callee"
+         "k": "callV",
+         "f": {
+          "k": "call",
+          "f": "cachetools/func.py:<module>._cache",
+          "args": [
+           {
+            "k": "alloc",
+            "cls": "TTLCache",
+            "args": [
+             {
+              "k": "int",
+              "v": "128"
+             },
+             {
+              "k": "name",
+              "v": "ttl"
+             },
+             {
+              "k": "name",
+              "v": "timer"
+             }
+            ]
+           },
+           {
+            "k": "int",
+            "v": "128"
+           },
+           {
+            "k": "name",
+            "v": "typed"
+           }
+          ]
+         },
+         "args": [
+          {
+           "k": "name",
+           "v": "maxsize"
+          }
+         ]
         }
        },
        "e": {
@@ -28768,24 +31130,116 @@
          }
         },
         "b": {
-         "k": "assign",
-         "x": "key",
-         "e": {
-          "k": "binop",
-          "op": "+",
-          "a": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "$exprV$154",
+          "e": {
            "k": "name",
            "v": "key"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "tmp0",
+           "e": {
+            "k": "listE",
+            "items": []
+           }
           },
           "b": {
-           "k": "call",
-           "f": "tuple",
-           "args": [
-            {
-             "k": "hole",
-             "label": "expr:genExp"
+           "k": "seq",
+           "a": {
+            "k": "forIn",
+            "x": "$comp$tmp2",
+            "e": {
+             "k": "name",
+             "v": "sorted_kwargs"
+            },
+            "body": {
+             "a": {
+              "k": "assign",
+              "x": "$comp$_",
+              "e": {
+               "a": {
+                "k": "name",
+                "v": "$comp$tmp2"
+               },
+               "b": {
+                "v": "0",
+                "k": "int"
+               },
+               "k": "index"
+              }
+             },
+             "b": {
+              "a": {
+               "k": "assign",
+               "x": "$comp$v",
+               "e": {
+                "a": {
+                 "k": "name",
+                 "v": "$comp$tmp2"
+                },
+                "b": {
+                 "v": "1",
+                 "k": "int"
+                },
+                "k": "index"
+               }
+              },
+              "b": {
+               "e": {
+                "args": [
+                 {
+                  "args": [
+                   {
+                    "k": "name",
+                    "v": "$comp$v"
+                   }
+                  ],
+                  "f": "type",
+                  "k": "call"
+                 }
+                ],
+                "recv": {
+                 "v": "tmp0",
+                 "k": "name"
+                },
+                "k": "mcall",
+                "m": "append"
+               },
+               "k": "exprS"
+              },
+              "k": "seq"
+             },
+             "k": "seq"
             }
-           ]
+           },
+           "b": {
+            "k": "assign",
+            "x": "key",
+            "e": {
+             "k": "binop",
+             "op": "+",
+             "a": {
+              "k": "name",
+              "v": "$exprV$154"
+             },
+             "b": {
+              "k": "call",
+              "f": "tuple",
+              "args": [
+               {
+                "k": "name",
+                "v": "tmp0"
+               }
+              ]
+             }
+            }
+           }
           }
          }
         }
@@ -28814,24 +31268,80 @@
       "b": {
        "k": "seq",
        "a": {
-        "k": "assign",
-        "x": "key",
-        "e": {
-         "k": "binop",
-         "op": "+",
-         "a": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "$exprV$155",
+         "e": {
           "k": "name",
           "v": "key"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "tmp3",
+          "e": {
+           "k": "listE",
+           "items": []
+          }
          },
          "b": {
-          "k": "call",
-          "f": "tuple",
-          "args": [
-           {
-            "k": "hole",
-            "label": "expr:genExp"
+          "k": "seq",
+          "a": {
+           "k": "forIn",
+           "x": "$comp$v",
+           "e": {
+            "k": "name",
+            "v": "args"
+           },
+           "body": {
+            "e": {
+             "args": [
+              {
+               "args": [
+                {
+                 "k": "name",
+                 "v": "$comp$v"
+                }
+               ],
+               "f": "type",
+               "k": "call"
+              }
+             ],
+             "recv": {
+              "v": "tmp3",
+              "k": "name"
+             },
+             "k": "mcall",
+             "m": "append"
+            },
+            "k": "exprS"
            }
-          ]
+          },
+          "b": {
+           "k": "assign",
+           "x": "key",
+           "e": {
+            "k": "binop",
+            "op": "+",
+            "a": {
+             "k": "name",
+             "v": "$exprV$155"
+            },
+            "b": {
+             "k": "call",
+             "f": "tuple",
+             "args": [
+              {
+               "k": "name",
+               "v": "tmp3"
+              }
+             ]
+            }
+           }
+          }
          }
         }
        },

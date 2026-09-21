@@ -252,11 +252,11 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **219 agree, 0 divergences, 306 INCONCLUSIVE** on `cachetools` v7.1.7 re-exported by the current exporter (basis `python-exception-guards-v3`); 209/0/256 on the previous artifact, byte-identical before and after the container switchover. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
+| semantics matches the real runtime | differential testing vs CPython / `cc` | `conformance.json`: **245 agree, 0 divergences, 315 INCONCLUSIVE** on `cachetools` v7.1.7 re-exported by the current exporter (basis `python-exception-guards-v3`); 219/0/306 before the object-protocol work, 209/0/256 on the previous artifact. Coverage, not agreement, is the limit — re-measure with `scripts/differential.py ast-Cachetools.json <src> Cachetools` |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on `Autoform/Generated/Cachetools.lean`, 10 survivors all analysed; **24/27** on `Autoform/Lang/Imp/*` with per-theorem attribution working (`mutation-Imp.json`) |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean — `propext`, `Quot.sound`, `Classical.choice` only; declaration count lives in `audit.json` (6,785 at the last recorded run, 2026-09-21; re-measure with `scripts/audit_all.py --strict`) |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
-| untranslated code is declared | hole counting + SACM assumptions | 22 holes, all named |
+| untranslated code is declared | hole counting + SACM assumptions | 3 holes, all named |
 | every AST names the exporter that made it | `scripts/check_provenance.py` | **0 violations**; 0 of 14 tracked ASTs attributed, all 14 named in `provenance/unattributed.json` with a reason |
 
 The second row used to read "100%, HAS TEETH". That number was an artifact of the gate,
@@ -311,8 +311,9 @@ a measurement rather than an impression:
 * **Calling conventions — done.** Literal, in-program-function, module-attribute and
   class-attribute-sentinel defaults all bind (`Cache.pop(default=__marker)` is seeded
   from the heap where the binding happens), as do `@staticmethod`, `@classmethod` and
-  `@property` definitions and recovered signatures. What remains is a receiver followed
-  by nothing but `*args, **kwargs` — 11 functions in `cachetools`, listed below.
+  `@property` definitions and recovered signatures; a receiver followed by nothing but
+  `*args, **kwargs` binds too, and a callee that is a run-time value (`Expr.callValue`)
+  is called. Every calling shape `cachetools` uses translates.
 * **Language-specific numeric behavior — no open divergence.** The differential suite was
   run across the whole language matrix against real runtimes: 5 passed, 2 xfailed, and
   neither xfail is numeric ([typed numerics](docs/typed-numerics.md)).
@@ -331,9 +332,9 @@ proves it and the gate that fails if it regresses.
 picking the easy one. The table below is a **snapshot to re-measure, not a current
 figure**: passes close labels concurrently, and a count in prose is stale the day it is
 written. Last measured 2026-09-21 on `cachetools` v7.1.7 with the exporter at that
-commit: **22 holes across 20 of 209 functions**, down from 134 across 111 at the start of
-the pass (and from 97 across 74 midway, when 18 had been *added* because they were
-concealing a wrong answer). Reproduce it before quoting it:
+commit: **3 holes across 2 of 209 functions**, down from 134 across 111 at the start of
+the pass (22 across 20 after the re-land that morning; 97 across 74 midway, when 18 had
+been *added* because they were concealing a wrong answer). Reproduce it before quoting it:
 
 ```sh
 # from a checkout of cachetools v7.1.7 with src/cachetools as the export root
@@ -343,10 +344,10 @@ python3 scripts/lang_matrix.py ast-Cachetools.json   # holes by cause, per corpu
 
 | label | holes (snapshot) | what would close it |
 |---|---|---|
-| `call:python-receiver-signature` | 11 → landed; re-measure with `lang_matrix.py` | every one was `def f(self, *args, **kwargs)` — a receiver followed by nothing but collectors (`_TimedCache.get/pop/setdefault`, the six `Descriptor.Wrapper.__call__`s, the two descriptor bases). **Done** since this snapshot: the stripped receiver's name travels in the signature (`receiverName`) and `kwargsRejected` refuses the `self=` keyword that `**kwargs` used to be able to swallow — the only thing the refusal was protecting (`#guard`s in `Semantics.lean`, `tests/test_python_receivers.py`). What still holes is a method with no ordinary first positional `self` (`def f()`, `def f(*, self)`, `def f(*self)`) or one named otherwise (`def f(receiver, a)`); re-measure to see the count move. Was 23 |
-| `call:computed-callee` | 6 → landed; re-measure with `lang_matrix.py` | `_cache.decorator` and the five `*_cache` factories call a closure chosen by a branch — the callee is a run-time value, not a name. `Expr.callValue` applies what the callee evaluates to (a function, closure or boxed function object) and holes `call:value:not-callable` on anything else; the exporter emits it for a callee that is itself a call |
-| `op:stringExpressionList:non-literal-part` | 3 | f-strings whose parts are not literals (the `_DescriptorBase` deprecation messages) — `str()` of an arbitrary value is the `__str__`/`__repr__` protocol, which Core does not model |
-| `expr:genExp` | 2 | **lowered where it is consumed at once** — `tuple(g)`, `sum(g)`, `sorted(g)`, `"".join(g)` materialise the generator as a list, observationally equal for a finite iterable; `typedkey`'s two are that shape and go on the next re-land. A generator that is stored or returned keeps the hole: laziness is observable there. List and dict comprehensions lower outright, with the loop variable rebound so it cannot leak ([§10.6](docs/languages.md)) |
+| `call:python-receiver-signature` | 0 (was 11) | every one was `def f(self, *args, **kwargs)` — a receiver followed by nothing but collectors (`_TimedCache.get/pop/setdefault`, the six `Descriptor.Wrapper.__call__`s, the two descriptor bases). **Done** since this snapshot: the stripped receiver's name travels in the signature (`receiverName`) and `kwargsRejected` refuses the `self=` keyword that `**kwargs` used to be able to swallow — the only thing the refusal was protecting (`#guard`s in `Semantics.lean`, `tests/test_python_receivers.py`). What still holes is a method with no ordinary first positional `self` (`def f()`, `def f(*, self)`, `def f(*self)`) or one named otherwise (`def f(receiver, a)`); re-measure to see the count move. Was 23 |
+| `call:computed-callee` | 0 (was 6) | `_cache.decorator` and the five `*_cache` factories call a closure chosen by a branch — the callee is a run-time value, not a name. `Expr.callValue` applies what the callee evaluates to (a function, closure or boxed function object) and holes `call:value:not-callable` on anything else; the exporter emits it for a callee that is itself a call |
+| `op:stringExpressionList:non-literal-part` | 3 — the last label standing | f-strings whose parts are not literals (the `_DescriptorBase` deprecation messages) — `str()` of an arbitrary value is the `__str__`/`__repr__` protocol, which Core does not model |
+| `expr:genExp` | 0 (was 2) | **lowered where it is consumed at once** — `tuple(g)`, `sum(g)`, `sorted(g)`, `"".join(g)` materialise the generator as a list, observationally equal for a finite iterable; `typedkey`'s two are that shape and go on the next re-land. A generator that is stored or returned keeps the hole: laziness is observable there. List and dict comprehensions lower outright, with the loop variable rebound so it cannot leak ([§10.6](docs/languages.md)) |
 | `control:TRY-exception-representation` | 0 | **done** (was 34). The guard was standing in for a proof; `ExcSafe.lean` is the proof — under `.python` every exception Core raises names a represented class, by simultaneous induction over the interpreter ([§10](docs/languages.md)) |
 | `call:python-property-access` | 0 | **done** (was 21). The getter runs: a `.field` read that misses the instance and names a `@property` of the receiver's class calls it (`Program.properties`), proved fuel-monotone; `Cache.maxsize`/`currsize` now translate and their theorems survived the re-land unchanged |
 | `call:python-defaults` | 0 | **done** (53 → 0). Literals, in-program functions and module attributes bind at the call; the class-attribute sentinel `Cache.pop(default=__marker)` is seeded from the heap at bind time (`classAttrDefaults`) |

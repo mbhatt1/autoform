@@ -124,11 +124,11 @@ def f_cachetools___init___py__module__Cache___getitem__ : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true }
   , body := (.tryCatch
             (.ret (.index (.field (.name "self") "_Cache__data") (.name "key")))
-            "$exprV$100"
+            "$exprV$104"
             (.ifte
-              (.inOp false (.name "$exprV$100") (.tupleE [(.lit (.str "KeyError"))]))
+              (.inOp false (.name "$exprV$104") (.tupleE [(.lit (.str "KeyError"))]))
               (.ret (.mcall (.name "self") "__missing__" [(.name "key")]))
-              (.raise (.name "$exprV$100")))) }
+              (.raise (.name "$exprV$104")))) }
 
 /-- `cachetools/__init__.py:<module>.Cache.__setitem__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__Cache___setitem__ : Func :=
@@ -405,7 +405,7 @@ def f_cachetools___init___py__module__FIFOCache_popitem : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "$exprV$102" (.lit (.bool true)))
+                  (.assign "$exprV$106" (.lit (.bool true)))
                   (.seq
                     (.tryCatch
                       (.assign
@@ -413,13 +413,13 @@ def f_cachetools___init___py__module__FIFOCache_popitem : Func :=
                         (.call
                           "next"
                           [(.call "iter" [(.field (.name "self") "_FIFOCache__order")])]))
-                      "$exprV$101"
+                      "$exprV$105"
                       (.seq
-                        (.assign "$exprV$102" (.lit (.bool false)))
+                        (.assign "$exprV$106" (.lit (.bool false)))
                         (.ifte
                           (.inOp
                             false
-                            (.name "$exprV$101")
+                            (.name "$exprV$105")
                             (.tupleE [(.lit (.str "StopIteration"))]))
                           (.raise
                             (.unop
@@ -429,9 +429,9 @@ def f_cachetools___init___py__module__FIFOCache_popitem : Func :=
                                     "%"
                                     (.lit (.str "%s is empty"))
                                     (.field (.call "type" [(.name "self")]) "__name__")) ])))
-                          (.raise (.name "$exprV$101")))))
+                          (.raise (.name "$exprV$105")))))
                     (.ifte
-                      (.name "$exprV$102")
+                      (.name "$exprV$106")
                       (.ret
                         (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
                       .skip)))
@@ -816,19 +816,19 @@ def f_cachetools___init___py__module__LRUCache_popitem : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "$exprV$104" (.lit (.bool true)))
+                  (.assign "$exprV$108" (.lit (.bool true)))
                   (.seq
                     (.tryCatch
                       (.assign
                         "key"
                         (.call "next" [(.call "iter" [(.field (.name "self") "_LRUCache__order")])]))
-                      "$exprV$103"
+                      "$exprV$107"
                       (.seq
-                        (.assign "$exprV$104" (.lit (.bool false)))
+                        (.assign "$exprV$108" (.lit (.bool false)))
                         (.ifte
                           (.inOp
                             false
-                            (.name "$exprV$103")
+                            (.name "$exprV$107")
                             (.tupleE [(.lit (.str "StopIteration"))]))
                           (.raise
                             (.unop
@@ -838,9 +838,9 @@ def f_cachetools___init___py__module__LRUCache_popitem : Func :=
                                     "%"
                                     (.lit (.str "%s is empty"))
                                     (.field (.call "type" [(.name "self")]) "__name__")) ])))
-                          (.raise (.name "$exprV$103")))))
+                          (.raise (.name "$exprV$107")))))
                     (.ifte
-                      (.name "$exprV$104")
+                      (.name "$exprV$108")
                       (.ret
                         (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
                       .skip)))
@@ -874,11 +874,11 @@ def f_cachetools___init___py__module__LRUCache__LRUCache__touch : Func :=
                 (.seq
                   (.assign "tmp0" (.field (.name "self") "_LRUCache__order"))
                   (.expr (.mcall (.name "tmp0") "move_to_end" [(.name "key")])))
-                "$exprV$105"
+                "$exprV$109"
                 (.ifte
-                  (.inOp false (.name "$exprV$105") (.tupleE [(.lit (.str "KeyError"))]))
+                  (.inOp false (.name "$exprV$109") (.tupleE [(.lit (.str "KeyError"))]))
                   (.setIndex (.field (.name "self") "_LRUCache__order") (.name "key") (.lit .unit))
-                  (.raise (.name "$exprV$105")))))) }
+                  (.raise (.name "$exprV$109")))))) }
 
 /-- `cachetools/__init__.py:<module>.RRCache.__init__`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module__RRCache___init__ : Func :=
@@ -990,7 +990,7 @@ def f_cachetools___init___py__module__RRCache_popitem : Func :=
               .skip
               (.seq
                 (.seq
-                  (.assign "$exprV$107" (.lit (.bool true)))
+                  (.assign "$exprV$111" (.lit (.bool true)))
                   (.seq
                     (.tryCatch
                       (.assign
@@ -999,11 +999,11 @@ def f_cachetools___init___py__module__RRCache_popitem : Func :=
                           (.name "self")
                           "_RRCache__choice"
                           [(.field (.name "self") "_RRCache__keys")]))
-                      "$exprV$106"
+                      "$exprV$110"
                       (.seq
-                        (.assign "$exprV$107" (.lit (.bool false)))
+                        (.assign "$exprV$111" (.lit (.bool false)))
                         (.ifte
-                          (.inOp false (.name "$exprV$106") (.tupleE [(.lit (.str "IndexError"))]))
+                          (.inOp false (.name "$exprV$110") (.tupleE [(.lit (.str "IndexError"))]))
                           (.raise
                             (.unop
                               "py:exception:KeyError"
@@ -1012,9 +1012,9 @@ def f_cachetools___init___py__module__RRCache_popitem : Func :=
                                     "%"
                                     (.lit (.str "%s is empty"))
                                     (.field (.call "type" [(.name "self")]) "__name__")) ])))
-                          (.raise (.name "$exprV$106")))))
+                          (.raise (.name "$exprV$110")))))
                     (.ifte
-                      (.name "$exprV$107")
+                      (.name "$exprV$111")
                       (.ret
                         (.tupleE [(.name "key"), (.mcall (.name "self") "pop" [(.name "key")])]))
                       .skip)))
@@ -1215,25 +1215,76 @@ def f_cachetools___init___py__module___TimedCache_timer : Func :=
 def f_cachetools___init___py__module___TimedCache_get : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.get"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.seq
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
+              (.seq
+                (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
+                (.seq
+                  (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "get"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
+            (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.pop`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_pop : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.pop"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.seq
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
+              (.seq
+                (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
+                (.seq
+                  (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "pop"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
+            (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.setdefault`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_setdefault : Func :=
   { name := "cachetools/__init__.py:<module>._TimedCache.setdefault"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.seq
+              (.assign "manager_tmp0" (.field (.name "self") "_TimedCache__timer"))
+              (.seq
+                (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
+                (.seq
+                  (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
+                  (.seq
+                    (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                    (.tryFinally
+                      (.ret
+                        (.mcall
+                          (.name "Cache")
+                          "setdefault"
+                          [(.name "self"), (.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                      (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
+            (.seq .skip (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))) }
 
 /-- `cachetools/__init__.py:<module>._TimedCache.clear`  (from `cachetools/__init__.py`) -/
 def f_cachetools___init___py__module___TimedCache_clear : Func :=
@@ -1321,19 +1372,19 @@ def f_cachetools___init___py__module__TTLCache___contains__ : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true }
   , body := (.seq
             (.seq
-              (.assign "$exprV$109" (.lit (.bool true)))
+              (.assign "$exprV$113" (.lit (.bool true)))
               (.seq
                 (.tryCatch
                   (.assign "link" (.index (.field (.name "self") "_TTLCache__links") (.name "key")))
-                  "$exprV$108"
+                  "$exprV$112"
                   (.seq
-                    (.assign "$exprV$109" (.lit (.bool false)))
+                    (.assign "$exprV$113" (.lit (.bool false)))
                     (.ifte
-                      (.inOp false (.name "$exprV$108") (.tupleE [(.lit (.str "KeyError"))]))
+                      (.inOp false (.name "$exprV$112") (.tupleE [(.lit (.str "KeyError"))]))
                       (.ret (.lit (.bool false)))
-                      (.raise (.name "$exprV$108")))))
+                      (.raise (.name "$exprV$112")))))
                 (.ifte
-                  (.name "$exprV$109")
+                  (.name "$exprV$113")
                   (.ret
                     (.binop
                       "<"
@@ -1349,19 +1400,19 @@ def f_cachetools___init___py__module__TTLCache___getitem__ : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true, defaults := [("cache_getitem", (.fnref "cachetools/__init__.py:<module>.Cache.__getitem__"))] }
   , body := (.seq
             (.seq
-              (.assign "$exprV$111" (.lit (.bool true)))
+              (.assign "$exprV$115" (.lit (.bool true)))
               (.seq
                 (.tryCatch
                   (.assign "link" (.mcall (.name "self") "_TTLCache__getlink" [(.name "key")]))
-                  "$exprV$110"
+                  "$exprV$114"
                   (.seq
-                    (.assign "$exprV$111" (.lit (.bool false)))
+                    (.assign "$exprV$115" (.lit (.bool false)))
                     (.ifte
-                      (.inOp false (.name "$exprV$110") (.tupleE [(.lit (.str "KeyError"))]))
+                      (.inOp false (.name "$exprV$114") (.tupleE [(.lit (.str "KeyError"))]))
                       (.assign "expired" (.lit (.bool false)))
-                      (.raise (.name "$exprV$110")))))
+                      (.raise (.name "$exprV$114")))))
                 (.ifte
-                  (.name "$exprV$111")
+                  (.name "$exprV$115")
                   (.assign
                     "expired"
                     (.unop
@@ -1404,15 +1455,15 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
                       (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
             (.seq
               (.seq
-                (.assign "$exprV$113" (.lit (.bool true)))
+                (.assign "$exprV$117" (.lit (.bool true)))
                 (.seq
                   (.tryCatch
                     (.assign "link" (.mcall (.name "self") "_TTLCache__getlink" [(.name "key")]))
-                    "$exprV$112"
+                    "$exprV$116"
                     (.seq
-                      (.assign "$exprV$113" (.lit (.bool false)))
+                      (.assign "$exprV$117" (.lit (.bool false)))
                       (.ifte
-                        (.inOp false (.name "$exprV$112") (.tupleE [(.lit (.str "KeyError"))]))
+                        (.inOp false (.name "$exprV$116") (.tupleE [(.lit (.str "KeyError"))]))
                         (.seq
                           (.assign "tmp0" (.mcall (.name "TTLCache") "_Link" [(.name "key")]))
                           (.seq
@@ -1421,8 +1472,8 @@ def f_cachetools___init___py__module__TTLCache___setitem__ : Func :=
                               (.name "key")
                               (.name "tmp0"))
                             (.assign "link" (.name "tmp0"))))
-                        (.raise (.name "$exprV$112")))))
-                  (.ifte (.name "$exprV$113") (.expr (.mcall (.name "link") "unlink" [])) .skip)))
+                        (.raise (.name "$exprV$116")))))
+                  (.ifte (.name "$exprV$117") (.expr (.mcall (.name "link") "unlink" [])) .skip)))
               (.seq
                 .skip
                 (.seq
@@ -1714,7 +1765,7 @@ def f_cachetools___init___py__module__TTLCache_popitem : Func :=
                             (.seq
                               (.expr (.mcall (.name "self") "expire" [(.name "time")]))
                               (.seq
-                                (.assign "$exprV$115" (.lit (.bool true)))
+                                (.assign "$exprV$119" (.lit (.bool true)))
                                 (.seq
                                   (.tryCatch
                                     (.assign
@@ -1722,13 +1773,13 @@ def f_cachetools___init___py__module__TTLCache_popitem : Func :=
                                       (.call
                                         "next"
                                         [ (.call "iter" [(.field (.name "self") "_TTLCache__links")]) ]))
-                                    "$exprV$114"
+                                    "$exprV$118"
                                     (.seq
-                                      (.assign "$exprV$115" (.lit (.bool false)))
+                                      (.assign "$exprV$119" (.lit (.bool false)))
                                       (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$114")
+                                        (.name "$exprV$118")
                                         (.tupleE [(.lit (.str "StopIteration"))]))
                                         (.raise
                                         (.unop
@@ -1738,9 +1789,9 @@ def f_cachetools___init___py__module__TTLCache_popitem : Func :=
                                         "%"
                                         (.lit (.str "%s is empty"))
                                         (.field (.call "type" [(.name "self")]) "__name__")) ])))
-                                        (.raise (.name "$exprV$114")))))
+                                        (.raise (.name "$exprV$118")))))
                                   (.ifte
-                                    (.name "$exprV$115")
+                                    (.name "$exprV$119")
                                     (.ret
                                       (.tupleE
                                         [ (.name "key")
@@ -1841,21 +1892,21 @@ def f_cachetools___init___py__module__TLRUCache___contains__ : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true }
   , body := (.seq
             (.seq
-              (.assign "$exprV$117" (.lit (.bool true)))
+              (.assign "$exprV$121" (.lit (.bool true)))
               (.seq
                 (.tryCatch
                   (.assign
                     "item"
                     (.index (.field (.name "self") "_TLRUCache__items") (.name "key")))
-                  "$exprV$116"
+                  "$exprV$120"
                   (.seq
-                    (.assign "$exprV$117" (.lit (.bool false)))
+                    (.assign "$exprV$121" (.lit (.bool false)))
                     (.ifte
-                      (.inOp false (.name "$exprV$116") (.tupleE [(.lit (.str "KeyError"))]))
+                      (.inOp false (.name "$exprV$120") (.tupleE [(.lit (.str "KeyError"))]))
                       (.ret (.lit (.bool false)))
-                      (.raise (.name "$exprV$116")))))
+                      (.raise (.name "$exprV$120")))))
                 (.ifte
-                  (.name "$exprV$117")
+                  (.name "$exprV$121")
                   (.ret
                     (.binop
                       "<"
@@ -1871,19 +1922,19 @@ def f_cachetools___init___py__module__TLRUCache___getitem__ : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true, defaults := [("cache_getitem", (.fnref "cachetools/__init__.py:<module>.Cache.__getitem__"))] }
   , body := (.seq
             (.seq
-              (.assign "$exprV$119" (.lit (.bool true)))
+              (.assign "$exprV$123" (.lit (.bool true)))
               (.seq
                 (.tryCatch
                   (.assign "item" (.mcall (.name "self") "_TLRUCache__getitem" [(.name "key")]))
-                  "$exprV$118"
+                  "$exprV$122"
                   (.seq
-                    (.assign "$exprV$119" (.lit (.bool false)))
+                    (.assign "$exprV$123" (.lit (.bool false)))
                     (.ifte
-                      (.inOp false (.name "$exprV$118") (.tupleE [(.lit (.str "KeyError"))]))
+                      (.inOp false (.name "$exprV$122") (.tupleE [(.lit (.str "KeyError"))]))
                       (.assign "expired" (.lit (.bool false)))
-                      (.raise (.name "$exprV$118")))))
+                      (.raise (.name "$exprV$122")))))
                 (.ifte
-                  (.name "$exprV$119")
+                  (.name "$exprV$123")
                   (.assign
                     "expired"
                     (.unop
@@ -1944,11 +1995,11 @@ def f_cachetools___init___py__module__TLRUCache___setitem__ : Func :=
                   (.mcall (.name "self") "_TLRUCache__getitem" [(.name "key")])
                   "removed"
                   (.lit (.bool true)))
-                "$exprV$120"
+                "$exprV$124"
                 (.ifte
-                  (.inOp false (.name "$exprV$120") (.tupleE [(.lit (.str "KeyError"))]))
+                  (.inOp false (.name "$exprV$124") (.tupleE [(.lit (.str "KeyError"))]))
                   .skip
-                  (.raise (.name "$exprV$120"))))
+                  (.raise (.name "$exprV$124"))))
               (.seq
                 .skip
                 (.seq
@@ -2101,18 +2152,19 @@ def f_cachetools___init___py__module__TLRUCache_expire : Func :=
                                   (.seq
                                     (.assign "tmp0" (.listE []))
                                     (.seq
-                                      .skip
-                                      (.seq
-                                        (.forIn
-                                        "item"
+                                      (.forIn
+                                        "$comp$item"
                                         (.name "order")
                                         (.seq
                                         (.ifte
-                                        (.unop "!" (.unop "!" (.field (.name "item") "removed")))
+                                        (.unop
+                                        "!"
+                                        (.unop "!" (.field (.name "$comp$item") "removed")))
                                         .cont
                                         .skip)
-                                        (.expr (.mcall (.name "tmp0") "append" [(.name "item")]))))
-                                        (.assign "tmp2" (.name "tmp0")))))
+                                        (.expr
+                                        (.mcall (.name "tmp0") "append" [(.name "$comp$item")]))))
+                                      (.assign "tmp2" (.name "tmp0"))))
                                   (.seq
                                     (.setField (.name "self") "_TLRUCache__order" (.name "tmp2"))
                                     (.assign "order" (.name "tmp2"))))
@@ -2205,7 +2257,7 @@ def f_cachetools___init___py__module__TLRUCache_popitem : Func :=
                             (.seq
                               (.expr (.mcall (.name "self") "expire" [(.name "time")]))
                               (.seq
-                                (.assign "$exprV$122" (.lit (.bool true)))
+                                (.assign "$exprV$126" (.lit (.bool true)))
                                 (.seq
                                   (.tryCatch
                                     (.assign
@@ -2213,13 +2265,13 @@ def f_cachetools___init___py__module__TLRUCache_popitem : Func :=
                                       (.call
                                         "next"
                                         [ (.call "iter" [(.field (.name "self") "_TLRUCache__items")]) ]))
-                                    "$exprV$121"
+                                    "$exprV$125"
                                     (.seq
-                                      (.assign "$exprV$122" (.lit (.bool false)))
+                                      (.assign "$exprV$126" (.lit (.bool false)))
                                       (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$121")
+                                        (.name "$exprV$125")
                                         (.tupleE [(.lit (.str "StopIteration"))]))
                                         (.raise
                                         (.unop
@@ -2229,9 +2281,9 @@ def f_cachetools___init___py__module__TLRUCache_popitem : Func :=
                                         "%"
                                         (.lit (.str "%s is empty"))
                                         (.field (.call "type" [(.name "self")]) "__name__")) ])))
-                                        (.raise (.name "$exprV$121")))))
+                                        (.raise (.name "$exprV$125")))))
                                   (.ifte
-                                    (.name "$exprV$122")
+                                    (.name "$exprV$126")
                                     (.ret
                                       (.tupleE
                                         [ (.name "key")
@@ -2291,22 +2343,22 @@ def f_cachetools___init___py__module__TLRUCache__TLRUCache__delitem : Func :=
   , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := ["key"], isMethod := some true, defaults := [("cache_delitem", (.fnref "cachetools/__init__.py:<module>.Cache.__delitem__"))] }
   , body := (.seq
             (.seq
-              (.assign "$exprV$124" (.lit (.bool true)))
+              (.assign "$exprV$128" (.lit (.bool true)))
               (.seq
                 (.tryCatch
                   (.setField
                     (.mcall (.field (.name "self") "_TLRUCache__items") "pop" [(.name "key")])
                     "removed"
                     (.lit (.bool true)))
-                  "$exprV$123"
+                  "$exprV$127"
                   (.seq
-                    (.assign "$exprV$124" (.lit (.bool false)))
+                    (.assign "$exprV$128" (.lit (.bool false)))
                     (.ifte
-                      (.inOp false (.name "$exprV$123") (.tupleE [(.lit (.str "KeyError"))]))
+                      (.inOp false (.name "$exprV$127") (.tupleE [(.lit (.str "KeyError"))]))
                       .skip
-                      (.raise (.name "$exprV$123")))))
+                      (.raise (.name "$exprV$127")))))
                 (.ifte
-                  (.name "$exprV$124")
+                  (.name "$exprV$128")
                   (.expr (.call "cache_delitem" [(.name "self"), (.name "key")]))
                   .skip)))
             .skip) }
@@ -2612,11 +2664,11 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
                                     "v"
                                     (.binop "+" (.field (.name "hits") "v") (.lit (.int 1))))
                                   (.ret (.name "result"))))
-                              "$exprV$125"
+                              "$exprV$129"
                               (.ifte
                                 (.inOp
                                   false
-                                  (.name "$exprV$125")
+                                  (.name "$exprV$129")
                                   (.tupleE [(.lit (.str "KeyError"))]))
                                 (.seq
                                   (.expr (.mcall (.name "pending") "add" [(.name "k")]))
@@ -2624,7 +2676,7 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
                                     (.name "misses")
                                     "v"
                                     (.binop "+" (.field (.name "misses") "v") (.lit (.int 1)))))
-                                (.raise (.name "$exprV$125")))))
+                                (.raise (.name "$exprV$129")))))
                           (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
@@ -2648,14 +2700,14 @@ def f_cachetools__cached_py__module___condition_info_wrapper : Func :=
                                   (.seq
                                     (.tryCatch
                                       (.setIndex (.name "cache") (.name "k") (.name "v"))
-                                      "$exprV$126"
+                                      "$exprV$130"
                                       (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$126")
+                                        (.name "$exprV$130")
                                         (.tupleE [(.lit (.str "ValueError"))]))
                                         .skip
-                                        (.raise (.name "$exprV$126"))))
+                                        (.raise (.name "$exprV$130"))))
                                     (.ret (.name "v")))
                                   (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                       (.seq
@@ -2847,17 +2899,17 @@ def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
                                       "v"
                                       (.binop "+" (.field (.name "hits") "v") (.lit (.int 1))))
                                     (.ret (.name "result"))))
-                                "$exprV$127"
+                                "$exprV$131"
                                 (.ifte
                                   (.inOp
                                     false
-                                    (.name "$exprV$127")
+                                    (.name "$exprV$131")
                                     (.tupleE [(.lit (.str "KeyError"))]))
                                   (.setField
                                     (.name "misses")
                                     "v"
                                     (.binop "+" (.field (.name "misses") "v") (.lit (.int 1))))
-                                  (.raise (.name "$exprV$127"))))
+                                  (.raise (.name "$exprV$131"))))
                               (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                     (.seq
                       .skip
@@ -2885,14 +2937,14 @@ def f_cachetools__cached_py__module___locked_info_wrapper : Func :=
                                         (.name "cache")
                                         "setdefault"
                                         [(.name "k"), (.name "v")]))
-                                        "$exprV$128"
+                                        "$exprV$132"
                                         (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$128")
+                                        (.name "$exprV$132")
                                         (.tupleE [(.lit (.str "ValueError"))]))
                                         (.ret (.name "v"))
-                                        (.raise (.name "$exprV$128"))))
+                                        (.raise (.name "$exprV$132"))))
                                       (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                             (.seq
                               .skip
@@ -3034,14 +3086,14 @@ def f_cachetools__cached_py__module___unlocked_info_wrapper : Func :=
                             "v"
                             (.binop "+" (.field (.name "hits") "v") (.lit (.int 1))))
                           (.ret (.name "result"))))
-                      "$exprV$129"
+                      "$exprV$133"
                       (.ifte
-                        (.inOp false (.name "$exprV$129") (.tupleE [(.lit (.str "KeyError"))]))
+                        (.inOp false (.name "$exprV$133") (.tupleE [(.lit (.str "KeyError"))]))
                         (.setField
                           (.name "misses")
                           "v"
                           (.binop "+" (.field (.name "misses") "v") (.lit (.int 1))))
-                        (.raise (.name "$exprV$129"))))
+                        (.raise (.name "$exprV$133"))))
                     (.seq
                       .skip
                       (.seq
@@ -3053,14 +3105,14 @@ def f_cachetools__cached_py__module___unlocked_info_wrapper : Func :=
                           (.seq
                             (.tryCatch
                               (.setIndex (.name "cache") (.name "k") (.name "v"))
-                              "$exprV$130"
+                              "$exprV$134"
                               (.ifte
                                 (.inOp
                                   false
-                                  (.name "$exprV$130")
+                                  (.name "$exprV$134")
                                   (.tupleE [(.lit (.str "ValueError"))]))
                                 .skip
-                                (.raise (.name "$exprV$130"))))
+                                (.raise (.name "$exprV$134"))))
                             (.seq .skip (.seq (.ret (.name "v")) (.seq .skip (.seq .skip .skip))))))))))))) }
 
 /-- `cachetools/_cached.py:<module>._unlocked_info.cache_clear`  (from `cachetools/_cached.py`) -/
@@ -3202,14 +3254,14 @@ def f_cachetools__cached_py__module___condition_wrapper : Func :=
                             (.seq
                               (.assign "result" (.index (.name "cache") (.name "k")))
                               (.ret (.name "result")))
-                            "$exprV$131"
+                            "$exprV$135"
                             (.ifte
                               (.inOp
                                 false
-                                (.name "$exprV$131")
+                                (.name "$exprV$135")
                                 (.tupleE [(.lit (.str "KeyError"))]))
                               (.expr (.mcall (.name "pending") "add" [(.name "k")]))
-                              (.raise (.name "$exprV$131")))))
+                              (.raise (.name "$exprV$135")))))
                         (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
               (.seq
                 (.tryFinally
@@ -3229,14 +3281,14 @@ def f_cachetools__cached_py__module___condition_wrapper : Func :=
                               (.seq
                                 (.tryCatch
                                   (.setIndex (.name "cache") (.name "k") (.name "v"))
-                                  "$exprV$132"
+                                  "$exprV$136"
                                   (.ifte
                                     (.inOp
                                       false
-                                      (.name "$exprV$132")
+                                      (.name "$exprV$136")
                                       (.tupleE [(.lit (.str "ValueError"))]))
                                     .skip
-                                    (.raise (.name "$exprV$132"))))
+                                    (.raise (.name "$exprV$136"))))
                                 (.ret (.name "v")))
                               (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                   (.seq
@@ -3352,14 +3404,14 @@ def f_cachetools__cached_py__module___locked_wrapper : Func :=
                         (.tryFinally
                           (.tryCatch
                             (.ret (.index (.name "cache") (.name "k")))
-                            "$exprV$133"
+                            "$exprV$137"
                             (.ifte
                               (.inOp
                                 false
-                                (.name "$exprV$133")
+                                (.name "$exprV$137")
                                 (.tupleE [(.lit (.str "KeyError"))]))
                               .skip
-                              (.raise (.name "$exprV$133"))))
+                              (.raise (.name "$exprV$137"))))
                           (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
@@ -3387,14 +3439,14 @@ def f_cachetools__cached_py__module___locked_wrapper : Func :=
                                         (.name "cache")
                                         "setdefault"
                                         [(.name "k"), (.name "v")]))
-                                    "$exprV$134"
+                                    "$exprV$138"
                                     (.ifte
                                       (.inOp
                                         false
-                                        (.name "$exprV$134")
+                                        (.name "$exprV$138")
                                         (.tupleE [(.lit (.str "ValueError"))]))
                                       (.ret (.name "v"))
-                                      (.raise (.name "$exprV$134"))))
+                                      (.raise (.name "$exprV$138"))))
                                   (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                         (.seq
                           .skip
@@ -3459,11 +3511,11 @@ def f_cachetools__cached_py__module___unlocked_wrapper : Func :=
               (.seq
                 (.tryCatch
                   (.ret (.index (.name "cache") (.name "k")))
-                  "$exprV$135"
+                  "$exprV$139"
                   (.ifte
-                    (.inOp false (.name "$exprV$135") (.tupleE [(.lit (.str "KeyError"))]))
+                    (.inOp false (.name "$exprV$139") (.tupleE [(.lit (.str "KeyError"))]))
                     .skip
-                    (.raise (.name "$exprV$135"))))
+                    (.raise (.name "$exprV$139"))))
                 (.seq
                   .skip
                   (.seq
@@ -3475,14 +3527,14 @@ def f_cachetools__cached_py__module___unlocked_wrapper : Func :=
                       (.seq
                         (.tryCatch
                           (.setIndex (.name "cache") (.name "k") (.name "v"))
-                          "$exprV$136"
+                          "$exprV$140"
                           (.ifte
                             (.inOp
                               false
-                              (.name "$exprV$136")
+                              (.name "$exprV$140")
                               (.tupleE [(.lit (.str "ValueError"))]))
                             .skip
-                            (.raise (.name "$exprV$136"))))
+                            (.raise (.name "$exprV$140"))))
                         (.seq .skip (.seq (.ret (.name "v")) .skip))))))))) }
 
 /-- `cachetools/_cached.py:<module>._unlocked.<lambda>3`  (from `cachetools/_cached.py`) -/
@@ -3744,9 +3796,10 @@ def f_cachetools__cachedmethod_py__module___WrapperBase___init__ : Func :=
 def f_cachetools__cachedmethod_py__module___WrapperBase___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._WrapperBase.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq (.raise (.unop "py:exception:NotImplementedError" (.tupleE []))) .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._WrapperBase.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___WrapperBase_cache_clear : Func :=
@@ -3834,11 +3887,11 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                             (.name "tmp0")
                             "setdefault"
                             [(.field (.name "self") "_DescriptorBase__attrname"), (.name "wrapper")])))
-                      "$exprV$137"
+                      "$exprV$141"
                       (.ifte
                         (.inOp
                           false
-                          (.name "$exprV$137")
+                          (.name "$exprV$141")
                           (.tupleE [(.lit (.str "AttributeError"))]))
                         (.seq
                           (.assign "msg" (.hole "op:stringExpressionList:non-literal-part"))
@@ -3850,7 +3903,7 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                                 [(.name "msg"), (.lit (.int 3))]))
                             (.raise (.unop "py:exception:TypeError" (.tupleE [(.name "msg")])))))
                         (.ifte
-                          (.inOp false (.name "$exprV$137") (.tupleE [(.lit (.str "TypeError"))]))
+                          (.inOp false (.name "$exprV$141") (.tupleE [(.lit (.str "TypeError"))]))
                           (.seq
                             (.assign "msg" (.hole "op:stringExpressionList:non-literal-part"))
                             (.ifte
@@ -3860,7 +3913,7 @@ def f_cachetools__cachedmethod_py__module___DescriptorBase___get__ : Func :=
                                   "cachetools/_cachedmethod.py:<module>._warn_instance_dict"
                                   [(.name "msg"), (.lit (.int 3))]))
                               (.raise (.unop "py:exception:TypeError" (.tupleE [(.name "msg")])))))
-                          (.raise (.name "$exprV$137")))))
+                          (.raise (.name "$exprV$141")))))
                     (.ifte
                       (.field (.name "self") "_DescriptorBase__deprecated")
                       .skip
@@ -3897,9 +3950,21 @@ def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___init__ : 
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.expr
+              (.call
+                "cachetools/_cachedmethod.py:<module>._warn_classmethod"
+                [(.kwargE "stacklevel" (.lit (.int 3)))]))
+            (.seq
+              .skip
+              (.ret
+                (.mcall
+                  (.name "self")
+                  "_DeprecatedDescriptorBase__wrapper"
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))])))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._DeprecatedDescriptorBase.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___DeprecatedDescriptorBase_cache_clear : Func :=
@@ -3972,9 +4037,156 @@ def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___
 def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.assign "cache" (.field (.name "self") "cache"))
+            (.seq
+              (.assign "lock" (.field (.name "self") "cache_lock"))
+              (.seq
+                (.assign "cond" (.field (.name "self") "cache_condition"))
+                (.seq
+                  (.assign
+                    "key"
+                    (.mcall
+                      (.name "self")
+                      "cache_key"
+                      [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                  (.seq
+                    (.seq
+                      (.assign "manager_tmp0" (.name "lock"))
+                      (.seq
+                        (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
+                        (.seq
+                          (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
+                          (.seq
+                            (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                            (.tryFinally
+                              (.seq
+                                (.expr
+                                  (.mcall
+                                    (.name "cond")
+                                    "wait_for"
+                                    [ (.closure
+                                        "cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0") ]))
+                                (.tryCatch
+                                  (.seq
+                                    (.assign "result" (.index (.name "cache") (.name "key")))
+                                    (.seq
+                                      (.setField
+                                        (.name "self")
+                                        "_Wrapper__hits"
+                                        (.binop
+                                        "+"
+                                        (.field (.name "self") "_Wrapper__hits")
+                                        (.lit (.int 1))))
+                                      (.ret (.name "result"))))
+                                  "$exprV$142"
+                                  (.ifte
+                                    (.inOp
+                                      false
+                                      (.name "$exprV$142")
+                                      (.tupleE [(.lit (.str "KeyError"))]))
+                                    (.seq
+                                      (.seq
+                                        (.assign "tmp0" (.field (.name "self") "_Wrapper__pending"))
+                                        (.expr (.mcall (.name "tmp0") "add" [(.name "key")])))
+                                      (.setField
+                                        (.name "self")
+                                        "_Wrapper__misses"
+                                        (.binop
+                                        "+"
+                                        (.field (.name "self") "_Wrapper__misses")
+                                        (.lit (.int 1)))))
+                                    (.raise (.name "$exprV$142")))))
+                              (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
+                    (.seq
+                      (.tryFinally
+                        (.seq
+                          (.assign
+                            "val"
+                            (.call
+                              "method"
+                              [ (.field (.name "self") "_obj")
+                              , (.starred (.name "args"))
+                              , (.dstarred (.name "kwargs")) ]))
+                          (.seq
+                            (.assign "manager_tmp1" (.name "lock"))
+                            (.seq
+                              (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                              (.seq
+                                (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
+                                (.seq
+                                  (.assign
+                                    "value_tmp1"
+                                    (.mcall (.name "manager_tmp1") "__enter__" []))
+                                  (.tryFinally
+                                    (.seq
+                                      (.tryCatch
+                                        (.setIndex (.name "cache") (.name "key") (.name "val"))
+                                        "$exprV$143"
+                                        (.ifte
+                                        (.inOp
+                                        false
+                                        (.name "$exprV$143")
+                                        (.tupleE [(.lit (.str "ValueError"))]))
+                                        .skip
+                                        (.raise (.name "$exprV$143"))))
+                                      (.ret (.name "val")))
+                                    (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
+                        (.seq
+                          (.assign "manager_tmp2" (.name "lock"))
+                          (.seq
+                            (.assign "enter_tmp2" (.field (.name "manager_tmp2") "__enter__"))
+                            (.seq
+                              (.assign "exit_tmp2" (.field (.name "manager_tmp2") "__exit__"))
+                              (.seq
+                                (.assign
+                                  "value_tmp2"
+                                  (.mcall (.name "manager_tmp2") "__enter__" []))
+                                (.tryFinally
+                                  (.seq
+                                    (.seq
+                                      (.assign "tmp1" (.field (.name "self") "_Wrapper__pending"))
+                                      (.expr (.mcall (.name "tmp1") "remove" [(.name "key")])))
+                                    (.expr (.mcall (.name "cond") "notify_all" [])))
+                                  (.expr (.mcall (.name "manager_tmp2") "__exit__" []))))))))
+                      (.seq
+                        .skip
+                        (.seq
+                          .skip
+                          (.seq
+                            .skip
+                            (.seq
+                              .skip
+                              (.seq
+                                .skip
+                                (.seq
+                                  .skip
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip))))))))))))))))))))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition_info.Descriptor.Wrapper.__call__.<lambda>0`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_info_Descriptor_Wrapper___call____lambda_0 : Func :=
@@ -4081,9 +4293,116 @@ def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___ini
 def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.assign "cache" (.field (.name "self") "cache"))
+            (.seq
+              (.assign "lock" (.field (.name "self") "cache_lock"))
+              (.seq
+                (.assign
+                  "key"
+                  (.mcall
+                    (.name "self")
+                    "cache_key"
+                    [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+                (.seq
+                  (.seq
+                    (.assign "manager_tmp0" (.name "lock"))
+                    (.seq
+                      (.assign "enter_tmp0" (.field (.name "manager_tmp0") "__enter__"))
+                      (.seq
+                        (.assign "exit_tmp0" (.field (.name "manager_tmp0") "__exit__"))
+                        (.seq
+                          (.assign "value_tmp0" (.mcall (.name "manager_tmp0") "__enter__" []))
+                          (.tryFinally
+                            (.tryCatch
+                              (.seq
+                                (.assign "result" (.index (.name "cache") (.name "key")))
+                                (.seq
+                                  (.setField
+                                    (.name "self")
+                                    "_Wrapper__hits"
+                                    (.binop
+                                      "+"
+                                      (.field (.name "self") "_Wrapper__hits")
+                                      (.lit (.int 1))))
+                                  (.ret (.name "result"))))
+                              "$exprV$144"
+                              (.ifte
+                                (.inOp
+                                  false
+                                  (.name "$exprV$144")
+                                  (.tupleE [(.lit (.str "KeyError"))]))
+                                (.setField
+                                  (.name "self")
+                                  "_Wrapper__misses"
+                                  (.binop
+                                    "+"
+                                    (.field (.name "self") "_Wrapper__misses")
+                                    (.lit (.int 1))))
+                                (.raise (.name "$exprV$144"))))
+                            (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
+                  (.seq
+                    .skip
+                    (.seq
+                      (.assign
+                        "val"
+                        (.call
+                          "method"
+                          [ (.field (.name "self") "_obj")
+                          , (.starred (.name "args"))
+                          , (.dstarred (.name "kwargs")) ]))
+                      (.seq
+                        .skip
+                        (.seq
+                          (.seq
+                            (.assign "manager_tmp1" (.name "lock"))
+                            (.seq
+                              (.assign "enter_tmp1" (.field (.name "manager_tmp1") "__enter__"))
+                              (.seq
+                                (.assign "exit_tmp1" (.field (.name "manager_tmp1") "__exit__"))
+                                (.seq
+                                  (.assign
+                                    "value_tmp1"
+                                    (.mcall (.name "manager_tmp1") "__enter__" []))
+                                  (.tryFinally
+                                    (.tryCatch
+                                      (.ret
+                                        (.mcall
+                                        (.name "cache")
+                                        "setdefault"
+                                        [ (.fnref
+                                        "cachetools/_cachedmethod.py:<module>._WrapperBase.cache")
+                                        , (.name "key")
+                                        , (.name "val") ]))
+                                      "$exprV$145"
+                                      (.ifte
+                                        (.inOp
+                                        false
+                                        (.name "$exprV$145")
+                                        (.tupleE [(.lit (.str "ValueError"))]))
+                                        (.ret (.name "val"))
+                                        (.raise (.name "$exprV$145"))))
+                                    (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
+                          (.seq
+                            .skip
+                            (.seq
+                              .skip
+                              (.seq
+                                .skip
+                                (.seq
+                                  .skip
+                                  (.seq
+                                    .skip
+                                    (.seq
+                                      .skip
+                                      (.seq
+                                        .skip
+                                        (.seq
+                                        .skip
+                                        (.seq .skip (.seq .skip (.seq .skip (.seq .skip .skip)))))))))))))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked_info.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_info_Descriptor_Wrapper_cache_clear : Func :=
@@ -4181,9 +4500,60 @@ def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___i
 def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.assign "cache" (.field (.name "self") "cache"))
+            (.seq
+              (.assign
+                "key"
+                (.mcall
+                  (.name "self")
+                  "cache_key"
+                  [(.starred (.name "args")), (.dstarred (.name "kwargs"))]))
+              (.seq
+                (.tryCatch
+                  (.seq
+                    (.assign "result" (.index (.name "cache") (.name "key")))
+                    (.seq
+                      (.setField
+                        (.name "self")
+                        "_Wrapper__hits"
+                        (.binop "+" (.field (.name "self") "_Wrapper__hits") (.lit (.int 1))))
+                      (.ret (.name "result"))))
+                  "$exprV$146"
+                  (.ifte
+                    (.inOp false (.name "$exprV$146") (.tupleE [(.lit (.str "KeyError"))]))
+                    (.setField
+                      (.name "self")
+                      "_Wrapper__misses"
+                      (.binop "+" (.field (.name "self") "_Wrapper__misses") (.lit (.int 1))))
+                    (.raise (.name "$exprV$146"))))
+                (.seq
+                  .skip
+                  (.seq
+                    (.assign
+                      "val"
+                      (.call
+                        "method"
+                        [ (.field (.name "self") "_obj")
+                        , (.starred (.name "args"))
+                        , (.dstarred (.name "kwargs")) ]))
+                    (.seq
+                      .skip
+                      (.seq
+                        (.tryCatch
+                          (.setIndex (.name "cache") (.name "key") (.name "val"))
+                          "$exprV$147"
+                          (.ifte
+                            (.inOp
+                              false
+                              (.name "$exprV$147")
+                              (.tupleE [(.lit (.str "ValueError"))]))
+                            .skip
+                            (.raise (.name "$exprV$147"))))
+                        (.seq .skip (.seq (.ret (.name "val")) (.seq .skip .skip)))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked_info.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_info_Descriptor_Wrapper_cache_clear : Func :=
@@ -4295,14 +4665,14 @@ def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
                                       "cachetools/_cachedmethod.py:<module>._condition.wrapper.<lambda>1") ])))
                             (.tryCatch
                               (.ret (.index (.name "c") (.name "k")))
-                              "$exprV$144"
+                              "$exprV$148"
                               (.ifte
                                 (.inOp
                                   false
-                                  (.name "$exprV$144")
+                                  (.name "$exprV$148")
                                   (.tupleE [(.lit (.str "KeyError"))]))
                                 (.expr (.mcall (.name "pending") "add" [(.name "k")]))
-                                (.raise (.name "$exprV$144")))))
+                                (.raise (.name "$exprV$148")))))
                           (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                 (.seq
                   .skip
@@ -4330,14 +4700,14 @@ def f_cachetools__cachedmethod_py__module___condition_wrapper : Func :=
                                   (.seq
                                     (.tryCatch
                                       (.setIndex (.name "c") (.name "k") (.name "v"))
-                                      "$exprV$145"
+                                      "$exprV$149"
                                       (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$145")
+                                        (.name "$exprV$149")
                                         (.tupleE [(.lit (.str "ValueError"))]))
                                         .skip
-                                        (.raise (.name "$exprV$145"))))
+                                        (.raise (.name "$exprV$149"))))
                                     (.ret (.name "v")))
                                   (.expr (.mcall (.name "manager_tmp1") "__exit__" []))))))))
                       (.seq
@@ -4474,9 +4844,18 @@ def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___init_
 def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.ret
+              (.call
+                "wrapper"
+                [ (.field (.name "self") "_obj")
+                , (.field (.name "self") "_Wrapper__pending")
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
+            .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._condition.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___condition_Descriptor_Wrapper_cache_clear : Func :=
@@ -4540,14 +4919,14 @@ def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
                             (.tryFinally
                               (.tryCatch
                                 (.ret (.index (.name "c") (.name "k")))
-                                "$exprV$146"
+                                "$exprV$150"
                                 (.ifte
                                   (.inOp
                                     false
-                                    (.name "$exprV$146")
+                                    (.name "$exprV$150")
                                     (.tupleE [(.lit (.str "KeyError"))]))
                                   .skip
-                                  (.raise (.name "$exprV$146"))))
+                                  (.raise (.name "$exprV$150"))))
                               (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))
                     (.seq
                       .skip
@@ -4576,14 +4955,14 @@ def f_cachetools__cachedmethod_py__module___locked_wrapper : Func :=
                                       (.tryCatch
                                         (.ret
                                         (.mcall (.name "c") "setdefault" [(.name "k"), (.name "v")]))
-                                        "$exprV$147"
+                                        "$exprV$151"
                                         (.ifte
                                         (.inOp
                                         false
-                                        (.name "$exprV$147")
+                                        (.name "$exprV$151")
                                         (.tupleE [(.lit (.str "ValueError"))]))
                                         (.ret (.name "v"))
-                                        (.raise (.name "$exprV$147"))))
+                                        (.raise (.name "$exprV$151"))))
                                       (.expr (.mcall (.name "manager_tmp1") "__exit__" [])))))))
                             (.seq
                               .skip
@@ -4651,9 +5030,17 @@ def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___init__ :
 def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.ret
+              (.call
+                "wrapper"
+                [ (.field (.name "self") "_obj")
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
+            .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._locked.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___locked_Descriptor_Wrapper_cache_clear : Func :=
@@ -4710,11 +5097,11 @@ def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
                   (.seq
                     (.tryCatch
                       (.ret (.index (.name "c") (.name "k")))
-                      "$exprV$148"
+                      "$exprV$152"
                       (.ifte
-                        (.inOp false (.name "$exprV$148") (.tupleE [(.lit (.str "KeyError"))]))
+                        (.inOp false (.name "$exprV$152") (.tupleE [(.lit (.str "KeyError"))]))
                         .skip
-                        (.raise (.name "$exprV$148"))))
+                        (.raise (.name "$exprV$152"))))
                     (.seq
                       .skip
                       (.seq
@@ -4730,14 +5117,14 @@ def f_cachetools__cachedmethod_py__module___unlocked_wrapper : Func :=
                           (.seq
                             (.tryCatch
                               (.setIndex (.name "c") (.name "k") (.name "v"))
-                              "$exprV$149"
+                              "$exprV$153"
                               (.ifte
                                 (.inOp
                                   false
-                                  (.name "$exprV$149")
+                                  (.name "$exprV$153")
                                   (.tupleE [(.lit (.str "ValueError"))]))
                                 .skip
-                                (.raise (.name "$exprV$149"))))
+                                (.raise (.name "$exprV$153"))))
                             (.seq .skip (.seq (.ret (.name "v")) .skip))))))))))) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
@@ -4774,9 +5161,17 @@ def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___init__
 def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper___call__ : Func :=
   { name := "cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.__call__"
   , params := ["args", "kwargs"]
-  , vararg := some "<unmodelled-signature-args>"
-  , kwarg := some "<unmodelled-signature-keywords>"
-  , body := (.hole "call:python-receiver-signature") }
+  , vararg := some "args"
+  , kwarg := some "kwargs"
+  , pythonSignature := some { positionalOnly := [], keywordOnly := [], required := [], isMethod := some true, receiverName := some "self" }
+  , body := (.seq
+            (.ret
+              (.call
+                "wrapper"
+                [ (.field (.name "self") "_obj")
+                , (.starred (.name "args"))
+                , (.dstarred (.name "kwargs")) ]))
+            .skip) }
 
 /-- `cachetools/_cachedmethod.py:<module>._unlocked.Descriptor.Wrapper.cache_clear`  (from `cachetools/_cachedmethod.py`) -/
 def f_cachetools__cachedmethod_py__module___unlocked_Descriptor_Wrapper_cache_clear : Func :=
@@ -4947,7 +5342,16 @@ def f_cachetools_func_py__module___cache_decorator : Func :=
                 (.fnref "cachetools/keys.py:<module>.typedkey")
                 (.fnref "cachetools/keys.py:<module>.hashkey")))
             (.seq
-              (.assign "wrapper" (.hole "call:computed-callee"))
+              (.assign
+                "wrapper"
+                (.callValue
+                  (.call
+                    "cachetools/__init__.py:<module>.cached"
+                    [ (.kwargE "cache" (.name "cache"))
+                    , (.kwargE "key" (.name "key"))
+                    , (.kwargE "condition" (.alloc "Condition" []))
+                    , (.kwargE "info" (.lit (.bool true))) ])
+                  [(.name "func")]))
               (.seq
                 (.setField
                   (.name "wrapper")
@@ -4996,7 +5400,14 @@ def f_cachetools_func_py__module__fifo_cache : Func :=
                       [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret
+                      (.callValue
+                        (.call
+                          "cachetools/func.py:<module>._cache"
+                          [ (.alloc "FIFOCache" [(.lit (.int 128))])
+                          , (.lit (.int 128))
+                          , (.name "typed") ])
+                        [(.name "maxsize")]))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5025,7 +5436,14 @@ def f_cachetools_func_py__module__lfu_cache : Func :=
                       [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret
+                      (.callValue
+                        (.call
+                          "cachetools/func.py:<module>._cache"
+                          [ (.alloc "LFUCache" [(.lit (.int 128))])
+                          , (.lit (.int 128))
+                          , (.name "typed") ])
+                        [(.name "maxsize")]))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5054,7 +5472,14 @@ def f_cachetools_func_py__module__lru_cache : Func :=
                       [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret
+                      (.callValue
+                        (.call
+                          "cachetools/func.py:<module>._cache"
+                          [ (.alloc "LRUCache" [(.lit (.int 128))])
+                          , (.lit (.int 128))
+                          , (.name "typed") ])
+                        [(.name "maxsize")]))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5083,7 +5508,14 @@ def f_cachetools_func_py__module__rr_cache : Func :=
                       [(.dictE []), (.lit .unit), (.name "typed")]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret
+                      (.callValue
+                        (.call
+                          "cachetools/func.py:<module>._cache"
+                          [ (.alloc "RRCache" [(.lit (.int 128)), (.name "choice")])
+                          , (.lit (.int 128))
+                          , (.name "typed") ])
+                        [(.name "maxsize")]))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5114,7 +5546,14 @@ def f_cachetools_func_py__module__ttl_cache : Func :=
                       , (.name "typed") ]))
                   (.ifte
                     (.call "callable" [(.name "maxsize")])
-                    (.ret (.hole "call:computed-callee"))
+                    (.ret
+                      (.callValue
+                        (.call
+                          "cachetools/func.py:<module>._cache"
+                          [ (.alloc "TTLCache" [(.lit (.int 128)), (.name "ttl"), (.name "timer")])
+                          , (.lit (.int 128))
+                          , (.name "typed") ])
+                        [(.name "maxsize")]))
                     (.ret
                       (.call
                         "cachetools/func.py:<module>._cache"
@@ -5235,16 +5674,43 @@ def f_cachetools_keys_py__module__typedkey : Func :=
                               "+"
                               (.binop "+" (.name "args") (.name "_kwmark"))
                               (.name "sorted_kwargs")) ]))
-                      (.assign
-                        "key"
-                        (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:genExp")])))))
+                      (.seq
+                        (.assign "$exprV$154" (.name "key"))
+                        (.seq
+                          (.assign "tmp0" (.listE []))
+                          (.seq
+                            (.forIn
+                              "$comp$tmp2"
+                              (.name "sorted_kwargs")
+                              (.seq
+                                (.assign "$comp$_" (.index (.name "$comp$tmp2") (.lit (.int 0))))
+                                (.seq
+                                  (.assign "$comp$v" (.index (.name "$comp$tmp2") (.lit (.int 1))))
+                                  (.expr
+                                    (.mcall
+                                      (.name "tmp0")
+                                      "append"
+                                      [(.call "type" [(.name "$comp$v")])])))))
+                            (.assign
+                              "key"
+                              (.binop "+" (.name "$exprV$154") (.call "tuple" [(.name "tmp0")]))))))))
                   (.assign "key" (.alloc "_HashedTuple" [(.name "args")])))
                 (.seq
                   .skip
                   (.seq
-                    (.assign
-                      "key"
-                      (.binop "+" (.name "key") (.call "tuple" [(.hole "expr:genExp")])))
+                    (.seq
+                      (.assign "$exprV$155" (.name "key"))
+                      (.seq
+                        (.assign "tmp3" (.listE []))
+                        (.seq
+                          (.forIn
+                            "$comp$v"
+                            (.name "args")
+                            (.expr
+                              (.mcall (.name "tmp3") "append" [(.call "type" [(.name "$comp$v")])])))
+                          (.assign
+                            "key"
+                            (.binop "+" (.name "$exprV$155") (.call "tuple" [(.name "tmp3")]))))))
                     (.seq
                       .skip
                       (.seq

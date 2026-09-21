@@ -44,7 +44,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 90% | 97 (46%) | 0.4% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 99% | 107 (51%) | 0.05% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.java` ✅ (`#guard`) | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
 | Go | yes | yes | yes | `.go` ✅ (`#guard`) | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
