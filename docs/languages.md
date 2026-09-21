@@ -575,6 +575,28 @@ falsy value — every one in cachetools — this is exact. A suppressing `__exit
 observe the difference; it is recorded here as `control:WITH-exit-args` and is the next
 thing to close if a corpus has one.
 
+#### 10.7 The container protocol on user instances (`__contains__`, `__getitem__`, `__setitem__`, `__delitem__`)
+
+`key in self`, `self[key]`, `self[key] = v` and `del self[key]` on an ordinary instance
+are method calls in Python, and Core answered them structurally: an instance is not a
+list, so `Cache.get`'s `if key in self` was the dynamic hole `in:non-container` and the
+function INCONCLUSIVE against CPython. **Done** for the four container dunders:
+`Ctx.dunderOn` (`Semantics.lean`) answers `some (r, fn)` exactly when the receiver is a
+reference to an ordinary instance — payload `.none`, so boxed containers keep their path
+— whose class *defines* the method (`classDefines`, not `resolveMethod` alone: a free
+function called `__getitem__` is not the class's), under `.python`; `evalExpr`/`execStmt`
+then call it with the receiver bound, and `not in` negates the result's truthiness as
+CPython does. A class without the method keeps the hole it had — nothing is guessed.
+
+Checked: `dunderProg` in `Semantics.lean` (eleven `#guard`s: hit/miss/`not in`,
+`__getitem__` doubling, `__setitem__` and `__delitem__` writing the instance, the four
+`Plain` holes unchanged, `in` on a boxed list still structural). `FuelMono` gained the
+four recursive branches (`Ctx.dunderOn_resolves` connects a dispatched method to the
+`resolveMethod` hypothesis the transport is stated over) and `ExcSafe` closes them with
+the existing `ihF` closers. `tests/test_production_gaps.py::TestDunderDispatch` pins the
+text. Not yet: `__eq__`/`__lt__`/`__len__`/`__iter__`/`__bool__`/`__hash__`/`__str__`
+(Milestone 1's remaining protocols, `docs/GOAL-arbitrary-codebases.md`).
+
 ### 15. Three small exporter labels, dispositioned
 
 * **`op:delete-index` — closed for Python.** `del xs[i]` / `del d[k]` lower to

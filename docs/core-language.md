@@ -97,7 +97,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `binop : String → Expr → Expr → Expr` | Binary operator by name. `&&`/`\|\|` short-circuit (§5); everything else evaluates left then right. |
 | `unop : String → Expr → Expr` | Unary operator by name (`-`, `!`). |
 | `call : String → List Expr → Expr` | Call by name. Tries `Ctx.resolve`, then a `Val.fn`/`Val.clos` held in a variable, then the modelled stdlib, then a `call:<name>` hole. The stdlib is consulted **last** so a user function of the same name always wins. |
-| `index : Expr → Expr → Expr` | Subscript. Out-of-range list/tuple index raises `IndexError`; a missing dict key raises `KeyError`; anything else is `index:unsupported`. |
+| `index : Expr → Expr → Expr` | Subscript. Out-of-range list/tuple index raises `IndexError`; a missing dict key raises `KeyError`. Under `.python`, on an ordinary instance whose class defines `__getitem__`, it IS `c.__getitem__(k)` (`Ctx.dunderOn`); anything else is `index:unsupported`. |
 | `field : Expr → String → Expr` | Attribute read. A non-reference receiver is `field:<f>:non-object`. |
 | `mcall : Expr → String → List Expr → Expr` | Method call, dispatched on the receiver's class. A non-object receiver falls through to the modelled stdlib's container methods; a *mutating* container method is `mcall:<m>:unboxed-container` because writing back through the receiver expression would update a temporary. |
 | `alloc : String → List Expr → Expr` | Construction. Allocates a fresh object, copies in any bindings the class captured, and runs `__init__` if one resolves. |
@@ -107,7 +107,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `listE` / `tupleE` / `dictE` | Container literals. |
 | `cond : Expr → Expr → Expr → Expr` | Conditional expression; only the taken branch is evaluated. |
 | `isOp : Bool → Expr → Expr → Expr` | Identity. Reference identity for `.ref`, structural for immediates. The `Bool` means negated (`is not`). |
-| `inOp : Bool → Expr → Expr → Expr` | Membership over lists, tuples, dict keys, and substrings. The `Bool` means negated (`not in`). |
+| `inOp : Bool → Expr → Expr → Expr` | Membership over lists, tuples, dict keys, and substrings; under `.python`, on an ordinary instance whose class defines `__contains__`, it IS `c.__contains__(x)` and `not in` negates that result's truthiness. The `Bool` means negated (`not in`). |
 | `hole : String → Expr` | An unmapped expression, tagged with the CPG node label that produced it. |
 
 ## 4. Statements (`Stmt`)
@@ -118,7 +118,8 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `expr : Expr → Stmt` | Evaluate for effect; discard the value (but not exceptions or holes). |
 | `assign : String → Expr → Stmt` | Local binding — unless a `declGlobal` marker for that name is in scope, in which case it writes the globals frame. |
 | `setField : Expr → String → Expr → Stmt` | `e.f = v`. Non-object receiver: `setField:<f>:non-object`. |
-| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. **Always** the hole `setIndex:immutable-containers` — see §8. |
+| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. Writes through a boxed list or dict payload (`docs/boxed-containers.md`); under `.python`, on an ordinary instance whose class defines `__setitem__`, it IS `c.__setitem__(i, v)`. A container *value* (a C aggregate) or an instance without the method is the hole `setIndex:immutable-containers`. |
+| `delIndex : Expr → Expr → Stmt` | `del e[i]`. The same shape as `setIndex` one argument shorter: payload deletion, or `c.__delitem__(i)` under `.python` when the class defines it, else `delIndex:immutable-containers`. |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
 | `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
@@ -312,7 +313,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `mcall:<m>:unboxed-container` | A *mutating* container method. Honouring it would update a temporary, because the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`. |
 | `mcall:dangling-ref` | The receiver's ref is not in the heap. |
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
-| `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched. |
+| `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched — including an instance whose class defines no `__contains__`. |
 | `forIn:non-iterable` | Iterating a non-iterable. |
 | `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |

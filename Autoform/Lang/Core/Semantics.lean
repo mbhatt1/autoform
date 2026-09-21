@@ -1011,6 +1011,43 @@ free-function fallback, so a global `__eq__` cannot be mistaken for a class's ow
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
   ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
 
+/-- The user-class method a container operation on an ORDINARY instance dispatches to.
+
+`x in c`, `c[k]`, `c[k] = v` and `del c[k]` on an instance are `c.__contains__(x)`,
+`c.__getitem__(k)`, `c.__setitem__(k, v)` and `c.__delitem__(k)` in Python. This is
+`some (r, fn)` exactly when `c` is a reference to an ordinary instance -- payload `.none`,
+so a boxed container keeps its structural path -- whose class DEFINES the method itself
+(`classDefines`, so a free function that happens to be called `__getitem__` is not
+mistaken for it), under `.python`. Everything else is `none` and the caller falls back to
+the structural behaviour, including the hole it had before. The `Func` is the one
+`resolveMethod` finds, which is what `FuelMono`'s context hypothesis is stated over. -/
+def Ctx.dunderOn (ctx : Ctx) (h : Heap) (c : Val) (name : String) : Option (Ref × Func) :=
+  match c with
+  | .ref r =>
+      if ctx.dialect == .python then
+        match h.get r with
+        | some o =>
+            match o.payload with
+            | .none =>
+                if ctx.classDefines o.cls name then
+                  match ctx.resolveMethod o.cls name with
+                  | some fn => some (r, fn)
+                  | none    => none
+                else none
+            | _ => none
+        | none => none
+      else none
+  | _ => none
+
+/-- A dispatched dunder is a resolved method, so `FuelMono`'s and `ExcSafe`'s hypotheses
+about `resolveMethod` cover it. -/
+theorem Ctx.dunderOn_resolves {ctx : Ctx} {h : Heap} {c : Val} {name : String} {r : Ref}
+    {fn : Func} (hd : ctx.dunderOn h c name = some (r, fn)) :
+    ∃ cls, ctx.resolveMethod cls name = some fn := by
+  unfold Ctx.dunderOn at hd
+  repeat' split at hd
+  all_goals first | (cases hd; exact ⟨_, by assumption⟩) | cases hd
+
 /-- The builtin base of a class, if the exporter recorded one. -/
 def Ctx.builtinBase (ctx : Ctx) (cls : String) : Option BuiltinBase :=
   match ctx.builtinBases.find? (·.1 == cls) with
@@ -1212,7 +1249,17 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val x) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val c) =>
-            match valIn x c with
+            -- An ordinary instance whose class defines `__contains__`: `x in c` IS
+            -- `c.__contains__(x)`, and `not in` negates its truthiness -- CPython's
+            -- protocol. Boxed containers, builtin-based instances and immediates take
+            -- the structural path below; `.unbox` is what reads a boxed list or dict.
+            match ctx.dunderOn h₂ c "__contains__" with
+            | some (r, fn) =>
+                match applyFunc ctx n h₂ fn (some (.ref r)) [x] [] with
+                | (h₃, .val rv) => (h₃, .val (.bool (if neg then !rv.truthy else rv.truthy)))
+                | (h₃, res)     => (h₃, res)
+            | none =>
+            match valIn x (c.unbox h₂) with
             | .val (.bool r) => (h₂, .val (.bool (if neg then !r else r)))
             | r              => (h₂, r)
         | (h₂, r) => (h₂, r)
@@ -1222,6 +1269,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val c) =>
         match evalExpr ctx n h₁ ρ b with
         | (h₂, .val k) =>
+          -- An ordinary instance whose class defines `__getitem__`: `c[k]` IS
+          -- `c.__getitem__(k)`. Checked first because the structural match below
+          -- cannot see a user class; boxed containers are `none` here and unaffected.
+          match ctx.dunderOn h₂ c "__getitem__" with
+          | some (r, fn) => applyFunc ctx n h₂ fn (some (.ref r)) [k] []
+          | none =>
           -- `A((0,))[0]` is `0` in CPython for `class A(tuple)`.
           -- `.unbox` is the boxed-container case: after the switchover `xs[0]` reads
           -- through a `Val.ref`, and without it a subscript of a list literal holes.
@@ -1988,10 +2041,18 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
             | .dict kvs => (h₃.setPayload r (.dict (Stdlib.dictSet kvs iv vv)), .normal ρ)
             -- A `tuple` SUBCLASS instance: immutable, and Python says so with a value.
             | .tuple _  => (h₃, .exn (.str "TypeError") ρ)
-            -- An ordinary instance. `__setitem__` dispatch is the user-class path and is
-            -- not part of this step, so it stays ignorance rather than becoming a
-            -- TypeError that would be wrong for every class that defines one.
-            | .none     => (h₃, .hole "setIndex:immutable-containers")
+            -- An ordinary instance: `c[k] = v` IS `c.__setitem__(k, v)` when the class
+            -- defines it. A class that does not stays ignorance rather than becoming a
+            -- TypeError that would be wrong for a class that inherits one.
+            | .none     =>
+                match ctx.dunderOn h₃ (.ref r) "__setitem__" with
+                | some (_, fn) =>
+                    match applyFunc ctx n h₃ fn (some (.ref r)) [iv, vv] [] with
+                    | (h₄, .val _)     => (h₄, .normal ρ)
+                    | (h₄, .exn e)     => (h₄, .exn e ρ)
+                    | (h₄, .hole l)    => (h₄, .hole l)
+                    | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+                | none => (h₃, .hole "setIndex:immutable-containers")
           | (h₃, .exn ex)   => (h₃, .exn ex ρ)
           | (h₃, .hole l)   => (h₃, .hole l)
           | (h₃, .outOfFuel) => (h₃, .outOfFuel)
@@ -2022,7 +2083,16 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
                 (h₂.setPayload r (.dict (Stdlib.dictDel kvs iv)), .normal ρ)
               else (h₂, .exn (.str "KeyError") ρ)
           | .tuple _ => (h₂, .exn (.str "TypeError") ρ)
-          | .none    => (h₂, .hole "delIndex:immutable-containers")
+          -- An ordinary instance: `del c[k]` IS `c.__delitem__(k)` when the class defines it.
+          | .none    =>
+              match ctx.dunderOn h₂ (.ref r) "__delitem__" with
+              | some (_, fn) =>
+                  match applyFunc ctx n h₂ fn (some (.ref r)) [iv] [] with
+                  | (h₃, .val _)     => (h₃, .normal ρ)
+                  | (h₃, .exn e)     => (h₃, .exn e ρ)
+                  | (h₃, .hole l)    => (h₃, .hole l)
+                  | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+              | none => (h₂, .hole "delIndex:immutable-containers")
         | (h₂, .exn ex)    => (h₂, .exn ex ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
@@ -2970,6 +3040,93 @@ private def shrinkLoop : Heap × Ctl :=
 #guard match (execStmt setIdxCtxC 50 setIdxHeap setIdxEnv
                 (.setIndex (.listE [.lit (.int 1)]) (.lit (.int 0)) (.lit (.int 9)))).2 with
        | .hole "setIndex:immutable-containers" => true | _ => false
+
+/-! ## The container protocol on user instances, checked against CPython
+
+`class Bag: def __contains__(self, k): return k == 1` -- `1 in Bag()` is `True`,
+`2 in Bag()` is `False`, `2 not in Bag()` is `True`. A `__getitem__` that doubles its key,
+a `__setitem__` that records `k + v` in a field, a `__delitem__` that records the key; and
+`Plain`, which defines none of them, keeps exactly the holes it had. Boxed containers are
+untouched by this path (`Ctx.dunderOn` is `none` on any payload), which the `aliasProg`
+guards below keep checking. -/
+private def dunderProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.Bag.__contains__", params := ["k"]
+      , body := .ret (.binop "==" (.name "k") (.lit (.int 1))) }
+    , { name := "m.py:<module>.Bag.__getitem__", params := ["k"]
+      , body := .ret (.binop "*" (.name "k") (.lit (.int 2))) }
+    , { name := "m.py:<module>.Bag.__setitem__", params := ["k", "v"]
+      , body := .setField (.name "self") "last" (.binop "+" (.name "k") (.name "v")) }
+    , { name := "m.py:<module>.Bag.__delitem__", params := ["k"]
+      , body := .setField (.name "self") "deleted" (.name "k") }
+    , { name := "m.py:<module>.hit", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp false (.lit (.int 1)) (.name "b"))) }
+    , { name := "m.py:<module>.miss", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp false (.lit (.int 2)) (.name "b"))) }
+    , { name := "m.py:<module>.notIn", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.inOp true (.lit (.int 2)) (.name "b"))) }
+    , { name := "m.py:<module>.get", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+                     (.ret (.index (.name "b") (.lit (.int 21)))) }
+    , { name := "m.py:<module>.set", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+               (.seq (.setIndex (.name "b") (.lit (.int 40)) (.lit (.int 2)))
+                     (.ret (.field (.name "b") "last"))) }
+    , { name := "m.py:<module>.del", params := []
+      , body := .seq (.assign "b" (.alloc "Bag" []))
+               (.seq (.delIndex (.name "b") (.lit (.int 7)))
+                     (.ret (.field (.name "b") "deleted"))) }
+    , { name := "m.py:<module>.plainIn", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.ret (.inOp false (.lit (.int 1)) (.name "p"))) }
+    , { name := "m.py:<module>.plainGet", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.ret (.index (.name "p") (.lit (.int 1)))) }
+    , { name := "m.py:<module>.plainSet", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.setIndex (.name "p") (.lit (.int 1)) (.lit (.int 2))) }
+    , { name := "m.py:<module>.plainDel", params := []
+      , body := .seq (.assign "p" (.alloc "Plain" []))
+                     (.delIndex (.name "p") (.lit (.int 1))) }
+    -- `in` on a BOXED list still takes the structural path: `2 in [1, 2]`.
+    , { name := "m.py:<module>.boxedIn", params := []
+      , body := .seq (.assign "xs" (.listE [.lit (.int 1), .lit (.int 2)]))
+                     (.ret (.inOp false (.lit (.int 2)) (.name "xs"))) } ] }
+
+-- `1 in Bag()`      CPython True
+#guard match runFunc dunderProg 200 "m.py:<module>.hit" [] with
+       | .val (.bool true) => true | _ => false
+-- `2 in Bag()`      CPython False
+#guard match runFunc dunderProg 200 "m.py:<module>.miss" [] with
+       | .val (.bool false) => true | _ => false
+-- `2 not in Bag()`  CPython True -- the negation is of `__contains__`'s truthiness
+#guard match runFunc dunderProg 200 "m.py:<module>.notIn" [] with
+       | .val (.bool true) => true | _ => false
+-- `Bag()[21]`       CPython 42
+#guard match runFunc dunderProg 200 "m.py:<module>.get" [] with
+       | .val (.int 42) => true | _ => false
+-- `b[40] = 2; b.last`  CPython 42 -- `__setitem__` ran on THIS instance
+#guard match runFunc dunderProg 200 "m.py:<module>.set" [] with
+       | .val (.int 42) => true | _ => false
+-- `del b[7]; b.deleted`  CPython 7
+#guard match runFunc dunderProg 200 "m.py:<module>.del" [] with
+       | .val (.int 7) => true | _ => false
+-- A class WITHOUT the dunder keeps the hole it had: nothing is guessed.
+#guard match runFunc dunderProg 200 "m.py:<module>.plainIn" [] with
+       | .hole "in:non-container" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainGet" [] with
+       | .hole "index:unsupported" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainSet" [] with
+       | .hole "setIndex:immutable-containers" => true | _ => false
+#guard match runFunc dunderProg 200 "m.py:<module>.plainDel" [] with
+       | .hole "delIndex:immutable-containers" => true | _ => false
+-- `2 in [1, 2]` on a boxed list: True, through the structural path.
+#guard match runFunc dunderProg 200 "m.py:<module>.boxedIn" [] with
+       | .val (.bool true) => true | _ => false
 
 /-! ## The switchover: containers have identity
 

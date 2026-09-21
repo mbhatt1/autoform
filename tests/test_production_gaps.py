@@ -565,3 +565,46 @@ class TestJavaAndGoDialects:
         syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
         assert 'def stringEqIsReference : Dialect → Bool' in syntax
         assert 'if d.stringEqIsReference then .hole "str:reference-equality"' in sem
+
+
+class TestDunderDispatch:
+    """The container protocol on user instances (docs/languages.md §10.6).
+
+    `x in c`, `c[k]`, `c[k] = v` and `del c[k]` on an ordinary instance are method calls
+    in Python. `Ctx.dunderOn` is the one place that decides whether Core makes the call,
+    and these pins hold its shape in place: the dispatch is Python-only, requires the
+    class to DEFINE the method (`classDefines`, so a free `__getitem__` is not the
+    class's), leaves boxed containers on their structural path, and falls back to the
+    hole a class without the method always had. The behaviour itself is checked by the
+    `dunderProg` `#guard`s in `Semantics.lean`, against CPython, on every build.
+    """
+
+    SEM = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+
+    def test_dispatch_is_one_named_predicate(self):
+        assert 'def Ctx.dunderOn (ctx : Ctx) (h : Heap) (c : Val) (name : String) : Option (Ref × Func)' in self.SEM
+        assert 'if ctx.dialect == .python then' in self.SEM.split('def Ctx.dunderOn', 1)[1].split('theorem', 1)[0]
+        assert 'if ctx.classDefines o.cls name then' in self.SEM
+
+    def test_all_four_container_operations_consult_it(self):
+        for name in ('__contains__', '__getitem__', '__setitem__', '__delitem__'):
+            assert f'"{name}" with' in self.SEM, name
+        assert 'match ctx.dunderOn h₂ c "__contains__" with' in self.SEM
+        assert 'match ctx.dunderOn h₂ c "__getitem__" with' in self.SEM
+        assert 'match ctx.dunderOn h₃ (.ref r) "__setitem__" with' in self.SEM
+        assert 'match ctx.dunderOn h₂ (.ref r) "__delitem__" with' in self.SEM
+
+    def test_not_in_negates_the_methods_truthiness(self):
+        assert '(if neg then !rv.truthy else rv.truthy)' in self.SEM
+
+    def test_a_class_without_the_method_keeps_its_hole(self):
+        """The fallbacks are the labels that existed before; nothing became a guess."""
+        for label in ('in:non-container', 'index:unsupported',
+                      'setIndex:immutable-containers', 'delIndex:immutable-containers'):
+            assert f'"{label}"' in self.SEM, label
+        assert '"m.py:<module>.plainIn"' in self.SEM and '"m.py:<module>.boxedIn"' in self.SEM
+
+    def test_fuel_monotonicity_covers_the_dispatch(self):
+        fm = (ROOT / 'Autoform/FuelMono.lean').read_text()
+        assert fm.count('Ctx.dunderOn_resolves hd') == 4
+        assert 'theorem Ctx.dunderOn_resolves' in self.SEM

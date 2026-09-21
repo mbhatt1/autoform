@@ -317,9 +317,27 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 dsimp only at hy ⊢
                 rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
                 rw [hB] at hy
-                cases r₂ <;> first
-                  | (cases hy; exact absurd rfl hne)
-                  | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                cases r₂ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val c =>
+                    rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                    dsimp only at hy ⊢
+                    -- `__contains__` on an ordinary instance is the one recursive branch;
+                    -- the structural `valIn` path is fuel-free.
+                    cases hd : ctx.dunderOn h₂ c "__contains__" with
+                    | none => rw [hd] at hy; exact hy
+                    | some rf =>
+                        obtain ⟨r, fn⟩ := rf
+                        rw [hd] at hy
+                        dsimp only at hy ⊢
+                        obtain ⟨cls, hrm⟩ := Ctx.dunderOn_resolves hd
+                        rcases hF : applyFunc ctx k h₂ fn (some (.ref r)) [x] [] with ⟨h₃, r₃⟩
+                        rw [hF] at hy
+                        cases r₃ <;> first
+                          | (cases hy; exact absurd rfl hne)
+                          | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]; exact hy)
         | index a b =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
@@ -333,9 +351,22 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 dsimp only at hy ⊢
                 rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
                 rw [hB] at hy
-                cases r₂ <;> first
-                  | (cases hy; exact absurd rfl hne)
-                  | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                cases r₂ with
+                | exn v => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                | outOfFuel => cases hy; exact absurd rfl hne
+                | val kv =>
+                    rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                    dsimp only at hy ⊢
+                    -- `__getitem__` on an ordinary instance: the result IS the call.
+                    cases hd : ctx.dunderOn h₂ x "__getitem__" with
+                    | none => rw [hd] at hy; exact hy
+                    | some rf =>
+                        obtain ⟨r, fn⟩ := rf
+                        rw [hd] at hy
+                        dsimp only at hy ⊢
+                        obtain ⟨cls, hrm⟩ := Ctx.dunderOn_resolves hd
+                        exact ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hy hne
         -- `xs[lo:hi:st]`: four sub-expressions in CPython's order, then a fuel-free
         -- payload computation. Same shape as `index`, two levels deeper.
         | slice a lo hi st =>
@@ -946,9 +977,34 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     dsimp only at hy ⊢
                     rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
                     rw [hB] at hy
-                    cases r₂ <;> first
-                      | (cases hy; exact absurd rfl hne)
-                      | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                    cases r₂ with
+                    | exn e => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | outOfFuel => cases hy; exact absurd rfl hne
+                    | val iv =>
+                        rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                        dsimp only at hy ⊢
+                        -- Only the ordinary-instance arm recurses (`__delitem__`); the
+                        -- payload arms are fuel-free.
+                        cases hp : h₂.payload r with
+                        | list vs => rw [hp] at hy; exact hy
+                        | dict kvs => rw [hp] at hy; exact hy
+                        | tuple vs => rw [hp] at hy; exact hy
+                        | none =>
+                            rw [hp] at hy
+                            dsimp only at hy ⊢
+                            cases hd : ctx.dunderOn h₂ (.ref r) "__delitem__" with
+                            | none => rw [hd] at hy; exact hy
+                            | some rf =>
+                                obtain ⟨r', fn⟩ := rf
+                                rw [hd] at hy
+                                dsimp only at hy ⊢
+                                obtain ⟨cls, hrm⟩ := Ctx.dunderOn_resolves hd
+                                rcases hF : applyFunc ctx k h₂ fn (some (.ref r)) [iv] [] with ⟨h₃, r₃⟩
+                                rw [hF] at hy
+                                cases r₃ <;> first
+                                  | (cases hy; exact absurd rfl hne)
+                                  | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]; exact hy)
                 all_goals (dsimp only at hy ⊢; exact hy)
         -- Boxed containers, step 3: `setIndex` recurses now, so it needs the same
         -- three-level unfolding `setDerefIref` uses -- one level per sub-expression, in
@@ -977,9 +1033,34 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         dsimp only at hy ⊢
                         rcases hC : evalExpr ctx k h₂ ρ b with ⟨h₃, r₃⟩
                         rw [hC] at hy
-                        cases r₃ <;> first
-                          | (cases hy; exact absurd rfl hne)
-                          | (rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy)
+                        cases r₃ with
+                        | exn e => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | hole l => rw [ihE _ hctx _ _ _ _ _ hC (by simp)]; exact hy
+                        | outOfFuel => cases hy; exact absurd rfl hne
+                        | val iv =>
+                            rw [ihE _ hctx _ _ _ _ _ hC (by simp)]
+                            dsimp only at hy ⊢
+                            -- Only the ordinary-instance arm recurses (`__setitem__`);
+                            -- the payload arms are fuel-free.
+                            cases hp : h₃.payload r with
+                            | list vs => rw [hp] at hy; exact hy
+                            | dict kvs => rw [hp] at hy; exact hy
+                            | tuple vs => rw [hp] at hy; exact hy
+                            | none =>
+                                rw [hp] at hy
+                                dsimp only at hy ⊢
+                                cases hd : ctx.dunderOn h₃ (.ref r) "__setitem__" with
+                                | none => rw [hd] at hy; exact hy
+                                | some rf =>
+                                    obtain ⟨r', fn⟩ := rf
+                                    rw [hd] at hy
+                                    dsimp only at hy ⊢
+                                    obtain ⟨cls, hrm⟩ := Ctx.dunderOn_resolves hd
+                                    rcases hF : applyFunc ctx k h₃ fn (some (.ref r)) [iv, vv] [] with ⟨h₄, r₄⟩
+                                    rw [hF] at hy
+                                    cases r₄ <;> first
+                                      | (cases hy; exact absurd rfl hne)
+                                      | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]; exact hy)
                     all_goals (dsimp only at hy ⊢; exact hy)
         -- `xs[lo:hi:st] = v`: `setIndex`'s shape with two more bound levels. Order is
         -- the semantics' -- value, target (must be a ref), lower, upper, step.

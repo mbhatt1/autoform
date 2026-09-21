@@ -343,7 +343,7 @@ theorem Cache_contains_mrefines :
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
   simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
-        hg, hfld]
+        Ctx.dunderOn, Val.unbox, hg, hfld]
 
 /-- Membership is not constant: it answers `true` for a present key and `false` for an
 absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
@@ -359,7 +359,7 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
-          f_cachetools___init___py__module__Cache___contains__]
+          Ctx.dunderOn, Val.unbox, f_cachetools___init___py__module__Cache___contains__]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
 
