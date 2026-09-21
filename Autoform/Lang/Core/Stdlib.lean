@@ -227,6 +227,337 @@ def listSetSlice (vs : List Val) (lo hi st : Option Int) (ys : List Val) : Excep
       let ks := sliceIdx lower upper step
       if ks.length == ys.length then .ok (listSetAt vs ks ys) else .error "ValueError"
 
+/-! ## `str()`, `repr()` and `format()`
+
+Python's three string conversions, exactly as the language defines them and only where
+the answer is a function of the value alone.
+
+* `repr(x)` — "a string containing a printable representation of an object ... for many
+  types ... a string that would yield an object with the same value when passed to
+  `eval()`" (docs.python.org, Built-in Functions § `repr`). For `int`, `bool`, `None`,
+  `str`, `list`, `tuple` and `dict` that string is determined by the value, and
+  `pyRepr` produces it. For everything else — a float (shortest round-trip decimal,
+  `Float.lean` header: deliberately unmodelled), an instance (`<C object at 0x…>`, an
+  address), a function or class — it is `none`, which the builtin turns into a hole that
+  names the kind. An instance whose class defines `__repr__`/`__str__` never reaches this
+  file: `builtinDunderTarget` in `Semantics.lean` runs the method first (Data model
+  § `object.__repr__`, § `object.__str__`).
+* `str(x)` — the "informal" representation. `str` of a `str` is the string itself; for
+  every other type "the default implementation defined by the built-in type `object`
+  calls `object.__repr__()`" (Data model § `object.__str__`), and the builtin types that
+  matter here print the same under both.
+* `format(value, format_spec)` — "the default `format_spec` is an empty string which
+  usually gives the same effect as calling `str(value)`" (Built-in Functions § `format`).
+  A non-empty spec is interpreted by the value's type under the Format Specification
+  Mini-Language (Library § `string`, "Format Specification Mini-Language"); the subset
+  implemented below is the part whose output is exact — fill, align, `0`, width, string
+  precision, and the `s`/`d` presentation types — and every other spec is a hole that
+  quotes the spec, never an approximation.
+
+The string escaping in `repr` follows CPython's `unicode_repr` (`Objects/unicodeobject.c`):
+single quotes unless the string contains `'` and no `"`; `\\`, the quote, `\n`, `\r`, `\t`
+escaped; other control characters and DEL as `\xNN`. Non-ASCII characters are printed
+as-is when Unicode-printable and escaped otherwise — a property Core does not carry — so
+a string with any character above U+007F is `none` here rather than guessed. -/
+
+/-- One lowercase hex digit. -/
+private def hexDigit (n : Nat) : Char :=
+  if n < 10 then Char.ofNat (48 + n) else Char.ofNat (87 + n)
+
+/-- `repr` of a `str`, per `unicode_repr`; `none` past ASCII (see the section note). -/
+def pyReprStr (s : String) : Option String :=
+  let cs := s.toList
+  if cs.any (fun c => c.toNat > 0x7f) then none else
+  let q : Char := if cs.contains '\'' && !cs.contains '"' then '"' else '\''
+  let esc (c : Char) : List Char :=
+    if c == '\\' then ['\\', '\\']
+    else if c == q then ['\\', q]
+    else if c == '\n' then ['\\', 'n']
+    else if c == '\r' then ['\\', 'r']
+    else if c == '\t' then ['\\', 't']
+    else if c.toNat < 0x20 || c.toNat == 0x7f then
+      ['\\', 'x', hexDigit (c.toNat / 16), hexDigit (c.toNat % 16)]
+    else [c]
+  some (String.mk (q :: (cs.flatMap esc ++ [q])))
+
+mutual
+/-- `repr(v)` where it is a function of the value; `none` otherwise (floats, instances,
+callables, builtin-based instances — the last because their class may override it). The
+container spellings are CPython's: `[1, 2]`, `(1,)`, `{'a': 1}`. Every recursive call is
+on a subterm, which keeps this reducible by `rfl`/`decide` like `Val.beq`. -/
+def pyRepr : Val → Option String
+  | .int i    => some (toString i)
+  | .bool b   => some (if b then "True" else "False")
+  | .unit     => some "None"
+  | .str s    => pyReprStr s
+  | .list vs  => (pyReprL vs).map (fun ps => "[" ++ ", ".intercalate ps ++ "]")
+  | .tuple [x] => (pyRepr x).map (fun r => "(" ++ r ++ ",)")
+  | .tuple vs => (pyReprL vs).map (fun ps => "(" ++ ", ".intercalate ps ++ ")")
+  | .dict kvs => (pyReprP kvs).map (fun ps => "{" ++ ", ".intercalate ps ++ "}")
+  | _         => none
+/-- `repr` of every element, or `none` if any element has none. -/
+def pyReprL : List Val → Option (List String)
+  | []      => some []
+  | v :: vs =>
+      match pyRepr v, pyReprL vs with
+      | some r, some rs => some (r :: rs)
+      | _, _            => none
+/-- `repr` of every `key: value` pair. -/
+def pyReprP : List (Val × Val) → Option (List String)
+  | []           => some []
+  | (k, v) :: ps =>
+      match pyRepr k, pyRepr v, pyReprP ps with
+      | some kr, some vr, some rs => some ((kr ++ ": " ++ vr) :: rs)
+      | _, _, _                   => none
+end
+
+/-- `str(v)`: a `str` is itself; everything else prints as its `repr` (Data model
+§ `object.__str__`: the default `__str__` calls `__repr__`, and for `int`, `bool`,
+`None` and the containers the two agree). -/
+def pyStr : Val → Option String
+  | .str s => some s
+  | v      => pyRepr v
+
+/-- The kind of a value `pyStr`/`pyRepr` decline, for the hole label. -/
+private def printKind : Val → String
+  | .float _     => "float"
+  | .str _       => "str-non-ascii"
+  | .ref _       => "instance"
+  | .fn _        => "function"
+  | .clos _ _    => "closure"
+  | .clsClos _ _ => "class"
+  | .bobj _ _    => "builtin-based-instance"
+  | .iref _ _    => "interior-pointer"
+  | .list _      => "list"
+  | .tuple _     => "tuple"
+  | .dict _      => "dict"
+  | _            => "value"
+
+/-- `str(v)` as a result: the string, or a hole naming what could not be printed. -/
+def strE (v : Val) : EResult :=
+  match pyStr v with
+  | some s => .val (.str s)
+  | none   => .hole s!"format:unprintable:{printKind v}"
+
+/-- `repr(v)` as a result. -/
+def reprE (v : Val) : EResult :=
+  match pyRepr v with
+  | some s => .val (.str s)
+  | none   => .hole s!"format:unprintable:{printKind v}"
+
+/-- The parsed subset of the Format Specification Mini-Language:
+`[[fill]align]["0"][width]["." precision][type]`. `fill` is `some` only when written
+(the `0` option's effect depends on that); `sign`, `z`, `#` and grouping are not in the
+subset and make `parseSpec` answer `none`. -/
+structure FmtSpec where
+  fill      : Option Char := none
+  align     : Option Char := none
+  zero      : Bool        := false
+  width     : Nat         := 0
+  precision : Option Nat  := none
+  ty        : Option Char := none
+
+private def isAlign (c : Char) : Bool := c == '<' || c == '>' || c == '=' || c == '^'
+
+/-- Leading decimal digits and the rest. -/
+private def takeDigits : List Char → Nat → Nat × List Char
+  | c :: cs, acc => if c.isDigit then takeDigits cs (acc * 10 + (c.toNat - 48)) else (acc, c :: cs)
+  | [],      acc => (acc, [])
+
+/-- `parseSpec` after the `[[fill]align]` prefix. -/
+private def parseSpecRest (fill : Option Char) (align : Option Char) (cs : List Char) :
+    Option FmtSpec :=
+  match cs with
+  -- sign / `z` / `#` / grouping / nested fields: outside the implemented subset
+  | c :: _ =>
+      if c == '+' || c == '-' || c == ' ' || c == 'z' || c == '#' || c == '{' then none else
+      let (zero, r1) := match cs with | '0' :: r => (true, r) | _ => (false, cs)
+      let (width, r2) := takeDigits r1 0
+      match r2 with
+      | ',' :: _ | '_' :: _ => none
+      | '.' :: r3 =>
+          match r3 with
+          | d :: _ =>
+              if d.isDigit then
+                let (p, r4) := takeDigits r3 0
+                match r4 with
+                | []  => some { fill, align, zero, width, precision := some p }
+                | [t] => some { fill, align, zero, width, precision := some p, ty := some t }
+                | _   => none
+              else none
+          | [] => none
+      | []  => some { fill, align, zero, width }
+      | [t] => some { fill, align, zero, width, ty := some t }
+      | _   => none
+  | [] => some { fill, align }
+
+/-- Parse a format spec into the implemented subset, or `none`. The `[[fill]align]`
+prefix is disambiguated as the grammar does: a second character that is an align makes
+the first the fill. -/
+def parseSpec (spec : String) : Option FmtSpec :=
+  match spec.toList with
+  | a :: b :: r =>
+      if isAlign b then parseSpecRest (some a) (some b) r
+      else if isAlign a then parseSpecRest none (some a) (b :: r)
+      else parseSpecRest none none (a :: b :: r)
+  | [a] => if isAlign a then parseSpecRest none (some a) [] else parseSpecRest none none [a]
+  | []  => some {}
+
+/-- Pad `s` to `width` with `fill` under `align`; `'='` is the caller's business. -/
+private def padTo (fill : Char) (align : Char) (width : Nat) (s : String) : String :=
+  let n := s.length
+  if width ≤ n then s else
+  let pad := width - n
+  let f (k : Nat) : String := String.mk (List.replicate k fill)
+  if align == '<' then s ++ f pad
+  else if align == '^' then f (pad / 2) ++ s ++ f (pad - pad / 2)
+  else f pad ++ s
+
+/-- Presentation types an `int` accepts but this subset does not implement (hole), as
+opposed to a code CPython rejects with `ValueError` ("Unknown format code"). -/
+private def intCodeKnown (t : Char) : Bool :=
+  t == 'b' || t == 'c' || t == 'e' || t == 'E' || t == 'f' || t == 'F' || t == 'g' ||
+  t == 'G' || t == 'n' || t == 'o' || t == 'x' || t == 'X' || t == '%'
+
+/-- The body of `fmtInt` once the presentation type has been checked. -/
+def fmtIntBody (i : Int) (sp : FmtSpec) : EResult :=
+  match sp.precision with
+  | some _ => .exn (.str "ValueError")
+  | none =>
+    let fill  := sp.fill.getD (if sp.zero then '0' else ' ')
+    let align := sp.align.getD (if sp.zero then '=' else '>')
+    let digits := toString i.natAbs
+    let sign := if i < 0 then "-" else ""
+    if align == '=' then
+      let body := padTo fill '>' (sp.width - sign.length) digits
+      .val (.str (sign ++ body))
+    else .val (.str (padTo fill align sp.width (sign ++ digits)))
+
+/-- An `int` (or a `bool`, which formats as an `int` once a spec is present) under a
+parsed spec. Mini-language: numbers align right by default; `0` before the width means
+fill `0` and sign-aware `=` alignment when no explicit alignment is given; precision is
+"not allowed in integer format specifier"; `s` is an "Unknown format code" for an int. -/
+def fmtInt (i : Int) (sp : FmtSpec) (spec : String) : EResult :=
+  match sp.ty with
+  | some t =>
+      if t == 'd' then fmtIntBody i sp
+      else if intCodeKnown t then .hole s!"format:spec:{spec}"
+      else .exn (.str "ValueError")
+  | none => fmtIntBody i sp
+
+/-- The body of `fmtStr` once the presentation type has been checked. -/
+def fmtStrBody (s : String) (sp : FmtSpec) : EResult :=
+  let align := sp.align.getD '<'
+  if align == '=' then .exn (.str "ValueError") else
+  let fill := sp.fill.getD (if sp.zero then '0' else ' ')
+  let s' := match sp.precision with
+    | some p => String.mk (s.toList.take p)
+    | none   => s
+  .val (.str (padTo fill align sp.width s'))
+
+/-- A `str` under a parsed spec. Mini-language: strings align left by default; `=` is
+"not allowed in string format specifier"; since 3.10 a leading `0` no longer changes a
+string's alignment (it is still the fill when none is written); precision truncates;
+`d` is an "Unknown format code" for a str. -/
+def fmtStr (s : String) (sp : FmtSpec) : EResult :=
+  match sp.ty with
+  | some t => if t == 's' then fmtStrBody s sp else .exn (.str "ValueError")
+  | none   => fmtStrBody s sp
+
+/-- `format(v, spec)`. An empty spec is `str(v)` (Built-in Functions § `format`); a
+non-empty spec goes to the type's `__format__`: `int`/`bool` and `str` are the
+mini-language above; `None`, `list`, `tuple` and `dict` inherit `object.__format__`,
+which "raises `TypeError` if passed any non-empty string" (Data model
+§ `object.__format__`); a float's spelling is unmodelled; an instance may define its
+own `__format__`, which Core does not run — a hole, not a guess. -/
+def fmtE (v : Val) (spec : String) : EResult :=
+  if spec == "" then strE v else
+  match parseSpec spec with
+  | none    => .hole s!"format:spec:{spec}"
+  | some sp =>
+    match v with
+    | .int i  => fmtInt i sp spec
+    | .bool b => fmtInt (if b then 1 else 0) sp spec
+    | .str s  => fmtStr s sp
+    | .unit | .list _ | .tuple _ | .dict _ => .exn (.str "TypeError")
+    | .float _ => .hole "format:unprintable:float"
+    | _        => .hole "format:instance-spec"
+
+/-- The string-conversion builtins, as one table consulted by `builtinCore` BEFORE its
+main `match`. Kept separate and `@[irreducible]` so the proofs that enumerate
+`builtinCore`'s arms (`builtin_heap_unchanged`, `builtinCore_excSafe`) see one opaque
+`Option` here instead of six arms whose right-hand sides `isDefEq` would try to
+normalise -- that was a heartbeat timeout, not a proof. `str()` with no argument is `''`;
+`format(value)` is `str(value)`; `format() argument 2 must be str, not …` is a
+`TypeError` (Built-in Functions § `format`). -/
+def strBuiltin (name : String) (args : List Val) : Option EResult :=
+  match name, args with
+  | "str",    []            => some (.val (.str ""))
+  | "str",    [x]           => some (strE x)
+  | "repr",   [x]           => some (reprE x)
+  | "format", [x]           => some (strE x)
+  | "format", [x, .str spec] => some (fmtE x spec)
+  | "format", [_, _]        => some (.exn (.str "TypeError"))
+  | _, _                    => none
+
+/-- Guard helpers: `EResult` carries no `BEq`. -/
+private def fmtIs (r : EResult) (t : String) : Bool :=
+  match r with | .val (.str u) => u == t | _ => false
+private def fmtRaises (r : EResult) (n : String) : Bool :=
+  match r with | .exn (.str m) => m == n | _ => false
+private def fmtHoles (r : EResult) (l : String) : Bool :=
+  match r with | .hole m => m == l | _ => false
+
+-- The expectations are CPython 3.11's, taken from the interpreter, not from memory.
+#guard pyStr (.list [.int 1, .str "a", .unit, .bool true, .tuple [.int 2],
+                     .dict [(.str "k", .list [.int 3])]])
+       == some "[1, 'a', None, True, (2,), {'k': [3]}]"
+#guard pyRepr (.str "it's")   == some "\"it's\""
+#guard pyRepr (.str "a\"b")   == some "'a\"b'"
+#guard pyRepr (.str "x'y\"z") == some "'x\\'y\"z'"
+#guard pyRepr (.str "tab\t nl\n bs\\ nul\x00 esc\x1b del\x7f cr\r")
+       == some "'tab\\t nl\\n bs\\\\ nul\\x00 esc\\x1b del\\x7f cr\\r'"
+#guard pyRepr (.str "é") == none          -- printability is not a property Core carries
+#guard pyStr (.tuple []) == some "()"
+#guard pyStr (.dict [])  == some "{}"
+#guard pyRepr (.int (-5)) == some "-5"
+#guard pyStr (.float (Fl.ofBits 0x3FF8000000000000)) == none   -- 1.5: shortest round-trip repr is unmodelled
+#guard fmtIs (fmtE (.int 42) ">5") "   42"
+#guard fmtIs (fmtE (.int 42) "<5") "42   "
+#guard fmtIs (fmtE (.int 42) "^6") "  42  "
+#guard fmtIs (fmtE (.int 42) "05") "00042"
+#guard fmtIs (fmtE (.int (-42)) "05") "-0042"
+#guard fmtIs (fmtE (.int (-42)) "=6") "-   42"
+#guard fmtIs (fmtE (.int 42) "*^7") "**42***"
+#guard fmtIs (fmtE (.int 42) "3") " 42"
+#guard fmtIs (fmtE (.int 1234) "2") "1234"
+#guard fmtIs (fmtE (.int 42) "=") "42"
+#guard fmtIs (fmtE (.int (-7)) "^6") "  -7  "
+#guard fmtIs (fmtE (.str "ab") "05") "ab000"
+#guard fmtIs (fmtE (.str "ab") "5") "ab   "
+#guard fmtIs (fmtE (.str "abcdef") ".3") "abc"
+#guard fmtIs (fmtE (.str "ab") "x<4") "abxx"
+#guard fmtIs (fmtE (.str "ab") "s") "ab"
+#guard fmtIs (fmtE (.int 7) "d") "7"
+#guard fmtIs (fmtE (.bool true) "d") "1"
+#guard fmtIs (fmtE (.bool true) ">6") "     1"
+#guard fmtIs (fmtE (.bool true) "") "True"
+#guard fmtIs (fmtE .unit "") "None"
+#guard fmtIs (fmtE (.tuple [.int 1]) "") "(1,)"
+-- ValueError / TypeError exactly where CPython raises them
+#guard fmtRaises (fmtE (.str "ab") "=5") "ValueError"
+#guard fmtRaises (fmtE (.int 42) "s") "ValueError"
+#guard fmtRaises (fmtE (.str "ab") "d") "ValueError"
+#guard fmtRaises (fmtE (.int 42) ".2") "ValueError"
+#guard fmtRaises (fmtE (.int 42) "q") "ValueError"
+#guard fmtRaises (fmtE (.bool true) "s") "ValueError"
+#guard fmtRaises (fmtE .unit ">5") "TypeError"
+#guard fmtRaises (fmtE (.list [.int 1]) ">5") "TypeError"
+-- outside the subset: a hole that quotes the spec, never an approximation
+#guard fmtHoles (fmtE (.int 42) "x") "format:spec:x"
+#guard fmtHoles (fmtE (.str "ab") "+5") "format:spec:+5"
+#guard fmtHoles (fmtE (.int 42) ",d") "format:spec:,d"
+
 /-! ## Iteration and ordering -/
 
 /-- What a value yields when iterated. Extends `Val.iterable` with the string case
@@ -486,7 +817,7 @@ proved by evaluation against a witness argument list (`knowsFree_complete`). -/
 the modelled builtins. -/
 def freeNames : List String :=
   excNames ++
-  [ "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "int"
+  [ "len", "abs", "sum", "min", "max", "sorted", "bool", "str", "repr", "format", "int"
   , "ord", "chr", "callable", "isinstance", "getattr", "hasattr"
   , "list", "tuple", "dict" ]
 
@@ -524,6 +855,16 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
       -- Validation can itself raise, even when the caller never raises the instance.
       ok (makeException name args)
     else
+    -- str / repr / format: `strBuiltin`, see "`str()`, `repr()` and `format()`" above. An
+    -- instance whose class defines `__str__`/`__repr__` never arrives here
+    -- (`builtinDunderTarget` runs the method first); one that does not is the hole
+    -- `format:unprintable:instance`, because its CPython spelling is an address. A `.str`
+    -- prints as itself: a caught exception cannot flow here today (`except E as e` is the
+    -- hole `control:TRY-handler-binding`), so the ambiguity the old `str`-declines-on-str
+    -- rule guarded against has no witness -- docs/languages.md §16.E.
+    match strBuiltin name args with
+    | some r => ok r
+    | none =>
     match name, args with
     -- len: code points for `str`, exactly like CPython.
     | "len", [.list vs]  => v (.int vs.length)
@@ -541,12 +882,6 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     -- bool / truthiness. Core's `Val.truthy` is the shared dynamic-language notion.
     | "bool", []       => v (.bool false)
     | "bool", [x]      => v (.bool x.truthy)
-    -- str / repr: `.int` and `.bool` only. On a `.str` we cannot tell an ordinary
-    -- string from an exception value, so we decline (module docstring, assumption 1).
-    | "str",  [.int i]  => v (.str (toString i))
-    | "str",  [.bool b] => v (.str (if b then "True" else "False"))
-    | "repr", [.int i]  => v (.str (toString i))
-    | "repr", [.bool b] => v (.str (if b then "True" else "False"))
     -- int: no string parsing (Python accepts underscores, signs, surrounding
     -- whitespace and arbitrary bases; getting that subtly wrong is not worth it).
     | "int", []         => v (.int 0)
@@ -877,6 +1212,89 @@ theorem minMax_excSafe (h : Heap) (x : Val) (isMin : Bool) (h₂ : Heap) (v : Va
   repeat' split at hm
   all_goals first | (cases hm; done) | (cases hm; exact excSafe_str (by decide))
 
+/-- `strE` and `reprE` never raise: a value prints, or the answer is a hole. -/
+theorem strE_ne_exn (v : Val) {w : Val} : strE v = .exn w → False := by
+  intro h; unfold strE at h; split at h <;> cases h
+
+theorem reprE_ne_exn (v : Val) {w : Val} : reprE v = .exn w → False := by
+  intro h; unfold reprE at h; split at h <;> cases h
+
+/-- The integer body raises only on a precision, and then `ValueError`. Proved without
+splitting inside the `.val` arms: `dsimp only` zeta-reduces the `let`s, one `split` on
+the alignment, and both arms are values. -/
+theorem fmtIntBody_excSafe (i : Int) (sp : FmtSpec) {w : Val} :
+    fmtIntBody i sp = .exn w → ExcSafe w := by
+  intro h
+  unfold fmtIntBody at h
+  split at h
+  · cases h; exact excSafe_str (by decide)
+  · -- every remaining `if` (zero, alignment, the sign) sits under a `.val`, so each
+    -- leaf is a constructor mismatch that `simp` closes
+    dsimp only at h
+    repeat' split at h
+    all_goals simp at h
+
+theorem fmtInt_excSafe (i : Int) (sp : FmtSpec) (spec : String) {w : Val} :
+    fmtInt i sp spec = .exn w → ExcSafe w := by
+  intro h
+  unfold fmtInt at h
+  split at h
+  · split at h
+    · exact fmtIntBody_excSafe _ _ h
+    · split at h
+      · simp at h
+      · cases h; exact excSafe_str (by decide)
+  · exact fmtIntBody_excSafe _ _ h
+
+/-- The string body raises only on `=` alignment, and then `ValueError`. -/
+theorem fmtStrBody_excSafe (s : String) (sp : FmtSpec) {w : Val} :
+    fmtStrBody s sp = .exn w → ExcSafe w := by
+  intro h
+  unfold fmtStrBody at h
+  repeat' (first | split at h | (dsimp only at h))
+  all_goals first
+    | (simp at h; done)
+    | (cases h; exact excSafe_str (by decide))
+
+theorem fmtStr_excSafe (s : String) (sp : FmtSpec) {w : Val} :
+    fmtStr s sp = .exn w → ExcSafe w := by
+  intro h
+  unfold fmtStr at h
+  split at h
+  · split at h
+    · exact fmtStrBody_excSafe _ _ h
+    · cases h; exact excSafe_str (by decide)
+  · exact fmtStrBody_excSafe _ _ h
+
+/-- `format` raises only `ValueError` or `TypeError`, both represented. -/
+theorem fmtE_excSafe (v : Val) (spec : String) {w : Val} : fmtE v spec = .exn w → ExcSafe w := by
+  intro h
+  unfold fmtE at h
+  split at h
+  · exact (strE_ne_exn _ h).elim
+  · split at h
+    · simp at h
+    · -- one goal per arm of `match v`, in source order
+      split at h
+      all_goals first
+        | (simp at h; done)
+        | exact fmtInt_excSafe _ _ _ h
+        | exact fmtStr_excSafe _ _ h
+        | (cases h; exact excSafe_str (by decide))
+
+/-- The string-conversion table raises only represented names. -/
+theorem strBuiltin_excSafe {name : String} {args : List Val} {v : Val} :
+    strBuiltin name args = some (.exn v) → ExcSafe v := by
+  intro h
+  unfold strBuiltin at h
+  repeat' split at h
+  all_goals first
+    | exact (strE_ne_exn _ (Option.some.inj h)).elim
+    | exact (reprE_ne_exn _ (Option.some.inj h)).elim
+    | exact fmtE_excSafe _ _ (Option.some.inj h)
+    | (cases h; done)
+    | (cases h; exact excSafe_str (by decide))
+
 theorem builtinCore_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : String)
     (args : List Val) (h₂ : Heap) (v : Val) :
     builtinCore d h name args = some (h₂, .exn v) → ExcSafe v := by
@@ -886,12 +1304,16 @@ theorem builtinCore_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : 
   dsimp only [raiseE] at hb
   split at hb
   · exact makeException_excSafe (Or.inr (Prod.mk.inj (Option.some.inj hb)).2)
-  · repeat' split at hb
-    all_goals first
-      | (cases hb; done)
-      | (simp at hb; done)
-      | (cases hb; exact excSafe_str (by decide))
-      | exact minMax_excSafe _ _ _ _ _ hb
+  · -- the string-conversion table, then the main match
+    split at hb
+    · rename_i r hsb
+      exact strBuiltin_excSafe (hsb.trans (congrArg some (Prod.mk.inj (Option.some.inj hb)).2))
+    · repeat' split at hb
+      all_goals first
+        | (cases hb; done)
+        | (simp at hb; done)
+        | (cases hb; exact excSafe_str (by decide))
+        | exact minMax_excSafe _ _ _ _ _ hb
 
 theorem builtin_excSafe {d : Dialect} (hd : d = .python) (h : Heap) (name : String)
     (args : List Val) (h₂ : Heap) (v : Val) :
@@ -1048,6 +1470,7 @@ private def freeWitness : String → List Val
   | "bool"       => []
   | "str"        => [.int 0]
   | "repr"       => [.int 0]
+  | "format"     => [.int 0, .str ">3"]
   | "int"        => []
   | "ord"        => [.str "a"]
   | "chr"        => [.int 65]
@@ -1086,7 +1509,8 @@ private def methodWitness : String → Val × List Val
 `builtin_none_of_not_knowsFree`, `knowsFree` is exactly the set of answered names. -/
 theorem knowsFree_complete :
     freeNames.all (fun n => (builtin .python wHeap n (freeWitness n)).isSome) = true := by
-  decide
+  -- `+kernel`: the formatter arms are `@[irreducible]`, which the kernel ignores.
+  decide +kernel
 
 /-- Every name `knowsMethod` accepts is genuinely answered by `method` on some
 receiver. -/
@@ -1165,12 +1589,15 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
     simp only at hb
     split at hb
     · simp_all
-    · split at hb <;> simp_all [Option.map_eq_some_iff, builtinCore.minMax] <;>
-        (try split at hb) <;> (try simp_all) <;>
-        (try (obtain ⟨_, h1, _⟩ := hb; exact h1.symm)) <;>
-        (try (obtain ⟨_, _, h1, _⟩ := hb; exact h1.symm)) <;>
-        (try (rcases hb with ⟨_, h1, _⟩ | ⟨_, h1, _⟩ <;> exact h1.symm)) <;>
-        (try (rename_i hx; exact hx.2.1.symm))
+    · -- the string-conversion table (one opaque `Option`), then the main match
+      split at hb
+      · simp_all
+      · split at hb <;> simp_all [Option.map_eq_some_iff, builtinCore.minMax] <;>
+          (try split at hb) <;> (try simp_all) <;>
+          (try (obtain ⟨_, h1, _⟩ := hb; exact h1.symm)) <;>
+          (try (obtain ⟨_, _, h1, _⟩ := hb; exact h1.symm)) <;>
+          (try (rcases hb with ⟨_, h1, _⟩ | ⟨_, h1, _⟩ <;> exact h1.symm)) <;>
+          (try (rename_i hx; exact hx.2.1.symm))
 
 /-- Reading back a key just written returns what was written. -/
 @[simp] theorem dictGet_dictSet_self (ps : List (Val × Val)) (k v : Val)
@@ -1283,7 +1710,7 @@ private def Mth (r : Val) (n : String) (as : List Val) : Option MethodResult :=
 #eval B "str"  [.int (-5)]                          -- val (str "-5")
 #eval B "str"  [.bool true]                         -- val (str "True")
 #eval B "repr" [.int 12]                            -- val (str "12")
-#eval B "str"  [.str "x"]                           -- none  (exception ambiguity)
+#eval B "str"  [.str "x"]                           -- val (str "x")
 #eval B "int"  [.bool true]                         -- val (int 1)
 #eval B "ord"  [.str "A"]                           -- val (int 65)
 #eval B "chr"  [.int 65]                            -- val (str "A")

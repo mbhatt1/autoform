@@ -5968,52 +5968,130 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def goFile: Boolean = currentFile.toLowerCase.endsWith(".go")
   def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
 
-  /** One `{...}` field of an f-string.
-    *
-    * `Left` carries the reason it is not expressible, so the hole says which of the two
-    * different problems it is rather than lumping them together.
-    *
-    * A field with no conversion and no format spec means exactly `str(value)` — that is
-    * the language definition, not an approximation — so it becomes `Expr.call "str"`.
-    * `{x!r}` is `repr(x)` and `{x:>10.2f}` is `format(x, '>10.2f')`; Core models neither,
-    * and a formatting model invented here would be worse than a hole.
-    *
-    * The frontend records neither the conversion nor the spec anywhere but the source
-    * text — `{command!r}` has a single child whose code is `command` — so the only sound
-    * test is whether the field's text *is* the expression's text. `{x}` passes; `{x!r}`,
-    * `{x:>10}`, `{x=}` and anything the frontend rewrote into a prelude (`{tmp1 = ...}`)
-    * do not, and are refused rather than silently stripped. */
-  def fstringField(c: Call): Either[String, ujson.Obj] = {
-    val ks = kidsOf(c)
-    val inner = c.code.trim.stripPrefix("{").stripSuffix("}")
-    if (ks.size != 1) Left("shape")
-    else if (inner != ks.head.code.trim) Left("conversion-or-spec")
-    else Right(ujson.Obj("k" -> "call", "f" -> "str", "args" -> ujson.Arr(expr(ks.head))))
+  /** Decode the escapes of a Python (non-raw) string segment, as the lexer does
+    * (Lexical analysis § "String and Bytes literals", the escape-sequence table):
+    * `\\`, `\'`, `\"`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, up to three octal
+    * digits, `\xhh`, `\uxxxx`, `\Uxxxxxxxx`, and backslash-newline (dropped). A `\N{name}`
+    * needs the Unicode database and is `None`; an unrecognised escape "is left in the
+    * string unchanged, i.e., the backslash is left in the result", which is also what is
+    * done here. */
+  def pyDecodeEscapes(raw: String): Option[String] = {
+    val out = new StringBuilder
+    var i = 0
+    def hex(k: Int): Option[Int] =
+      if (i + k <= raw.length && raw.substring(i, i + k).forall(c => Character.digit(c, 16) >= 0))
+        Some(Integer.parseInt(raw.substring(i, i + k), 16))
+      else None
+    while (i < raw.length) {
+      val c = raw.charAt(i)
+      if (c != '\\' || i + 1 >= raw.length) { out.append(c); i += 1 }
+      else {
+        val e = raw.charAt(i + 1)
+        i += 2
+        e match {
+          case '\\' => out.append('\\')
+          case '\'' => out.append('\'')
+          case '"'  => out.append('"')
+          case 'a'  => out.append('\u0007')
+          case 'b'  => out.append('\b')
+          case 'f'  => out.append('\f')
+          case 'n'  => out.append('\n')
+          case 'r'  => out.append('\r')
+          case 't'  => out.append('\t')
+          case 'v'  => out.append('\u000b')
+          case '\n' => ()
+          case 'x'  => hex(2) match { case Some(n) => out.append(n.toChar); i += 2; case None => return None }
+          case 'u'  => hex(4) match { case Some(n) => out.append(n.toChar); i += 4; case None => return None }
+          case 'U'  => hex(8) match { case Some(n) => out.appendAll(Character.toChars(n)); i += 8; case None => return None }
+          case 'N'  => return None
+          case d if d >= '0' && d <= '7' =>
+            var n = d - '0'; var k = 1
+            while (k < 3 && i < raw.length && raw.charAt(i) >= '0' && raw.charAt(i) <= '7') {
+              n = n * 8 + (raw.charAt(i) - '0'); i += 1; k += 1
+            }
+            out.append(n.toChar)
+          case other => out.append('\\').append(other)
+        }
+      }
+    }
+    Some(out.toString)
   }
 
-  /** An f-string: the concatenation of its literal segments and its fields.
+  /** One `{...}` field of an f-string: `{expr}`, `{expr!c}`, `{expr:spec}` or
+    * `{expr!c:spec}` (Lexical analysis § f-strings: `fstring_replacement_field`).
     *
-    * ## What this does and does not close
-    *
-    * The *structure* is now translated: `f'version {v}'` is `"version " + str(v)`, which
-    * is what CPython does. What it runs into is a Core limitation that already existed
-    * and is now visible in more places: `Stdlib.builtin`'s `str` answers on `.int` and
-    * `.bool` and **declines on `.str`**, because Core represents an exception as a bare
-    * `Val.str` and cannot tell one from an ordinary string. So `f'{n}'` with an integer
-    * evaluates; `f'{s}'` with a string is the runtime hole `call:str`.
-    *
-    * That is a moved hole, not a closed one, and it is recorded as such: the AST-level
-    * `op:formatString` count goes to zero while the residue reappears at run time under a
-    * label that names the actual blocker — Core's `str`, not the f-string. Inventing a
-    * string conversion here to make the number look better is the thing not done. */
+    * The frontend records neither the conversion nor the spec anywhere but the source
+    * text — `{command!r}` has a single child whose code is `command` — so both are read
+    * off the field's text after the child's own text. Per the Format String Syntax
+    * (Library § string): `!s` calls `str()`, `!r` calls `repr()`, `!a` calls `ascii()`,
+    * and the conversion happens BEFORE the spec is applied; a field with neither is
+    * `format(value, '')`, which is `str(value)` (Built-in Functions § format). So
+    * `{x}` is `str(x)`, `{x!r}` is `repr(x)`, `{x:>5}` is `format(x, '>5')` and
+    * `{x!r:>5}` is `format(repr(x), '>5')` -- `Stdlib.strBuiltin` implements the three
+    * names, and a spec outside its exact subset is a run-time hole `format:spec:<spec>`,
+    * never an approximation. `!a` (ASCII escaping of non-ASCII) and the debug specifier
+    * `{x=}` are refused here; a spec with a nested field (`{x:{w}}`) too. */
+  def fstringField(c: Call): Either[String, ujson.Obj] = {
+    val ks = kidsOf(c)
+    val inner = c.code.trim.stripPrefix("{").stripSuffix("}").trim
+    if (ks.size != 1) Left("shape")
+    else {
+      val ec = ks.head.code.trim
+      if (!inner.startsWith(ec)) Left("shape")
+      else {
+        val rest = inner.drop(ec.length).trim
+        if (rest.startsWith("=")) Left("debug-specifier")
+        else {
+          val (conv, spec): (Option[Char], Option[String]) =
+            if (rest.isEmpty) (None, None)
+            else if (rest.startsWith("!") && rest.length >= 2) {
+              val cv = rest.charAt(1)
+              val after = rest.drop(2)
+              if (after.isEmpty) (Some(cv), None)
+              else if (after.startsWith(":")) (Some(cv), Some(after.drop(1)))
+              else return Left("shape")
+            }
+            else if (rest.startsWith(":")) (None, Some(rest.drop(1)))
+            else return Left("shape")
+          if (spec.exists(sp => sp.contains('{') || sp.contains('}'))) Left("nested-spec")
+          else conv match {
+            case Some(cv) if cv != 'r' && cv != 's' => Left("conversion-" + cv)
+            case _ =>
+              val base = expr(ks.head)
+              val converted = conv match {
+                case Some('r') => ujson.Obj("k" -> "call", "f" -> "repr", "args" -> ujson.Arr(base))
+                case Some(_)   => ujson.Obj("k" -> "call", "f" -> "str",  "args" -> ujson.Arr(base))
+                case None      => base
+              }
+              spec match {
+                case Some(sp) =>
+                  Right(ujson.Obj("k" -> "call", "f" -> "format",
+                    "args" -> ujson.Arr(converted, ujson.Obj("k" -> "str", "v" -> sp))))
+                case None =>
+                  if (conv.isDefined) Right(converted)
+                  else Right(ujson.Obj("k" -> "call", "f" -> "str", "args" -> ujson.Arr(base)))
+              }
+          }
+        }
+      }
+    }
+  }
+
+  /** An f-string: the concatenation of its literal segments and its fields (Lexical
+    * analysis § f-strings). A literal segment's `code` is the raw source, so its escapes
+    * are decoded here as the lexer would (`pyDecodeEscapes`) and "any doubled curly
+    * braces (`{{` or `}}`) outside replacement fields are replaced with the corresponding
+    * single curly brace". The value is `str`-typed `+` over the parts, which is what
+    * CPython's `BUILD_STRING` computes; each field is `str`/`repr`/`format` of its value
+    * (`fstringField`), so a value Core cannot print is a run-time hole that names its
+    * kind (`format:unprintable:<kind>`), not a wrong string. */
   def fstring(kids: List[AstNode]): ujson.Obj = {
     val parts: List[Either[String, ujson.Obj]] = kids.sortBy(_.order).map {
       case l: Literal =>
-        // The segment's `code` is the raw source between the braces, so a backslash in it
-        // is an escape CPython has already interpreted and we have not. Emitting the text
-        // verbatim would put a literal `\` and `n` into the string.
-        if (l.code.contains('\\')) Left("escape")
-        else Right(ujson.Obj("k" -> "str", "v" -> l.code))
+        pyDecodeEscapes(l.code.replace("{{", "{").replace("}}", "}")) match {
+          case Some(text) => Right(ujson.Obj("k" -> "str", "v" -> text))
+          case None       => Left("escape")
+        }
       case c: Call if callName(c) == "<operator>.formattedValue" => fstringField(c)
       case _ => Left("shape")
     }
@@ -6039,8 +6117,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def pyStringLit(c: String): Option[String] = {
     val re = "(?is)^([ruRU]{0,2})(\"\"\"|'''|\"|')(.*)\\2$".r
     c match {
-      case re(_, _, body) => Some(body)
-      case _              => None
+      // A raw literal (`r'...'`) keeps its backslashes (Lexical analysis § "String and
+      // Bytes literals": "the backslash is left in the result"); every other literal has
+      // its escapes decoded as the lexer decodes them, so `'a\nb'` is two lines and not
+      // a backslash and an `n` -- the silent wrong value the old identity mapping gave.
+      case re(prefix, _, body) =>
+        if (prefix.toLowerCase.contains("r")) Some(body) else pyDecodeEscapes(body)
+      case _ => None
     }
   }
   // JLS §15.8.3: `this` "denotes a value that is a reference to the object for which the
@@ -7826,19 +7909,21 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       }
     }
     // `"a" "b"` -- Python's implicit concatenation of ADJACENT string literals arrives as
-    // `<operator>.stringExpressionList` over the parts. When every part is a plain
-    // string literal the value is their concatenation and nothing else, so it is one
-    // `.str`. An f-string takes the same operator with non-literal parts, and folding
-    // those would need `str()` conversion semantics for each interpolated value; that
-    // keeps a hole, with a label that says which shape it was rather than the generic
-    // operator name.
+    // `<operator>.stringExpressionList` over the parts (Lexical analysis § "String
+    // literal concatenation": "Multiple adjacent string or bytes literals ... are allowed,
+    // and their meaning is the same as their concatenation"). A plain literal part is its
+    // decoded text; an f-string part (`"a" f"{x}"`, the same operator with a
+    // `formatString` child) is `fstring`'s `str`-typed `+` chain -- `str()` is modelled
+    // now (`Stdlib.strBuiltin`), so the concatenation is `+` over the parts. Any other
+    // part shape keeps the hole, with a label that says which shape it was.
     else if (pyFile && mfn == "<operator>.stringExpressionList") {
-      val parts = kidsOf(c).map {
-        case l: Literal => pyStringLit(l.code.trim)
-        case _          => None
+      val parts: List[Option[ujson.Obj]] = kidsOf(c).map {
+        case l: Literal => pyStringLit(l.code.trim).map(t => ujson.Obj("k" -> "str", "v" -> t))
+        case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))
+        case _ => None
       }
       if (parts.nonEmpty && parts.forall(_.isDefined))
-        ujson.Obj("k" -> "str", "v" -> parts.map(_.get).mkString)
+        parts.map(_.get).reduceLeft((a, b) => ujson.Obj("k" -> "binop", "op" -> "+", "a" -> a, "b" -> b))
       else hole("op:stringExpressionList:non-literal-part")
     }
     // TypeScript `x!` asserts a type; at run time it is `x`. JavaScript `void e` evaluates
