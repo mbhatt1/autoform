@@ -1754,12 +1754,76 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .forIn x e body =>
       match evalExpr ctx n h ρ e with
       | (h₁, .val v) =>
-        match v.iterable with
-        | some vs => execFor ctx n h₁ ρ x vs body
-        | none    => (h₁, .hole "forIn:non-iterable")
+        -- A boxed container iterates LIVE; everything else keeps the snapshot, which is
+        -- exactly right for a `Val.tuple` or `Val.str` and is all Core can do for an
+        -- unboxed `Val.list` anyway.
+        match v with
+        | .ref r =>
+            match h₁.payload r with
+            | .none => match v.iterable with
+                       | some vs => execFor ctx n h₁ ρ x vs body
+                       | none    => (h₁, .hole "forIn:non-iterable")
+            | _     => execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
+        | _ =>
+            match v.iterable with
+            | some vs => execFor ctx n h₁ ρ x vs body
+            | none    => (h₁, .hole "forIn:non-iterable")
       | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+
+/-- Live iteration over a **boxed** container (`docs/boxed-containers.md` §4).
+
+Snapshot iteration is wrong the moment a container can be mutated mid-loop, and §4 is
+explicit that it must not survive boxing: landing boxing beside a snapshot loop would
+introduce a silent wrong answer in the same change that removes one. So this re-reads the
+payload at every step instead of copying it once.
+
+The two containers differ, and CPython is the authority for both:
+
+* a `list` iterator holds the object and an index, so appending during the loop extends
+  it and deleting shortens it -- no error, just a different number of iterations;
+* a `dict` iterator raises `RuntimeError: dictionary changed size during iteration`.
+  `Obj.version` exists for this: the version is recorded when the loop starts and checked
+  at every step, which turns an invisible wrong answer into a modelled exception.
+
+A `tuple` payload is immutable, so re-reading it is the same as a snapshot. -/
+def execForRef (ctx : Ctx) :
+    Nat → Heap → Env → String → Ref → Nat → Nat → Stmt → Heap × Ctl
+  | 0,   h, _, _, _, _, _, _ => (h, .outOfFuel)
+  | n+1, h, ρ, x, r, i, ver, body =>
+      match h.payload r with
+      | .list vs =>
+          match vs[i]? with
+          | none   => (h, .normal ρ)
+          | some v =>
+            match execStmt ctx n h (ρ.set x v) body with
+            | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .brk ρ')    => (h₁, .normal ρ')
+            | (h₁, res)        => (h₁, res)
+      | .tuple vs =>
+          match vs[i]? with
+          | none   => (h, .normal ρ)
+          | some v =>
+            match execStmt ctx n h (ρ.set x v) body with
+            | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+            | (h₁, .brk ρ')    => (h₁, .normal ρ')
+            | (h₁, res)        => (h₁, res)
+      | .dict kvs =>
+          if ((h.get r).elim 0 (·.version)) != ver then
+            (h, .exn (.str "RuntimeError") ρ)
+          else
+            match kvs[i]? with
+            | none        => (h, .normal ρ)
+            | some (k, _) =>
+              match execStmt ctx n h (ρ.set x k) body with
+              | (h₁, .normal ρ') => execForRef ctx n h₁ ρ' x r (i+1) ver body
+              | (h₁, .cont ρ')   => execForRef ctx n h₁ ρ' x r (i+1) ver body
+              | (h₁, .brk ρ')    => (h₁, .normal ρ')
+              | (h₁, res)        => (h₁, res)
+      | .none => (h, .hole "forIn:non-iterable")
 
 /-- Run a loop body once per element of an already-computed sequence. -/
 def execFor (ctx : Ctx) : Nat → Heap → Env → String → List Val → Stmt → Heap × Ctl
@@ -2441,6 +2505,27 @@ private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × ERes
 -- An ordinary instance has no payload, so nothing changed for it.
 #guard match (mcallOn (.name "o") "append" [.lit (.int 3)]).2 with
        | .hole "mcall:Plain.append" => true | _ => false
+
+-- §4, live iteration. `for v in xs: del xs[0]` on [1,2].
+-- CPython sees one element and ends with [2]; a SNAPSHOT loop would see two. This is the
+-- case §4 says must not survive boxing, because it is silently wrong the moment a
+-- container can be mutated mid-loop.
+private def shrinkLoop : Heap × Ctl :=
+  execStmt setIdxCtx 300 setIdxHeap setIdxEnv
+    (.forIn "v" (.name "xs") (.delIndex (.name "xs") (.lit (.int 0))))
+
+#guard match shrinkLoop.1[0]!.payload with | .list [.int 2] => true | _ => false
+-- Iterated once, not twice: the loop variable never reached the second element.
+#guard match shrinkLoop.2 with
+       | .normal ρ => (match ρ.get "v" with | .int 1 => true | _ => false)
+       | _ => false
+
+-- A dict mutated during iteration raises, which is what `Obj.version` is for.
+-- CPython: RuntimeError: dictionary changed size during iteration.
+#guard match (execStmt setIdxCtx 300 setIdxHeap setIdxEnv
+                (.forIn "k" (.name "d")
+                  (.setIndex (.name "d") (.lit (.str "c")) (.lit (.int 3))))).2 with
+       | .exn (.str "RuntimeError") _ => true | _ => false
 
 -- An unboxed `Val.list` still holes. That case is ignorance -- the container is a value
 -- with no identity to mutate -- and removing it is the rest of this migration.

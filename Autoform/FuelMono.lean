@@ -61,7 +61,7 @@ private def CoveredCtx (ctx : Ctx) : Prop :=
 private theorem coveredCtx_all (ctx : Ctx) : CoveredCtx ctx :=
   ⟨fun _ fn _ => controlCovered_all fn.body, fun _ _ fn _ => controlCovered_all fn.body⟩
 
-/-- The seven-way simultaneous statement, at a fixed fuel `k`. -/
+/-- The eight-way simultaneous statement, at a fixed fuel `k`. -/
 private def FuelStep (k : Nat) : Prop :=
   (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (e : Expr) (h' : Heap)
         (r : EResult),
@@ -93,20 +93,26 @@ private def FuelStep (k : Nat) : Prop :=
         (body : Stmt), controlCovered body = true → ∀ (h' : Heap) (c : Ctl),
       execFor ctx k h ρ x vs body = (h', c) → c ≠ .outOfFuel →
       execFor ctx (k+1) h ρ x vs body = (h', c))
+  -- Boxed containers §4: live iteration is a separate recursive function, so it needs
+  -- its own clause here rather than riding on `execFor`'s.
+  ∧ (∀ (ctx : Ctx), CoveredCtx ctx → ∀ (h : Heap) (ρ : Env) (x : String) (r : Ref)
+        (i ver : Nat) (body : Stmt), controlCovered body = true → ∀ (h' : Heap) (c : Ctl),
+      execForRef ctx k h ρ x r i ver body = (h', c) → c ≠ .outOfFuel →
+      execForRef ctx (k+1) h ρ x r i ver body = (h', c))
 
 private theorem fuelStep : ∀ k, FuelStep k := by
   intro k
   induction k with
   | zero =>
-      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intros <;>
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intros <;>
         (rename_i hy hne
          simp only [evalExpr, applyFunc, applyClosure, evalList, evalPairs, execStmt,
-           execFor] at hy
+           execFor, execForRef] at hy
          cases hy
          exact absurd rfl hne)
   | succ k ih =>
-      obtain ⟨ihE, ihF, ihC, ihL, ihP, ihS, ihR⟩ := ih
-      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+      obtain ⟨ihE, ihF, ihC, ihL, ihP, ihS, ihR, ihRef⟩ := ih
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
       · intro ctx hctx h ρ e h' r hy hne
         cases e with
         | lit l => cases l <;> exact hy
@@ -1061,11 +1067,31 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | val v =>
                 rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                cases hit : Val.iterable v with
-                | none => rw [hit] at hy; exact hy
-                | some vs =>
-                    rw [hit] at hy
-                    exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                -- Boxed containers §4: a ref with a payload iterates live and is a
+                -- different recursive call, so it is dispatched before `iterable`.
+                cases v with
+                | ref rr =>
+                    dsimp only at hy ⊢
+                    cases hpay : h₁.payload rr with
+                    | none =>
+                        rw [hpay] at hy
+                        dsimp only at hy ⊢
+                        cases hit : Val.iterable (Val.ref rr) with
+                        | none => rw [hit] at hy; exact hy
+                        | some vs =>
+                            rw [hit] at hy
+                            exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                    | list _ | dict _ | tuple _ =>
+                        rw [hpay] at hy
+                        dsimp only at hy ⊢
+                        exact ihRef _ hctx _ _ _ _ _ _ _ hb _ _ hy hne
+                | _ =>
+                    dsimp only at hy ⊢
+                    cases hit : Val.iterable _ with
+                    | none => rw [hit] at hy; exact hy
+                    | some vs =>
+                        rw [hit] at hy
+                        exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
       · intro ctx hctx h ρ x vs bdy hfree h' c hy hne
         cases vs with
         | nil => exact hy
@@ -1079,6 +1105,58 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                  first
                    | exact hy
                    | exact ihR _ hctx _ _ _ _ _ hfree _ _ hy hne)
+      · -- Live iteration over a boxed container. Same shape as `execFor`, but the
+        -- sequence is re-read from the payload each step instead of being carried.
+        intro ctx hctx h ρ x r i ver bdy hfree h' c hy hne
+        simp only [execForRef] at hy ⊢
+        cases hpay : h.payload r with
+        | none => simp only [hpay] at hy; exact hy
+        | list vs =>
+            simp only [hpay] at hy ⊢
+            cases hidx : vs[i]? with
+            | none => simp only [hidx] at hy; exact hy
+            | some v =>
+                simp only [hidx] at hy ⊢
+                rcases hA : execStmt ctx k h (ρ.set x v) bdy with ⟨h₁, c₁⟩
+                rw [hA] at hy
+                cases c₁ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihS _ hctx _ _ _ hfree _ _ hA (by simp)]
+                     first
+                       | exact hy
+                       | exact ihRef _ hctx _ _ _ _ _ _ _ hfree _ _ hy hne)
+        | tuple vs =>
+            simp only [hpay] at hy ⊢
+            cases hidx : vs[i]? with
+            | none => simp only [hidx] at hy; exact hy
+            | some v =>
+                simp only [hidx] at hy ⊢
+                rcases hA : execStmt ctx k h (ρ.set x v) bdy with ⟨h₁, c₁⟩
+                rw [hA] at hy
+                cases c₁ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihS _ hctx _ _ _ hfree _ _ hA (by simp)]
+                     first
+                       | exact hy
+                       | exact ihRef _ hctx _ _ _ _ _ _ _ hfree _ _ hy hne)
+        | dict kvs =>
+            simp only [hpay] at hy ⊢
+            by_cases hv : ((h.get r).elim 0 (·.version)) != ver
+            · simp only [hv, if_pos] at hy ⊢; exact hy
+            · simp only [hv, if_neg] at hy ⊢
+              cases hidx : kvs[i]? with
+              | none => simp only [hidx] at hy; exact hy
+              | some kv =>
+                  obtain ⟨kk, _⟩ := kv
+                  simp only [hidx] at hy ⊢
+                  rcases hA : execStmt ctx k h (ρ.set x kk) bdy with ⟨h₁, c₁⟩
+                  rw [hA] at hy
+                  cases c₁ <;> first
+                    | (cases hy; exact absurd rfl hne)
+                    | (rw [ihS _ hctx _ _ _ hfree _ _ hA (by simp)]
+                       first
+                         | exact hy
+                         | exact ihRef _ hctx _ _ _ _ _ _ _ hfree _ _ hy hne)
 
 
 /-- The suffix scanner in `Ctx.resolve` only ever returns a function drawn from the list it
@@ -1195,7 +1273,7 @@ theorem execFor_fuel_succ {ctx : Ctx} (hctx : TFFreeCtx ctx) {k : Nat} {h h' : H
     {ρ : Env} {x : String} {vs : List Val} {body : Stmt} (hb : tfFreeS body = true)
     {c : Ctl} (he : execFor ctx k h ρ x vs body = (h', c)) (hne : c ≠ .outOfFuel) :
     execFor ctx (k+1) h ρ x vs body = (h', c) :=
-  (fuelStep k).2.2.2.2.2.2 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
+  (fuelStep k).2.2.2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
 
 /-- **Fuel monotonicity for expressions**: any larger budget gives the same heap and the
 same result. -/
@@ -1331,10 +1409,18 @@ theorem execStmt_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
   (fuelStep k).2.2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ st (controlCovered_all st) h' c he hne
 
 /-- `execFor` version, also with `Ctl.outOfFuel`. -/
+theorem execForRef_fuel_succ {ctx : Ctx} {k : Nat} {h h' : Heap} {ρ : Env} {x : String}
+    {r : Ref} {i ver : Nat} {body : Stmt} {c : Ctl}
+    (he : execForRef ctx k h ρ x r i ver body = (h', c)) (hne : c ≠ .outOfFuel) :
+    execForRef ctx (k+1) h ρ x r i ver body = (h', c) :=
+  (fuelStep k).2.2.2.2.2.2.2 ctx (coveredCtx_all ctx) h ρ x r i ver body
+    (controlCovered_all body) h' c he hne
+
+/-- `execFor` version, also with `Ctl.outOfFuel`. -/
 theorem execFor_fuel_succ_all {ctx : Ctx} {k : Nat} {h h' : Heap}
     {ρ : Env} {x : String} {vs : List Val} {body : Stmt} {c : Ctl} (he : execFor ctx k h ρ x vs body = (h', c)) (hne : c ≠ .outOfFuel) :
     execFor ctx (k+1) h ρ x vs body = (h', c) :=
-  (fuelStep k).2.2.2.2.2.2 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
+  (fuelStep k).2.2.2.2.2.2.1 ctx (coveredCtx_all ctx) h ρ x vs body (controlCovered_all body) h' c he hne
 
 /-- **Fuel monotonicity for expressions**: any larger budget gives the same heap and the
 same result. -/

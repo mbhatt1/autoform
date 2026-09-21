@@ -849,11 +849,19 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     case clsClos c cap => exact absurd hg (hcap c cap)
   simp only [evalExpr, has, hbb, hc, Heap.alloc, hm, hinit]
 
+/-- Snapshot iteration, for a subject that is not a boxed container.
+
+`hbox` is the statement change §4 of `docs/boxed-containers.md` requires: a `Val.ref`
+whose object carries a payload iterates LIVE, re-reading the container at every step, so
+it is not this equation. Every corpus today satisfies `hbox` vacuously -- nothing
+constructs a payload -- and it is stated rather than assumed so that the day something
+does, this theorem stops applying instead of quietly becoming false. -/
 theorem execStmt_forIn_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {x : String} {e : Expr} {body : Stmt} {h₁ : Heap} {v : Val} {vs : List Val}
-    (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs) :
+    (he : evalExpr ctx k h ρ e = (h₁, .val v)) (hv : v.iterable = some vs)
+    (hbox : ∀ r, v = .ref r → h₁.payload r = .none) :
     execStmt ctx (k+1) h ρ (.forIn x e body) = execFor ctx k h₁ ρ x vs body := by
-  simp [execStmt, he, hv]
+  cases v <;> simp_all [execStmt, he, hv]
 
 /-! ## 4. End-to-end: real translated functions
 
@@ -2004,8 +2012,11 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
         [("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))]
         (.forIn "x" (.name "xs") (.expr (.mcall (.name "c") "bump" [(.name "x")])))
       = (h', .normal ρ') := by
+    -- The subject is a `Val.list` VALUE, not a ref, so `hbox` holds vacuously: there is
+    -- no receiver to be boxed. This is the discharge every corpus makes today.
     rw [execStmt_forIn_val ctxT (G+9) _ _
-      (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)]
+      (evalExpr_name ctxT (G+8) _ _ "xs" (by simp)) (rfl : (Val.list (ys.map Val.int)).iterable = _)
+      (by simp)]
     exact hfor
   have hret : execStmt ctxT (G+10) h' ρ' (.ret ((Expr.name "c").field "n"))
       = (h', .ret (.int (isum ys)) ρ') :=

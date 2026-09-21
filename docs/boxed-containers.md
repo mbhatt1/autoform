@@ -1,7 +1,8 @@
 # Boxed containers for Core
 
-**Status: step 1 landed; step 2 landed in half; step 3's `setIndex` landed INERT; steps
-4-5 and the `Val.eqPy` half of step 2 unimplemented.** Read this before changing
+**Status: steps 1, 3 and 4 landed (3 and 4 INERT); step 2 landed in half; the `Val.eqPy`
+half of step 2 and step 5 unimplemented. The switchover — making `[1,2]` allocate — is not
+started and is the step that moves every number.** Read this before changing
 `Syntax.lean` or `Semantics.lean`.
 
 `Stmt.setIndex`, the new `Stmt.delIndex`, and the `MethodResult.mutating` wiring in
@@ -301,6 +302,18 @@ Both fall out of the design without a special case.
   iteration`. This is what `Obj.version` is for: the iterator records the version at
   creation and the loop head compares. Cheap, and it turns a currently-invisible wrong
   answer into a modelled exception.
+
+**Landed.** `execForRef` iterates a boxed container live: a `list` re-reads the payload
+at each index (so appending extends the loop and deleting shortens it, as CPython's
+`list_iterator` does), a `dict` records `Obj.version` at loop entry and raises
+`RuntimeError` when it changes, and a `tuple` payload is immutable so re-reading equals a
+snapshot. Everything unboxed keeps `execFor`.
+
+Cost: an eighth clause in `FuelMono`'s simultaneous induction — live iteration is a
+separate recursive function, so it needs its own fuel-monotonicity case rather than
+riding on `execFor`'s — and one statement change, `execStmt_forIn_val`, which now carries
+`hbox` saying the subject is not a boxed container. Every corpus discharges `hbox`
+vacuously today.
 
 Snapshot iteration must not be retained past this change. It is currently harmless because
 nothing can mutate a container mid-loop; boxing is what makes the case reachable. Landing
