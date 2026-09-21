@@ -59,6 +59,20 @@ following was found here rather than by inspection:
 * Python private name mangling (`__x` → `_Cls__x` inside a class body): a silently wrong
   field read returning `unit`.
 
+**Other runtimes.** The same script has backends for Node (JavaScript, and TypeScript
+through `--experimental-strip-types`), the JVM (Java; Kotlin through a compiled
+`@JvmStatic` thunk) and Go, selected by file extension or `--language`. They do less
+than the CPython tracer and the report says so in its `measurement_basis`: there is no
+test suite to trace, so each backend calls the corpus's own module-scope / static /
+package-level functions on a fixed, per-type argument pool, skips and COUNTS every
+signature it cannot encode (receivers, objects, promises, multi-value returns), and
+records `runtime_version`. What such a run establishes is that Core agrees with the
+runtime on those calls; what it does not establish is anything about the calls it
+skipped, which is why `backend_skipped_total` sits beside `agree` in the report. As of
+this writing each backend has been executed end to end only on the in-repo fixtures
+(`tests/test_differential_backends.py`), not on the language corpora in
+`docs/languages.md`.
+
 Three discipline rules the oracle operates under:
 
 * **Outcomes are three-valued, never two**: agree / diverge / INCONCLUSIVE. A case that

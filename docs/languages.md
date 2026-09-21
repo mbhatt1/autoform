@@ -46,14 +46,25 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 |---|---|---|---|---|---|---|---|---|---|
 | Python | yes | yes | yes | `.python` ✅ | 209 | 90% | 108 (51%) | 0.4% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
-| Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
-| Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
-| TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (21%) | 4% | **none** |
-| JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | **none** |
-| JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | **none** |
+| Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | JVM backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | `go test` backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (21%) | 4% | Node (`--experimental-strip-types`) backend present; the fixture run covers `.js` only, **not yet run on `.ts` or on this corpus** |
+| JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | Node backend present; ran end to end on the in-repo fixture (`tests/test_differential_backends.py`, `AUTOFORM_TEST_ORACLES=1`), **not yet on this corpus** -- its sources are not in the repository |
+| JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | Node backend present; nothing to compare until it translates |
 | Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
 | Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
 | `.tsx` / `.jsx` | yes | yes | yes | **`.python` ❌ WRONG** | — | — | — | — | none |
+
+**On the "Differential oracle" column.** `scripts/differential.py` now carries a runtime
+backend for Node (JS/TS), the JVM (Java, and Kotlin through a `@JvmStatic` thunk) and Go,
+each with its own recorded `measurement_basis` (`node-numeric-pool-v1`,
+`jvm-primitive-static-v1`, `go-package-func-v1`) and `runtime_version`, selectable with
+`--language`. "Backend present; ran on the fixture" means exactly that: the oracle was
+executed end to end -- runtime, `lake build`, Lean evaluation, comparison -- on a
+three-function fixture per language and agreed with Core with 0 divergences. It is NOT a
+statement about the corpora in this table, whose sources are not in the repository; the
+day one is re-exported with `scripts/reland_corpus.sh` its conformance row goes here with
+the counts, and until then the column says "not yet on this corpus".
 
 Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
