@@ -947,3 +947,58 @@ language's own specification, cited beside the rule in `cartographer/export_ast.
   when the left does not decide, and the expression's value is then the left operand) is
   likewise unmodelled until the frontend's operator names for them are confirmed on a
   real export. Both need a Joern run, which this pass did not have.
+
+#### 16.F Iteration protocol and generators
+
+**The iteration protocol is modelled; generators are not.** `for x in obj` on an ordinary
+instance now does what the language reference says the `for` statement does
+([§8.3](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement): "An
+iterator is created for that iterable. The first item provided by the iterator is then
+assigned to the target list ... When the iterator is exhausted ... the loop terminates"),
+creating the iterator as `iter()` does
+([functions.html#iter](https://docs.python.org/3/library/functions.html#iter): the
+`__iter__()` method, else the sequence protocol -- `__getitem__()` with integer arguments
+from `0`) and driving it as the [Iterator Types](https://docs.python.org/3/library/stdtypes.html#iterator-types)
+section prescribes (`__next__()` "Return the next item from the iterator. If there are no
+further items, raise the `StopIteration` exception"). `iter(x)` and `next(x)` on such an
+instance call the dunders; `next(x, default)` returns the default on `StopIteration`
+([functions.html#next](https://docs.python.org/3/library/functions.html#next)).
+
+*How.* Core does not grow a ninth interpreter function. The loop over a user iterator is a
+statement Core synthesises (`nextDriver` / `seqDriver` in `Semantics.lean`) and runs
+through `execStmt`: the iterator is bound to a name no Python source can spell (`$iter`),
+each step is `x = $iter.__next__()` inside a `tryCatch` whose handler `break`s on
+`StopIteration` and re-raises anything else, and the body follows. `break`, `continue`
+and `return` in the body therefore mean exactly what §8.3 says because `Stmt.loop`
+already gives them that meaning, and the target keeps its last value ("names in the
+target list are not deleted when the loop is finished"). `FuelMono` covers the new arms
+(`__iter__` is one `applyFunc`; the drivers go through the statement IH); `ExcSafe`
+covers them because the only new raise is a re-raise of a caught, represented name.
+Checked against CPython 3.11 by the `iterProg` guards: a counter iterator sums to 6,
+`break` at 2 leaves `x == 2`, `__iter__` returning a list, a sequence-protocol object,
+`next()` past the end raising `StopIteration`, `next(it, 99)`, `next(iter(c))`.
+
+*Not modelled, stated.* The `for ... else` clause is the exporter's lowering, unchanged.
+`iter()` on a sequence-protocol object returns an iterator OBJECT in Python; Core has no
+value for one, so `iter(seq)` stays the builtin hole while `for` over it works. Nothing
+enforces "once `__next__()` raises `StopIteration` it must continue to do so" -- that is
+the iterator author's obligation, which CPython does not enforce either.
+
+**Generators** ([§6.2.10](https://docs.python.org/3/reference/expressions.html#yield-expressions)):
+"When a generator function is called, it returns an iterator known as a generator ... The
+execution starts when one of the generator's methods is called. At that time, the execution
+proceeds to the first yield expression, where it is suspended again." A suspended frame is
+the one thing Core's interpreter cannot represent -- `execStmt` runs a statement to its
+outcome -- so a faithful model needs either a resumable statement cursor (a `Val.gen`
+holding a saved environment and a continuation over `Stmt`) or an eager lowering that is
+only observationally equal when the body is finite and effect-free and the consumer
+exhausts it. The exporter already takes the eager route for a generator EXPRESSION whose
+consumer is immediate (§10.6, `genExpConsumers`); extending it to generator FUNCTIONS
+needs a syntactic effect-freeness proof on the body (no calls except to pure builtins, no
+attribute writes, a provably terminating loop) before `yield v` may be lowered to
+`__gen.append(v)`. That check is not written; a generator function stays whatever hole the
+exporter gives its `yield` today (none of cachetools, requests or click contains one --
+jinja2 does, and its export will name the label) rather than become a silently eager
+wrong answer. This is recorded here as the next item, with the two designs and the
+observational argument, so that whoever lands it does not have to rediscover which one is
+honest.

@@ -100,6 +100,10 @@ private def FuelStep (k : Nat) : Prop :=
       execForRef ctx k h ρ x r i ver body = (h', c) → c ≠ .outOfFuel →
       execForRef ctx (k+1) h ρ x r i ver body = (h', c))
 
+-- One declaration carries the whole eight-way induction; the iteration protocol's
+-- `__iter__` / `__next__` / sequence-protocol branches in `forIn` pushed it past the
+-- default budget.
+set_option maxHeartbeats 1000000 in
 private theorem fuelStep : ∀ k, FuelStep k := by
   intro k
   induction k with
@@ -608,6 +612,28 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     -- tail position, so the IH rewrites it in place.
                     all_goals
                       (rw [hg] at hy
+                       dsimp only at hy ⊢
+                       -- `next(it, default)` first: one `applyFunc` whose outcome is
+                       -- inspected (a `StopIteration` becomes the default), so the IH
+                       -- rewrites it in place and the two sides coincide.
+                       cases hnd : nextDefaultTarget ctx h₁ f vs with
+                       | some t =>
+                           rw [hnd] at hy
+                           obtain ⟨r, fn, d⟩ := t
+                           dsimp only at hy ⊢
+                           obtain ⟨cls, hrm⟩ := nextDefaultTarget_resolves hnd
+                           by_cases hk : kws.isEmpty = true
+                           · rw [if_pos hk] at hy ⊢
+                             rcases hF : applyFunc ctx k h₁ fn (some (.ref r)) [] []
+                               with ⟨h₂, r₂⟩
+                             rw [hF] at hy
+                             cases r₂ <;> first
+                               | (cases hy; exact absurd rfl hne)
+                               | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                  exact hy)
+                           · rw [if_neg hk] at hy ⊢; exact hy
+                       | none =>
+                       rw [hnd] at hy
                        dsimp only at hy ⊢
                        cases hbt : builtinDunderTarget ctx h₁ f vs with
                        | none => rw [hbt] at hy; exact hy
@@ -1496,11 +1522,70 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     | none =>
                         rw [hpay] at hy
                         dsimp only at hy ⊢
-                        cases hit : Val.iterable (Val.ref rr) with
-                        | none => rw [hit] at hy; exact hy
-                        | some vs =>
-                            rw [hit] at hy
-                            exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                        -- The iteration protocol: `__iter__` is one `applyFunc`; what it
+                        -- returns is driven by a synthesised statement (`ihS`), a live
+                        -- boxed loop (`ihRef`) or a snapshot (`ihR`). The sequence
+                        -- protocol is a synthesised statement too.
+                        cases hdi : ctx.dunderOn h₁ (Val.ref rr) "__iter__" with
+                        | some rf =>
+                            obtain ⟨ri, fn⟩ := rf
+                            rw [hdi] at hy
+                            dsimp only at hy ⊢
+                            obtain ⟨cls, hrm⟩ := Ctx.dunderOn_resolves hdi
+                            rcases hF : applyFunc ctx k h₁ fn (some (.ref ri)) [] [] with ⟨h₂, r₂⟩
+                            rw [hF] at hy
+                            cases r₂ with
+                            | exn v => rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]; exact hy
+                            | hole l => rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]; exact hy
+                            | outOfFuel => cases hy; exact absurd rfl hne
+                            | val it =>
+                                rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                dsimp only at hy ⊢
+                                cases it with
+                                | ref r₂ =>
+                                    dsimp only at hy ⊢
+                                    cases hpay₂ : h₂.payload r₂ with
+                                    | none =>
+                                        rw [hpay₂] at hy
+                                        dsimp only at hy ⊢
+                                        cases hdn : ctx.dunderOn h₂ (Val.ref r₂) "__next__" with
+                                        | some _ =>
+                                            rw [hdn] at hy
+                                            exact ihS _ hctx _ _ _ (by simp [nextDriver, controlCovered, hb]) _ _ hy hne
+                                        | none =>
+                                            rw [hdn] at hy
+                                            dsimp only at hy ⊢
+                                            cases hit : Val.iterable (Val.ref r₂) with
+                                            | none => rw [hit] at hy; exact hy
+                                            | some vs =>
+                                                rw [hit] at hy
+                                                exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                                    | list _ | dict _ | tuple _ =>
+                                        rw [hpay₂] at hy
+                                        dsimp only at hy ⊢
+                                        exact ihRef _ hctx _ _ _ _ _ _ _ hb _ _ hy hne
+                                | _ =>
+                                    dsimp only at hy ⊢
+                                    cases hit : Val.iterable _ with
+                                    | none => rw [hit] at hy; exact hy
+                                    | some vs =>
+                                        rw [hit] at hy
+                                        exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                        | none =>
+                            rw [hdi] at hy
+                            dsimp only at hy ⊢
+                            cases hdg : ctx.dunderOn h₁ (Val.ref rr) "__getitem__" with
+                            | some _ =>
+                                rw [hdg] at hy
+                                exact ihS _ hctx _ _ _ (by simp [seqDriver, controlCovered, hb]) _ _ hy hne
+                            | none =>
+                                rw [hdg] at hy
+                                dsimp only at hy ⊢
+                                cases hit : Val.iterable (Val.ref rr) with
+                                | none => rw [hit] at hy; exact hy
+                                | some vs =>
+                                    rw [hit] at hy
+                                    exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
                     | list _ | dict _ | tuple _ =>
                         rw [hpay] at hy
                         dsimp only at hy ⊢
