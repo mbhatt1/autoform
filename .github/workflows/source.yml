@@ -73,7 +73,7 @@ jobs:
         env:
           AUTOFORM_TEST_JOERN: '1'
           AUTOFORM_REQUIRE_LEAN: '1'
-        run: python -m pytest tests/test_source_pipeline.py tests/test_source_numeric.py tests/test_control_flow.py tests/test_python_handlers.py tests/test_python_raises.py tests/test_python_signatures.py tests/test_python_binding.py tests/test_python_receivers.py tests/test_python_callable_shapes.py tests/test_spec_synthesis.py tests/test_linux_pipeline.py -q
+        run: python -m pytest tests/test_source_pipeline.py tests/test_source_numeric.py tests/test_control_flow.py tests/test_python_handlers.py tests/test_python_raises.py tests/test_python_signatures.py tests/test_python_binding.py tests/test_python_receivers.py tests/test_python_callable_shapes.py tests/test_production_gaps.py tests/test_spec_synthesis.py tests/test_linux_pipeline.py -q
       - name: Installed source CLI outside checkout
         run: |
           cd "$RUNNER_TEMP"

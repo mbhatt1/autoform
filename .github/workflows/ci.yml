@@ -146,6 +146,9 @@ jobs:
       # standing, documented condition, so treating 3 as a hard failure made this step
       # permanently red, which is how a genuine mismatch would have gone unnoticed among
       # the noise. A module becoming unverifiable for any OTHER reason still fails.
+      # The tolerated list below is the ONE in docs/integrity.md ("Input availability"):
+      # Ansible, LinuxCrypto and LinuxLib have tracked manifests but untracked ASTs.
+      # Change both or neither.
       - name: check_render — committed modules are renders of committed ASTs
         run: |
           set -o pipefail
@@ -388,3 +391,122 @@ jobs:
           lake env lean Demo.lean 2>&1 | tee demo.out || true
           grep -q "TRUSTED-CODE LEAK" demo.out
           grep -q "VACUOUS" demo.out
+
+  # ------------------------------------------------------------------ #
+  # The Joern-gated suites. Everything above runs without Joern by design;
+  # these are the tests that compare the exporter's output to the REAL
+  # runtimes -- CPython, cc, javac, go, node -- through the real frontend.
+  # They live behind AUTOFORM_TEST_JOERN=1 because Joern is a ~1.7 GB
+  # download, which means an ordinary `pytest` never runs them and a
+  # regression in the numeric or signature semantics is invisible until
+  # someone remembers to set the flag. So they run here, on every push.
+  #
+  # Two guards that are easy to get wrong:
+  #   * Joern is installed from the pinned release asset, never
+  #     `joern-install.sh` and never "latest": the neutral AST is a function
+  #     of the frontend build (docs/running.md §1), and the pin is checked
+  #     against the jars actually on disk before a single test runs.
+  #   * A gated test that SKIPS still shows green. The last step fails the
+  #     job if pytest reports the skip reason these tests use, because a
+  #     silently skipped gate is exactly the shape of failure this repository
+  #     keeps re-learning (an oracle that no-ops looks like one that passes).
+  # ------------------------------------------------------------------ #
+  joern-gated:
+    name: Joern-gated suites (real frontend, real runtimes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+
+      - name: Install elan / Lean (pinned)
+        run: |
+          set -euo pipefail
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Cache .lake
+        uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ hashFiles('lakefile.toml', 'Autoform/**/*.lean', 'Autoform.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+            lake-${{ runner.os }}-
+
+      - uses: actions/cache@v4
+        id: joern
+        with:
+          path: ~/joern
+          key: joern-${{ runner.os }}-${{ hashFiles('joern-version') }}
+
+      - name: Install pinned Joern
+        if: steps.joern.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fL "https://github.com/joernio/joern/releases/download/v$(cat joern-version)/joern-cli.zip" -o /tmp/joern.zip
+          mkdir -p "$HOME/joern"
+          unzip -q /tmp/joern.zip -d "$HOME/joern"
+
+      # Reads the version out of the jar names on disk, as provenance.py does. This is
+      # what catches an installer that "exited 0" having installed nothing.
+      - name: Installed Joern matches the pin
+        run: python3 scripts/provenance.py joern-version --check
+
+      - name: Install the Python tooling
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pytest -r requirements.txt
+
+      # JOERN_HOME is deliberately unset: every harness defaults to ~/joern, which is
+      # where the step above unpacked it, and `${{ env.HOME }}` is not a job-level
+      # expression GitHub evaluates.
+      - name: Gated suites against the real runtimes
+        env:
+          AUTOFORM_TEST_JOERN: '1'
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q -rs \
+            tests/test_source_numeric.py \
+            tests/test_python_signatures.py \
+            tests/test_python_receivers.py \
+            tests/test_python_binding.py \
+            tests/test_python_callable_shapes.py \
+            tests/test_python_handlers.py \
+            tests/test_python_raises.py \
+            tests/test_control_flow.py \
+            tests/test_production_gaps.py \
+            2>&1 | tee /tmp/gated.log
+
+      - name: The gate actually ran (no test skipped for want of Joern)
+        run: |
+          set -euo pipefail
+          if grep -q 'set AUTOFORM_TEST_JOERN=1' /tmp/gated.log; then
+            echo "FAIL: at least one Joern-gated test SKIPPED. Joern was installed above, so" >&2
+            echo "the skip means the harness could not see it -- a gate that skips is a gate" >&2
+            echo "that passed by not looking. Skip reasons:" >&2
+            grep 'SKIPPED' /tmp/gated.log >&2 || true
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: joern-gated-evidence
+          path: |
+            /tmp/gated.log
+            artifacts/pipeline/
+          if-no-files-found: warn
