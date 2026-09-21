@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-Click.json",
+ "artifact_bytes": 3722946,
+ "artifact_sha256": "74726948e19319897d80aadb3650dbcb95f61082ea9d3e2c7b7a70674e07add7",
+ "command": "scripts/reland_corpus.sh /private/tmp/corp_click Click",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "b82b43eae510fdcb4d6a9b949ebe8c56cb1c86119fec9f0edf0d5bcc39e4b310",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/corp_click",
+ "source_revision": "tree-sha256:42ee03eeaa468fcea0752aa8b1ed6e47cd9e96b07ee503ca8d490b398ce1ea99:17files"
+}

@@ -23,6 +23,13 @@
       "render_bytes": 354688,
       "render_sha256": "38112e88aa8262a066f83ce3aa54248e4133f2b9b081d5a6b739db2749e829f5"
     },
+    "Click": {
+      "ast_bytes": 3722946,
+      "ast_sha256": "74726948e19319897d80aadb3650dbcb95f61082ea9d3e2c7b7a70674e07add7",
+      "ast_tracked": true,
+      "render_bytes": 1426216,
+      "render_sha256": "b16611a1183ba783bc29f7b91f7ca12b9adafac0ef6d5ed37c0aeda07e2d7032"
+    },
     "LangC": {
       "ast_bytes": 175419,
       "ast_sha256": "19c1a0420c48dc1186416aff6b7a0d46eafebe6880ad70045d485442013d6cb4",

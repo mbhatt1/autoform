@@ -217,7 +217,13 @@ class Encoder:
             raise Unencodable("callable")
         fields = {}
         if hasattr(obj, "__dict__"):
-            fields.update(vars(obj))
+            # `vars` can hand back something that is not a dict -- click's objects with a
+            # `__dict__` descriptor returning None did -- and that is an object we cannot
+            # snapshot faithfully, not a dict with no entries.
+            d = vars(obj)
+            if not isinstance(d, dict):
+                raise Unencodable("non-dict-__dict__")
+            fields.update(d)
         for cls in type(obj).__mro__:
             for s in getattr(cls, "__slots__", ()) or ():
                 if hasattr(obj, s): fields[s] = getattr(obj, s)
@@ -2632,4 +2638,11 @@ def _run_on_a_big_stack(fn):
 
 
 if __name__ == "__main__":
+    # The oracle is headless. A corpus function that reads the terminal (`click.prompt`,
+    # `getpass`) must see EOF, not this process's stdin: a prompt that blocks would hang
+    # every run and one that echoes fills the log with password warnings.
+    try:
+        sys.stdin = open(os.devnull)
+    except OSError:
+        pass
     sys.exit(_run_on_a_big_stack(main))
