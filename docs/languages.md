@@ -352,12 +352,28 @@ the worked program as a `#guard_msgs` — two calls through a closure, owning fr
 both writes, `2`. It is checked on every build rather than asserted here, because "the
 semantics can already do this" is the kind of claim that rots.
 
-What actually blocks it is the exporter's shape. Converting a variable to a cell is a
-whole-scope rewrite — box it at its definition, then rewrite every read and write in that
-scope and all nested ones — and the exporter translates one method at a time. A missed read
-site produces a stale value with no hole marking it, which is worse than the hole that is
-there now. So the remedy is an exporter pass, and the reason it has not been written is
-cost and risk, not expressiveness.
+**Done.** The exporter now boxes the name in the scope that defines it and lets the
+closure share the cell, reusing the `boxedLocals` machinery that already existed for C
+address-taken locals. Two sets per function: the enclosing scope's names get the box and
+the allocation prologue, the closure's get the same `field`/`setField` treatment and
+explicitly NO prologue — allocating there would rebind the name to a fresh box and
+destroy the alias.
+
+The safety condition is the whole content, and it is checked rather than assumed. The box
+must exist when the closure captures it, so the enclosing function must bind the name by a
+plain assignment at the top level of its body **before the first nested `def`**. A binding
+inside an `if`, or after the `def`, does not dominate the capture: the parent leaves the
+name a plain value, and telling the closure it is boxed would read a field off an integer.
+Those keep the hole. One level of nesting; deeper chains keep it too.
+
+On cachetools this closes all 8 sites — every one is the decorator idiom, `hits = misses =
+0` before `def wrapper`. Checked end to end: `counter()` with a `nonlocal hits` increment
+called twice returns `2`, as in CPython, and the `if`-bound variant still holes.
+
+One bug worth recording, because it was silent in the first pass: `globalDeclNames` strips
+the literal prefix `global`, so on `nonlocal x` it returns the name `"nonlocal x"`. The
+membership test then failed and the hole stayed — the harmless direction that time, but
+the same parser was one edit away from deciding a name WAS boxed when it was not.
 
 ### 12. A `@property` read was a silent wrong answer, and is now a hole
 

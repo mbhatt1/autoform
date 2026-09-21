@@ -34,7 +34,8 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        staticMethod=False, positionalOnly=[], keywordOnly=[], required=['a'])
+        staticMethod=False, nonlocalUses=[], nonlocalDefines=[],
+        positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
     # holes the definition. A LITERAL default is modelled, so it clears the flag and
     # appears in `defaultValues` instead -- binding it at call time is indistinguishable
@@ -293,3 +294,74 @@ class TestPropertyAccessHoles:
         exactly what happened first."""
         src = (ROOT / 'cartographer/export_ast.sc').read_text()
         assert src.count('call:python-property-access') == 2
+
+
+class TestNonlocalBoxing:
+    """`nonlocal x` writes, via the exporter's existing local-boxing machinery.
+
+    `Expr.closure` captures the environment BY VALUE, so a plain write can never reach
+    the frame that owns the variable — which is why this was the hole
+    `scope:nonlocal-write`. Capturing a `Val.ref` by value still shares the object behind
+    it, so the enclosing scope boxes the name and both scopes read and write the one
+    cell. Core needs nothing new: `boxNew`/`field`/`setField` already do this.
+
+    The safety condition is the whole content. The box must exist when the closure
+    captures it, so the enclosing function has to bind the name by a plain assignment at
+    the top level of its body BEFORE the first nested `def`. A binding inside an `if`
+    does not dominate the capture, and treating the name as boxed anyway would read a
+    field off an integer — a wrong answer where the hole was right.
+    """
+
+    def test_the_safe_idiom_is_boxed_on_both_sides(self):
+        source = ('def counter():\n'
+                  '    hits = 0\n\n'
+                  '    def bump():\n'
+                  '        nonlocal hits\n'
+                  '        hits += 1\n\n'
+                  '    return hits\n')
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['counter']['nonlocalDefines'] == ['hits']
+        assert recs['counter']['nonlocalUses'] == []
+        assert recs['bump']['nonlocalUses'] == ['hits']
+        assert recs['bump']['nonlocalDefines'] == []
+
+    def test_a_binding_that_does_not_dominate_the_capture_is_refused(self):
+        """`n = 0` inside an `if` leaves the parent unboxed, so the child must NOT be
+        told the name is boxed — it would read `n.v` off a plain integer."""
+        source = ('def unsafe():\n'
+                  '    if True:\n'
+                  '        n = 0\n\n'
+                  '    def bump():\n'
+                  '        nonlocal n\n'
+                  '        n += 1\n\n'
+                  '    return n\n')
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['unsafe']['nonlocalDefines'] == []
+        assert recs['bump']['nonlocalUses'] == []
+
+    def test_a_binding_after_the_def_is_refused(self):
+        """Lexical order matters: the closure is created before the box exists."""
+        source = ('def late():\n'
+                  '    def bump():\n'
+                  '        nonlocal n\n'
+                  '        n += 1\n'
+                  '    n = 0\n'
+                  '    return n\n')
+        recs = {v['name']: v for v in _decode(source)['signatures'].values()}
+        assert recs['late']['nonlocalDefines'] == []
+        assert recs['bump']['nonlocalUses'] == []
+
+    def test_the_declaration_parser_is_not_the_global_one(self):
+        """`globalDeclNames` strips the literal prefix `global`, which leaves
+        `nonlocal x` as the name `"nonlocal x"` — silently, and the caller then keeps a
+        hole that should have gone. That cost a debugging cycle."""
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert 'def nonlocalDeclNames' in src
+        assert 'nonlocalDeclNames(u).forall(capturedBoxes.contains)' in src
+
+    def test_captured_boxes_get_no_allocation_prologue(self):
+        """Allocating in the closure would rebind the name to a fresh box and destroy
+        the alias the box exists to create. `prologues` iterates `boxedLocals` only."""
+        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        assert 'val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.map' in src
+        assert 'capturedBoxes' in src

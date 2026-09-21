@@ -153,6 +153,17 @@ tree = ast.parse(source)
 # way to read one back -- which makes the assignment unobservable, but only if nothing
 # tries to observe it. Checked rather than assumed: if this module touches any of the
 # chaining attributes, every `raise ... from ...` in it keeps holing.
+# `id(func) -> enclosing function`, for the `nonlocal` box analysis.
+_parent_function = {}
+def _index_parents(node, current):
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _parent_function[id(child)] = current
+            _index_parents(child, child)
+        else:
+            _index_parents(child, current)
+_index_parents(tree, None)
+
 reads_exception_chain = any(
     isinstance(n, ast.Attribute)
     and n.attr in ('__cause__', '__context__', '__suppress_context__')
@@ -206,6 +217,83 @@ def handler(node, scopes):
     accepted = sorted({name for name in represented
                        if any(issubclass(exceptions[name], exceptions[t.id]) for t in types)})
     return dict(result, kind='typed', accepted=accepted)
+
+# `nonlocal x` write support, via the exporter's existing local-boxing machinery.
+#
+# `Expr.closure` captures the enclosing environment BY VALUE, so a plain write can never
+# reach the frame that owns the variable -- which is why `scope:nonlocal-write` is a hole.
+# Capturing a `Val.ref` by value still shares the object behind it, so the fix is to box
+# the variable in the scope that DEFINES it and read/write it through its box in both
+# scopes. Core needs nothing new; `boxNew`/`field`/`setField` already do this.
+#
+# Two sets per function:
+#   nonlocalUses    -- names THIS function declares `nonlocal`. Read/written through a
+#                      box that the enclosing scope allocated; no prologue here, or it
+#                      would rebind the name to a fresh box and destroy the alias.
+#   nonlocalDefines -- names a DIRECTLY nested function declares `nonlocal` and this
+#                      function binds. These get the box and the allocation prologue.
+#
+# `nonlocalDefines` is guarded: the name must be bound by a plain assignment at the top
+# level of this function's body BEFORE the first nested `def`. The box has to exist when
+# the closure captures it, and a binding inside an `if` or a loop does not dominate the
+# capture. One level of nesting only. Anything else keeps the hole, which is why the
+# guard is a set intersection rather than an assertion.
+def nonlocal_boxes(node):
+    if isinstance(node, ast.Lambda):
+        return {'nonlocalUses': [], 'nonlocalDefines': []}
+    defines = _nonlocal_defines(node)
+    # A name is read/written through a box HERE only if the enclosing function actually
+    # boxed it. Declaring `nonlocal n` is not enough: if the parent binds `n` inside an
+    # `if`, no box dominates the capture, the parent leaves `n` a plain value, and
+    # treating it as boxed here would read a field off an integer -- a wrong answer
+    # where the hole was right. Checked against the parent, not assumed from the
+    # declaration.
+    parent = _parent_function.get(id(node))
+    boxed_by_parent = _nonlocal_defines(parent) if parent is not None else set()
+    uses = sorted({n for st in node.body for n in _direct_nonlocals(st)} & boxed_by_parent)
+    return {'nonlocalUses': uses, 'nonlocalDefines': sorted(defines)}
+
+
+# Names a DIRECTLY nested function declares `nonlocal` and that `node` binds by a plain
+# assignment at the top level of its body BEFORE the first nested `def` -- so the box
+# exists when the closure captures it. One level of nesting. Everything else keeps the
+# hole.
+def _nonlocal_defines(node):
+    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return set()
+    wanted = set()
+    for inner in ast.walk(node):
+        if inner is node or not isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for st in inner.body:
+            wanted.update(_direct_nonlocals(st))
+    bound = set()
+    for st in node.body:
+        if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            break
+        if isinstance(st, ast.Assign):
+            for tgt in st.targets:
+                for nm in ast.walk(tgt):
+                    if isinstance(nm, ast.Name) and isinstance(nm.ctx, ast.Store):
+                        bound.add(nm.id)
+    own = {n for st in node.body for n in _direct_nonlocals(st)}
+    return (wanted & bound) - own
+
+
+# `nonlocal` statements in a statement subtree, not descending into nested functions --
+# a nested function's `nonlocal` binds against ITS enclosing scope, not this one.
+def _direct_nonlocals(st):
+    out = set()
+    stack = [st]
+    while stack:
+        x = stack.pop()
+        if isinstance(x, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        if isinstance(x, ast.Nonlocal):
+            out.update(x.names)
+        stack.extend(ast.iter_child_nodes(x))
+    return out
+
 
 # Parameter defaults, but only when EVERY default is a literal.
 #
@@ -301,7 +389,8 @@ def visit(node, scopes):
             'required': [a.arg for a in [*node.args.posonlyargs, *node.args.args]
                 [:len(node.args.posonlyargs) + len(node.args.args) - len(node.args.defaults)]] +
                 [a.arg for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults) if v is None],
-            **literal_defaults(node)}
+            **literal_defaults(node),
+            **nonlocal_boxes(node)}
         # Defaults and decorators belong to the defining scope. The function's
         # parameters and local assignments only shadow names inside its body.
         for value in [*node.args.defaults, *node.args.kw_defaults,
@@ -1318,6 +1407,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * binding (`expr`'s `Identifier`/`MethodParameterIn` cases, `assignTo`, `incrStmt`,
     * and the `<operator>.addressOf` case in `callExpr`). */
   var boxedLocals = Set.empty[String]
+
+  /** Names this method reads and writes through a box that SOMEONE ELSE allocated: the
+    * `nonlocal` targets of a Python closure. Same `Expr.field`/`Stmt.setField` treatment
+    * as `boxedLocals`, and deliberately NOT part of `prologues` -- allocating here would
+    * rebind the name to a fresh box and destroy the very alias the box exists to create.
+    * Same shape as `closedOutParams`, for the same reason. */
+  var capturedBoxes = Set.empty[String]
+
+  /** Read/written through a box, whoever allocated it. */
+  def isBoxed(nm: String): Boolean = boxedLocals.contains(nm) || capturedBoxes.contains(nm)
 
   /** `003-box-address-taken-locals`: `pointerLocalName -> boxedLocalName`, for a
     * pointer-typed local that is PROVABLY, syntactically, an alias of one specific
@@ -5739,7 +5838,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // `003-box-address-taken-locals`: a plain read of a boxed local/parameter reads
     // the box's one field instead of the name directly -- `x` itself now holds the
     // `Val.ref`, not the value (see `boxedLocals`, `boxableName`).
-    case i: Identifier if boxedLocals.contains(localName(i.name)) => boxField(localName(i.name))
+    case i: Identifier if isBoxed(localName(i.name)) => boxField(localName(i.name))
     // `006-reduce-remaining-holes`, Story 5: array-to-pointer decay -- a boxed
     // array read as a bare VALUE (an assignment RHS, a binop operand, ...) is,
     // in C, the address of its first element; `&a[i]`/`a[i]` themselves are
@@ -7888,7 +7987,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // `003-box-address-taken-locals`: a plain write to a boxed local/parameter
       // writes the box's one field instead of rebinding the name -- see `expr`'s
       // matching read-side case just above, and `boxedLocals`.
-      case i: Identifier if boxedLocals.contains(localName(i.name)) =>
+      case i: Identifier if isBoxed(localName(i.name)) =>
         val nm = localName(i.name)
         ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> combine(boxField(nm)))
       // `006-reduce-remaining-holes`, Story 5: the C frontend spells BOTH
@@ -8140,6 +8239,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def globalDeclNames(u: Unknown): List[String] =
     u.code.trim.stripPrefix("global").split(",").map(_.trim).filter(_.nonEmpty).toList
 
+  /** The names a `nonlocal x, y` statement declares. Separate from `globalDeclNames`
+    * because that one strips the literal prefix `global`, which leaves `nonlocal x` as
+    * the name `"nonlocal x"` -- silently, and the caller then decides the name is not
+    * boxed and keeps a hole that should have gone away. */
+  def nonlocalDeclNames(u: Unknown): List[String] =
+    u.code.trim.stripPrefix("nonlocal").split(",").map(_.trim).filter(_.nonEmpty).toList
+
   /** `++x` / `x++` / `--x` / `x--` as a **statement**.
     *
     * With the value discarded, all four are `x = x ± 1`, and prefix and postfix are
@@ -8183,7 +8289,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // `003-box-address-taken-locals`: `x++`/`x--` on a boxed local, same rewrite as
       // a plain write (`assignTo`'s matching case) -- `x`'s own binding holds the ref,
       // not the value, so the bump has to go through the box's field.
-      case i: Identifier if boxedLocals.contains(localName(i.name)) =>
+      case i: Identifier if isBoxed(localName(i.name)) =>
         val nm = localName(i.name)
         ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> bump(boxField(nm)))
       case i: Identifier =>
@@ -8232,7 +8338,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def targetReadExpr(lhs: AstNode): Option[ujson.Obj] = lhs match {
     case i: Identifier =>
       val nm = localName(i.name)
-      Some(if (boxedLocals.contains(nm)) boxField(nm) else ujson.Obj("k" -> "name", "v" -> nm))
+      Some(if (isBoxed(nm)) boxField(nm) else ujson.Obj("k" -> "name", "v" -> nm))
     case fa if asField(fa).isDefined =>
       val (r, f) = asField(fa).get
       Some(ujson.Obj("k" -> "field", "a" -> expr(r), "f" -> f))
@@ -8991,7 +9097,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case u: Unknown if u.code.trim.startsWith("global ") =>
       seqOf(globalDeclNames(u).map(x => ujson.Obj("k" -> "declGlobal", "x" -> x)))
     case u: Unknown if u.code.trim.startsWith("nonlocal ") =>
-      holeS("scope:nonlocal-write")
+      // Once every name it mentions is boxed, the declaration itself carries no
+      // meaning: the writes already go through the shared cell. If any name is NOT
+      // boxed -- the enclosing scope did not bind it before the closure was created,
+      // so no box dominates the capture -- this stays the hole it has always been,
+      // because a write that cannot reach the owning frame is a wrong answer.
+      if (nonlocalDeclNames(u).forall(capturedBoxes.contains)) skip
+      else holeS("scope:nonlocal-write")
     // The label carries the frontend's PARSER NODE TYPE, not the source text.
     //
     // It used to be the first word of the code, which made the label space unbounded:
@@ -9558,6 +9670,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case _       => None
       }).groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2) }
     boxedLocals = candidates.keySet
+    // Python `nonlocal`: the enclosing scope boxes the name (and gets the prologue),
+    // the closure reads and writes the same cell without one. The extractor only
+    // reports a name as defined here when it is bound at the top level of this
+    // function before the first nested `def`, so the box exists when the closure
+    // captures it -- everything else keeps the hole.
+    capturedBoxes = Set.empty
+    if (pyFile) pythonSignatureInfo(m).foreach { sig =>
+      boxedLocals ++= sig("nonlocalDefines").arr.map(_.str).toSet
+      capturedBoxes = sig("nonlocalUses").arr.map(_.str).toSet
+    }
     // `p -> n`: every pointer-typed local provably aliasing exactly one boxed local
     // for its whole lifetime -- `p = &n` is the ONLY assignment to `p` anywhere in
     // this method (see `ptrAliases`'s own doc comment for why this must be stricter
@@ -10418,6 +10540,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     boundMethods = Map.empty
     attrsOf = Map.empty
     boxedLocals = Set.empty
+    capturedBoxes = Set.empty
     ptrAliases = Map.empty
     closedOutParams = Set.empty
     fnPtrVars = Map.empty
