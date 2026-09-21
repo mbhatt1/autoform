@@ -143,6 +143,79 @@ def seqIndex (n : Nat) (i : Int) : Option Nat :=
 /-- Remove the element at a resolved position. -/
 def dropAt (vs : List Val) (k : Nat) : List Val := vs.take k ++ vs.drop (k + 1)
 
+/-! ## Slices
+
+CPython's `slice.indices(len)`, then the positions it denotes. Every function here is a
+closed arithmetic computation rather than a loop: the number of positions is computed
+first and the positions are generated from it, so totality is by construction and the
+indices are in range by construction — no `toNat` clamping can misfire. -/
+
+/-- A slice bound as the interpreter receives it. `unit` is Python's `None` — the default
+for the step's direction — and anything that is not an integer is a `TypeError`
+(`none` here). -/
+def sliceBound : Val → Option (Option Int)
+  | .unit  => some none
+  | .int i => some (some i)
+  | _      => none
+
+/-- `slice(lo, hi, st).indices(n)` exactly as CPython normalises it, returning
+`(lower, upper, step)`. `none` for a zero step, which is a `ValueError`.
+
+For a positive step a negative bound counts from the end and both bounds clamp to
+`[0, n]`; for a negative step the defaults are `n-1` and "before 0", and both bounds clamp
+to `[-1, n-1]`. -/
+def sliceBounds (n : Nat) (lo hi st : Option Int) : Option (Int × Int × Int) :=
+  let len : Int := n
+  let step := st.getD 1
+  if step == 0 then none else
+  let norm (i : Int) : Int := if i < 0 then i + len else i
+  let clamp (i : Int) : Int :=
+    if step > 0 then max 0 (min i len) else max (-1) (min i (len - 1))
+  let lower := match lo with
+    | none   => if step > 0 then 0 else len - 1
+    | some i => clamp (norm i)
+  let upper := match hi with
+    | none   => if step > 0 then len else -1
+    | some i => clamp (norm i)
+  some (lower, upper, step)
+
+/-- The positions a normalised slice denotes, in slice order. Both operands of the
+division are non-negative on the branch where it is taken, so `/` is unambiguous. -/
+def sliceIdx (lower upper step : Int) : List Nat :=
+  let count : Nat :=
+    if step > 0 then (if lower < upper then ((upper - lower - 1) / step + 1).toNat else 0)
+    else (if lower > upper then ((lower - upper - 1) / (-step) + 1).toNat else 0)
+  (List.range count).map (fun j => (lower + (j : Int) * step).toNat)
+
+/-- `sliceBounds` then `sliceIdx`. -/
+def sliceIndices (n : Nat) (lo hi st : Option Int) : Option (List Nat) :=
+  (sliceBounds n lo hi st).map (fun (l, u, s) => sliceIdx l u s)
+
+/-- The elements at the given positions, in that order. -/
+def slicePick (vs : List Val) (ks : List Nat) : List Val := ks.filterMap (vs[·]?)
+
+/-- Positional assignment at the given positions. -/
+def listSetAt (vs : List Val) (ks : List Nat) (ys : List Val) : List Val :=
+  (ks.zip ys).foldl (fun acc (k, y) => acc.set k y) vs
+
+/-- Everything except the given positions. -/
+def listDelIdx (vs : List Val) (ks : List Nat) : List Val :=
+  ((List.range vs.length).zip vs).filterMap (fun (i, v) => if ks.contains i then none else some v)
+
+/-- `xs[lo:hi:st] = ys` on a list. A unit step replaces the range with `ys`, whatever its
+length — CPython's `xs[3:1] = [9]` inserts at 3, which is why the drop point is
+`max lower upper`. Any other step is an extended-slice assignment and CPython requires
+the lengths to match. The error is the exception's NAME, which is what `.exn` carries. -/
+def listSetSlice (vs : List Val) (lo hi st : Option Int) (ys : List Val) : Except String (List Val) :=
+  match sliceBounds vs.length lo hi st with
+  | none => .error "ValueError"
+  | some (lower, upper, step) =>
+    if step == 1 then
+      .ok (vs.take lower.toNat ++ ys ++ vs.drop (max lower upper).toNat)
+    else
+      let ks := sliceIdx lower upper step
+      if ks.length == ys.length then .ok (listSetAt vs ks ys) else .error "ValueError"
+
 /-! ## Iteration and ordering -/
 
 /-- What a value yields when iterated. Extends `Val.iterable` with the string case

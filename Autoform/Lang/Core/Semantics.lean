@@ -1064,6 +1064,53 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           | _, _ => (h₂, .hole "index:unsupported")
         | (h₂, r) => (h₂, r)
       | (h₁, r) => (h₁, r)
+  | n+1, h, ρ, .slice a lo hi st =>
+      -- `xs[lo:hi:st]` (`docs/boxed-containers.md` §9 item 3, now landed). Order is
+      -- receiver, lower, upper, step -- CPython's. A bound is an `Int`, or `unit` for
+      -- Python's `None` (the default for the step's direction); anything else is a
+      -- `TypeError`, and a zero step a `ValueError`, both as CPython reports them.
+      --
+      -- A slice is a NEW container. For a boxed list receiver that means a fresh boxed
+      -- list -- `ys = xs[:]` is the idiom for a copy precisely because it does not
+      -- alias -- gated on the dialect like every other allocation. A tuple slice is a
+      -- tuple value and a string slice a string; both are immutable in Python and need
+      -- no identity. `d[1:2]` on a dict is Python's "unhashable type: 'slice'".
+      match evalExpr ctx n h ρ a with
+      | (h₁, .val c) =>
+        match evalExpr ctx n h₁ ρ lo with
+        | (h₂, .val lv) =>
+          match evalExpr ctx n h₂ ρ hi with
+          | (h₃, .val hv) =>
+            match evalExpr ctx n h₃ ρ st with
+            | (h₄, .val sv) =>
+              match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+              | some lo', some hi', some st' =>
+                match (c.unbox h₄).unbuiltin with
+                | .list vs =>
+                    match Stdlib.sliceIndices vs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks =>
+                        let picked := Stdlib.slicePick vs ks
+                        if ctx.dialect == .python then
+                          let (h₅, r) := h₄.alloc { cls := "list", fields := [], payload := .list picked }
+                          (h₅, .val (.ref r))
+                        else (h₄, .val (.list picked))
+                | .tuple vs =>
+                    match Stdlib.sliceIndices vs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks => (h₄, .val (.tuple (Stdlib.slicePick vs ks)))
+                | .str s =>
+                    let cs := s.toList
+                    match Stdlib.sliceIndices cs.length lo' hi' st' with
+                    | none    => (h₄, .exn (.str "ValueError"))
+                    | some ks => (h₄, .val (.str (String.mk (ks.filterMap (cs[·]?)))))
+                | .dict _ => (h₄, .exn (.str "TypeError"))
+                | _       => (h₄, .hole "slice:unsupported")
+              | _, _, _ => (h₄, .exn (.str "TypeError"))
+            | (h₄, r) => (h₄, r)
+          | (h₃, r) => (h₃, r)
+        | (h₂, r) => (h₂, r)
+      | (h₁, r) => (h₁, r)
   -- `009-reduce-remaining-holes-4`: `Expr.strByte a b` -- read the byte at position
   -- `b` of string `a`, as an `Int`. See `Syntax.lean`'s own doc comment for why this
   -- is a separate constructor from `.index` rather than a new case on it. `a`'s own
@@ -1706,6 +1753,89 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val _)     => (h₁, .hole "delIndex:immutable-containers")
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .setSlice e lo hi st v =>
+      -- `xs[lo:hi:st] = v`. Order is v, then e, then lo, hi, st: CPython evaluates the
+      -- RHS first, exactly as for `setIndex`. The RHS is any iterable -- a boxed list is
+      -- looked through, a string contributes its characters -- and a non-iterable is a
+      -- `TypeError`. A unit step replaces the range whatever the RHS length; an extended
+      -- step requires equal lengths and is otherwise a `ValueError`. Both from CPython.
+      match evalExpr ctx n h ρ v with
+      | (h₁, .val vv) =>
+        match evalExpr ctx n h₁ ρ e with
+        | (h₂, .val (.ref r)) =>
+          match evalExpr ctx n h₂ ρ lo with
+          | (h₃, .val lv) =>
+            match evalExpr ctx n h₃ ρ hi with
+            | (h₄, .val hv) =>
+              match evalExpr ctx n h₄ ρ st with
+              | (h₅, .val sv) =>
+                match h₅.payload r with
+                | .list vs =>
+                    match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+                    | some lo', some hi', some st' =>
+                        match (vv.unbox h₅).iterable with
+                        | none    => (h₅, .exn (.str "TypeError") ρ)
+                        | some ys =>
+                            match Stdlib.listSetSlice vs lo' hi' st' ys with
+                            | .ok vs'    => (h₅.setPayload r (.list vs'), .normal ρ)
+                            | .error ex  => (h₅, .exn (.str ex) ρ)
+                    | _, _, _ => (h₅, .exn (.str "TypeError") ρ)
+                -- A `tuple` subclass instance is immutable; a dict cannot take a slice
+                -- key ("unhashable type: 'slice'"). Both are Python `TypeError`s.
+                | .tuple _ => (h₅, .exn (.str "TypeError") ρ)
+                | .dict _  => (h₅, .exn (.str "TypeError") ρ)
+                | .none    => (h₅, .hole "setSlice:immutable-containers")
+              | (h₅, .exn ex)    => (h₅, .exn ex ρ)
+              | (h₅, .hole l)    => (h₅, .hole l)
+              | (h₅, .outOfFuel) => (h₅, .outOfFuel)
+            | (h₄, .exn ex)    => (h₄, .exn ex ρ)
+            | (h₄, .hole l)    => (h₄, .hole l)
+            | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+          | (h₃, .exn ex)    => (h₃, .exn ex ρ)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .val _)     => (h₂, .hole "setSlice:immutable-containers")
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .exn ex)    => (h₁, .exn ex ρ)
+      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .outOfFuel) => (h₁, .outOfFuel)
+  | n+1, h, ρ, .delSlice e lo hi st =>
+      -- `del xs[lo:hi:st]`: receiver, then bounds. Removes exactly the positions the
+      -- slice denotes, so `del xs[::2]` works too.
+      match evalExpr ctx n h ρ e with
+      | (h₁, .val (.ref r)) =>
+        match evalExpr ctx n h₁ ρ lo with
+        | (h₂, .val lv) =>
+          match evalExpr ctx n h₂ ρ hi with
+          | (h₃, .val hv) =>
+            match evalExpr ctx n h₃ ρ st with
+            | (h₄, .val sv) =>
+              match h₄.payload r with
+              | .list vs =>
+                  match Stdlib.sliceBound lv, Stdlib.sliceBound hv, Stdlib.sliceBound sv with
+                  | some lo', some hi', some st' =>
+                      match Stdlib.sliceIndices vs.length lo' hi' st' with
+                      | none    => (h₄, .exn (.str "ValueError") ρ)
+                      | some ks => (h₄.setPayload r (.list (Stdlib.listDelIdx vs ks)), .normal ρ)
+                  | _, _, _ => (h₄, .exn (.str "TypeError") ρ)
+              | .tuple _ => (h₄, .exn (.str "TypeError") ρ)
+              | .dict _  => (h₄, .exn (.str "TypeError") ρ)
+              | .none    => (h₄, .hole "delSlice:immutable-containers")
+            | (h₄, .exn ex)    => (h₄, .exn ex ρ)
+            | (h₄, .hole l)    => (h₄, .hole l)
+            | (h₄, .outOfFuel) => (h₄, .outOfFuel)
+          | (h₃, .exn ex)    => (h₃, .exn ex ρ)
+          | (h₃, .hole l)    => (h₃, .hole l)
+          | (h₃, .outOfFuel) => (h₃, .outOfFuel)
+        | (h₂, .exn ex)    => (h₂, .exn ex ρ)
+        | (h₂, .hole l)    => (h₂, .hole l)
+        | (h₂, .outOfFuel) => (h₂, .outOfFuel)
+      | (h₁, .val _)     => (h₁, .hole "delSlice:immutable-containers")
       | (h₁, .exn ex)    => (h₁, .exn ex ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
@@ -2623,5 +2753,93 @@ private def aliasProg : Program :=
        | .val (.bool true) => true | _ => false
 #guard match runFunc aliasProg 400 "identity" [] with
        | .val (.bool false) => true | _ => false
+
+/-! ## Slices, checked against CPython
+
+`xs = [1, 2, 3, 4, 5]`, boxed. Every expected value below is CPython's, and the failure
+cases are CPython's exceptions by name. A slice read is a fresh allocation, so its result
+is a `Val.ref` to a NEW heap cell, whose payload is what is checked. -/
+private def sliceHeap : Heap :=
+  [ { cls := "list", fields := [], payload := .list [.int 1, .int 2, .int 3, .int 4, .int 5] } ]
+private def sliceEnv : Env :=
+  [("xs", .ref 0), ("t", .tuple [.int 1, .int 2, .int 3]), ("s", .str "hello")]
+private def sU : Expr := .lit .unit
+private def sI (i : Int) : Expr := .lit (.int i)
+private def slRead (recv lo hi st : Expr) : Heap × EResult :=
+  evalExpr setIdxCtx 80 sliceHeap sliceEnv (.slice recv lo hi st)
+private def slList (r : Heap × EResult) : Option (List Val) :=
+  match r.2 with
+  | .val (.ref k) =>
+      match r.1.payload k with
+      | .list vs => some vs
+      | _        => none
+  | _ => none
+private def slStmt (st : Stmt) : Heap × Ctl := execStmt setIdxCtx 120 sliceHeap sliceEnv st
+private def slAt0 (r : Heap × Ctl) : Payload := r.1.payload 0
+
+-- xs[1:]     CPython [2, 3, 4, 5]
+#guard match slList (slRead (.name "xs") (sI 1) sU sU) with
+       | some [.int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- xs[:-1]    CPython [1, 2, 3, 4]
+#guard match slList (slRead (.name "xs") sU (sI (-1)) sU) with
+       | some [.int 1, .int 2, .int 3, .int 4] => true | _ => false
+-- xs[::-1]   CPython [5, 4, 3, 2, 1]
+#guard match slList (slRead (.name "xs") sU sU (sI (-1))) with
+       | some [.int 5, .int 4, .int 3, .int 2, .int 1] => true | _ => false
+-- xs[::2]    CPython [1, 3, 5]
+#guard match slList (slRead (.name "xs") sU sU (sI 2)) with
+       | some [.int 1, .int 3, .int 5] => true | _ => false
+-- xs[5:]     CPython []  (a start past the end is empty, not an error)
+#guard match slList (slRead (.name "xs") (sI 5) sU sU) with
+       | some [] => true | _ => false
+-- xs[-2:]    CPython [4, 5]
+#guard match slList (slRead (.name "xs") (sI (-2)) sU sU) with
+       | some [.int 4, .int 5] => true | _ => false
+-- xs[3:1]    CPython []  (reversed bounds with a positive step)
+#guard match slList (slRead (.name "xs") (sI 3) (sI 1) sU) with
+       | some [] => true | _ => false
+-- xs[::0]    CPython ValueError: slice step cannot be zero
+#guard match (slRead (.name "xs") sU sU (sI 0)).2 with
+       | .exn (.str "ValueError") => true | _ => false
+-- xs["a":]   CPython TypeError: slice indices must be integers or None
+#guard match (slRead (.name "xs") (.lit (.str "a")) sU sU).2 with
+       | .exn (.str "TypeError") => true | _ => false
+-- The slice is a COPY: the original is untouched by the read.
+#guard match (slRead (.name "xs") (sI 1) sU sU).1.payload 0 with
+       | .list [.int 1, .int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- t[1:]      CPython (2, 3) -- a tuple slice is a tuple value, not an allocation
+#guard match (slRead (.name "t") (sI 1) sU sU).2 with
+       | .val (.tuple [.int 2, .int 3]) => true | _ => false
+-- s[1:3]     CPython 'el'
+#guard match (slRead (.name "s") (sI 1) (sI 3) sU).2 with
+       | .val (.str "el") => true | _ => false
+-- s[::-1]    CPython 'olleh'
+#guard match (slRead (.name "s") sU sU (sI (-1))).2 with
+       | .val (.str "olleh") => true | _ => false
+
+-- del xs[0:1]        CPython [2, 3, 4, 5]
+#guard match slAt0 (slStmt (.delSlice (.name "xs") (sI 0) (sI 1) sU)) with
+       | .list [.int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- del xs[::2]        CPython [2, 4]
+#guard match slAt0 (slStmt (.delSlice (.name "xs") sU sU (sI 2))) with
+       | .list [.int 2, .int 4] => true | _ => false
+-- xs[0:1] = [9, 8]   CPython [9, 8, 2, 3, 4, 5]  (a unit-step assignment may resize)
+#guard match slAt0 (slStmt (.setSlice (.name "xs") (sI 0) (sI 1) sU
+                             (.listE [sI 9, sI 8]))) with
+       | .list [.int 9, .int 8, .int 2, .int 3, .int 4, .int 5] => true | _ => false
+-- xs[3:1] = [9]      CPython [1, 2, 3, 9, 4, 5]  (reversed bounds insert at `lower`)
+#guard match slAt0 (slStmt (.setSlice (.name "xs") (sI 3) (sI 1) sU (.listE [sI 9]))) with
+       | .list [.int 1, .int 2, .int 3, .int 9, .int 4, .int 5] => true | _ => false
+-- xs[::2] = [7, 7, 7]  CPython [7, 2, 7, 4, 7]
+#guard match slAt0 (slStmt (.setSlice (.name "xs") sU sU (sI 2)
+                             (.listE [sI 7, sI 7, sI 7]))) with
+       | .list [.int 7, .int 2, .int 7, .int 4, .int 7] => true | _ => false
+-- xs[::2] = [7]      CPython ValueError: attempt to assign sequence of size 1 to
+--                    extended slice of size 3
+#guard match (slStmt (.setSlice (.name "xs") sU sU (sI 2) (.listE [sI 7]))).2 with
+       | .exn (.str "ValueError") _ => true | _ => false
+-- xs[0:1] = 5        CPython TypeError: can only assign an iterable
+#guard match (slStmt (.setSlice (.name "xs") (sI 0) (sI 1) sU (sI 5))).2 with
+       | .exn (.str "TypeError") _ => true | _ => false
 
 end Autoform.Core

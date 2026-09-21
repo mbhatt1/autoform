@@ -3,8 +3,8 @@
 **Status: steps 1-4 and THE SWITCHOVER are landed.** A Python list or dict literal
 allocates, containers have identity, and aliasing works — `a = [1,2]; b = a; b[0] = 9`
 makes `a[0]` nine, as in CPython. The `Val.eqPy` half of step 2 was already landed (see
-the correction below). What remains is §8's named exclusions — slices — and the
-`(Ref, Nat)` iterator refinements beyond §4. Read this before changing
+the correction below). Slices — §9 item 3 — are landed too: `xs[a:b]`, `xs[a:b] = ys` and `del xs[a:b]`, checked
+against CPython. What remains is the `(Ref, Nat)` iterator refinements beyond §4. Read this before changing
 `Syntax.lean` or `Semantics.lean`.
 
 `Stmt.setIndex`, the new `Stmt.delIndex`, and the `MethodResult.mutating` wiring in
@@ -204,7 +204,7 @@ else match Heap.payload r with
   | .tuple _  => .exn (.str "TypeError")
   | .none     => .exn (.str "TypeError")   -- unless __setitem__ resolved above
 ```
-with `i` a slice → `Expr.hole "setIndex:slice"` (§8, item 3).
+with `i` a slice → **landed as its own statement**, `Stmt.setSlice` (see §9 item 3).
 
 `Stdlib.dictSet` already implements CPython's replace-in-place / append-at-end rule, so
 key order stays observable and correct.
@@ -231,7 +231,7 @@ Semantics mirror `setIndex`: `.dict` → `dictDel`, missing key → `KeyError`; 
 `dropAt`, out of range → `IndexError`; `.tuple`/non-container → `TypeError`. Both helpers
 already exist in `Stdlib.lean`.
 
-`del xs[a:b]` (`op:delete-slice`) stays a hole. See §8.
+`del xs[a:b]` (`op:delete-slice`) is `Stmt.delSlice` — landed, see §9 item 3.
 
 ### `list.append`, `dict.pop`, and the rest of `MethodResult.mutating`
 
@@ -617,11 +617,20 @@ Stated explicitly so they are not rediscovered as divergences.
 2. **`is` / `id` on unboxed values** (`int`, `str`, `bool`, `float`, `tuple`). CPython
    interns small integers and some strings; none of it is specified. Hole
    `is:unboxed-value-identity`.
-3. **Slice assignment and slice deletion** (`xs[a:b] = …`, `del xs[a:b]`). Needs a slice
-   *value* with tri-state `start`/`stop`/`step`, plus CPython's extended-slice length
-   rules (`xs[::2] = [...]` requires matching lengths, `xs[a:b] = ...` does not). Holes
-   `setIndex:slice`, `op:delete-slice` until Core has a slice value. Boxing is a
-   prerequisite for that work, not a substitute.
+3. **Slices — landed, and no longer in this list.** `Expr.slice`, `Stmt.setSlice` and
+   `Stmt.delSlice`, with `Stdlib.sliceBounds` reproducing CPython's `slice.indices`
+   normalisation (negative bounds count from the end, both clamp, a negative step flips
+   the defaults, a zero step is `ValueError`) and `Stdlib.listSetSlice` its two assignment
+   rules — a unit step replaces the range whatever the RHS length, an extended step demands
+   equal lengths. The tri-state bound this item asked for is NOT a new `Option` type: an
+   omitted bound is `.lit .unit`, because that is what Python means by it — `xs[None:2]`
+   *is* `xs[:2]`, `slice(None, 2, None)`. A slice read allocates a fresh list (a slice is a
+   copy, which is the whole reason `xs[:]` is an idiom), gated on the dialect like every
+   other allocation. Twenty `#guard`s in `Semantics.lean` carry CPython's answers. What
+   was not verifiable without the frontend running: whether pysrc2cpg spells an omitted
+   bound as a `None` literal or by omitting the child; the exporter accepts the former and
+   holes (`op:slice-shape`) on any child count other than three, so the failure mode of a
+   wrong guess is a hole, not a wrong answer.
 4. **Anything observing deallocation**: `weakref`, `__del__`, refcount-driven finalisation.
    The heap is append-only and never collects. `cachetools` uses `functools` machinery
    that touches weakrefs; those functions must remain holes rather than being modelled

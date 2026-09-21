@@ -804,6 +804,45 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case _ => None
   }
 
+  /** `xs[lo:hi:st]`. Joern's Python frontend emits ONE call, `<operator>.slice`, with the
+    * receiver as its first child and the bounds after it -- which is how `del xs[a:b]`
+    * came to be labelled `op:delete-slice` (the `<operator>.delete` child's own name) rather
+    * than falling into the `indexAccess` case. `pysrc2cpg`'s `createSliceCall` takes three
+    * `Option`s, one per bound.
+    *
+    * What could not be checked without running the frontend: how an OMITTED bound is
+    * spelled -- a `None` literal in place, or a shorter child list. `sliceBoundJson` accepts
+    * a `None` literal/identifier as "omitted"; the lowering sites require exactly three
+    * bounds and hole otherwise (`op:slice-shape`), because guessing which of two bounds is
+    * the upper one is the silent-wrong failure this exporter exists to avoid. If the
+    * frontend omits children instead, every slice holes until this is corrected -- the
+    * safe direction, and visible on the first export. */
+  def asSlice(n: AstNode): Option[(AstNode, List[AstNode])] = n match {
+    case c: Call if callName(c) == "<operator>.slice" =>
+      kidsOf(c) match {
+        case recv :: bounds if bounds.size <= 3 => Some((recv, bounds))
+        case _ => None
+      }
+    case _ => None
+  }
+
+  /** Python's `None` as a slice bound. Deliberately NOT `isNullLiteral`, which also
+    * accepts a literal zero -- and `xs[0:2]` has a real bound of `0`. */
+  def isNoneBound(b: AstNode): Boolean = b match {
+    case l: Literal    => l.code.trim == "None"
+    case i: Identifier => i.name == "None"
+    case _             => false
+  }
+
+  /** A bound as an expression: `unit` for an omitted/`None` bound, else the expression.
+    * `unit` is what `Expr.slice` means by "use the default" -- see `Syntax.lean`. */
+  def sliceBoundJson(b: AstNode): ujson.Obj =
+    if (isNoneBound(b)) ujson.Obj("k" -> "unit") else expr(b)
+
+  /** `sliceBoundJson`, prelude-aware, for `exprV` positions. */
+  def sliceBoundV(b: AstNode): (List[ujson.Obj], ujson.Obj) =
+    if (isNoneBound(b)) (Nil, ujson.Obj("k" -> "unit")) else exprV(b)
+
   /** Re-evaluable without observable effect. Augmented assignment (`o.f += 1`) is
     * desugared by duplicating the target expression, which is only faithful if
     * evaluating it twice is the same as evaluating it once. */
@@ -6795,6 +6834,17 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         "a" -> ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> structName), "f" -> f),
         "i" -> expr(idxNode)))
     }
+    // `xs[lo:hi:st]` -- Python only; other frontends spell slices differently or not
+    // at all, and a JS `arr.slice(a, b)` is a METHOD call, not this operator.
+    else if (mfn == "<operator>.slice")
+      asSlice(c) match {
+        case Some((recv, bounds)) if pyFile && bounds.size == 3 =>
+          ujson.Obj("k" -> "slice", "a" -> expr(recv),
+                    "lo" -> sliceBoundJson(bounds(0)), "hi" -> sliceBoundJson(bounds(1)),
+                    "st" -> sliceBoundJson(bounds(2)))
+        case Some(_) if pyFile => hole("op:slice-shape")
+        case _                 => hole("op:slice:dialect")
+      }
     else if (indexOps.contains(mfn) && kids.size == 2)
       ujson.Obj("k" -> "index", "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     else if (fieldOps.contains(mfn))
@@ -8247,6 +8297,20 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                           "i" -> expr(idxNode))
         ujson.Obj("k" -> "setDerefIref", "p" -> p,
                   "v" -> combine(ujson.Obj("k" -> "derefIref", "p" -> p)))
+      // `xs[lo:hi:st] = v`. An augmented form (`xs[1:3] += [9]`) reads the slice, extends
+      // the fresh copy, and writes it back -- three steps this lowering does not spell
+      // out, so it stays a hole rather than being approximated.
+      case sl if asSlice(sl).isDefined && pyFile =>
+        val (recv, bounds) = asSlice(sl).get
+        if (aug.isDefined) holeS("assign:aug-slice")
+        else if (bounds.size != 3) holeS("op:slice-shape")
+        else {
+          val (pa, ae) = exprV(recv)
+          val bs = bounds.map(sliceBoundV)
+          indexPrelude = pa ++ bs.flatMap(_._1)
+          ujson.Obj("k" -> "setSlice", "r" -> ae, "lo" -> bs(0)._2, "hi" -> bs(1)._2,
+                    "st" -> bs(2)._2, "v" -> rhsE)
+        }
       case ia if asIndex(ia).isDefined && aug.isDefined =>
         val (a, b) = asIndex(ia).get
         if (!(pureNode(a) && pureNode(b))) holeS("assign:aug-impure-target")
@@ -8673,6 +8737,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       (pb, ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "irefIndex",
         "a" -> ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> structName), "f" -> f),
         "i" -> be)))
+    // `xs[lo:hi:st]` in a prelude-aware position -- `exprV` never routes through
+    // `callExpr`, so this mirrors `callExpr`'s slice case exactly, threading each
+    // bound's prelude in CPython's evaluation order (receiver, lower, upper, step).
+    case c: Call if callName(c) == "<operator>.slice" && pyFile &&
+                    asSlice(c).exists(_._2.size == 3) =>
+      val (recv, bounds) = asSlice(c).get
+      val (pa, ae) = exprV(recv)
+      val bs = bounds.map(sliceBoundV)
+      (pa ++ bs.flatMap(_._1),
+       ujson.Obj("k" -> "slice", "a" -> ae, "lo" -> bs(0)._2, "hi" -> bs(1)._2, "st" -> bs(2)._2))
     case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
       val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
@@ -9018,6 +9092,15 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // `del` only unbinds a variable, so translating them would be a lie.
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
+        // `del xs[lo:hi:st]` -- the constructor `op:delete-slice` was waiting for.
+        case (x: Call) :: Nil if callName(x) == "<operator>.slice" && pyFile =>
+          asSlice(x) match {
+            case Some((recv, bounds)) if bounds.size == 3 =>
+              ujson.Obj("k" -> "delSlice", "r" -> expr(recv),
+                        "lo" -> sliceBoundJson(bounds(0)), "hi" -> sliceBoundJson(bounds(1)),
+                        "st" -> sliceBoundJson(bounds(2)))
+            case _ => holeS("op:delete-slice-shape")
+          }
         case (x: Call) :: Nil if callName(x).startsWith("<operator>") =>
           holeS("op:delete-" + callName(x).stripPrefix("<operator>."))
         case _ => holeS("op:delete-shape")

@@ -547,6 +547,20 @@ inductive Expr where
   `""` in Python and `s.drop 999` is `[]` in Lean -- no undefined behaviour to
   guard against on that side, unlike `strByte`'s own out-of-range READ. -/
   | strFrom : Expr → Expr → Expr
+  /-- `xs[lo:hi:st]` — a Python slice read (`docs/boxed-containers.md` §2, §9 item 3).
+
+  Every bound is a mandatory `Expr`, and an OMITTED bound is `.lit .unit`. That is not a
+  shortcut around `Option`: it is Python's own definition. `xs[:2]` is `xs[slice(None, 2,
+  None)]`, `xs[None:2]` is the same slice, and the bound `None` means "use the default for
+  this step's direction". Encoding absence as the value Python itself uses keeps the
+  constructor on the plain four-child shape every exhaustive match, `FuelMono` case and
+  renderer path already handles, and it makes `xs[None:2]` and `xs[:2]` the same term,
+  which is what they are.
+
+  Evaluates to a NEW container — a fresh boxed list for a list receiver, a `Val.tuple` for
+  a tuple, a `Val.str` for a string — with CPython's `slice.indices` normalisation for
+  negative, out-of-range and reversed bounds and its `ValueError` for a zero step. -/
+  | slice : Expr → Expr → Expr → Expr → Expr
   deriving Repr, Inhabited
 
 /-- Statements. -/
@@ -564,6 +578,14 @@ inductive Stmt where
   `KeyError`, `.list` drops the position or raises `IndexError`, a `.tuple` payload is a
   `TypeError`, and an unboxed container value still holes. -/
   | delIndex : Expr → Expr → Stmt
+  /-- `xs[lo:hi:st] = v`. Bounds as in `Expr.slice` (`.lit .unit` is an omitted bound).
+  A unit step replaces the range with the iterable, whatever its length — CPython's
+  `xs[3:1] = [9]` inserts at 3. Any other step is an *extended* slice assignment and
+  requires the iterable's length to equal the slice's, else `ValueError`. Only a list
+  payload is assignable; a tuple payload is a `TypeError`. -/
+  | setSlice : Expr → Expr → Expr → Expr → Expr → Stmt
+  /-- `del xs[lo:hi:st]`. Removes exactly the positions the slice denotes, for any step. -/
+  | delSlice : Expr → Expr → Expr → Expr → Stmt
   /-- `006-reduce-remaining-holes`, Story 5: `*p = v` where `p` is an interior-pointer
   VALUE (as opposed to `Stmt.setField`, which takes an explicit field name for a NAMED
   receiver). Requires its pointer operand to evaluate to `Val.iref r sel` and
@@ -723,6 +745,7 @@ def holes : Expr → List String
   | .binop _ a b  => holes a ++ holes b
   | .unop _ a     => holes a
   | .index a b    => holes a ++ holes b
+  | .slice a lo hi st => holes a ++ holes lo ++ holes hi ++ holes st
   | .field a _    => holes a
   | .call _ as    => holesL as
   | .mcall r _ as => holes r ++ holesL as
@@ -761,6 +784,7 @@ def size : Expr → Nat
   | .binop _ a b  => 1 + size a + size b
   | .unop _ a     => 1 + size a
   | .index a b    => 1 + size a + size b
+  | .slice a lo hi st => 1 + size a + size lo + size hi + size st
   | .field a _    => 1 + size a
   | .call _ as    => 1 + sizeL as
   | .mcall r _ as => 1 + size r + sizeL as
@@ -804,6 +828,9 @@ def holes : Stmt → List String
   | .assign _ e      => e.holes
   | .setField r _ v  => r.holes ++ v.holes
   | .setIndex r i v  => r.holes ++ i.holes ++ v.holes
+  | .delIndex r i    => r.holes ++ i.holes
+  | .setSlice r lo hi st v => r.holes ++ lo.holes ++ hi.holes ++ st.holes ++ v.holes
+  | .delSlice r lo hi st   => r.holes ++ lo.holes ++ hi.holes ++ st.holes
   | .setDerefIref p v => p.holes ++ v.holes
   | .seq a b         => a.holes ++ b.holes
   | .ifte c a b      => c.holes ++ a.holes ++ b.holes
@@ -823,6 +850,9 @@ def size : Stmt → Nat
   | .assign _ e      => 1 + e.size
   | .setField r _ v  => 1 + r.size + v.size
   | .setIndex r i v  => 1 + r.size + i.size + v.size
+  | .delIndex r i    => 1 + r.size + i.size
+  | .setSlice r lo hi st v => 1 + r.size + lo.size + hi.size + st.size + v.size
+  | .delSlice r lo hi st   => 1 + r.size + lo.size + hi.size + st.size
   | .setDerefIref p v => 1 + p.size + v.size
   | .seq a b         => a.size + b.size
   | .ifte c a b      => 1 + c.size + a.size + b.size
