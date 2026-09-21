@@ -243,19 +243,24 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
 /-- Whether `==`/`!=` on these operands has to consult the heap.
 
 Only a REFERENCE forces it: two distinct objects with equal contents are `==` in Python, and
-no structural compare of two refs can see that. Everything else stays on `applyBinop`, which
-is heap-free and reducible -- the property `Refine.lean` is built on. Named rather than
-inlined so proofs can discharge it by `simp` on concrete operands. -/
+no structural compare of two refs can see that. The order operators join `==`/`!=` here
+because a Python class can define `__lt__` and friends (`cmpDunderTarget`), which needs the
+receiver's class off the heap. Everything else stays on `applyBinop`, which is heap-free
+and reducible -- the property `Refine.lean` is built on. Named rather than inlined so
+proofs can discharge it by `simp` on concrete operands. -/
+def isCmpOp (op : String) : Bool :=
+  op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">="
+
 def binopNeedsHeap (op : String) (x y : Val) : Bool :=
-  (op == "==" || op == "!=") && (x.kind == 8 || y.kind == 8)
+  isCmpOp op && (x.kind == 8 || y.kind == 8)
 
 @[simp] theorem binopNeedsHeap_int_left (op : String) (i : Int) (y : Val) :
-    binopNeedsHeap op (.int i) y = ((op == "==" || op == "!=") && y.kind == 8) := by
+    binopNeedsHeap op (.int i) y = (isCmpOp op && y.kind == 8) := by
   simp [binopNeedsHeap, Val.kind]
 
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
-    (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
-  simp [binopNeedsHeap, beq_iff_eq, h, h2]
+    (h : isCmpOp op = false) : binopNeedsHeap op x y = false := by
+  simp [binopNeedsHeap, h]
 
 /-- Explicit language operators for newly exported terms. Keeping this dispatch
 separate also keeps reduction of the legacy integer operators inexpensive. -/
@@ -1151,6 +1156,97 @@ def pythonRaise (v : Val) : EResult :=
   | .str name => if Stdlib.excNames.contains name then .exn v else Stdlib.raiseValue v
   | _         => Stdlib.raiseValue v
 
+/-! ## Value dunders on ordinary instances
+
+Python lets a class redefine what a VALUE means for its instances: `a == b` is
+`a.__eq__(b)`, `a < b` is `a.__lt__(b)`, `len(a)` is `a.__len__()`, `bool(a)` is
+`a.__bool__()` (or, failing that, `a.__len__() != 0`), `hash`/`str`/`repr` likewise. Core
+answered all of these structurally -- identity for `==`, a hole for `<`, a hole for `len`
+-- which for a class that defines the dunder is a silent wrong answer, not a gap. The two
+helpers below decide WHETHER a dunder applies; the interpreter makes the call, so fuel
+monotonicity and exception safety go through the ordinary `applyFunc` induction.
+
+Both are gated on `.python` and on the receiver being an ordinary instance -- a heap
+object with no container payload (a boxed list compares by contents, `Val.eqPy`) and not
+a module frame -- whose class DEFINES the method itself (`Ctx.classDefines`, not
+`resolveMethod`, so a free function named `__eq__` cannot be mistaken for a method).
+Only the LEFT operand dispatches; CPython's reflected `__gt__`-for-`<` fallback when
+`__lt__` returns `NotImplemented` is not modelled, and `NotImplemented` has no value here. -/
+
+/-- The dunder a comparison operator names. `!=` is resolved by `cmpDunderTarget`
+(`__ne__`, else the negation of `__eq__`, as CPython's default `__ne__` does). -/
+@[simp] def cmpDunderName : String → Option String
+  | "==" => some "__eq__"
+  | "<"  => some "__lt__"
+  | "<=" => some "__le__"
+  | ">"  => some "__gt__"
+  | ">=" => some "__ge__"
+  | _    => none
+
+/-- `(receiver, class, method, negate)` when `x op y` dispatches to a dunder on `x`;
+`none` means "compare structurally, as before". -/
+@[simp] def cmpDunderTarget (ctx : Ctx) (h : Heap) (op : String) (x : Val) :
+    Option (Ref × String × String × Bool) :=
+  if ctx.dialect != .python then none else
+  match x with
+  | .ref r =>
+    match h.get r with
+    | some o =>
+      if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none
+      else if op == "!=" then
+        if ctx.classDefines o.cls "__ne__" then some (r, o.cls, "__ne__", false)
+        else if ctx.classDefines o.cls "__eq__" then some (r, o.cls, "__eq__", true)
+        else none
+      else
+        match cmpDunderName op with
+        | some m => if ctx.classDefines o.cls m then some (r, o.cls, m, false) else none
+        | none   => none
+    | none => none
+  | _ => none
+
+/-- `(receiver, class, method)` when the builtin `f` applied to exactly one ordinary
+instance dispatches to that instance's class. `bool` falls back to `__len__` as CPython
+does; everything else names exactly one method. -/
+@[simp] def builtinDunderTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
+    Option (Ref × String × String) :=
+  if ctx.dialect != .python then none else
+  match vs with
+  | [.ref r] =>
+    match h.get r with
+    | some o =>
+      if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none else
+      let pick (m : String) : Option (Ref × String × String) :=
+        if ctx.classDefines o.cls m then some (r, o.cls, m) else none
+      match f with
+      | "len"  => pick "__len__"
+      | "hash" => pick "__hash__"
+      | "str"  => pick "__str__"
+      | "repr" => pick "__repr__"
+      | "bool" => match pick "__bool__" with
+                  | some t => some t
+                  | none   => pick "__len__"
+      | _      => none
+    | none => none
+  | _ => none
+
+/-- What the builtin makes of the dunder's answer. CPython type-checks it: `__len__` must
+return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
+`__bool__` a `bool`; and `bool()` through `__len__` is the length's truthiness. -/
+@[simp] def builtinDunderResult (f m : String) (v : Val) : EResult :=
+  match f, v with
+  | "len",  .int i  => if i < 0 then .exn (.str "ValueError") else .val v
+  | "len",  _       => .exn (.str "TypeError")
+  | "hash", .int _  => .val v
+  | "hash", _       => .exn (.str "TypeError")
+  | "str",  .str _  => .val v
+  | "str",  _       => .exn (.str "TypeError")
+  | "repr", .str _  => .val v
+  | "repr", _       => .exn (.str "TypeError")
+  | "bool", .bool _ => if m == "__len__" then .exn (.str "TypeError") else .val v
+  | "bool", .int i  => if m == "__len__" then .val (.bool (i != 0)) else .exn (.str "TypeError")
+  | "bool", _       => .exn (.str "TypeError")
+  | _, _            => .val v
+
 mutual
 
 /-- Evaluate an expression, threading the heap. -/
@@ -1219,9 +1315,23 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- one `Refine.lean` needs reducible -- diverting here costs one call site
             -- instead of re-typing `applyBinop` and its 155 references.
             if binopNeedsHeap op x y then
-              match Val.eqPy h₂ (Val.eqFuel h₂) x y with
-              | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
-              | none   => (h₂, .outOfFuel)
+              -- A comparison whose LEFT operand is an ordinary instance of a class that
+              -- defines the dunder RUNS it (`cmpDunderTarget`); `!=` through `__eq__`
+              -- negates the truthiness of what `__eq__` returned.
+              match cmpDunderTarget ctx h₂ op x with
+              | some (r, cls, m, neg) =>
+                match ctx.resolveMethod cls m with
+                | some fn =>
+                  match applyFunc ctx n h₂ fn (some (.ref r)) [y] [] with
+                  | (h₃, .val v) => (h₃, .val (if neg then .bool (!v.truthy) else v))
+                  | (h₃, e)      => (h₃, e)
+                | none => (h₂, .hole s!"binop:{op}:dunder-unresolved")
+              | none =>
+                if op == "==" || op == "!=" then
+                  match Val.eqPy h₂ (Val.eqFuel h₂) x y with
+                  | some r => (h₂, .val (.bool (if op == "==" then r else !r)))
+                  | none   => (h₂, .outOfFuel)
+                else (h₂, applyBinop ctx.dialect op x y)
             else (h₂, applyBinop ctx.dialect op x y)
           | (h₂, r)      => (h₂, r)
       | (h₁, r) => (h₁, r)
@@ -1563,6 +1673,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                     | none    => (h₁, .hole s!"call:{g}")
             | _ => (h₁, .hole s!"call:{f}:not-callable")
           | _          =>
+            -- `len(x)`, `bool(x)`, `hash(x)`, `str(x)`, `repr(x)` on an ordinary instance
+            -- whose class defines the dunder run the method (`builtinDunderTarget`); the
+            -- answer is type-checked as CPython does (`builtinDunderResult`).
+            match builtinDunderTarget ctx h₁ f vs with
+            | some (r, cls, m) =>
+              if kws.isEmpty then
+                match ctx.resolveMethod cls m with
+                | some fn =>
+                  match applyFunc ctx n h₁ fn (some (.ref r)) [] [] with
+                  | (h₂, .val v) => (h₂, builtinDunderResult f m v)
+                  | (h₂, e)      => (h₂, e)
+                | none => (h₁, .hole s!"call:{f}:dunder-unresolved")
+              else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+            | none =>
             -- Modelled stdlib is consulted LAST, so a user function of the same name
             -- always wins. `builtin` returns `none` for anything it cannot model
             -- faithfully, which falls through to a visible hole.
@@ -3301,6 +3425,69 @@ private def slAt0 (r : Heap × Ctl) : Payload := r.1.payload 0
 -- xs[0:1] = 5        CPython TypeError: can only assign an iterable
 #guard match (slStmt (.setSlice (.name "xs") (sI 0) (sI 1) sU (sI 5))).2 with
        | .exn (.str "TypeError") _ => true | _ => false
+
+/-! ## Value dunders, checked against CPython
+
+`class P: __init__(x), __eq__, __lt__`; `class C: __len__ → 3`; `class Z: __len__ → 0`;
+`class H: __hash__ → 7`, `__str__ → "h"`; `class Q:` (nothing). Each expectation is what
+CPython 3.11 prints. -/
+private def valueDunderProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "d.py:<module>.P.__init__", params := ["x"]
+      , body := .setField (.name "self") "x" (.name "x") }
+    , { name := "d.py:<module>.P.__eq__", params := ["o"]
+      , body := .ret (.binop "==" (.field (.name "self") "x") (.field (.name "o") "x")) }
+    , { name := "d.py:<module>.P.__lt__", params := ["o"]
+      , body := .ret (.binop "<" (.field (.name "self") "x") (.field (.name "o") "x")) }
+    , { name := "d.py:<module>.C.__len__", params := [], body := .ret (.lit (.int 3)) }
+    , { name := "d.py:<module>.Z.__len__", params := [], body := .ret (.lit (.int 0)) }
+    , { name := "d.py:<module>.H.__hash__", params := [], body := .ret (.lit (.int 7)) }
+    , { name := "d.py:<module>.H.__str__", params := [], body := .ret (.lit (.str "h")) }
+    , { name := "d.py:<module>.Q.__init__", params := [], body := .skip }
+    , { name := "eqTrue", params := []
+      , body := .ret (.binop "==" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 1)])) }
+    , { name := "eqFalse", params := []
+      , body := .ret (.binop "==" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "neFalse", params := []
+      , body := .ret (.binop "!=" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 1)])) }
+    , { name := "ltTrue", params := []
+      , body := .ret (.binop "<" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "geHole", params := []   -- no `__ge__`: stays the hole it was
+      , body := .ret (.binop ">=" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 2)])) }
+    , { name := "lenC", params := [], body := .ret (.call "len" [.alloc "C" []]) }
+    , { name := "boolC", params := [], body := .ret (.call "bool" [.alloc "C" []]) }
+    , { name := "boolZ", params := [], body := .ret (.call "bool" [.alloc "Z" []]) }
+    , { name := "hashH", params := [], body := .ret (.call "hash" [.alloc "H" []]) }
+    , { name := "strH", params := [], body := .ret (.call "str" [.alloc "H" []]) }
+    , { name := "identityQ", params := []
+      , body := .ret (.binop "==" (.alloc "Q" []) (.alloc "Q" [])) }
+    , { name := "lenQ", params := [], body := .ret (.call "len" [.alloc "Q" []]) } ] }
+
+-- `P(1) == P(1)`  -- CPython True (through `__eq__`; identity would say False)
+#guard match runFunc valueDunderProg 200 "eqTrue" [] with | .val (.bool true) => true | _ => false
+-- `P(1) == P(2)`  -- CPython False
+#guard match runFunc valueDunderProg 200 "eqFalse" [] with | .val (.bool false) => true | _ => false
+-- `P(1) != P(1)`  -- CPython False (default `__ne__` negates `__eq__`)
+#guard match runFunc valueDunderProg 200 "neFalse" [] with | .val (.bool false) => true | _ => false
+-- `P(1) < P(2)`   -- CPython True
+#guard match runFunc valueDunderProg 200 "ltTrue" [] with | .val (.bool true) => true | _ => false
+-- `P(1) >= P(2)`  -- CPython TypeError ('>=' not supported); Core keeps the hole, not a guess
+#guard match runFunc valueDunderProg 200 "geHole" [] with | .hole _ => true | _ => false
+-- `len(C())`      -- CPython 3
+#guard match runFunc valueDunderProg 200 "lenC" [] with | .val (.int 3) => true | _ => false
+-- `bool(C())`     -- CPython True (no `__bool__`, so `__len__() != 0`)
+#guard match runFunc valueDunderProg 200 "boolC" [] with | .val (.bool true) => true | _ => false
+-- `bool(Z())`     -- CPython False
+#guard match runFunc valueDunderProg 200 "boolZ" [] with | .val (.bool false) => true | _ => false
+-- `hash(H())`     -- CPython 7;  `str(H())` -- 'h'
+#guard match runFunc valueDunderProg 200 "hashH" [] with | .val (.int 7) => true | _ => false
+#guard match runFunc valueDunderProg 200 "strH" [] with | .val (.str "h") => true | _ => false
+-- `Q() == Q()`    -- CPython False: no `__eq__`, so identity, and these are two objects
+#guard match runFunc valueDunderProg 200 "identityQ" [] with | .val (.bool false) => true | _ => false
+-- `len(Q())`      -- CPython TypeError; Core has no `len` on an instance without `__len__`
+--                    and says so (`call:len`), which is the pre-existing behaviour.
+#guard match runFunc valueDunderProg 200 "lenQ" [] with | .hole _ => true | _ => false
 
 /-! ## JavaScript arrays and strings
 

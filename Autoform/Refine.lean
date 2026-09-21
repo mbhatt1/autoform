@@ -513,13 +513,20 @@ for all expressions because for the full language it is simply false as an uncon
 equation (a call can diverge), and the honest conditional version is listed as an open
 obligation at the end of this file. -/
 
-/-- The expression fragment that is pure and call-free. -/
+/-- The expression fragment that is pure and call-free.
+
+A COMPARISON is not in it. `==`, `!=` and the order operators dispatch to `__eq__`/`__lt__`/…
+when the left operand is a Python instance whose class defines them (`cmpDunderTarget`),
+and that is a call — it can touch the heap and it can run out of fuel. `isCmpOp op = false`
+is the syntactic side condition that keeps `binop` call-free; a comparison on operands known
+to be scalars is handled by `evalExpr_binop_val` with its `binopNeedsHeap` premise instead. -/
 inductive PureE : Expr → Prop where
   | lit   (l : Lit)      : PureE (.lit l)
   | name  (x : String)   : PureE (.name x)
   | fnref (f : String)   : PureE (.fnref f)
   | unop  {a} (op : String) : PureE a → PureE (.unop op a)
-  | binop {a b} (op : String) : PureE a → PureE b → PureE (.binop op a b)
+  | binop {a b} (op : String) (hop : isCmpOp op = false) :
+      PureE a → PureE b → PureE (.binop op a b)
   | cond  {c t e} : PureE c → PureE t → PureE e → PureE (.cond c t e)
 
 /-- Evaluation depth: the fuel needed to evaluate a pure expression. -/
@@ -563,15 +570,17 @@ theorem evalExpr_pure_fuel_indep (ctx : Ctx) :
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
       simp only [evalExpr, ih (k₁ := m₁) (k₂ := m₂) (h := h) (ρ := ρ) (by omega) (by omega)]
-  | binop op _ _ iha ihb =>
+  | binop op hop _ _ iha ihb =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
       simp only [evalExpr, iha (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
       rcases hA : evalExpr ctx m₂ h ρ _ with ⟨hA', rA⟩
+      -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
       cases rA <;>
-        simp only [ihb (h := hA') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
+        simp only [ihb (h := hA') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega),
+                   binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true, if_false]
   | cond _ _ _ ihc iht ihe =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
@@ -617,7 +626,7 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
         rw [hA] at ha; simp only at ha; subst ha
         simp only [evalExpr, hA]
         cases rA <;> rfl
-  | binop op _ _ iha ihb =>
+  | binop op hop _ _ iha ihb =>
       intro k h ρ; cases k with
       | zero => rfl
       | succ m =>
@@ -629,7 +638,9 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           have hb := ihb (k := m) (h := hA') (ρ := ρ)
           rcases hB : evalExpr ctx m hA' ρ _ with ⟨hB', rB⟩
           rw [hB] at hb; simp only at hb; subst hb
-          simp only [evalExpr, hA, hB]
+          -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
+          simp only [evalExpr, hA, hB, binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true,
+                     if_false]
           -- three cases: the two short-circuit exits (heap untouched by construction)
           -- and the strict path (heap untouched by both induction hypotheses).
           by_cases hs1 : (op == "&&" && !x.truthy) = true

@@ -335,6 +335,15 @@ theorem listSetSlice_excSafe {vs : List Val} {lo hi st : Option Int} {ys : List 
     {ex : String} (h : Stdlib.listSetSlice vs lo hi st ys = .error ex) : ExcSafe (.str ex) := by
   rw [listSetSlice_error h]; exact Stdlib.excSafe_str (by decide)
 
+/-- The type checks `len`/`bool`/`hash`/`str`/`repr` apply to a dunder's answer raise
+only `TypeError`/`ValueError`, both represented. -/
+theorem builtinDunderResult_excSafe (f m : String) (v : Val) {w : Val} :
+    builtinDunderResult f m v = .exn w → ExcSafe w := by
+  intro h
+  unfold builtinDunderResult at h
+  repeat' split at h
+  all_goals first | (cases h; exact Stdlib.excSafe_str (by decide)) | cases h
+
 theorem allocBuiltin_ne_exn (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val)
     {v : Val} : allocBuiltin ctx cls b vs = .exn v → False := by
   intro h
@@ -420,6 +429,7 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | (cases hy; exact listSetSlice_excSafe (by assumption))
+  | exact builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))

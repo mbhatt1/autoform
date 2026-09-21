@@ -271,9 +271,37 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   · rw [if_neg hc2] at hy ⊢
                     rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
                     rw [hB] at hy
-                    cases r₂ <;> first
-                      | (cases hy; exact absurd rfl hne)
-                      | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                    cases r₂ with
+                    | exn v => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | hole l => rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy
+                    | outOfFuel => cases hy; exact absurd rfl hne
+                    | val y =>
+                        rw [ihE _ hctx _ _ _ _ _ hB (by simp)]
+                        dsimp only at hy ⊢
+                        -- The heap path may now RUN a dunder (`cmpDunderTarget`): one
+                        -- `applyFunc` whose result is post-processed, so it is not in
+                        -- tail position and the IH rewrites it in place.
+                        by_cases hnh : binopNeedsHeap op x y = true
+                        · rw [if_pos hnh] at hy ⊢
+                          cases hct : cmpDunderTarget ctx h₂ op x with
+                          | none => rw [hct] at hy; exact hy
+                          | some t =>
+                              rw [hct] at hy
+                              obtain ⟨r, cls, m, neg⟩ := t
+                              dsimp only at hy ⊢
+                              cases hrm : Ctx.resolveMethod ctx cls m with
+                              | none => rw [hrm] at hy; exact hy
+                              | some fn =>
+                                  rw [hrm] at hy
+                                  dsimp only at hy ⊢
+                                  rcases hF : applyFunc ctx k h₂ fn (some (.ref r)) [y] []
+                                    with ⟨h₃, r₃⟩
+                                  rw [hF] at hy
+                                  cases r₃ <;> first
+                                    | (cases hy; exact absurd rfl hne)
+                                    | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                       exact hy)
+                        · rw [if_neg hnh] at hy ⊢; exact hy
         | cond c t el =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ c with ⟨h₁, r₁⟩
@@ -501,6 +529,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                   | (rw [ihL _ hctx _ _ _ _ _ hA (by simp)]; exact hy)
             | inr vs =>
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
+                obtain ⟨vs, kws⟩ := vs
                 dsimp only at hy ⊢
                 cases hres : Ctx.resolve ctx f with
                 | some fn =>
@@ -574,7 +603,33 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                     exact ihC _ hctx _ _ (hctx.1 _ _ hr3) _ _ _ _ _ hy hne
                                 | none => rw [hr3] at hy; exact hy
                             all_goals (dsimp only at hy ⊢; exact hy)
-                    all_goals (rw [hg] at hy; exact hy)
+                    -- Every other value in `f`'s slot reaches the builtin path, which may
+                    -- now RUN a dunder (`builtinDunderTarget`): one `applyFunc`, not in
+                    -- tail position, so the IH rewrites it in place.
+                    all_goals
+                      (rw [hg] at hy
+                       dsimp only at hy ⊢
+                       cases hbt : builtinDunderTarget ctx h₁ f vs with
+                       | none => rw [hbt] at hy; exact hy
+                       | some t =>
+                           rw [hbt] at hy
+                           obtain ⟨r, cls, m⟩ := t
+                           dsimp only at hy ⊢
+                           by_cases hk : kws.isEmpty = true
+                           · rw [if_pos hk] at hy ⊢
+                             cases hrm : Ctx.resolveMethod ctx cls m with
+                             | none => rw [hrm] at hy; exact hy
+                             | some fn =>
+                                 rw [hrm] at hy
+                                 dsimp only at hy ⊢
+                                 rcases hF : applyFunc ctx k h₁ fn (some (.ref r)) [] []
+                                   with ⟨h₂, r₂⟩
+                                 rw [hF] at hy
+                                 cases r₂ <;> first
+                                   | (cases hy; exact absurd rfl hne)
+                                   | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
+                                      exact hy)
+                           · rw [if_neg hk] at hy ⊢; exact hy)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩

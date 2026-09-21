@@ -608,3 +608,62 @@ class TestDunderDispatch:
         fm = (ROOT / 'Autoform/FuelMono.lean').read_text()
         assert fm.count('Ctx.dunderOn_resolves hd') == 4
         assert 'theorem Ctx.dunderOn_resolves' in self.SEM
+
+
+class TestValueDunders:
+    """Milestone 1(b): a Python class redefines what a VALUE means for its instances.
+
+    `a == b` is `a.__eq__(b)`, `a < b` is `a.__lt__(b)`, `len(a)` is `a.__len__()`, `bool(a)`
+    is `a.__bool__()` or, failing that, `a.__len__() != 0`. Core used to answer identity,
+    a hole and a hole -- silent wrong answers for any class that defines the dunder. These
+    pin the shape of the dispatch; the CPython comparisons themselves are the `#guard`s
+    over `dunderProg` in Semantics.lean, checked on every build."""
+
+    SEMANTICS = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+
+    def test_the_comparison_family_forces_the_heap_path(self):
+        # The order operators join ==/!= because `__lt__` and friends need the receiver's
+        # class off the heap; a scalar comparison still never touches it.
+        assert 'def isCmpOp (op : String) : Bool :=' in self.SEMANTICS
+        assert 'isCmpOp op && (x.kind == 8 || y.kind == 8)' in self.SEMANTICS
+
+    def test_dispatch_requires_the_class_to_define_the_dunder_itself(self):
+        # `classDefines`, not `resolveMethod`: a free function named `__eq__` must not be
+        # mistaken for a method of every class.
+        for helper in ('cmpDunderTarget', 'builtinDunderTarget'):
+            body = self.SEMANTICS.split(f'def {helper}', 1)[1].split('\n\n', 1)[0]
+            assert 'ctx.classDefines' in body, helper
+            assert 'resolveMethod' not in body, helper
+            # ordinary instances only: no container payload, not a module frame
+            assert 'o.payload.toVal.isSome || o.cls.startsWith "<module>"' in body, helper
+            assert 'ctx.dialect != .python then none' in body, helper
+
+    def test_not_equal_falls_back_to_the_negation_of_eq(self):
+        assert 'if ctx.classDefines o.cls "__ne__" then some (r, o.cls, "__ne__", false)' in self.SEMANTICS
+        assert 'else if ctx.classDefines o.cls "__eq__" then some (r, o.cls, "__eq__", true)' in self.SEMANTICS
+        assert '.val (if neg then .bool (!v.truthy) else v)' in self.SEMANTICS
+
+    def test_bool_falls_back_to_len_and_the_answers_are_type_checked(self):
+        assert '| "bool" => match pick "__bool__" with' in self.SEMANTICS
+        assert '| none   => pick "__len__"' in self.SEMANTICS
+        # CPython: __len__ must be a non-negative int, __str__ a str, __bool__ a bool.
+        assert '| "len",  .int i  => if i < 0 then .exn (.str "ValueError") else .val v' in self.SEMANTICS
+        assert '| "str",  _       => .exn (.str "TypeError")' in self.SEMANTICS
+
+    def test_every_protocol_has_a_cpython_guard(self):
+        guards = self.SEMANTICS.split('private def dunderProg', 1)[1].split('/-! ## JavaScript', 1)[0]
+        for subject in ('eqTrue', 'eqFalse', 'neFalse', 'ltTrue', 'geHole', 'lenC', 'boolC',
+                        'boolZ', 'hashH', 'strH', 'identityQ', 'lenQ'):
+            assert f'#guard match runFunc dunderProg 200 "{subject}" []' in guards, subject
+
+    def test_the_proofs_follow_the_dispatch(self):
+        fuelmono = (ROOT / 'Autoform/FuelMono.lean').read_text()
+        excsafe = (ROOT / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
+        assert 'cases hct : cmpDunderTarget ctx h₂ op x with' in fuelmono
+        assert 'cases hbt : builtinDunderTarget ctx h₁ f vs with' in fuelmono
+        assert 'theorem builtinDunderResult_excSafe' in excsafe
+        assert 'builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2' in excsafe
+        # The pure fragment is call-free BY CONSTRUCTION again: a comparison can now call.
+        refine = (ROOT / 'Autoform/Refine.lean').read_text()
+        assert '(hop : isCmpOp op = false)' in refine
+

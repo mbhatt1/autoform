@@ -597,6 +597,47 @@ the existing `ihF` closers. `tests/test_production_gaps.py::TestDunderDispatch` 
 text. Not yet: `__eq__`/`__lt__`/`__len__`/`__iter__`/`__bool__`/`__hash__`/`__str__`
 (Milestone 1's remaining protocols, `docs/GOAL-arbitrary-codebases.md`).
 
+#### 10.8 Value dunders: `==`, `<`, `len()`, `bool()` on an instance run the class's method
+
+A Python class redefines what a *value* means for its instances: `a == b` is
+`a.__eq__(b)`, `a < b` is `a.__lt__(b)`, `len(a)` is `a.__len__()`, `bool(a)` is
+`a.__bool__()` or, failing that, `a.__len__() != 0`; `hash`, `str`, `repr` likewise. Core
+answered all of these structurally — identity for `==` (`Val.eqPy`), a hole for `<`
+(`binop:<`), a hole for `len` (`call:len`). For a class that defines the dunder that is a
+**silent wrong answer**, the §12 kind: `_HashedTuple.__eq__`, `TLRUCache._Item.__lt__`
+(the heap ordering `cachetools` sorts expiries by) were compared as objects.
+
+**Done.** `cmpDunderTarget` / `builtinDunderTarget` (`Semantics.lean`) decide whether a
+dunder applies — `.python` only, receiver an ordinary instance (no container payload, not a
+module frame) whose class **defines** the method itself (`Ctx.classDefines`, so a free
+function named `__eq__` is not mistaken for every class's method) — and the interpreter
+makes the call through `applyFunc`, so fuel monotonicity (`FuelMono.lean`, two new
+non-tail `applyFunc` sites) and exception safety (`ExcSafe.lean`,
+`builtinDunderResult_excSafe`) go through the ordinary induction. `!=` uses `__ne__` when
+defined and otherwise negates `__eq__`, as CPython's default `__ne__` does. The answer of
+`len`/`hash`/`str`/`repr`/`bool` is type-checked as CPython does (`__len__` must return a
+non-negative `int`, …), raising `TypeError`/`ValueError` by name.
+
+The order operators join `==`/`!=` in `binopNeedsHeap`, so a comparison whose left
+operand is a reference goes through the heap; a scalar comparison never does, and
+`Refine.lean`'s `evalExpr_binop_val` is untouched. The cost is honest and stated: the
+**pure fragment** (`PureE`) now excludes comparisons syntactically (`isCmpOp op = false`),
+because a comparison can call — `evalExpr_pure_fuel_indep` and
+`evalExpr_pure_heap_inert` would otherwise be false.
+
+Checked against CPython 3.11 by twelve `#guard`s over `dunderProg`: `P(1) == P(1)` is
+`True` through `__eq__` where identity said `False`; `P(1) != P(1)` is `False`; `P(1) <
+P(2)`; `len(C())` is 3; `bool(C())`/`bool(Z())` through `__len__`; `hash`/`str`; and the
+two negatives — a class without `__eq__` keeps identity, and `>=` on a class without
+`__ge__` stays the hole it was rather than a guess. `tests/test_production_gaps.py::
+TestValueDunders` pins the shape.
+
+**Not done, and named.** Only the LEFT operand dispatches: CPython's reflected fallback
+(`b.__gt__(a)` when `a.__lt__(b)` returns `NotImplemented`) is not modelled, and
+`NotImplemented` has no value in Core. `__iter__` is out of scope here — iteration over
+an instance needs `__next__` state, a generator-shaped frame (Milestone 4). `in`, `[]`,
+`[]=` and `del []` are the container half of the protocol and land separately.
+
 ### 15. Three small exporter labels, dispositioned
 
 * **`op:delete-index` — closed for Python.** `del xs[i]` / `del d[k]` lower to
