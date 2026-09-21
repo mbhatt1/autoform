@@ -2230,8 +2230,16 @@ cachetools v7.1.7 (`provenance/ast-Cachetools.json.prov.json`):**
 
     functions        209
     hole-free        189
-    verifiable core  108
+    verifiable core  97
     holes            22
+
+(97, not 108: on the same day the ledger's call analysis was found to have a wildcard arm
+that skipped `tryFinally` -- every Python `with` block -- so calls inside one were
+invisible and eleven functions were counted closed that are not. `Analysis.sCalls` and
+`eCalls` are now exhaustive over the constructors, and `dynamic-hole risk` rose from 867
+to 1,067 for the same reason. Milestone 3's `scripts/external_callees.py` is what found
+it: its independent mirror of `Ctx.resolvable` reported 92 open hole-free functions where
+the ledger reported 81, and the difference was exactly the `with` bodies.)
 
 (The previous artifact read 209 / 180 / 101 / 40; what closed the difference is the
 `control:TRY-exception-representation`, `call:python-property-access`,

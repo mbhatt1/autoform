@@ -10,7 +10,7 @@ whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is 
 other half.
 
 On `cachetools`, 189 of 209 functions are
-hole-free and 108 are call-closed. A single untranslated construct anywhere in a function
+hole-free and 97 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -210,7 +210,164 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 180 hole-free, 101 call-closed, 40 holes.
+> fails on a mismatch. Current: 209 functions, 189 hole-free, 97 call-closed, 22 holes.
+> (97, not the 108 reported until 2026-09-21: the ledger's call analysis had a wildcard
+> arm and did not look inside `tryFinally` -- Python `with` -- so eleven functions whose
+> only open callee sat inside one were counted as closed. `Ledger.lean`'s analyses are
+> now exhaustive over every constructor; see "Which callees to contract next".)
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.
+
+## Which callees to contract next — measured
+
+The verifiable core is *hole-free and call-closed*. The gap between the two counts is the
+functions whose body translates but whose callees leave the program, and those callees are
+mostly the standard library. Milestone 3 of
+[the goal statement](GOAL-arbitrary-codebases.md) closes that gap with **contracts**:
+an explicit assumption about what an external call does, carried by the theorem that
+depends on it, never folded into the unconditional core.
+
+Which callees are worth a contract is a frequency question, so it is answered by a table
+rather than a guess. `scripts/external_callees.py` mirrors `Ctx.resolvable` — unique
+dotted-suffix for free calls, any suffix for method calls, modelled Python builtins
+resolvable — and reports, per callee, how many call sites it has and how many
+**hole-free functions it alone keeps out of the core** (`blocks`). The second number is
+what a contract for it is worth.
+
+Snapshot taken 2026-09-21 on the tracked corpora; re-measure before quoting:
+
+```sh
+python3 scripts/external_callees.py ast-Cachetools.json ast-LangJava.json ast-LangGo.json \
+    ast-LangJS.json ast-LangTS.json ast-LangC.json ast-Sample.json ast-Stress.json --json out.json
+```
+
+| corpus | dialect | functions | hole-free but call-open | distinct external callees |
+|---|---|--:|--:|--:|
+| `ast-Cachetools.json` | python | 209 | 92 | 55 |
+| `ast-LangJava.json` | cLike | 669 | 159 | 315 |
+| `ast-LangGo.json` | cLike | 83 | 15 | 65 |
+| `ast-LangJS.json` | javascript | 14 | 4 | 18 |
+| `ast-LangTS.json` | javascript | 86 | 26 | 72 |
+| `ast-LangC.json` | cLike | 59 | 9 | 24 |
+| `ast-Sample.json` | python | 5 | 2 | 6 |
+| `ast-Stress.json` | python | 6 | 0 | 0 |
+
+The table is honest about what it finds: many of the top entries are not the standard
+library at all but **closure-local names** (`info`, `wrapper`, `cache_clear`,
+`this.delegate`, `value`) — calls to a variable holding a function, which is the
+value-callee gap of milestone 2, not a contract. The library calls that do appear
+(`strlen`, `requireNonNull`, `Sprintf`, `functools.update_wrapper`, `startsWith`,
+`equals`, `Math.max`) are the initial contracted set in `Ledger.lean`'s
+`contractedCallees`, each annotated *modelled* (executed by `Stdlib.lean`) or *assumed*
+(a boundary assumption, pure and total on its documented domain — nothing proves it).
+
+| # | external callee | sites | blocks | corpora |
+|--:|---|--:|--:|---|
+| 1 | `this.delegate` | 19 | 19 | LangJava(cLike) |
+| 2 | `value` | 39 | 8 | LangJava(cLike) |
+| 3 | `info` | 7 | 7 | Cachetools(python) |
+| 4 | `cache_delitem` | 9 | 6 | Cachetools(python) |
+| 5 | `super` | 9 | 6 | Cachetools(python), LangTS(javascript) |
+| 6 | `getName` | 16 | 4 | LangJava(cLike) |
+| 7 | `cache_getitem` | 6 | 4 | Cachetools(python) |
+| 8 | `_CacheInfo` | 5 | 4 | Cachetools(python) |
+| 9 | `.RECORD_HELPER` | 4 | 4 | LangJava(cLike) |
+| 10 | `set` | 14 | 3 | Cachetools(python), LangJava(cLike) |
+| 11 | `strlen` | 6 | 3 | LangC(cLike) |
+| 12 | `tmp0.move_to_end` | 4 | 3 | Cachetools(python) |
+| 13 | `.gson` | 3 | 3 | LangJava(cLike) |
+| 14 | `cache_clear` | 3 | 3 | Cachetools(python) |
+| 15 | `this.outerClass` | 20 | 2 | LangJava(cLike) |
+| 16 | `equals` | 19 | 2 | LangJava(cLike) |
+| 17 | `add` | 14 | 2 | Cachetools(python), LangJava(cLike) |
+| 18 | `requireNonNull` | 14 | 2 | LangJava(cLike) |
+| 19 | `isAssignableFrom` | 10 | 2 | LangJava(cLike) |
+| 20 | `func` | 8 | 2 | Cachetools(python) |
+| 21 | `getAnnotation` | 8 | 2 | LangJava(cLike) |
+| 22 | `startsWith` | 8 | 2 | LangJava(cLike) |
+| 23 | `lock` | 7 | 2 | Cachetools(python) |
+| 24 | `max` | 5 | 2 | LangJava(cLike) |
+| 25 | `this.#scheduleRateLimitUpdate` | 5 | 2 | LangTS(javascript) |
+| 26 | `this.appendable` | 5 | 2 | LangJava(cLike) |
+| 27 | `this.on` | 4 | 2 | LangTS(javascript) |
+| 28 | `this.value` | 4 | 2 | LangJava(cLike) |
+| 29 | `Sprintf` | 3 | 2 | LangGo(cLike) |
+| 30 | `functools.update_wrapper` | 3 | 2 | Cachetools(python) |
+| 31 | `this.componentType` | 3 | 2 | LangJava(cLike) |
+| 32 | `v.Tags` | 3 | 2 | LangGo(cLike) |
+| 33 | `nextNode` | 2 | 2 | LangJava(cLike) |
+| 34 | `self._Timer__timer` | 2 | 2 | Cachetools(python) |
+| 35 | `warnings.warn` | 2 | 2 | Cachetools(python) |
+| 36 | `<init>` | 58 | 1 | LangJava(cLike) |
+| 37 | `nullValue` | 21 | 1 | LangJava(cLike) |
+| 38 | `this.stack` | 16 | 1 | LangJava(cLike) |
+| 39 | `Implements` | 8 | 1 | LangGo(cLike) |
+| 40 | `__ecma.Array.factory` | 7 | 1 | LangJS(javascript), LangTS(javascript) |
+| 41 | `type` | 7 | 1 | Cachetools(python) |
+| 42 | `cache_setitem` | 6 | 1 | Cachetools(python) |
+| 43 | `iter` | 6 | 1 | Cachetools(python) |
+| 44 | `string` | 6 | 1 | LangGo(cLike) |
+| 45 | `assert` | 4 | 1 | LangJava(cLike), LangC(cLike) |
+| 46 | `reject` | 4 | 1 | LangTS(javascript) |
+| 47 | `this.#tryToStartAnother` | 4 | 1 | LangTS(javascript) |
+| 48 | `this.constructor` | 4 | 1 | LangJava(cLike) |
+| 49 | `LFUCache._Link` | 3 | 1 | Cachetools(python) |
+| 50 | `getTimeZone` | 3 | 1 | LangJava(cLike) |
+| 51 | `skipValue` | 3 | 1 | LangJava(cLike) |
+| 52 | `this.#getActiveTicksCount` | 3 | 1 | LangTS(javascript) |
+| 53 | `this.#processQueue` | 3 | 1 | LangTS(javascript) |
+| 54 | `this.adapterFactoryMap` | 3 | 1 | LangJava(cLike) |
+| 55 | `.typeAdapter` | 2 | 1 | LangJava(cLike) |
+| 56 | `ParseBool` | 2 | 1 | LangGo(cLike) |
+| 57 | `Symbol` | 2 | 1 | LangJS(javascript), LangTS(javascript) |
+| 58 | `TTLCache._Link` | 2 | 1 | Cachetools(python) |
+| 59 | `getSimpleName` | 2 | 1 | LangJava(cLike) |
+| 60 | `kwargs.items` | 2 | 1 | Cachetools(python) |
+| 61 | `memset` | 2 | 1 | LangC(cLike) |
+| 62 | `queueMicrotask` | 2 | 1 | LangTS(javascript) |
+| 63 | `signal.removeEventListener` | 2 | 1 | LangJS(javascript), LangTS(javascript) |
+| 64 | `this.#onInterval` | 2 | 1 | LangTS(javascript) |
+| 65 | `this.#updateRateLimitState` | 2 | 1 | LangTS(javascript) |
+| 66 | `this.clazz` | 2 | 1 | LangJava(cLike) |
+| 67 | `this.dateTypeAdapter` | 2 | 1 | LangJava(cLike) |
+| 68 | `this.type` | 2 | 1 | LangJava(cLike) |
+| 69 | `AccessChecker.INSTANCE` | 1 | 1 | LangJava(cLike) |
+| 70 | `EnumSet.class` | 1 | 1 | LangJava(cLike) |
+| 71 | `Execute` | 1 | 1 | LangGo(cLike) |
+| 72 | `JsonElementTypeAdapter.ADAPTER` | 1 | 1 | LangJava(cLike) |
+| 73 | `_TimedCache._Timer` | 1 | 1 | Cachetools(python) |
+| 74 | `cache_len` | 1 | 1 | Cachetools(python) |
+| 75 | `cache_repr` | 1 | 1 | Cachetools(python) |
+| 76 | `clearInterval` | 1 | 1 | LangTS(javascript) |
+| 77 | `clearTimeout` | 1 | 1 | LangTS(javascript) |
+| 78 | `collections.namedtuple` | 1 | 1 | Cachetools(python) |
+| 79 | `compile` | 1 | 1 | LangJava(cLike) |
+| 80 | `construct` | 1 | 1 | LangJava(cLike) |
+| 81 | `getProperty` | 1 | 1 | LangJava(cLike) |
+| 82 | `hash` | 1 | 1 | Cachetools(python) |
+| 83 | `hashCode` | 1 | 1 | LangJava(cLike) |
+| 84 | `isMemberClass` | 1 | 1 | LangJava(cLike) |
+| 85 | `memcmp` | 1 | 1 | LangC(cLike) |
+| 86 | `newFactory` | 1 | 1 | LangJava(cLike) |
+| 87 | `ofEpochSecond` | 1 | 1 | LangJava(cLike) |
+| 88 | `ofSeconds` | 1 | 1 | LangJava(cLike) |
+| 89 | `out.append` | 1 | 1 | Sample(python) |
+| 90 | `panic` | 1 | 1 | LangGo(cLike) |
+| 91 | `parseDouble` | 1 | 1 | LangJava(cLike) |
+| 92 | `parseFloat` | 1 | 1 | LangJava(cLike) |
+| 93 | `reject_` | 1 | 1 | LangJS(javascript) |
+| 94 | `resolve_` | 1 | 1 | LangJS(javascript) |
+| 95 | `self._DeprecatedDescriptorBase__cache_clear` | 1 | 1 | Cachetools(python) |
+| 96 | `self._WrapperBase__cache` | 1 | 1 | Cachetools(python) |
+| 97 | `self._WrapperBase__cond` | 1 | 1 | Cachetools(python) |
+| 98 | `self._WrapperBase__lock` | 1 | 1 | Cachetools(python) |
+| 99 | `setTimeout` | 1 | 1 | LangTS(javascript) |
+| 100 | `this.#next` | 1 | 1 | LangTS(javascript) |
+
+**How the ledger reports it.** `ledger-<Module>.json` carries `closedByTranslation` (the
+unconditional core, identical to `verifiableCore`) and, separately, `closedByContract`:
+hole-free functions that are *not* call-closed but become closed once the dialect's
+`contractedCallees` are assumed, with `contractsUsed` naming which. The printed ledger
+shows the second as `closed by contract : +N … NOT in the core above`, and the SACM case
+must attach those N to a claim that carries the assumption, never to `G3.1`.
