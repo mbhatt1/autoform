@@ -263,6 +263,13 @@ def Dialect.toNumConfig : Dialect → NumConfig
   | .python     => NumConfig.python
   | .cLike      => NumConfig.c32Wrapv
   | .javascript => NumConfig.python
+  -- The UNTAGGED default per language: Java `int` (32-bit, wraps, masked shifts) and Go
+  -- `int` (64-bit on every mainstream target, wraps, zero-divide panics). A `long`, `int8`,
+  -- `uint64`… operation is tagged by the exporter (`num:java:i64:+`, `num:go:u64:<<`) and
+  -- `TypedNumeric` gives it its own width; this config is what an operation gets when no
+  -- type was recoverable.
+  | .java       => NumConfig.java32
+  | .go         => NumConfig.go64
 
 /-! ## Results -/
 
@@ -722,14 +729,11 @@ invisible because nothing in the build ever named a language.
 `Lang` names it. `javascript`/`typescript` now route to the real `Dialect.javascript`
 (see `Syntax.lean`) instead of `.cLike`, which fixes the measured `&&`/`||` and integer-
 overflow bugs; `Lang.approximated` still marks them `true` because the bitwise/shift-op
-gap documented on `Dialect` itself remains open. Java and Go stay on `.cLike`, which is
-still the correct call for their boolean operators.
-
-Why constructor-per-language for the *other* under-provisioned languages (Java, Go) is
-still additive rather than done: about 110 sites still `match` on `Dialect` directly, so
-adding a constructor makes every one of them non-exhaustive at once — which is exactly
-what happened, and was worked through, when `javascript` was added. `java`/`go`
-constructors are the same shape of work, not yet done. -/
+gap documented on `Dialect` itself remains open. Java and Go have their own constructors
+too now (`Dialect.java`, `Dialect.go` in `Syntax.lean`): boolean operators still yield a
+bool as under `.cLike`, but strings are values, containers are boxed, untagged Go `int` is
+64-bit and untagged Java `int` 32-bit (`Dialect.toNumConfig`), and Java's `==` on strings
+is the named hole `str:reference-equality`. Kotlin/JVM rides `.java`. -/
 inductive Lang where
   | python | c | java | go | javascript | typescript | kotlin
   deriving Repr, Inhabited, DecidableEq
@@ -752,15 +756,19 @@ def extensions : Lang → List String
 approximations; `approximated` says which. -/
 def dialect : Lang → Dialect
   | .python     => .python
-  -- Correct for `and`/`or`: Java and Go really do yield a bool. No constructor of their
-  -- own yet (see the module doc comment above), so they stay on `.cLike`.
-  | .java | .go | .c => .cLike
+  | .c          => .cLike
+  -- Real constructors now (Syntax.lean): 64-bit Go `int`, value strings with content
+  -- `+`, boxed arrays/slices/maps, and Java's reference `==` on strings as a named hole.
+  | .java       => .java
+  | .go         => .go
   -- `.javascript` is a real constructor now (Syntax.lean): `&&`/`||` yield an operand
   -- and arithmetic no longer wraps at 32 bits. TypeScript shares it — type erasure means
   -- TS's runtime numeric/boolean/string behaviour is JS's.
   | .javascript | .typescript => .javascript
-  -- Kotlin's `&&`/`||` are bool-valued, like Java's.
-  | .kotlin     => .cLike
+  -- Kotlin/JVM: Java's integer model and boolean operators. Its `==` on strings is
+  -- structural where Java's is by reference; under `.java` that is the
+  -- `str:reference-equality` hole — conservative, not wrong.
+  | .kotlin     => .java
 
 /-- Does the language-wide dialect default approximate numeric behavior?
 Fresh exports use TypedNumeric operation tags for known C/Java/Go integer types
@@ -774,20 +782,17 @@ def approximated : Lang → Bool
 exporter's operation tags and interpreted in TypedNumeric.
 
 **NON-NORMATIVE. The interpreter does not consult this function.** It has no callers
-anywhere in `Autoform/` -- it is documentation of what each language's integers *are*,
-not of what the evaluator *does*. What the evaluator does is: a tagged operation goes
-through `TypedNumeric.parse` (which is width-correct, so Java `long` really is 64-bit),
-and an untagged one goes through `Dialect.toNumConfig`, which sends every `.cLike`
-language -- Java and Kotlin included -- to `NumConfig.c32Wrapv`.
-
-So `numConfig .java = java64` and the untagged evaluation path disagree about Java, and
-the evaluator wins. Read this table as a statement of intent for the day `.java` becomes
-a real `Dialect` constructor; do not read it as a description of current behaviour, and
-do not "fix" a width bug by editing it, because nothing will change. -/
+anywhere in `Autoform/` -- it is documentation of what each language's untagged integers
+*are*, and `Lang.numConfig_agrees_with_dialect` below checks it against what the
+evaluator *does*: a tagged operation goes through `TypedNumeric.parse` (width-correct,
+so Java `long` really is 64-bit), an untagged one through `Dialect.toNumConfig`. C is
+the one deliberate disagreement: this table states the STANDARD (`c32`, overflow
+undefined) where the evaluator uses the measured compiler behaviour (`c32Wrapv`). -/
 def numConfig : Lang → NumConfig
   | .python                   => NumConfig.python
   | .c                        => NumConfig.c32
-  | .java | .kotlin           => NumConfig.java64
+  -- Java `int` / Kotlin `Int`: the untagged default. `long` is tagged, 64-bit.
+  | .java | .kotlin           => NumConfig.java32
   | .go                       => NumConfig.go64
   -- JS/TS numbers are IEEE doubles, not integers at all; `.javascript`'s `NumConfig` is
   -- `NumConfig.python` (unbounded) — exact up to `Number.MAX_SAFE_INTEGER`, a named
@@ -797,6 +802,18 @@ def numConfig : Lang → NumConfig
 /-- Languages whose semantics are currently known to be wrong. -/
 def known_wrong : List Lang :=
   [.python, .c, .java, .go, .javascript, .typescript, .kotlin].filter approximated
+
+/-- The non-normative table agrees with the evaluator for every language but C, where
+the disagreement is the standard-vs-compiler one its docstring names. -/
+theorem numConfig_agrees_with_dialect (l : Lang) (hc : l ≠ .c) :
+    l.numConfig = l.dialect.toNumConfig := by
+  cases l <;> first | rfl | exact absurd rfl hc
+
+-- Untagged Go `int` is 64-bit and wraps; untagged Java `int` is 32-bit and wraps.
+#guard Dialect.go.toNumConfig.add 9223372036854775807 1 == .ok (-9223372036854775808)
+#guard Dialect.go.toNumConfig.add 2147483647 1 == .ok 2147483648
+#guard Dialect.java.toNumConfig.add 2147483647 1 == .ok (-2147483648)
+#guard Dialect.java.toNumConfig.mul 100000 100000 == .ok 1410065408
 
 end Lang
 

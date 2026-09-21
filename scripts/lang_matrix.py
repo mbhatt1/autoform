@@ -27,8 +27,10 @@ import deep_json
 # deliberately: this script measures the pipeline, so it must not import from it and
 # inherit a change silently.
 DIALECT = {".py": "python", ".c": "cLike", ".h": "cLike", ".cpp": "cLike",
-           ".java": "cLike", ".js": "cLike", ".ts": "cLike", ".kt": "cLike",
-           ".go": "cLike"}
+           ".cc": "cLike", ".cxx": "cLike", ".hh": "cLike", ".hpp": "cLike",
+           ".java": "java", ".kt": "java", ".kts": "java", ".go": "go",
+           ".js": "javascript", ".ts": "javascript", ".tsx": "javascript",
+           ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript"}
 
 def walk(node):
     """Yield every dict node in an AST, iteratively (the JS ASTs are deep)."""

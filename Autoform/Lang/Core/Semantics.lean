@@ -69,6 +69,8 @@ def Dialect.idiv : Dialect → Int → Int → Int
   | .python,     a, b => Int.fdiv a b
   | .cLike,      a, b => Int.tdiv a b
   | .javascript, a, b => Int.fdiv a b
+  | .java,       a, b => Int.tdiv a b
+  | .go,         a, b => Int.tdiv a b
 
 /-- Integer remainder under a dialect. See `idiv` — unused, kept exhaustive and
 consistent with it. -/
@@ -76,6 +78,8 @@ def Dialect.imod : Dialect → Int → Int → Int
   | .python,     a, b => Int.fmod a b
   | .cLike,      a, b => Int.tmod a b
   | .javascript, a, b => Int.fmod a b
+  | .java,       a, b => Int.tmod a b
+  | .go,         a, b => Int.tmod a b
 
 
 /-- Result of executing a statement: how control left it and the locals at that point.
@@ -174,14 +178,14 @@ def flCmp (d : Dialect) : Val → Val → Option Ordering
       | .python => Fl.cmpIntv n y                     -- exact, no conversion
       -- `comparesIntFloatExactly d = false` for both: JS has no separate int type to be
       -- exact about, so it promotes like C.
-      | .cLike | .javascript =>
+      | .cLike | .javascript | .java | .go =>
           match (d.toFConfig).ofInt n with
           | .ok x => Fl.cmpv x y
           | _     => none
   | .float x, .int n   =>
       (match d with
        | .python => Fl.cmpIntv n x
-       | .cLike | .javascript =>
+       | .cLike | .javascript | .java | .go =>
            match (d.toFConfig).ofInt n with
            | .ok y => Fl.cmpv y x
            | _     => none).map Ordering.swap
@@ -353,11 +357,15 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
       else .hole "str:pointer-compare-not-modelled"
   -- `==` on strings compares contents in Python and addresses in C. `Val.beq` is
   -- structural, so it is right for Python and wrong for C.
+  -- Java is the third case: strings are values, but `==` is REFERENCE equality, and
+  -- Core's one `Val.str` cannot say whether two equal contents are one object.
   | "==", .str _, .str _ =>
-      if d.stringsAreValues then .val (.bool (Val.beq a b))
+      if d.stringEqIsReference then .hole "str:reference-equality"
+      else if d.stringsAreValues then .val (.bool (Val.beq a b))
       else .hole "str:pointer-equality-not-modelled"
   | "!=", .str _, .str _ =>
-      if d.stringsAreValues then .val (.bool (!Val.beq a b))
+      if d.stringEqIsReference then .hole "str:reference-equality"
+      else if d.stringsAreValues then .val (.bool (!Val.beq a b))
       else .hole "str:pointer-equality-not-modelled"
   -- Floats, including mixed `int`/`float`. Placed before the generic `==`/`!=` so that
   -- the dialect split on comparison (see `flCmp`) is not bypassed by `Val.beq`.
@@ -482,6 +490,32 @@ wrapped to `-2147483648`, the same confirmed-wrong answer `applyBinop_c_add` abo
 give (32-bit wraparound). -/
 example : applyBinop .javascript "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := rfl
 #eval applyBinop .javascript "+" (.int 2147483647) (.int 1)  -- val (int 2147483648)
+
+/-! ### Java and Go, split from `.cLike` (docs/languages.md §5, §6)
+
+Untagged Java arithmetic is `int`: 32-bit and wrapping, like `javac`/HotSpot. Untagged Go
+arithmetic is `int`: 64-bit and wrapping. Strings are values in both — `+` concatenates —
+and `==` on two strings is content equality in Go but REFERENCE equality in Java, which
+Core's one `Val.str` cannot decide, so it is the hole `str:reference-equality` rather than
+either wrong answer. Every claim here is a `#guard`, not an oracle: no Java or Go runtime
+is compared against yet (the support matrix's last column). -/
+example : applyBinop .java "+" (.int 2147483647) (.int 1) = .val (.int (-2147483648)) := by rfl
+example : applyBinop .java "*" (.int 100000) (.int 100000) = .val (.int 1410065408) := by rfl
+example : applyBinop .go "+" (.int 2147483647) (.int 1) = .val (.int 2147483648) := by rfl
+example : applyBinop .go "+" (.int 9223372036854775807) (.int 1) = .val (.int (-9223372036854775808)) := by rfl
+example : applyBinop .go "*" (.int 100000) (.int 100000) = .val (.int 10000000000) := by rfl
+example : applyBinop .java "+" (.str "a") (.str "b") = .val (.str "ab") := by rfl
+example : applyBinop .go "+" (.str "a") (.str "b") = .val (.str "ab") := by rfl
+example : applyBinop .java "==" (.str "a") (.str "a") = .hole "str:reference-equality" := by rfl
+example : applyBinop .java "!=" (.str "a") (.str "b") = .hole "str:reference-equality" := by rfl
+example : applyBinop .go "==" (.str "a") (.str "a") = .val (.bool true) := by rfl
+example : applyBinop .cLike "==" (.str "a") (.str "a") = .hole "str:pointer-equality-not-modelled" := by rfl
+-- `&&`/`||` yield booleans in both, as in C — the one thing `.cLike` had right for them.
+example : applyBinop .java "||" (.int 0) (.int 5) = .val (.bool true) := by rfl
+example : applyBinop .go "&&" (.int 1) (.int 0) = .val (.bool false) := by rfl
+-- `/` truncates toward zero in both; `-7 / 2` is `-3`.
+example : applyBinop .java "/" (.int (-7)) (.int 2) = .val (.int (-3)) := by rfl
+example : applyBinop .go "%" (.int (-7)) (.int 3) = .val (.int (-1)) := by rfl
 
 /-! ### Float equations, and the two that must not regress
 

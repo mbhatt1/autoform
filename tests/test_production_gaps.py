@@ -452,3 +452,57 @@ class TestClassAttributeDefaultRendering:
                 {'positionalOnly': [], 'keywordOnly': [], 'required': ['d'],
                  'classAttrDefaults': [['d', 'C', '_C__m']]},
                 ['d'])
+
+
+class TestJavaAndGoDialects:
+    """`.java` and `.go` are `Dialect` constructors, not `.cLike` aliases. Three scripts
+    carry an extension→dialect table each (the renderer decides, `lang_matrix.py` measures
+    independently, `differential.py` records what it expects); this pins them to one
+    another and to the constructors that exist in `Syntax.lean`."""
+
+    def _module(self, rel, name):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(name, ROOT / rel)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_renderer_routes_java_go_and_kotlin_to_their_own_constructors(self):
+        render = self._module('cartographer/render_lean.py', 'render_lean_dialects')
+        assert render.DIALECT['.java'] == '.java'
+        assert render.DIALECT['.go'] == '.go'
+        # Kotlin/JVM rides `.java`: same integer model and boolean operators; its
+        # structural string `==` lands on Java's `str:reference-equality` hole.
+        assert render.DIALECT['.kt'] == '.java' and render.DIALECT['.kts'] == '.java'
+        assert render.DIALECT['.c'] == '.cLike'
+        constructors = {'.python', '.cLike', '.javascript', '.java', '.go'}
+        assert set(render.DIALECT.values()) <= constructors
+
+    def test_every_rendered_dialect_is_a_constructor_in_syntax(self):
+        render = self._module('cartographer/render_lean.py', 'render_lean_dialects2')
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        block = syntax.split('inductive Dialect where', 1)[1].split('deriving', 1)[0]
+        declared = {'.' + line.strip()[2:].split()[0]
+                    for line in block.splitlines() if line.strip().startswith('| ')}
+        assert set(render.DIALECT.values()) <= declared, declared
+
+    def test_the_measuring_script_agrees_with_the_renderer(self):
+        render = self._module('cartographer/render_lean.py', 'render_lean_dialects3')
+        matrix = self._module('scripts/lang_matrix.py', 'lang_matrix_dialects')
+        assert {k: '.' + v for k, v in matrix.DIALECT.items()} == render.DIALECT
+
+    def test_differential_expects_the_same_dialects(self):
+        src = (ROOT / 'scripts/differential.py').read_text()
+        table = src.split('DIALECT_FOR = ', 1)[1].split('}', 1)[0] + '}'
+        expected = eval(table)
+        assert expected['java'][0] == 'java' and expected['go'][0] == 'go'
+        assert expected['kotlin'][0] == 'java'
+        # Exactness is about the UNTAGGED integer path (one width per language), which
+        # is why an own constructor does not make the dialect "exact".
+        assert expected['java'][1] is False and expected['go'][1] is False
+
+    def test_java_string_equality_is_a_named_hole_not_a_guess(self):
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert 'def stringEqIsReference : Dialect → Bool' in syntax
+        assert 'if d.stringEqIsReference then .hole "str:reference-equality"' in sem

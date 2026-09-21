@@ -550,7 +550,12 @@ def ident(name: str) -> str:
 # (`Autoform/Lang/Core/Syntax.lean`) is the real fix; this table just has to point at it.
 DIALECT = {".py": ".python", ".c": ".cLike", ".h": ".cLike", ".cpp": ".cLike",
            ".cc": ".cLike", ".cxx": ".cLike", ".hh": ".cLike", ".hpp": ".cLike",
-           ".java": ".cLike", ".kt": ".cLike", ".go": ".cLike",
+           # `.java`/`.go` are real constructors (`Autoform.Core.Dialect.java`/`.go`,
+           # `Syntax.lean`): 64-bit Go `int`, value strings, boxed arrays/slices, Java's
+           # reference `==` as a named hole. Kotlin/JVM shares Java's integer model and
+           # boolean operators, so it rides `.java`; its structural string `==` lands on
+           # the same conservative hole.
+           ".java": ".java", ".kt": ".java", ".kts": ".java", ".go": ".go",
            ".js": ".javascript", ".ts": ".javascript", ".tsx": ".javascript",
            ".jsx": ".javascript", ".mjs": ".javascript", ".cjs": ".javascript"}
 
