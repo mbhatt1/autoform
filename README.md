@@ -269,6 +269,22 @@ See [the source-language measurements](docs/languages.md) and
 [the machine-code gap list](docs/machine-code.md#remaining-work-toward-arbitrary-codebases)
 for the scope of the remaining work.
 
+**The Python gaps, measured rather than listed.** A gap list without counts invites
+picking the easy one. Exporting `cachetools` v7.1.7 with the current exporter gives 109
+holes across 91 of 209 functions, and they are not evenly distributed:
+
+| label | holes | what would close it |
+|---|---|---|
+| `control:TRY-exception-representation` | 29 | a well-formedness predicate on `Stmt.raise` plus preservation over the interpreter — every *other* exception producer in Core is already pinned by a theorem ([§10](docs/languages.md)) |
+| `call:python-defaults` | 30 | function-object state. The literal defaults are done; these are `Attribute` causes (`math.inf`, `time.monotonic`) evaluated once at `def` time |
+| `call:python-receiver-signature` | 24 | descriptor/decorator binding, and receivers not named `self` |
+| `scope:nonlocal-write` | 8 | the "cross-scope writes" named above, counted |
+| `function:python-default-evaluation` | 4 | follows `call:python-defaults` |
+
+Each is a feature, not a fix. Two things this table is for: it is the reason
+[re-exporting the tracked corpora is currently a coverage regression rather than an
+integrity fix](docs/integrity.md), and it is the order to work in.
+
 ## Dependencies
 
 Lean 4.30.0-rc1 · [Specimen](https://github.com/strata-org/specimen) ·
