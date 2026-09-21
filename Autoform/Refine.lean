@@ -464,7 +464,8 @@ theorem applyUnop_int_neg (x : Int) :
 /-- The context `runFunc` builds internally. Exposed so that resolution facts can be
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
-  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases }
+  { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+    properties := p.properties }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable

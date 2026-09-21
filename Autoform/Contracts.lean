@@ -676,7 +676,8 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
 /-- `runFunc` builds its context inline; folding it back to `ctxOf` is what lets the
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
-    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases } : Ctx) = ctxOf p := rfl
+    ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
+       properties := p.properties } : Ctx) = ctxOf p := rfl
 
 /-! ### Satisfiability first
 

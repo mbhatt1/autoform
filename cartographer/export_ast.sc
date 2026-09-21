@@ -192,6 +192,11 @@ KeyboardInterrupt LookupError MemoryError NameError NotImplementedError Overflow
 RecursionError ReferenceError RuntimeError StopIteration StopAsyncIteration SyntaxError
 SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'''.split()
 tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
+# `(class, name)` for every `@property` getter defined by a decorator inside a class body,
+# and the names of properties Core can NOT dispatch -- `x = property(getx)` at class
+# level, where the getter is not syntactically a method of the class. The first list
+# becomes `Program.properties`; the second keeps its attribute reads holed.
+property_pairs, properties_unmodelled = [], set()
 
 def builtin_name(name, scopes):
     # A local assignment anywhere in a function hides the builtin. Global and
@@ -400,6 +405,16 @@ def visit(node, scopes):
         static_method = (len(decorators) == 1 and isinstance(decorators[0], ast.Name)
                          and decorators[0].id == 'staticmethod'
                          and builtin_name('staticmethod', scopes))
+        # A sole `@property` is likewise a binding directive with no residue: the getter
+        # is an ordinary method of its class (receiver under `self`), and the ONLY thing
+        # the decorator changes is that an attribute READ calls it. Core now does that
+        # dispatch itself from `Program.properties`, so the definition translates as a
+        # method and the pair is recorded. Any other decorator, or `property` stacked
+        # with one (a setter, `functools.cached_property`), still holes.
+        sole_property = (len(decorators) == 1 and isinstance(decorators[0], ast.Name)
+                         and decorators[0].id == 'property'
+                         and builtin_name('property', scopes)
+                         and scopes[-1].get_type() == 'class')
         parameters = [a.arg for a in [*node.args.posonlyargs, *node.args.args,
             *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
             *([node.args.kwarg] if node.args.kwarg else [])]]
@@ -411,15 +426,23 @@ def visit(node, scopes):
         # access instead of computing with `unit`.
         if any(isinstance(d, ast.Name) and d.id == 'property' for d in decorators):
             properties.add(node.name)
+            if sole_property:
+                property_pairs.append([scopes[-1].get_name(), node.name])
+            else:
+                # `@property` with company -- a setter stack, or a non-builtin
+                # `property` -- is not a plain getter and cannot be dispatched to.
+                properties_unmodelled.add(node.name)
         signatures[f'{node.lineno}:{node.col_offset + 1}'] = {
             'name': 'lambda' if isinstance(node, ast.Lambda) else node.name,
             'defaults': bool(node.args.defaults or any(v is not None for v in node.args.kw_defaults)),
             'positional_only': bool(node.args.posonlyargs),
             'keyword_only': bool(node.args.kwonlyargs),
             'firstPositional': next((a.arg for a in [*node.args.posonlyargs, *node.args.args]), None),
-            'decorated': bool(getattr(node, 'decorator_list', [])) and not static_method,
+            'decorated': bool(getattr(node, 'decorator_list', [])) and not static_method
+                         and not sole_property,
             'isMethod': scopes[-1].get_type() == 'class' and not static_method,
             'staticMethod': static_method,
+            'property': sole_property,
             'privateParameters': bool(class_scopes and class_scopes[-1].get_name().lstrip('_')
                 and any(name.startswith('__') and not name.endswith('__') for name in parameters)),
             'parameters': parameters,
@@ -471,6 +494,12 @@ def visit(node, scopes):
     if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
             and node.id in represented and builtin_name(node.id, scopes)):
         class_refs[f'{node.lineno}:{node.col_offset + 1}'] = node.id
+    if (isinstance(node, ast.Assign) and scopes[-1].get_type() == 'class'
+            and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == 'property'):
+        for tgt in node.targets:
+            if isinstance(tgt, ast.Name):
+                properties_unmodelled.add(tgt.id)
     if isinstance(node, ast.Raise):
         value = node.exc
         # `from None` is the idiom for SUPPRESSING chaining, and suppressing something
@@ -508,7 +537,9 @@ visit(tree, [symbols])
 print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   'signatures': signatures,
                   'exceptions': sorted(represented),
-                  'properties': sorted(properties)}, sort_keys=True))
+                  'properties': sorted(properties),
+                  'propertyPairs': sorted(property_pairs),
+                  'propertiesUnmodelled': sorted(properties_unmodelled)}, sort_keys=True))
 """
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
   def pythonHandlers(file: String): Option[ujson.Value] =
@@ -1354,8 +1385,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * property called `f`, every `_.f` in that file holes. Over-holing is the safe
     * direction, and Python attribute access is not statically resolvable in general. */
   def isPythonProperty(f: String): Boolean =
+    // Only the properties Core CANNOT dispatch to still hole: `x = property(getx)` at
+    // class level, or `@property` stacked with another decorator. A plain decorated
+    // getter is now in `Program.properties`, and `evalExpr` runs it on a field miss.
     pythonHandlers(currentFile)
-      .exists(_("properties").arr.exists(_.str == f))
+      .exists(_("propertiesUnmodelled").arr.exists(_.str == f))
 
   def pythonSignatureGap(m: Method): Option[String] = {
     if (!m.filename.toLowerCase.endsWith(".py") ||
@@ -10639,6 +10673,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         obj("classBases") = ujson.Obj.from(cb.toList.sortBy(_._1).map { case (k, v) =>
           k -> (ujson.Str(v): ujson.Value)
         })
+      // `@property` pairs ride on the module initializer for the same reason the bases
+      // do, and the renderer aggregates them into `Program.properties`. Source metadata
+      // is authoritative here: the frontend does not preserve decorators reliably.
+      if (pyFile) pythonHandlers(m.filename).foreach { info =>
+        val pairs = info("propertyPairs").arr
+        if (pairs.nonEmpty) obj("classProperties") = ujson.Arr.from(pairs.toList)
+      }
     }
     // Emitted only when present, so an AST with no variadic parameters renders exactly
     // as it did before this existed.
@@ -10667,6 +10708,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         val exportedParams = ps.map(_.name).toSet
         val receiverKeywordCollision = obj.value.contains("kwarg") &&
           !signature("positionalOnly").arr.contains(ujson.Str("self"))
+        // `decorated` is already false for a sole `@property` (the extractor treats it
+        // like `@staticmethod`: a directive with no residue). The getter is then an
+        // ordinary method with `self` stripped, which is exactly how `evalExpr` applies
+        // it when a field read dispatches to it.
         val bindingGap =
           if (isMethodDecl && (signature("firstPositional") != ujson.Str("self") ||
               signature("decorated").bool || receiverKeywordCollision))
