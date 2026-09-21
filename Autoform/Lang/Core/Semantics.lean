@@ -302,6 +302,27 @@ def languageBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                               else .hole s!"binop:{op}"
                | _       => TypedNumeric.binary op a b
 
+/-- JLS §5.1.3, the first step of a floating-point → integral narrowing: `NaN` is `0`;
+otherwise the value is rounded toward zero and, if it does not fit the intermediate type
+(`long` when the target is `long`, else `int`), saturates to that type's smallest or
+largest value -- an infinity is "too small"/"too large" by the same rule. The second step
+(narrowing the `int` to `byte`/`short`/`char`) is `IntType.wrap`, JLS §5.1.3's "discards
+all but the n lowest order bits". `FConfig.toInt` is the round-toward-zero truncation;
+it refuses NaN and infinities, which is exactly where the two saturating arms take over. -/
+def javaFloatToIntegral (ty : IntType) (f : Fl) : Int :=
+  let mid : IntType := match ty with
+    | .signed .w64 | .unsigned .w64 => .signed .w64
+    | _                             => .signed .w32
+  let lo := (IntType.lo mid).getD 0
+  let hi := (IntType.hi mid).getD 0
+  let step1 : Int :=
+    if f.isNaN then 0
+    else if f.isInf then (if f.signBit then lo else hi)
+    else match FConfig.toInt FConfig.cDouble f with
+      | .ok n    => if n < lo then lo else if n > hi then hi else n
+      | .error _ => 0
+  IntType.wrap ty step1
+
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
 Integer arithmetic goes through `NumConfig`, so width and overflow policy follow the
@@ -618,6 +639,17 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   | "cast:u8",  .int x => .val (.int (IntType.wrap (.unsigned .w8) x))
   | "cast:i16", .int x => .val (.int (IntType.wrap (.signed .w16) x))
   | "cast:u16", .int x => .val (.int (IntType.wrap (.unsigned .w16) x))
+  -- JLS §5.1.3, floating-point to an integral type, Java only. Step one: NaN is 0;
+  -- otherwise round toward zero, and a value outside `int`/`long` (an infinity or a
+  -- large magnitude) saturates to that type's smallest or largest value. Step two: for
+  -- `byte`, `short`, `char` the `int` result is narrowed again by discarding all but the
+  -- low-order bits (`IntType.wrap`). C leaves out-of-range float→int undefined
+  -- (C17 §6.3.1.4), so no other dialect gets this rule.
+  | "cast:i8",  .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w8) f))  else .hole "cast:float-to-int:non-java"
+  | "cast:i16", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w16) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:u16", .float f => if d == .java then .val (.int (javaFloatToIntegral (.unsigned .w16) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:i32", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w32) f)) else .hole "cast:float-to-int:non-java"
+  | "cast:i64", .float f => if d == .java then .val (.int (javaFloatToIntegral (.signed .w64) f)) else .hole "cast:float-to-int:non-java"
   | "cast:i32", .int x => .val (.int (IntType.wrap (.signed .w32) x))
   | "cast:u32", .int x => .val (.int (IntType.wrap (.unsigned .w32) x))
   | "cast:i64", .int x => .val (.int (IntType.wrap (.signed .w64) x))
@@ -1058,16 +1090,45 @@ on `.` is safe here because the file part's dots are never the LAST segment. -/
 def Func.ownerClassValue (fn : Func) : Val :=
   .fn (String.mk (dropLastDotSegment fn.name.toList) ++ "<meta>")
 
+/-- A Java method's qualified name carries its erased signature --
+`pkg.Cls.<init>:void(java.util.Map,boolean)` -- because the JVM overloads on it
+(JLS §8.4.9 overloading, §8.8 constructors). Core has no overloads and matches methods by
+dotted suffix, so the signature is dropped before the suffix test: everything from the
+LAST `:` on, but only when the name ends in `)`, which no Python name
+(`a.py:<module>.C.f`) does. Structural over `List Char`, so the kernel reduces it. -/
+def stripSig (k : String) : String :=
+  match k.toList.reverse with
+  | ')' :: _ =>
+      match k.toList.reverse.dropWhile (· != ':') with
+      | _ :: before => String.mk before.reverse
+      | []          => k
+  | _ => k
+
+#guard stripSig "com.google.gson.Foo.<init>:void(java.util.Map,boolean)" == "com.google.gson.Foo.<init>"
+#guard stripSig "a.py:<module>.C.f" == "a.py:<module>.C.f"
+#guard stripSig "plain" == "plain"
+
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
-  match ctx.table.filter (fun p => strEndsWith p.1 ("." ++ cls ++ "." ++ meth)) with
+  match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
-  ctx.table.any (fun p => strEndsWith p.1 ("." ++ cls ++ "." ++ meth))
+  ctx.table.any (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth))
+
+/-- The constructor a class instance creation runs. Python spells it `__init__`; Java
+spells it `<init>` (JLS §15.9.4: "the selected constructor is invoked" -- and the
+frontend names every constructor `<init>`, §8.8 gives them the class's own name in
+source). One lookup, two spellings; a class with neither is created uninitialised, which
+is what Python does for a class without `__init__` and what a Java class with only the
+default constructor (§8.8.9) does. -/
+def Ctx.resolveCtor (ctx : Ctx) (cls : String) : Option Func :=
+  match ctx.resolveMethod cls "__init__" with
+  | some f => some f
+  | none   => ctx.resolveMethod cls "<init>"
 
 /-- The user-class method a container operation on an ORDINARY instance dispatches to.
 
@@ -2028,7 +2089,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                    | .clsClos _ c => c
                    | _            => []
         let (h₂, r) := h₁.alloc { cls := cls, fields := [], captured := cap }
-        match ctx.resolveMethod cls "__init__" with
+        match ctx.resolveCtor cls with
         | none    => (h₂, .val (.ref r))
         | some fn =>
           match applyFunc ctx n h₂ fn (some (.ref r)) vs kws with
@@ -3632,6 +3693,43 @@ private def valueDunderProg : Program :=
 -- `len(Q())`      -- CPython TypeError; Core has no `len` on an instance without `__len__`
 --                    and says so (`call:len`), which is the pre-existing behaviour.
 #guard match runFunc valueDunderProg 200 "lenQ" [] with | .hole _ => true | _ => false
+
+/-! ## Java: casts, constructors, collections -- expectations from the JLS and `javac`
+
+`(byte) 300 == 44` and `(short) 70000 == 4464` are JLS §5.1.3's "discards all but the n
+lowest order bits"; `(int) 3.9 == 3` and `(int) -3.9 == -3` its round-toward-zero;
+`(int) NaN == 0`; `(int) 1e30 == Integer.MAX_VALUE` and `(long) -1e30 == Long.MIN_VALUE`
+its saturation; `(byte) 300.9 == 44` its two-step rule (to `int` 300, then narrowed). -/
+#guard match applyUnop .java "cast:i8" (.int 300) with | .val (.int 44) => true | _ => false
+#guard match applyUnop .java "cast:i16" (.int 70000) with | .val (.int 4464) => true | _ => false
+-- 3.9 is 0x400F333333333333; -3.9 sets the sign bit; 1e30 is 0x46293E5939A08CEA.
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with | .val (.int 3) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0xC00F333333333333)) with | .val (.int (-3)) => true | _ => false
+#guard match applyUnop .java "cast:i8" (.float (Fl.ofBits 0x4072CE6666666666)) with | .val (.int 44) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x7FF8000000000000)) with | .val (.int 0) => true | _ => false
+#guard match applyUnop .java "cast:i32" (.float (Fl.ofBits 0x46293E5939A08CEA)) with | .val (.int 2147483647) => true | _ => false
+#guard match applyUnop .java "cast:i64" (.float (Fl.ofBits 0xC6293E5939A08CEA)) with | .val (.int (-9223372036854775808)) => true | _ => false
+-- The same cast under C is not claimed: out-of-range float→int is undefined there.
+#guard match applyUnop .cLike "cast:i32" (.float (Fl.ofBits 0x400F333333333333)) with
+       | .hole _ => true | _ => false
+
+/-- A Java class with a constructor named `<init>` and a signature in its qualified name,
+as javasrc2cpg exports it. `new Box(7)` runs the constructor with `this` bound
+(JLS §15.9.4), then `box.v` reads the field it set. -/
+private def javaProg : Program :=
+  { dialect := .java
+  , funcs :=
+    [ { name := "pkg.Box.<init>:void(int)", params := ["v"]
+      , body := .setField (.name "self") "v" (.name "v") }
+    , { name := "pkg.Box.get:int()", params := []
+      , body := .ret (.field (.name "self") "v") }
+    , { name := "pkg.Main.mk:int()", params := []
+      , body := .seq (.assign "b" (.alloc "Box" [.lit (.int 7)]))
+                     (.ret (.binop "+" (.field (.name "b") "v")
+                                       (.mcall (.name "b") "get" []))) } ] }
+
+-- new Box(7).v + new Box(7).get()  -- java: 14
+#guard match runFunc javaProg 300 "pkg.Main.mk:int()" [] with | .val (.int 14) => true | _ => false
 
 /-! ## JavaScript arrays and strings
 
