@@ -729,6 +729,9 @@ structure Ctx where
   through, or the contexts disagree and every proof that folds one into the other breaks:
   that disagreement is what a `Ctx` field costs, and it is confined to those sites. -/
   properties : List (String × String) := []
+  /-- The program's own exception classes -- see `Program.excClasses`. Passed through by
+  every `Ctx` built from a `Program`, like `properties`. -/
+  excClasses : List String := []
 
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -1218,9 +1221,14 @@ EXPORTER; the value alone cannot separate them, and this comment is where that l
 Either way every exception this produces names a represented class
 (`pythonRaise_excSafe`, `Autoform/Lang/Core/ExcSafe.lean`), which is the invariant that
 lets the try/except lowering drop `control:TRY-exception-representation`. -/
-def pythonRaise (v : Val) : EResult :=
+def pythonRaise (extra : List String) (v : Val) : EResult :=
   match v with
-  | .str name => if Stdlib.excNames.contains name then .exn v else Stdlib.raiseValue v
+  -- A represented name -- a builtin (`Stdlib.excNames`) or a class the program itself
+  -- defines as an exception (`Ctx.excClasses`) -- is raised as is. Python reference
+  -- §8.4.1: the handler match is by class or base class, so the class NAME is what a
+  -- handler needs, and the hierarchy is expanded by the exporter into each accepted set.
+  | .str name => if Stdlib.excNames.contains name || extra.contains name then .exn v
+                 else Stdlib.raiseValue v
   | _         => Stdlib.raiseValue v
 
 /-! ## Value dunders on ordinary instances
@@ -2201,7 +2209,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
           -- whatever it was given: Java and C++ throw arbitrary objects, and Core has no
           -- exception-object representation to check them against.
           if ctx.dialect == .python then
-            match pythonRaise v with
+            match pythonRaise ctx.excClasses v with
             | .exn w     => (h₁, .exn w ρ)
             | .hole l    => (h₁, .hole l)
             | .val _     => (h₁, .hole "raise:non-exception-value")
@@ -2592,7 +2600,8 @@ for a self-contained function, and keeping it stable keeps the refinement layer'
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
-                     builtinBases := p.builtinBases, properties := p.properties }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -2606,7 +2615,8 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases, properties := p.properties }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -2628,7 +2638,8 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases, properties := p.properties }
+                     builtinBases := p.builtinBases, properties := p.properties,
+                     excClasses := p.excClasses }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)
@@ -3175,6 +3186,61 @@ private def valueCallProg : Program :=
 -- 5(1)       -- CPython TypeError; Core: a named hole, never a value
 #guard match runFunc valueCallProg 200 "notCallable" [] with
        | .hole "call:value:not-callable" => true | _ => false
+
+/-! ## Corpus exception classes and `except ... as e`
+
+`class MyErr(Exception)` in the program is an exception class -- the library reference
+("Built-in Exceptions") has user code "derive new exceptions from the `Exception` class or
+one of its subclasses" -- so `raise MyErr("x")` raises the represented name `MyErr`, and a
+handler matches it by "the class or a non-virtual base class of the exception object, or
+a tuple that contains such a class" (reference §8.4.1). The exporter lowers `except E as e:`
+to a binding of `e` to the pending value -- the class name -- and each handler's accepted
+set is its types closed over the corpus hierarchy. These `#guard`s build exactly the shape
+the exporter emits (`tryCatch` + `ifte (inOp pending accepted)`), against CPython. -/
+private def excClassProg : Program :=
+  { dialect := .python, excClasses := ["MyErr"]
+  , funcs :=
+    [ -- `raise MyErr("x")`: the argument is evaluated for its effects, the NAME is raised
+      { name := "boom", params := []
+      , body := .seq (.expr (.lit (.str "x"))) (.raise (.lit (.str "MyErr"))) }
+      -- `try: boom()  except MyErr: return 1`
+    , { name := "catchOwn", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "MyErr")]))
+                 (.ret (.lit (.int 1))) (.raise (.name "$exc"))) }
+      -- `except Exception: return 2` -- the accepted set is `Exception`'s descendants,
+      -- which the exporter closes over the corpus, so it contains `MyErr`
+    , { name := "catchBase", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc")
+                    (.tupleE [.lit (.str "Exception"), .lit (.str "KeyError"), .lit (.str "MyErr")]))
+                 (.ret (.lit (.int 2))) (.raise (.name "$exc"))) }
+      -- `except KeyError: return 3` -- no match, `MyErr` propagates
+    , { name := "miss", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "KeyError")]))
+                 (.ret (.lit (.int 3))) (.raise (.name "$exc"))) }
+      -- `except (KeyError, MyErr) as e: return e` -- `e` is bound to the pending value
+    , { name := "bound", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "KeyError"), .lit (.str "MyErr")]))
+                 (.seq (.assign "e" (.name "$exc")) (.ret (.name "e"))) (.raise (.name "$exc"))) }
+      -- `except MyErr as e: raise e`
+    , { name := "reraise", params := []
+      , body := .tryCatch (.expr (.call "boom" [])) "$exc"
+          (.ifte (.inOp false (.name "$exc") (.tupleE [.lit (.str "MyErr")]))
+                 (.seq (.assign "e" (.name "$exc")) (.raise (.name "e"))) (.raise (.name "$exc"))) }
+      -- `raise Widget` for a name that is NOT an exception class: CPython's
+      -- `TypeError: exceptions must derive from BaseException`
+    , { name := "notExc", params := []
+      , body := .raise (.lit (.str "Widget")) } ] }
+
+#guard match runFunc excClassProg 200 "catchOwn" [] with | .val (.int 1) => true | _ => false
+#guard match runFunc excClassProg 200 "catchBase" [] with | .val (.int 2) => true | _ => false
+#guard match runFunc excClassProg 200 "miss" [] with | .exn (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "bound" [] with | .val (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "reraise" [] with | .exn (.str "MyErr") => true | _ => false
+#guard match runFunc excClassProg 200 "notExc" [] with | .exn (.str "TypeError") => true | _ => false
 
 /-! ## Boxed containers, step 3: `setIndex` on a heap payload
 

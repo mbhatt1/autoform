@@ -685,7 +685,7 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
     ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
-       properties := p.properties } : Ctx) = ctxOf p := rfl
+       properties := p.properties, excClasses := p.excClasses } : Ctx) = ctxOf p := rfl
 
 /-! ### Satisfiability first
 

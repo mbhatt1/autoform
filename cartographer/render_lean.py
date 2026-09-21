@@ -595,6 +595,20 @@ def infer_dialect(funcs) -> str:
                          % dialects)
     return dialects[0]
 
+def program_exc_classes(funcs) -> str:
+    """The `Program.excClasses` literal: the corpus's own exception classes, as the module
+    initializers carry them (`exceptionClasses`), deduplicated and sorted. `Stmt.raise`
+    accepts these names exactly as it accepts the builtin ones (Python reference §8.4.1:
+    a handler matches by class or base class, so the name is what matters)."""
+    names = set()
+    for f in funcs:
+        for n in (f.get("exceptionClasses") or []):
+            if not isinstance(n, str):
+                raise ValueError(f"render_lean: malformed exceptionClasses entry {n!r}")
+            names.add(n)
+    return ", ".join(lean_str(n) for n in sorted(names))
+
+
 def program_properties(funcs) -> str:
     """The `Program.properties` literal: every `(class, name)` a `@property` getter was
     recorded under, aggregated across the module initializers, deduplicated and sorted.
@@ -813,6 +827,7 @@ def _run_main():
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
     props = program_properties(funcs)
+    excs = program_exc_classes(funcs)
 
     extra = ""
     notes = []
@@ -824,6 +839,10 @@ def _run_main():
         extra += ", properties := [" + props + "]"
         notes.append("`properties` lists every `@property` as `(class, name)`, so that an")
         notes.append("attribute read of one runs the getter instead of missing the field.")
+    if excs:
+        extra += ", excClasses := [" + excs + "]"
+        notes.append("`excClasses` lists the program's own exception classes, so that")
+        notes.append("`raise` of one is a represented exception and handlers can match it.")
     if notes:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention).")
         out.append("")

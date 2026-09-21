@@ -376,7 +376,7 @@ asks for that classification to be the identity; every other dialect throws what
 given, and the default discharges the hypothesis there. -/
 theorem execStmt_raise_val {e : Expr} {h₁ : Heap} {v : Val}
     (he : evalExpr ctx k h ρ e = (h₁, .val v))
-    (hr : ctx.dialect = .python → pythonRaise v = .exn v := by
+    (hr : ctx.dialect = .python → pythonRaise ctx.excClasses v = .exn v := by
       intro hc; exact absurd hc (by decide)) :
     execStmt ctx (k+1) h ρ (.raise e) = (h₁, .exn v ρ) := by
   by_cases hd : ctx.dialect = .python
@@ -479,7 +479,7 @@ theorem applyUnop_int_neg (x : Int) :
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
   { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
-    properties := p.properties }
+    properties := p.properties, excClasses := p.excClasses }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable

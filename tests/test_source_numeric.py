@@ -670,8 +670,8 @@ def test_try_dispatch_guard_is_gone_and_the_invariant_is_a_theorem():
     exporter = (ROOT / 'cartographer/export_ast.sc').read_text()
     assert 'control:TRY-exception-representation' not in exporter
     semantics = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
-    assert 'def pythonRaise (v : Val) : EResult' in semantics
-    assert 'match pythonRaise v with' in semantics
+    assert 'def pythonRaise (extra : List String) (v : Val) : EResult' in semantics
+    assert 'match pythonRaise ctx.excClasses v with' in semantics
     excsafe = (ROOT / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
     for name in ('theorem pythonRaise_excSafe', 'theorem evalExpr_exn_excSafe',
                  'theorem execStmt_exn_excSafe'):
