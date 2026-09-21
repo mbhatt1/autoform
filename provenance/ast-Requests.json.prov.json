@@ -1,0 +1,14 @@
+{
+ "artifact": "ast-Requests.json",
+ "artifact_bytes": 2184728,
+ "artifact_sha256": "fc5b713532907335036aac654f1196c90702611df31c85339804d379aa494692",
+ "command": "scripts/reland_corpus.sh /private/tmp/rq Requests",
+ "cpg_schema_version": "1.7.70",
+ "exporter": "cartographer/export_ast.sc",
+ "exporter_sha256": "b82b43eae510fdcb4d6a9b949ebe8c56cb1c86119fec9f0edf0d5bcc39e4b310",
+ "joern_version": "4.0.606",
+ "recorded_by": "scripts/provenance.py record",
+ "schema_version": 1,
+ "source_path": "/private/tmp/rq",
+ "source_revision": "tree-sha256:7b6d024cb59b08cf9ed83c2a4a90abc88b89538cd0d7e244064fbe98d7869a3a:18files"
+}
