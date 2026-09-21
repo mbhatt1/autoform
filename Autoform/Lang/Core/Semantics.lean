@@ -1583,14 +1583,19 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | some (_, v) => (h₁, .val v)
                            -- A **module object** — the exporter's representation of an
                            -- imported module, marked by a class name beginning `<module>`
-                           -- that no `class` statement in any language can spell — carries
-                           -- exactly its top-level functions, classes and submodules. Its
-                           -- module-level *data* is not a field, because Core's single
-                           -- globals frame is not per-module and the value would have to
-                           -- be captured before the module body computed it. Answering
-                           -- `unit` for such an attribute is the silent wrong answer;
-                           -- naming the miss is the honest one. Ordinary objects keep the
-                           -- documented `unit` behaviour, so no existing corpus changes.
+                           -- that no `class` statement in any language can spell — is
+                           -- Python's module namespace as an object: Language Reference
+                           -- §3.2.9 (Modules), "attribute references are translated to
+                           -- lookups in this dictionary, e.g. `m.x` is equivalent to
+                           -- `m.__dict__["x"]`". Its fields are its top-level functions,
+                           -- classes and submodules (written by `<module-objects>`) AND
+                           -- its module-level variables, written by the module's own body
+                           -- as each binding runs (§5.4.1: the body executes in that
+                           -- namespace) -- so the value is the one the body computed, not
+                           -- a pre-capture. A name the body never bound is, in CPython,
+                           -- an `AttributeError`; answering `unit` for it is the silent
+                           -- wrong answer, naming the miss is the honest one. Ordinary
+                           -- objects keep the documented `unit` behaviour.
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
@@ -3066,6 +3071,85 @@ module-scoped and its value would have to be captured before the module body com
 — and this is what stops that decision from becoming a silent `unit`. -/
 /-- info: Autoform.Core.EResult.hole "module-attr:VERSION" -/
 #guard_msgs in #eval runMain modProg 200 [modInit] "main.attr" []
+
+/-! ## Module-level variables are module attributes
+
+Language Reference §3.2.9 (Modules): a module's namespace is a dictionary and `m.x` is
+`m.__dict__["x"]`; §5.4.1 (Loaders): the module body executes in that dictionary; §7.11
+(The `import` statement): `from m import x` stores "a reference to that value" in the
+importing namespace. So the exporter lowers a module-level binding `X = e` to the
+globals-frame write it always was PLUS a write of the module object's field `X`, and
+`from a import X` to a read of that field at import time -- the value `a`'s body bound,
+copied once, as CPython binds it. `a.X` stays a `.field` read at use time.
+
+    # a.py
+    LIMIT = 3
+    # b.py
+    from a import LIMIT
+    from a import LIMIT as L
+    import a
+    def f(): return LIMIT + 1
+    def viaAttr(): return a.LIMIT
+    def alias(): return L
+    def missing(): return a.NOPE
+
+CPython: `f()` is `4`, `viaAttr()` is `3`, `alias()` is `3`, `missing()` raises
+`AttributeError`. Core answers the first three exactly and refuses the fourth with the
+module object's named miss. The initializers run in import-dependency order (`a` before
+`b`, as §5.4 loads `a` when `b` first imports it); the last check shows what a WRONG
+order gives -- a named hole, never a value. -/
+def modVarProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "b.py:<module>.f", params := []
+      , body := .ret (.binop "+" (.name "LIMIT") (.lit (.int 1))) }
+    , { name := "b.py:<module>.viaAttr", params := []
+      , body := .ret (.field (.name "<module>a.py") "LIMIT") }
+    , { name := "b.py:<module>.alias", params := []
+      , body := .ret (.name "L") }
+    , { name := "b.py:<module>.missing", params := []
+      , body := .ret (.field (.name "<module>a.py") "NOPE") } ] }
+
+/-- `<module-objects>`: one object per module, allocated before any body runs. -/
+def modVarObjects : Func :=
+  { name := "<module-objects>:<module>", params := []
+  , body :=
+      .seq (.setGlobal "<module>a.py" (.alloc "<module>a.py" []))
+           (.setGlobal "<module>b.py" (.alloc "<module>b.py" [])) }
+
+/-- `a.py`'s body: `LIMIT = 3`, lowered by `bindName` -- the globals-frame write and the
+module object's field, in that order, so the field holds what the body computed. -/
+def modVarAInit : Func :=
+  { name := "a.py:<module>", params := []
+  , body :=
+      .seq (.setGlobal "LIMIT" (.lit (.int 3)))
+           (.setField (.name "<module>a.py") "LIMIT" (.name "LIMIT")) }
+
+/-- `b.py`'s body: the two `from a import` forms, each a field read at import time. -/
+def modVarBInit : Func :=
+  { name := "b.py:<module>", params := []
+  , body :=
+      .seq (.setGlobal "LIMIT" (.field (.name "<module>a.py") "LIMIT"))
+           (.setGlobal "L" (.field (.name "<module>a.py") "LIMIT")) }
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 4) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.f" []
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 3) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.viaAttr" []
+
+/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 3) -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.alias" []
+
+/-! `a.NOPE`: never bound, so the module object names the miss (CPython: `AttributeError`). -/
+/-- info: Autoform.Core.EResult.hole "module-attr:NOPE" -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.missing" []
+
+/-! The order matters, and getting it wrong is loud: with `b`'s body before `a`'s, the
+import-time read finds no field yet and the initializer stops at the named hole, exactly
+where CPython's `from a import LIMIT` would have been the statement that runs `a` first. -/
+/-- info: Autoform.Core.EResult.hole "module-attr:LIMIT" -/
+#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarBInit, modVarAInit] "b.py:<module>.f" []
 
 /-! ## f-strings
 

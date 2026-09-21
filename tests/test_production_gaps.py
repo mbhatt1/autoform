@@ -750,3 +750,49 @@ class TestValueCallees:
         ledger = (ROOT / 'Autoform/Ledger.lean').read_text()
         assert '| .callValue f as => eCalls f ++ eCallsL as' in ledger
         assert '| .callValue f as => 1 + eRisk f + eRiskL as' in ledger
+
+
+class TestModuleVariables:
+    """A Python module object carries its module-level VARIABLES (Language Reference
+    §3.2.9: `m.x` is `m.__dict__["x"]`), written by the module's own body as each binding
+    runs, and `from m import x` reads that field at import time (§7.11). Behavioural check:
+    the `modVarProg` `#guard_msgs` in `Semantics.lean`; these pin the exporter side, which
+    needs Joern to exercise. Closes `import:member-not-found` on every Python module the CPG
+    contains (66 of requests' 148 holes; click's `get_completion_class` divergence).
+    """
+
+    def test_a_module_level_binding_also_writes_the_module_object(self):
+        src = EXPORTER.read_text()
+        assert 'def bindName(nm: String, e: ujson.Value): ujson.Obj' in src
+        # the globals-frame write is unchanged; the module object's field is the second copy
+        assert '"a" -> ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e)' in src
+        assert '"b" -> ujson.Obj("k" -> "setField", "r" -> moduleRef(currentModuleFull), "f" -> nm' in src
+        # only a Python module has an object to write; a C `<global>` scope keeps `setGlobal`
+        assert 'else if (pyModuleFullNames.contains(currentModuleFull))' in src
+        # every former `setGlobal`/`assign` site goes through it
+        assert 'val k = if (isGlobalWrite(' not in src
+
+    def test_from_import_of_a_variable_reads_the_field_not_a_hole(self):
+        src = EXPORTER.read_text()
+        assert 'ujson.Obj("k" -> "field", "a" -> moduleRef(mod), "f" -> name)' in src
+        # the old label survives only for a module without an object
+        assert 'else hole("import:member-not-found")' in src
+        assert '§7.11' in src and '§3.2.9' in src
+
+    def test_module_bodies_run_in_import_dependency_order(self):
+        src = EXPORTER.read_text()
+        assert 'val importEdges = collection.mutable.LinkedHashMap' in src
+        assert 'def recordImportEdge(target: String): Unit' in src
+        # recorded for `from p import x` and for every prefix of `import a.b.c`
+        assert 'recordImportEdge(mod)' in src
+        assert 'segs.indices.foreach(i => moduleAtTolerant(segs.take(i + 1).mkString("/")).foreach(recordImportEdge))' in src
+        # depth-first over the recorded edges; a cycle keeps its place
+        assert 'importEdges.getOrElse(name, Nil).foreach(dep => if (byName.contains(dep)) visit(dep))' in src
+        assert 'ordered.toList.map(emit(_, true))' in src
+
+    def test_the_semantics_pins_the_shape_against_cpython(self):
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert 'def modVarProg : Program' in sem
+        assert '#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarAInit, modVarBInit] "b.py:<module>.f" []' in sem
+        # the misordered run is pinned as a named hole, not a value
+        assert '#guard_msgs in #eval runMain modVarProg 200 [modVarObjects, modVarBInit, modVarAInit] "b.py:<module>.f" []' in sem

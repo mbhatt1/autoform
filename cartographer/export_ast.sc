@@ -1236,22 +1236,27 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // imports the package back (`ansible` / `ansible.errors`) is fine, and nesting is
   // unbounded: `a.b.c.d` is three field reads.
   //
-  // ## What a module object contains, and what it deliberately does not
+  // ## What a module object contains
   //
-  // Members are the module's top-level **functions**, **classes** and **submodules** —
-  // exactly the names whose value is fixed by the CPG and does not depend on when the
-  // module body ran. Module-level *data* (`__version__ = "7.1.7"`) is **not** a member,
-  // and that is not an oversight: Core has a single globals frame shared by every module,
-  // so a module-level constant is not module-scoped in the first place, and copying its
-  // value into the module object at init time would capture it *before* the module body
-  // that computes it has run. Binding `mod.__version__` to `unit` is precisely the silent
-  // wrong answer this project keeps finding.
+  // The initializer writes the members whose value the CPG fixes: the module's top-level
+  // **functions**, **classes**, **aliases** of either and **submodules**. Module-level
+  // *data* (`__version__ = "7.1.7"`, `_available_shells = {...}`) is a member too, but it
+  // is NOT written here: its value depends on the module body having run, and copying it
+  // at init time would capture it before the body computed it. It is written by the
+  // module's OWN body instead -- `bindName` lowers every module-level binding to the
+  // globals-frame write plus a `setField` on this module object -- which is the Language
+  // Reference's own model: §3.2.9 (Modules), "a module object has a namespace implemented
+  // by a dictionary ... attribute references are translated to lookups in this dictionary,
+  // e.g. `m.x` is equivalent to `m.__dict__["x"]`", and §5.4.1 (Loaders), the body
+  // executes "in the module's global name space (`module.__dict__`)". `from m import x`
+  // is then a read of that field at import time (§7.11: "a reference to that value is
+  // stored in the current namespace"), and `m.x` a read at use time.
   //
-  // So a miss has to be loud. `Semantics.evalExpr`'s `.field` case answers `unit` for a
-  // field an object does not have — a documented hazard — and for a module object it
-  // instead answers the hole `module-attr:<name>`. That is why the class name carries the
-  // `<module>` prefix: it is the marker the interpreter tests, and no `class` statement
-  // in any language can produce a class of that name.
+  // A miss is still loud. `Semantics.evalExpr`'s `.field` case answers `unit` for a field
+  // an ordinary object does not have — a documented hazard — and for a module object it
+  // instead answers the hole `module-attr:<name>` (CPython: `AttributeError`). That is why
+  // the class name carries the `<module>` prefix: it is the marker the interpreter tests,
+  // and no `class` statement in any language can produce a class of that name.
   //
   // ## Cost
   //
@@ -1316,9 +1321,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     if (methodByName.contains(mod + "." + target)) fnValue(mod + "." + target)
     else typeValue(mod + "." + target + "<meta>")
 
-  /** The exported members of a module: top-level functions, top-level classes, aliases of
-    * either, and immediate submodules. See the note above for why module-level *data* is
-    * absent. */
+  /** The exported members of a module the CPG fixes: top-level functions, top-level
+    * classes, aliases of either, and immediate submodules. Module-level *data* is written
+    * by the module body itself (`bindName`); see the note above. */
   def moduleMembers(mod: String): List[(String, ujson.Value)] = {
     def simple(k: String): Option[String] = {
       val n = k.drop(mod.length + 1)
@@ -5698,12 +5703,28 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * `aliased` is `import x.y as z` / `from p import x as z`. It matters for exactly one
     * case: plain `import a.b.c` binds the **top** package `a`, whereas `import a.b.c as z`
     * binds `a.b.c` itself. Getting that backwards would bind the wrong module. */
+  // Import edges `importer -> imported` (full `<file>:<module>` names), recorded by
+  // `importValue` during every translation pass. `moduleInits` is ordered by them: the
+  // Language Reference (§5.4 Loading) executes a module's code when it is first imported,
+  // before the importing module continues, and a module already in `sys.modules` is not
+  // executed again (§5.3.1 The module cache). Running initializers in dependency order is
+  // the finite, once-each approximation of exactly that; a cycle falls back to name order,
+  // which is also what Python does when a cyclic import reads a not-yet-bound name --
+  // the read fails.
+  val importEdges = collection.mutable.LinkedHashMap.empty[String, collection.mutable.LinkedHashSet[String]]
+  def currentModuleFull: String = currentFile + ":<module>"
+  def recordImportEdge(target: String): Unit =
+    if (target != currentModuleFull && pyModuleFullNames.contains(target))
+      importEdges.getOrElseUpdate(currentModuleFull, collection.mutable.LinkedHashSet.empty) += target
+
   def importValue(prefix: String, name: String, aliased: Boolean): ujson.Obj = {
     val dots = prefix.takeWhile(_ == '.').length
     val rest = prefix.drop(dots)
     if (dots == 0 && rest.isEmpty) {
       val segs = name.split('.').filter(_.nonEmpty).toList
       val path = (if (aliased) segs else segs.take(1)).mkString("/")
+      // `import a.b.c` imports every prefix (§7.11), so each is an edge for the order.
+      segs.indices.foreach(i => moduleAtTolerant(segs.take(i + 1).mkString("/")).foreach(recordImportEdge))
       moduleAtTolerant(path).flatMap(resolvedModule)
         .getOrElse(absentModule(path, relative = false))
     } else {
@@ -5714,6 +5735,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       moduleAtTolerant(path) match {
         case None => absentModule(path, relative = dots > 0)
         case Some(mod) =>
+          recordImportEdge(mod)
           val target = mod + "." + name
           if (methodByName.contains(target))        fnValue(target)
           else if (classByFullName.contains(target)) typeValue(target + "<meta>")
@@ -5727,11 +5749,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           else moduleAt(if (modulePath(mod).isEmpty) name else modulePath(mod) + "/" + name)
                  .flatMap(resolvedModule)
                  // The module is here and the name is not a function, a class or a
-                 // submodule of it. In practice that is a module-level *variable* or a
-                 // re-export, which a module object deliberately does not carry (see the
-                 // module-object note above) — a different problem from not having the
-                 // module at all, so a different label.
-                 .getOrElse(hole("import:member-not-found"))
+                 // submodule of it: a module-level VARIABLE or a re-export. Language
+                 // Reference §7.11: the `from` form "check[s] if the imported module has
+                 // an attribute by that name ... otherwise, a reference to that value is
+                 // stored in the current namespace" -- a read of the module object's
+                 // field at import time, which `bindName` wrote when the module body ran
+                 // (§3.2.9: `m.x` is `m.__dict__["x"]`). Absent after that, Core answers
+                 // its `module-attr:<name>` hole at the read (CPython: ImportError); a
+                 // module without an object (a C file scope) keeps the old label.
+                 .getOrElse(
+                   if (pyModuleFullNames.contains(mod))
+                     ujson.Obj("k" -> "field", "a" -> moduleRef(mod), "f" -> name)
+                   else hole("import:member-not-found"))
       }
     }
   }
@@ -8277,6 +8306,25 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case _ => None
   }
 
+  /** Bind a NAME: a local `assign`, or -- at module scope, or for a name a `global`
+    * statement rebound -- a write to the globals frame. For a Python module the write also
+    * lands in the module OBJECT: Language Reference §3.2.9 (Modules) defines a module's
+    * namespace as a dictionary in which "attribute assignment updates the module's
+    * namespace dictionary, e.g. `m.x = 1` is equivalent to `m.__dict__["x"] = 1`", and
+    * §5.4.1 (Loaders) has the module body execute in that same dictionary -- so every
+    * module-level binding IS a module attribute, written when the body's statement runs,
+    * with the value the body computed. Core keeps its single globals frame for the
+    * importing side (`setGlobal`); the module object's field is the second copy that
+    * `m.x` and `from m import x` read. (`<global>` C file scopes have no module object.) */
+  def bindName(nm: String, e: ujson.Value): ujson.Obj =
+    if (!isGlobalWrite(nm)) ujson.Obj("k" -> "assign", "x" -> nm, "e" -> e)
+    else if (pyModuleFullNames.contains(currentModuleFull))
+      ujson.Obj("k" -> "seq",
+                "a" -> ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e),
+                "b" -> ujson.Obj("k" -> "setField", "r" -> moduleRef(currentModuleFull), "f" -> nm,
+                                 "v" -> ujson.Obj("k" -> "name", "v" -> nm)))
+    else ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e)
+
   def assignTo(lhs: AstNode, rhs: AstNode, aug: Option[String]): ujson.Obj = {
     val (prelude, rhsValue) = valueOf(rhs)
     val targetBeforeRhs = Set("java", "js").contains(numericFamily) || (pyFile && aug.isDefined)
@@ -8478,9 +8526,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // files) a name that's a recognized file-scope global and not a local/
         // parameter of THIS method, an assignment writes the module-level frame
         // rather than creating a local -- see `isGlobalWrite`'s own doc comment.
-        val k = if (isGlobalWrite(i.name)) "setGlobal" else "assign"
-        ujson.Obj("k" -> k, "x" -> localName(i.name),
-                  "e" -> combine(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+        bindName(localName(i.name), combine(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
       // `*p = v` where `p` is PROVABLY, for its whole lifetime in this method, an
       // alias of one specific boxed local (`ptrAliases`), OR (Increment B) `p` is
       // itself a parameter verified closed (`closedOutParams`) -- the write-side
@@ -8681,8 +8727,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // any other scalar local -- `p`'s own binding holds the value directly.
     if (rawLocalOrParamName(tgt).map(localName).exists(ptrIrefNames.contains)) {
       val nm = rawLocalOrParamName(tgt).map(localName).get
-      val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
-      ujson.Obj("k" -> k, "x" -> nm, "e" -> bump(ujson.Obj("k" -> "name", "v" -> nm)))
+      bindName(nm, bump(ujson.Obj("k" -> "name", "v" -> nm)))
     }
     // `009-reduce-remaining-holes-4`: `z++`/`z--`, `z` a tracked byte cursor
     // (`strCursorParams`) -- bumps `z$off`, an ordinary integer local, leaving `z`'s
@@ -8702,9 +8747,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         val nm = localName(i.name)
         ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> bump(boxField(nm)))
       case i: Identifier =>
-        val k = if (isGlobalWrite(i.name)) "setGlobal" else "assign"
-        ujson.Obj("k" -> k, "x" -> localName(i.name),
-                  "e" -> bump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+        bindName(localName(i.name), bump(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (!pureNode(r)) holeS("op:" + opName + ":impure-receiver")
@@ -9208,10 +9251,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           if isOp(tr._2, "<operator>.alloc") && kidsOf(tr._2).isEmpty
           cls <- ctorClassOf(ctor)
         } yield {
-          val k = if (isGlobalWrite(tr._1.name)) "setGlobal" else "assign"
-          ujson.Obj("k" -> k, "x" -> localName(tr._1.name),
-                    "e" -> ujson.Obj("k" -> "alloc", "cls" -> cls,
-                                     "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1))))
+          bindName(localName(tr._1.name),
+                   ujson.Obj("k" -> "alloc", "cls" -> cls,
+                             "args" -> exprs(kidsOf(ctor).filter(aidx(_) >= 1))))
         }
       merged match {
         case Some(m) => stmts(rest, m :: acc)
@@ -11340,7 +11382,26 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   }
   closedIrefOutParamViaVtableTransitive = computeClosedIrefOutParamViaVtableTransitive()
   val funcs = methods.map(emit(_, false))
-  val inits = moduleMethods.map(emit(_, true))
+  // Module bodies run in import-dependency order (`importEdges`, recorded by the priming
+  // passes above and by this one): a module runs before every module that imports from
+  // it, so a `from a import X` field read finds the value `a`'s body bound. Depth-first
+  // from the sorted list; a module on a cycle keeps its place, as Python's own cyclic
+  // import would read whatever `a` has bound so far. C `<global>` scopes have no edges.
+  val inits = {
+    val byName = moduleMethods.map(m => m.fullName -> m).toMap
+    val ordered = collection.mutable.ArrayBuffer.empty[Method]
+    val state = collection.mutable.HashMap.empty[String, Int]   // 1 = visiting, 2 = done
+    def visit(name: String): Unit = state.get(name) match {
+      case Some(_) => ()
+      case None =>
+        state(name) = 1
+        importEdges.getOrElse(name, Nil).foreach(dep => if (byName.contains(dep)) visit(dep))
+        state(name) = 2
+        byName.get(name).foreach(ordered += _)
+    }
+    moduleMethods.foreach(m => visit(m.fullName))
+    ordered.toList.map(emit(_, true))
+  }
   // The module objects are built **before** any module body runs, so an `import` at the
   // top of a module reads a module object that already exists. `render_lean.py` keeps AST
   // order when it collects `moduleInits`, so placing this entry first here is what puts
