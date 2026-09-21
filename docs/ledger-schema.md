@@ -53,7 +53,7 @@ rules.
 | `E3` | mutation score (`killed/total`) | `mutation.json` | `scripts/mutate.py` (source-level mutation gate) |
 | `E4` | axiom basis, theorem count | `axioms.json`, falling back to `audit.json`'s `axiom_sweep` | `#audit_axioms` (`Autoform/Harness/Audit.lean`) |
 | `E5` | population context: function count, purity, effect histogram | `formalization-graph.json` | `cartographer/formalization_graph.sc` |
-| `E6` | call-closed core (`verifiableCore`), `dynamicHoleRisk` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`) |
+| `E6` | call-closed core (`verifiableCore` = `closedByTranslation`), `closedByContract` with `contractsUsed`, `dynamicHoleRisk` | `ledger-<Module>.json` | `Program.ledgerJson` (`Autoform/Ledger.lean`) |
 
 `E5` is **context, not support**: the formalization graph is corpus-scoped, not
 module-scoped, so it is attached to the strategy with an explicit context claim saying so.
@@ -218,3 +218,14 @@ scripts/sacm.py --module Cachetools [--out sacm-Cachetools.json] \
 Reads whichever artifacts exist and marks the rest `UNDEVELOPED`. Writes an in-toto
 Statement whose predicate is the SACM case, and prints the argument tree. Exit status is 0
 only if the top claim is assertable, so it can be used as a CI gate.
+
+## Closure by contract in `E6`
+
+`closedByContract` counts hole-free functions that are **not** in `verifiableCore` but
+whose every open callee is in the dialect's `contractedCallees` list (`Autoform/Ledger.lean`);
+`contractsUsed` names those callees with their call-site counts. The two closure numbers
+are reported side by side and never summed: `closedByTranslation` supports `G3.1`
+unconditionally, while a function closed by contract supports a claim only together with
+an `Assumption` node per contracted callee (docs/contracts.md, "The API for assumption
+extraction"). `scripts/sacm.py` does not yet consume `closedByContract`; until it does the
+number is informational and the case is built from `verifiableCore` alone.
