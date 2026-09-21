@@ -19,6 +19,7 @@ is the design record, which carries the reasoning behind everything here.
 | [`typed-numerics.md`](typed-numerics.md) | Preserving Joern's integer types through Core, numeric conformance tests, and remaining gaps. |
 | [`machine-code.md`](machine-code.md) | Binary and assembly formalization, raw p-code semantics, concrete proofs, and remaining coverage gaps. |
 | [`scale.md`](scale.md) | How the pipeline behaves on codebases larger than the reference corpus. |
+| [`GOAL-arbitrary-codebases.md`](GOAL-arbitrary-codebases.md) | The bar for "works on arbitrary codebases", as eight milestones with named exit criteria — a goal statement, not a status report. |
 | [`ledger-schema.md`](ledger-schema.md) | The trust ledger as a SACM profile: node vocabulary, evidence types, combination rules. |
 | [`fvspec.md`](fvspec.md) | The FVSpec benchmark harness and the anti-vacuity screen run across it. |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | The project's working rules. Read them before submitting anything. |

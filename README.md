@@ -323,7 +323,9 @@ but partially translated programs still need explicit assumptions and satisfiabi
 evidence.
 See [the source-language measurements](docs/languages.md) and
 [the machine-code gap list](docs/machine-code.md#remaining-work-toward-arbitrary-codebases)
-for the scope of the remaining work.
+for the scope of the remaining work, and [the goal statement](docs/GOAL-arbitrary-codebases.md)
+for the bar it is measured against — eight milestones, each with the artifact that
+proves it and the gate that fails if it regresses.
 
 **The Python gaps, measured rather than listed.** A gap list without counts invites
 picking the easy one. The table below is a **snapshot to re-measure, not a current

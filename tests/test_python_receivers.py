@@ -73,7 +73,13 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
         function = functions[f'receivers.py:<module>.Receiver.{name}']
         assert function['body'] != {'k': 'holeS', 'label': GAP}
         assert function['pythonSignature']['receiverKind'] == 'class'
-    for name in (n for n in SUBJECTS if n not in ('class_named', 'class_self')):
+    # `@staticmethod def static(self, a)` translates too: no receiver is bound, so `self`
+    # is an ordinary first parameter and the body is `return (self, a)` verbatim.
+    static = functions['receivers.py:<module>.Receiver.static']
+    assert static['body'] == {'k': 'ret', 'e': {'k': 'tupleE', 'items': [
+        {'k': 'name', 'v': 'self'}, {'k': 'name', 'v': 'a'}]}}
+    assert static['pythonSignature']['isMethod'] is False
+    for name in (n for n in SUBJECTS if n not in ('class_named', 'class_self', 'static')):
         function = functions[f'receivers.py:<module>.Receiver.{name}']
         assert function['body'] == {'k': 'holeS', 'label': GAP}
         assert 'pythonSignature' not in function

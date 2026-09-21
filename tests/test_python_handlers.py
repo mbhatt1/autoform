@@ -121,5 +121,10 @@ def test_unavailable_header_decoder_cannot_make_a_catch_all(handler_model, numer
     ast = json.loads((work / 'unavailable.json').read_text())
     subject = next(f for f in ast if f['name'] == 'handlers.py:<module>.mismatched')
     text = json.dumps(subject['body'])
-    assert 'control:TRY-source-metadata' in text
+    # Without a Python the exporter cannot recover the handler headers OR the signature,
+    # and the signature is asked for first: the whole function is a
+    # `call:python-signature-metadata` hole. Either hole is the safe answer; what must
+    # never happen is a `tryCatch` whose header nobody read.
+    assert ('control:TRY-source-metadata' in text
+            or text == json.dumps({'k': 'holeS', 'label': 'call:python-signature-metadata'}))
     assert 'tryCatch' not in text
