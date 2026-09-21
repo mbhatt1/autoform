@@ -532,7 +532,7 @@ class TestJavaAndGoDialects:
         assert render.DIALECT['.go'] == '.go'
         # Kotlin/JVM rides `.java`: same integer model and boolean operators; its
         # structural string `==` lands on Java's `str:reference-equality` hole.
-        assert render.DIALECT['.kt'] == '.java' and render.DIALECT['.kts'] == '.java'
+        assert render.DIALECT['.kt'] == '.java' and '.kts' not in render.DIALECT  # Kotlin scripts: recognised, not routed (repository_inventory)
         assert render.DIALECT['.c'] == '.cLike'
         constructors = {'.python', '.cLike', '.javascript', '.java', '.go'}
         assert set(render.DIALECT.values()) <= constructors

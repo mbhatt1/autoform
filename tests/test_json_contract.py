@@ -104,7 +104,7 @@ class TestTopLevelShape:
                 d = render_lean.infer_dialect(funcs)
             except SystemExit as e:
                 pytest.fail("%s: %s" % (name, e))
-            assert d in (".python", ".cLike", ".javascript"), (name, d)
+            assert d in (".python", ".cLike", ".javascript", ".java", ".go"), (name, d)
 
     # Was a strict xfail recording that `.cc` was absent from render_lean.DIALECT:
     # ast-V8Numbers.json is 104 `.cc` against 53 `.h`, so the dialect was decided by the

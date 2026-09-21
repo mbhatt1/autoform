@@ -28,7 +28,7 @@ import deep_json
 # inherit a change silently.
 DIALECT = {".py": "python", ".c": "cLike", ".h": "cLike", ".cpp": "cLike",
            ".cc": "cLike", ".cxx": "cLike", ".hh": "cLike", ".hpp": "cLike",
-           ".java": "java", ".kt": "java", ".kts": "java", ".go": "go",
+           ".java": "java", ".kt": "java", ".go": "go",
            ".js": "javascript", ".ts": "javascript", ".tsx": "javascript",
            ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript"}
 

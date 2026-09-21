@@ -557,7 +557,7 @@ DIALECT = {".py": ".python", ".c": ".cLike", ".h": ".cLike", ".cpp": ".cLike",
            # reference `==` as a named hole. Kotlin/JVM shares Java's integer model and
            # boolean operators, so it rides `.java`; its structural string `==` lands on
            # the same conservative hole.
-           ".java": ".java", ".kt": ".java", ".kts": ".java", ".go": ".go",
+           ".java": ".java", ".kt": ".java", ".go": ".go",
            ".js": ".javascript", ".ts": ".javascript", ".tsx": ".javascript",
            ".jsx": ".javascript", ".mjs": ".javascript", ".cjs": ".javascript"}
 
