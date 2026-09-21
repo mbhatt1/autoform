@@ -1,7 +1,8 @@
 # Boxed containers for Core
 
 **Status: steps 1-5 and THE SWITCHOVER are landed; the migration this document
-describes is complete.** Under the `.python` dialect a list or dict literal allocates
+describes is complete, for Python AND JavaScript.** Under either dialect a list or
+dict literal allocates
 into the heap, containers have identity, `setIndex`/`delIndex` and every
 `MethodResult.mutating` builtin write through the payload, iteration re-reads the
 container and a dict raises `RuntimeError` when it changes mid-loop, and `==`/`is`

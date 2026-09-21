@@ -7581,6 +7581,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               // `_cached.py` distinguishable from `_wrapper` in `_cachedmethod.py`:
               // `Ctx.resolve` matches the full name exactly, where its short-name fallback
               // needs a *unique* suffix and so resolved neither.
+              // JavaScript: the frontend lowers `[a, b]` to `__ecma.Array.factory()`
+              // followed by `.push(a)`, `.push(b)`. The factory is an empty array
+              // literal, which boxes under `.javascript` (`Dialect.boxesContainers`), and
+              // the pushes are then in-place mutations of that one object -- exactly the
+              // aliasing this construct was previously refused for. A factory call WITH
+              // arguments (`Array(3)`, `Array.of(...)`) is a different constructor and is
+              // left to the ordinary path.
+              else if ((mfn == "__ecma.Array.factory" || c.name == "__ecma.Array.factory") &&
+                       args.isEmpty && kwArgs.isEmpty)
+                ujson.Obj("k" -> "listE", "items" -> ujson.Arr())
               else if (methodByName.contains(mfn))
                 ujson.Obj("k" -> "call", "f" -> mangledFullName(mfn),
                           "args" -> argExprs(namedCallReceiver(c).toList ++ args, kwArgs))

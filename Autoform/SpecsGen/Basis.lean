@@ -345,7 +345,7 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- field it names" is a claim about ordinary instances. Only Python boxes, so the
     -- obligation is conditional on the dialect and the default discharges it outright
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
-    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
     -- A `@property` of this name turns the attribute read into a CALL, so the accessor
     -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
@@ -353,6 +353,10 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
+    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
+    -- accessor named `length` would not be "the field it names" there. Decidable at every
+    -- call site: the dialect and the field name are both concrete.
+    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
@@ -378,16 +382,19 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · rcases hgg : h.get ctx.globals with _ | g
-          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
+        · have hbx : ctx.dialect.boxesContainers = true := by rw [hd]; rfl
+          rcases hgg : h.get ctx.globals with _ | g
+          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, Option.bind,
                   props_any_false_of_all_ne (hprop hd)]
           · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
             -- class-attribute miss in the same form or the rewrite cannot fire.
             have hcm := hcls hd o g hgr hgg
             simp only [classAttrKey] at hcm
-            simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcm,
+            simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
-        · simp [hgr, hf, hc, hm, hd]
+        · by_cases hbx : ctx.dialect.boxesContainers = true
+          · simp [hgr, hf, hc, hm, hlen, hbox hbx o hgr, Payload.toVal, hd]
+          · simp [hgr, hf, hc, hm, hlen, hd, hbx]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 
@@ -409,7 +416,7 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- field it names" is a claim about ordinary instances. Only Python boxes, so the
     -- obligation is conditional on the dialect and the default discharges it outright
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
-    (hbox : ctx.dialect = .python → ∀ o, h.get r = some o → o.payload = .none := by
+    (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
     -- A `@property` of this name turns the attribute read into a CALL, so the accessor
     -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
@@ -417,6 +424,10 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
     (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
       intro hc; exact absurd hc (by decide))
+    -- Under JavaScript, `xs.length` on a boxed array is answered on the field path, so an
+    -- accessor named `length` would not be "the field it names" there. Decidable at every
+    -- call site: the dialect and the field name are both concrete.
+    (hlen : (ctx.dialect == .javascript && fld == "length") = false := by decide)
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
@@ -442,16 +453,19 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · rcases hgg : h.get ctx.globals with _ | g
-          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
+        · have hbx : ctx.dialect.boxesContainers = true := by rw [hd]; rfl
+          rcases hgg : h.get ctx.globals with _ | g
+          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, Option.bind,
                   props_any_false_of_all_ne (hprop hd)]
           · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
             -- class-attribute miss in the same form or the rewrite cannot fire.
             have hcm := hcls hd o g hgr hgg
             simp only [classAttrKey] at hcm
-            simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcm,
+            simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
-        · simp [hgr, hf, hc, hm, hd]
+        · by_cases hbx : ctx.dialect.boxesContainers = true
+          · simp [hgr, hf, hc, hm, hlen, hbox hbx o hgr, Payload.toVal, hd]
+          · simp [hgr, hf, hc, hm, hlen, hd, hbx]
       · simp [hgr, hf, hc, hm]
     · simp [hgr, hf]
 

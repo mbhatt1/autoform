@@ -58,6 +58,18 @@ inductive Dialect where
 
 namespace Dialect
 
+/-- Do this dialect's container literals allocate — do lists and dicts have IDENTITY?
+
+Python and JavaScript: yes. `a = [1]; b = a; b[0] = 9` changes `a` in both, and two
+literals with equal contents are `==` but not `is`/`===`. A C aggregate initializer is a
+VALUE — `int a[] = {7,8,9}` has no identity to share — and boxing it made C wrong in the
+commit that made Python right, which is why this is a named predicate rather than a
+`== .python` test scattered across the interpreter. -/
+def boxesContainers : Dialect → Bool
+  | .python | .javascript => true
+  | .cLike                => false
+
+
 /-- Do `and`/`or` evaluate to one of their **operands** (Python, JavaScript) rather than
 to a boolean (C, Java, Go)? `0 and 5` is `0` in Python and `1` in C. -/
 def boolOpsAreValues : Dialect → Bool
@@ -1182,6 +1194,34 @@ non-recursive matchers: making them recursive compiles them through `brecOn`, an
 def Val.unbuiltin : Val → Val
   | .bobj _ v => v
   | v         => v
+
+/-! ## UTF-16, for JavaScript strings
+
+A JavaScript string is a sequence of UTF-16 code units, and `s[i]` and `s.length` are
+defined over units, not codepoints: `"😀".length` is `2`. Lean's `String` is codepoints,
+so the units are computed rather than stored. Everything here is total; a lone surrogate
+(half of an astral codepoint) has no `Char`, and the caller refuses it rather than
+inventing one — `Char.ofNat` on a surrogate would silently yield `'\0'`. -/
+
+/-- The UTF-16 code units of a string, one or two per codepoint. -/
+def _root_.String.utf16Units (s : String) : List Nat :=
+  s.toList.flatMap fun c =>
+    let n := c.toNat
+    if n < 0x10000 then [n]
+    else
+      let m := n - 0x10000
+      [0xD800 + m / 0x400, 0xDC00 + m % 0x400]
+
+/-- `s.length` in JavaScript. -/
+def _root_.String.utf16Length (s : String) : Nat := s.utf16Units.length
+
+/-- The code unit at UTF-16 index `i`, or `none` when out of range — which is what
+JavaScript's `undefined` result for `s[i]` becomes. A negative index is out of range. -/
+def _root_.String.utf16At (s : String) (i : Int) : Option Nat :=
+  if i < 0 then none else s.utf16Units[i.toNat]?
+
+/-- A UTF-16 surrogate code unit: half of an astral codepoint, not a character on its own. -/
+def _root_.Nat.isUTF16Surrogate (u : Nat) : Bool := decide (0xD800 ≤ u) && decide (u ≤ 0xDFFF)
 
 /-- Truthiness, in the permissive sense shared by most dynamic languages. -/
 def Val.truthy : Val → Bool
