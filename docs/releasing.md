@@ -1,5 +1,41 @@
 # Release acceptance
 
+## The checklist
+
+Every line is a gate. Tick it only with the command's actual output in hand; a gate
+that was skipped because a tool was missing is an unmet gate, not a pass, and
+"the last release passed it" is not evidence about this one.
+
+- [ ] `autoform doctor --strict` exits `0` on the release machine (every pin matches,
+      every language runtime present, `[machine]` extras installed).
+- [ ] Working tree clean; `git status --porcelain` empty; no `*.mutate-backup` anywhere.
+- [ ] `lake build` clean (regenerate `Autoform/Generated/V8Base.lean` from its tracked AST first).
+- [ ] `python scripts/audit_all.py --strict` → `VERDICT: PASS` (axiom sweep clean, source
+      sweep verified, `leanchecker --fresh` VERIFIED). Retain `audit.json`.
+- [ ] `python -m pytest tests -q` all green; the count of `skipped` is explained by
+      missing *optional* tools only.
+- [ ] `AUTOFORM_TEST_JOERN=1 AUTOFORM_REQUIRE_LEAN=1 python -m pytest tests/test_source_numeric.py ... -q`
+      (the full list below): the numeric suite is `5 passed, 2 xfailed` or better, and
+      **no** gated test skipped -- grep the `-rs` output for `set AUTOFORM_TEST_JOERN`.
+- [ ] `python scripts/check_render.py` → 0, or 3 with *only* `Ansible`, `LinuxCrypto`,
+      `LinuxLib` unverifiable (the documented exceptions in `docs/integrity.md`).
+- [ ] `python scripts/check_docs.py`, `check_specs_fresh.py`, `check_provenance.py` all `0`.
+- [ ] `python -m build` from a clean checkout; `twine check --strict`;
+      `python scripts/check_distribution.py dist/candidate` passes.
+- [ ] Installed-wheel tests: `AUTOFORM_TEST_WHEEL=... pytest tests/test_package.py`, then
+      `AUTOFORM_TEST_INSTALLED_E2E=1 pytest tests/test_installed_assurance.py` from the
+      installed environment.
+- [ ] Bump `pyproject.toml` **and** `src/autoform/__init__.py`; the release tag is
+      `v<version>` (the package workflow rejects a mismatch).
+- [ ] Third-party notices re-checked against their pinned upstream revisions
+      (`THIRD_PARTY.md`); the Cachetools notice byte-compared as CI does.
+- [ ] Retain: distribution hashes, `autoform --version` output, toolchain versions,
+      full test output, `audit.json`, and one complete evidence directory from a pinned
+      Git URL run in a fresh workspace -- including a negative run whose guarantee was
+      withheld.
+
+## In full
+
 The product is an open-source CLI with paid engineering support. A release is a
 specific wheel, source distribution, toolchain and body of evidence. The current
 alpha does not warrant correctness of arbitrary source repositories.

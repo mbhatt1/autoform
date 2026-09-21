@@ -198,6 +198,57 @@ _JOERN_JAR = re.compile(r'^io\.joern\.joern-cli-(.+)\.jar$')
 # needed only for a particular source language or for the machine-code frontend.
 _REQUIRED = ('python', 'git', 'lake', 'lean', 'leanchecker', 'joern')
 
+# Which source languages an OPTIONAL runtime gates. A missing entry here is a
+# warning, never an error: translation and the kernel proofs still run, and only the
+# differential oracle for these languages is unavailable -- which the report says by
+# name, because "optional" on its own tells a first-time user nothing.
+_DISABLES = {
+    'java': ('Java', 'Kotlin'), 'javac': ('Java', 'Kotlin'),
+    'go': ('Go',), 'node': ('JavaScript', 'TypeScript'),
+    'cc': ('C',), 'clang': ('C++', 'assembling .s inputs for the machine frontend'),
+    'kotlinc': ('Kotlin — Joern bundles a Kotlin compiler, so this is only for the native oracle',),
+    'pypcode': ('the machine-code frontend',), 'pyelftools': ('the machine-code frontend',),
+    'macholib': ('the machine-code frontend',), 'pefile': ('the machine-code frontend',),
+}
+
+
+def _os_flavor():
+    if sys.platform == 'darwin':
+        return 'macos'
+    if sys.platform.startswith('linux'):
+        return 'linux'
+    return 'other'
+
+
+def install_hint(name, lean_toolchain=None, joern_pin=None):
+    """One actionable line for a missing tool on this OS. Points at docs for the rest."""
+    flavor = _os_flavor()
+    mac, linux = flavor == 'macos', flavor == 'linux'
+    lean_line = ("curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain "
+                 + (lean_toolchain or '$(cat lean-toolchain)')
+                 + "   # then: export PATH=$HOME/.elan/bin:$PATH")
+    joern_v = joern_pin or '<pinned version in joern-version>'
+    joern_line = (f"curl -L -o joern-cli.zip https://github.com/joernio/joern/releases/download/v{joern_v}/joern-cli.zip "
+                  "&& mkdir -p ~/joern && unzip -q joern-cli.zip -d ~/joern   "
+                  "# needs a JDK (temurin 21); see docs/running.md §1")
+    jdk = ('brew install --cask temurin@21' if mac else
+           'sudo apt-get install -y temurin-21-jdk  (or openjdk-21-jdk)' if linux else 'install a JDK 21')
+    hints = {
+        'git': 'brew install git' if mac else 'sudo apt-get install -y git' if linux else 'install git from https://git-scm.com',
+        'lake': lean_line, 'lean': lean_line,
+        'leanchecker': lean_line + '   # leanchecker ships with the toolchain (v4.28.0+)',
+        'joern': joern_line, 'java': jdk, 'javac': jdk,
+        'go': 'brew install go' if mac else 'sudo apt-get install -y golang-go' if linux else 'install Go from https://go.dev/dl',
+        'node': 'brew install node@22' if mac else 'sudo apt-get install -y nodejs' if linux else 'install Node 22 from https://nodejs.org',
+        'cc': 'xcode-select --install' if mac else 'sudo apt-get install -y build-essential' if linux else 'install a C compiler',
+        'clang': 'xcode-select --install' if mac else 'sudo apt-get install -y clang' if linux else 'install clang',
+        'kotlinc': 'brew install kotlin' if mac else 'sdk install kotlin  (SDKMAN) or your distribution package' if linux else 'install kotlinc',
+        'python': 'install Python 3.10 or newer and reinstall autoform-lean into it',
+    }
+    if name in ('pypcode', 'pyelftools', 'macholib', 'pefile'):
+        return "python -m pip install 'autoform-lean[machine]'"
+    return hints.get(name, 'see docs/running.md §1')
+
 
 def packaged_pin(name):
     """Read a pinned-version file (`lean-toolchain`, `joern-version`) from the package."""
@@ -206,6 +257,27 @@ def packaged_pin(name):
             return archive.read(name).decode('utf-8', 'replace').strip()
     except (KeyError, ValueError, OSError, zipfile.BadZipFile):
         return None
+
+
+def version_banner():
+    """`autoform <version>` plus the two external pins every result depends on.
+
+    A bug report that says "autoform 0.1.0" alone is not reproducible: the neutral AST
+    is a function of the Joern build and every proof of the Lean toolchain, so both
+    pins belong beside the package version wherever it is printed.
+    """
+    lean = packaged_pin('lean-toolchain') or 'lean-toolchain unavailable'
+    joern = packaged_pin('joern-version') or 'joern-version unavailable'
+    return f"autoform {__version__} (lean-toolchain {lean}, joern {joern})"
+
+
+class _VersionAction(argparse.Action):
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print(version_banner())
+        parser.exit(0)
 
 
 def tool_version(command, env):
@@ -242,8 +314,8 @@ def joern_report(env):
     return path, found[0], None
 
 
-def doctor(env, strict=False):
-    """Report tool availability AND version agreement, and fail when it matters.
+def doctor_report(env):
+    """Everything `doctor` knows, as data. Printing and the exit code are separate.
 
     This used to print a name->path map and `return 0` unconditionally, so a machine
     with no Lean and no Joern passed its own health check. Every version this needs is
@@ -252,18 +324,22 @@ def doctor(env, strict=False):
     a function of the Joern build, so a silently different frontend changes artifacts
     for reasons unrelated to the source being analyzed.
     """
-    report, problems, warnings = {}, [], []
+    toolchain = packaged_pin('lean-toolchain')
+    joern_pin = packaged_pin('joern-version')
+    lean_pin = toolchain.split(':v')[-1] if toolchain and ':v' in toolchain else None
+    tools, problems, warnings = {}, [], []
 
-    def record(name, path, found=None, expected=None, note=None):
+    def record(name, path, found=None, expected=None, note=None, status=None):
         required = name in _REQUIRED
-        if path is None:
-            status = 'missing'
-        elif expected is not None and found is not None:
-            status = 'ok' if found == expected else 'version-mismatch'
-        elif found is None and expected is not None:
-            status = 'unknown-version'
-        else:
-            status = 'ok'
+        if status is None:
+            if path is None:
+                status = 'missing'
+            elif expected is not None and found is not None:
+                status = 'ok' if found == expected else 'version-mismatch'
+            elif found is None and expected is not None:
+                status = 'unknown-version'
+            else:
+                status = 'ok'
         entry = dict(path=path, required=required, status=status)
         if found is not None:
             entry['found_version'] = found
@@ -271,21 +347,21 @@ def doctor(env, strict=False):
             entry['expected_version'] = expected
         if note:
             entry['note'] = note
-        report[name] = entry
         if status != 'ok':
-            (problems if required else warnings).append(f'{name}: {status}' + (f' ({note})' if note else ''))
+            entry['hint'] = install_hint(name, toolchain, joern_pin)
+            if not required:
+                entry['disables'] = list(_DISABLES.get(name, ()))
+            (problems if required else warnings).append(
+                f'{name}: {status}' + (f' ({note})' if note else ''))
+        tools[name] = entry
         return status
 
     version = '.'.join(str(part) for part in sys.version_info[:3])
-    record('python', sys.executable, found=version,
-           note=None if sys.version_info >= (3, 10) else 'autoform requires Python 3.10+')
-    if sys.version_info < (3, 10):
-        report['python']['status'] = 'version-mismatch'
-        if 'python: ok' not in problems:
-            problems.append('python: version-mismatch (requires 3.10+)')
-
-    toolchain = packaged_pin('lean-toolchain')
-    lean_pin = toolchain.split(':v')[-1] if toolchain and ':v' in toolchain else None
+    if sys.version_info >= (3, 10):
+        record('python', sys.executable, found=version)
+    else:
+        record('python', sys.executable, found=version, expected='3.10+',
+               note='autoform requires Python 3.10+', status='version-mismatch')
 
     for name in ('git', 'lake', 'lean', 'leanchecker'):
         path = shutil.which(name, path=env['PATH'])
@@ -300,7 +376,7 @@ def doctor(env, strict=False):
                note=None if path else f'{name} is not on PATH')
 
     path, found, note = joern_report(env)
-    record('joern', path, found=found, expected=packaged_pin('joern-version'), note=note)
+    record('joern', path, found=found, expected=joern_pin, note=note)
 
     # Optional: needed only to run the differential oracle for a given language.
     for name in ('java', 'javac', 'go', 'node', 'cc', 'clang', 'kotlinc'):
@@ -318,20 +394,71 @@ def doctor(env, strict=False):
         record(dist, sys.executable if installed else None, found=installed, expected=pin,
                note=None if installed else "install with: pip install 'autoform-lean[machine]'")
 
-    print(json.dumps(report, indent=2))
+    return dict(schema_version=1, autoform=__version__, platform=sys.platform,
+                pins=dict(lean_toolchain=toolchain, joern=joern_pin),
+                tools=tools, problems=problems, warnings=warnings)
+
+
+def doctor(env, strict=False, as_json=False):
+    """Report tool availability AND version agreement, and fail when it matters.
+
+    Exit 0: every required tool is present and matches its pin. Exit 1: a required
+    tool is missing or mismatched -- or, with --strict, an optional one is. Exit 2 is
+    returned by the caller when the check itself could not run (unreadable package).
+    A missing OPTIONAL runtime is a warning: it disables one language's differential
+    oracle, which the report names, and nothing else.
+    """
+    report = doctor_report(env)
+    problems, warnings = report['problems'], report['warnings']
+    code = 1 if problems or (strict and warnings) else 0
+    report['exit_code'] = code
+    if as_json:
+        print(json.dumps(report, indent=2))
+    else:
+        tools = report['tools']
+        required_ok = sum(1 for t in tools.values() if t['required'] and t['status'] == 'ok')
+        print(f"autoform doctor: {required_ok}/{len(_REQUIRED)} required ok, "
+              f"{len(problems)} problem(s), {len(warnings)} optional warning(s)  "
+              f"[{report['platform']}, autoform {__version__}]")
+        pins = report['pins']
+        print(f"  pins: lean-toolchain={pins['lean_toolchain'] or '?'}  joern={pins['joern'] or '?'}")
+        for name, entry in tools.items():
+            status = entry['status']
+            if status == 'ok':
+                mark = 'ok      '
+            elif status == 'version-mismatch':
+                mark = 'MISMATCH' if entry['required'] else 'mismatch'
+            elif status == 'unknown-version':
+                mark = 'UNKNOWN ' if entry['required'] else 'unknown '
+            else:
+                mark = 'MISSING ' if entry['required'] else 'missing '
+            detail = entry.get('found_version') or entry.get('path') or ''
+            expected = entry.get('expected_version')
+            if expected and entry.get('found_version') != expected:
+                detail += f"  (pin {expected})"
+            print(f"  {mark} {name:<12s} {detail}")
+            if status != 'ok':
+                kind = 'required' if entry['required'] else 'optional'
+                extra = kind
+                if entry.get('disables'):
+                    extra += '; disables: ' + '; '.join(entry['disables'])
+                print(f"             {extra}")
+                if entry.get('note'):
+                    print(f"             {entry['note']}")
+                print(f"             install: {entry['hint']}")
+        print("  exit codes: 0 all required present and pinned; 1 a required tool is missing or "
+              "mismatched (with --strict, also an optional one); 2 the check itself could not run.")
     if problems:
         print('\nautoform doctor: ' + str(len(problems)) + ' required check(s) failed:',
               file=sys.stderr)
         for line in problems:
             print('  - ' + line, file=sys.stderr)
-        return 1
-    if warnings and strict:
+    elif warnings and strict:
         print('\nautoform doctor: ' + str(len(warnings)) + ' optional check(s) failed (--strict):',
               file=sys.stderr)
         for line in warnings:
             print('  - ' + line, file=sys.stderr)
-        return 1
-    return 0
+    return code
 
 
 def discard_checkout(repository, keep=False):
@@ -358,15 +485,28 @@ def discard_checkout(repository, keep=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Formalize source or machine code and check it with Lean.",
-        epilog="A Git URL alone runs the full workflow: autoform https://host/owner/repo.git [Module] [--ref REF] [--subdir PATH]")
-    parser.add_argument("--version", action="version", version=f"autoform {__version__}")
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=("A Git URL alone runs the full workflow: "
+                "autoform https://host/owner/repo.git [Module] [--ref REF] [--subdir PATH]\n\n"
+                "exit codes (docs/running.md §7):\n"
+                "  0      completed; for `assure`, every required check passed\n"
+                "  1      a stage failed, or `assure` finished with unresolved verification gaps\n"
+                "  2      invocation, setup or orchestration failure: bad module name, missing\n"
+                "         Joern, busy workspace, unreadable package, or a refused dirty tree\n"
+                "  128+N  interrupted by signal N; `--timeout` expiry is 143 (SIGTERM)\n"
+                "Start with `autoform doctor`: it names every missing prerequisite and how to install it."))
+    parser.add_argument("--version", action=_VersionAction,
+                        help="print the package version with the pinned Lean and Joern versions")
     parser.add_argument("--workspace", type=Path, default=Path(".autoform-work"),
                         help="writable Lean project and evidence directory (default: .autoform-work)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="extract the bundled Lean project and tools")
-    health = sub.add_parser("doctor", help="check external tool availability and versions")
+    health = sub.add_parser("doctor",
+                            help="check external tools and their versions against this package's pins")
     health.add_argument("--strict", action="store_true",
                         help="also fail when an optional tool or [machine] extra is unavailable")
+    health.add_argument("--json", action="store_true",
+                        help="machine-readable report on stdout (schema_version 1) instead of the summary")
     for name in ("source", "assure"):
         command = sub.add_parser(name, help="translate and prove native observations" if name == "source" else "run the full assurance pipeline")
         command.add_argument("source", help="source directory or Git URL")
@@ -414,7 +554,7 @@ def main(argv=None):
     env = environment()
     if args.command == "doctor":
         try:
-            return doctor(env, strict=args.strict)
+            return doctor(env, strict=args.strict, as_json=args.json)
         except (ValueError, OSError, RuntimeError, zipfile.BadZipFile) as exc:
             print(f"autoform: {exc}", file=sys.stderr)
             return 2

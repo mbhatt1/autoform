@@ -123,16 +123,18 @@ def test_sourcepath_lets_an_intra_project_reference_compile(tmp_path, differenti
 # --------------------------------------------------------------------------- #
 
 def run_doctor(*args, env=None):
+    # `--json` is the machine-readable form; the default is a human summary with an
+    # install line per problem (tests/test_cli.py covers that surface).
     environment = dict(os.environ, PYTHONPATH=str(ROOT / 'src'))
     environment.update(env or {})
-    return subprocess.run([sys.executable, '-m', 'autoform', 'doctor', *args],
+    return subprocess.run([sys.executable, '-m', 'autoform', 'doctor', '--json', *args],
                           capture_output=True, text=True, env=environment, cwd=str(ROOT))
 
 
 def test_doctor_fails_when_a_required_tool_is_absent():
     result = run_doctor(env={'JOERN_HOME': '/nonexistent-joern'})
     assert result.returncode == 1, result.stdout
-    report = json.loads(result.stdout)
+    report = json.loads(result.stdout)['tools']
     assert report['joern']['status'] == 'missing'
     assert report['joern']['required'] is True
     # It must say which check failed, on stderr, not merely exit non-zero.
@@ -140,7 +142,7 @@ def test_doctor_fails_when_a_required_tool_is_absent():
 
 
 def test_doctor_reports_versions_against_the_packaged_pins():
-    report = json.loads(run_doctor().stdout)
+    report = json.loads(run_doctor().stdout)['tools']
     assert report['python']['status'] == 'ok'
     for name in ('lean', 'lake', 'joern'):
         if report[name]['path'] is not None:
@@ -148,7 +150,7 @@ def test_doctor_reports_versions_against_the_packaged_pins():
 
 
 def test_doctor_marks_optional_tools_as_not_required():
-    report = json.loads(run_doctor(env={'JOERN_HOME': '/nonexistent-joern'}).stdout)
+    report = json.loads(run_doctor(env={'JOERN_HOME': '/nonexistent-joern'}).stdout)['tools']
     for name in ('java', 'go', 'node', 'kotlinc', 'pypcode'):
         assert report[name]['required'] is False, name
 

@@ -21,6 +21,12 @@ Usage:
 Source mode requires Joern and Lean. Machine mode uses requirements-machine.txt
 and Lean. See docs/machine-code.md or ./autoform.sh --machine --help.
 AUTOFORM_DATA_MODEL selects lp64 (default), llp64, ilp32, or unknown for source integers.
+
+Exit status (docs/running.md §7): 0 every stage ran and the runtime oracle agreed;
+1 a stage failed or the oracle found divergences (its log is under
+artifacts/pipeline/<Module>/); 2 usage error, Joern not installed, or the run was
+refused because the tree holds a live mutant or modified tracked artifacts.
+Run `autoform doctor` first: it names every missing prerequisite and how to install it.
 USAGE
   exit 0
 fi
@@ -64,6 +70,11 @@ fi
 if [[ "$PYTHON" == */* ]]; then
   PYTHON="$(cd "$(dirname "$PYTHON")" && pwd)/$(basename "$PYTHON")"
 fi
+# Refuse to build evidence over a live mutant or a modified tracked artifact -- both
+# have produced false divergences here before (docs/integrity.md, "Concurrency").
+# shellcheck source=scripts/integrity_guard.sh
+. "$ROOT/scripts/integrity_guard.sh"
+autoform_integrity_guard "$ROOT" "$MOD" || exit $?
 REPORT="$ROOT/artifacts/pipeline/$MOD"
 mkdir -p "$REPORT"
 WORK="$(mktemp -d)"
@@ -214,11 +225,11 @@ fi
 STAGE=render
 echo "==> [4/8] rendering Lean"
 "$PYTHON" "$ROOT/cartographer/render_lean.py" "$WORK/ast.json" \
-  "$ROOT/Autoform/Generated/$MOD.lean" "$MOD"
+  "$ROOT/Autoform/Generated/$MOD.lean" "$MOD" 2>&1 | tee "$REPORT/render.log"
 
 STAGE=build
 echo "==> [5/8] type-checking generated Lean"
-lake build Autoform.Runtime "Autoform.Generated.$MOD"
+lake build Autoform.Runtime "Autoform.Generated.$MOD" 2>&1 | tee "$REPORT/build.log"
 
 STAGE=runtime
 echo "==> [6/8] differential conformance vs the real runtime"
@@ -233,7 +244,7 @@ fi
 STAGE=ledger
 echo "==> [7/8] coverage ledger"
 sed "s/@MODULE@/$MOD/g" "$ROOT/scripts/ledger.lean.tmpl" > "$WORK/Ledger.lean"
-lake env lean "$WORK/Ledger.lean"
+lake env lean "$WORK/Ledger.lean" 2>&1 | tee "$REPORT/ledger.log"
 cp "$ROOT/ledger-$MOD.json" "$REPORT/ledger.json"
 cp "$ROOT/ledger-$MOD.json" "$REPORT/ledger-$MOD.json"
 if [ "$CONFORMANCE_STATUS" -eq 0 ]; then
@@ -244,7 +255,7 @@ if [ "$CONFORMANCE_STATUS" -eq 0 ]; then
     --domain "${AUTOFORM_CASES:-5}" --sample-subjects 0 --json "$REPORT/specs.json" \
     >"$REPORT/specs.log" 2>&1 || { cat "$REPORT/specs.log" >&2; exit 1; }
   cat "$REPORT/specs.log"
-  lake build "Autoform.SpecsGen.$MOD"
+  lake build "Autoform.SpecsGen.$MOD" 2>&1 | tee "$REPORT/specs-build.log"
 fi
 if [ "$CONFORMANCE_STATUS" -eq 0 ]; then STAGE=complete; else STAGE=runtime; fi
 echo "==> evidence: $REPORT"

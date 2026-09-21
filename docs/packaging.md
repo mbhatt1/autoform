@@ -29,15 +29,22 @@ or Kotlin/JVM. Kotlin can use Joern's bundled Kotlin compiler. Machine runs need
 Lean and the `machine` extra; assembling `.s` files also needs clang. These external
 toolchains are not silently installed by pip. Initial Lean builds fetch the pinned
 Lake dependencies and may need network access.
-`autoform doctor` reports, per tool, its path, the version found and the version
-pinned in this package, and a `status` of `ok`, `missing`, `version-mismatch` or
-`unknown-version`. It returns `1` when a **required** tool (Python 3.10+, git, lake,
-lean, leanchecker, joern) is absent or disagrees with its pin, and `0` otherwise;
+`autoform doctor` prints a summary with one `install:` line per problem, chosen for
+the host OS (Homebrew on macOS, apt on Linux, otherwise a URL), and `autoform doctor
+--json` prints the same facts as a `schema_version: 1` document for scripts: per tool
+its `path`, `found_version`, `expected_version`, `status` (`ok`, `missing`,
+`version-mismatch`, `unknown-version`), whether it is `required`, an install `hint`,
+and for an optional runtime the list of languages it `disables`. It returns `1` when a
+**required** tool (Python 3.10+, git, lake, lean, leanchecker, joern) is absent or
+disagrees with its pin, `0` otherwise, and `2` if the check itself could not run;
 `--strict` also fails on an absent optional item. Lean is checked against
 `lean-toolchain` and Joern against `joern-version` -- both pins are load-bearing,
-because the neutral AST is a function of the frontend build. Language runtimes and
-the `[machine]` extras are reported but optional, so `doctor` still does not tell
-you that a *particular* language is ready end to end.
+because the neutral AST is a function of the frontend build. A missing language
+runtime is a **warning**: translation and kernel proofs still run, and only that
+language's differential oracle is unavailable -- `java`/`javac` gate Java and Kotlin,
+`go` gates Go, `node` gates JavaScript and TypeScript, `cc` gates C, `clang` gates C++
+and assembling `.s` inputs. `autoform --version` prints the package version together
+with both pins, which is the line to paste into a bug report.
 
 ```sh
 autoform https://github.com/OWNER/REPOSITORY.git
@@ -125,6 +132,27 @@ full build, trust audit, tooling and integrity checks. It rejects a release tag
 that disagrees with the metadata. A missing historical corpus or failed audit
 blocks publication; a successful package build alone is insufficient.
 This follows the [PyPA publishing workflow](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/).
+
+### Reproducible builds
+
+The wheel is a pure-Python archive plus `autoform/runtime.zip`, which `build_support.py`
+assembles from a fixed, sorted list of source files -- there is no compiled code and no
+timestamp of the build's own. Two builds of the same commit therefore differ only in
+archive metadata, and setting `SOURCE_DATE_EPOCH` pins that too:
+
+```sh
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python -m build
+sha256sum dist/*
+```
+
+`scripts/check_distribution.py dist` is the check that matters more than a matching
+hash: it opens the actual wheel and sdist and compares every runtime resource and CLI
+module byte-for-byte with this checkout, both package versions with `pyproject.toml`,
+the dependency metadata with the TOML contract, and the bundled license notices. A
+wheel that passes it contains exactly what the tree says it should and nothing else.
+The Python package workflow runs it on every build; `tests/test_package.py` runs it
+against `AUTOFORM_TEST_WHEEL` and additionally proves it *rejects* a wheel with an
+undeclared module, a startup hook, a wrong entry point or a tampered RECORD.
 
 Local distribution checks:
 

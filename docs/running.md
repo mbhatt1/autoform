@@ -452,3 +452,23 @@ mutation; an incomplete run cannot support a guarantee.
 **`Autoform/Generated/*.lean` looks wrong.** Do not hand-edit it. It is a pure function of
 `ast-<Module>.json`; re-run `cartographer/render_lean.py`, and if the AST is wrong, fix the
 exporter.
+
+## 7. Exit codes
+
+One table, matching the code. `autoform --help` prints the short form; this is the
+authority when they disagree, and a disagreement is a bug to file.
+
+| command | `0` | `1` | `2` | other |
+|---|---|---|---|---|
+| `autoform doctor` | every **required** tool (Python 3.10+, git, lake, lean, leanchecker, joern) present and matching its pin | a required tool missing or mismatched; with `--strict`, also an optional one | the check itself could not run (package payload unreadable) | — |
+| `autoform init` | workspace extracted or already matching this package | — | workspace not empty, from a different package, or an init already in progress | — |
+| `autoform source` / `./autoform.sh` | every stage ran and the differential oracle agreed | a stage failed (parse, graph, export, render, build, ledger, proofs) or the oracle reported divergences — the stage's log is under `artifacts/pipeline/<Module>/` | usage error, module name not a Lean identifier, Joern not installed, busy workspace, or the run was **refused** because the tree holds a live `.mutate-backup` or modified tracked artifacts (§5, `docs/integrity.md`) | `128+N` interrupted by signal N; `--timeout` expiry is `143` |
+| `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
+| `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
+
+Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the
+workflow saying the assurance case has gaps, which is the honest outcome for most
+real repositories — read `run.json` and `guarantee.json` together. And a `2` from the
+integrity guard is deliberate: `AUTOFORM_ALLOW_DIRTY=1` lifts the modified-artifact
+check for someone iterating on a render they know is uncommitted; nothing lifts the
+live-mutant check, because there is no legitimate evidence to collect over a mutant.
