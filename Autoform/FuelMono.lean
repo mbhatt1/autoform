@@ -1557,7 +1557,7 @@ theorem tfFree_of_table {ctx : Ctx}
   split at hr
   · rename_i a f rest hfilt
     have hmem : (a, f) ∈ ctx.table.filter
-        (fun p => p.1.endsWith ("." ++ c ++ "." ++ m)) := by
+        (fun p => strEndsWith p.1 ("." ++ c ++ "." ++ m)) := by
       rw [hfilt]; exact List.mem_cons_self
     have : f = fn := by simpa using hr
     exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1

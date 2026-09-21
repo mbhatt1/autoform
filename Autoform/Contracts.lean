@@ -893,16 +893,11 @@ theorem resolve_hashkey' :
   simp +decide [Ctx.resolve, ctxOf, table_keysProgram,
     f_cachetools_keys_py__module__hashkey]
 
+-- A concrete resolution MISS, by kernel computation: `resolveMethod`/`resolve` test
+-- suffixes with the structural `strEndsWith`, so nothing has to be unfolded by hand.
 theorem resolveMethod_hashedTuple_init' :
     (ctxOf keysProgram).resolveMethod "_HashedTuple" "__init__" = none := by
-  simp only [Ctx.resolveMethod, ctxOf, table_keysProgram,
-    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
-  rw [show ("." ++ "_HashedTuple" ++ "." ++ "__init__") = "._HashedTuple.__init__" from by rfl]
-  simp +decide [List.filter_cons, String.endsWith]
-  simp only [Ctx.resolve, ctxOf, table_keysProgram]
-  rw [show ("." ++ "__init__") = ".__init__" from by rfl]
-  simp +decide [Ctx.resolve.go, String.endsWith,
-    f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
+  rfl
 
 /-! ### The unconditional theorem
 

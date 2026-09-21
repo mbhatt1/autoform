@@ -1846,15 +1846,14 @@ theorem ew4 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.__init__" = 
 theorem ew5 : "cnt.py:<module>.Counter.bump".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 theorem ew6 : "cnt.py:<module>.total".endsWith ".Counter.__init__" = false := by simp [String.endsWith]; decide
 
+-- `resolveMethod` now tests suffixes with `strEndsWith`, which the kernel computes, so
+-- these are decided outright; the `ew*` facts above are kept as the record of what the
+-- library function needed (`strEndsWith_eq_endsWith` is the bridge between the two).
 theorem resolve_bump : ctxT.resolveMethod "Counter" "bump" = some f_counter_bump := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
-  rw [show ("." ++ "Counter" ++ "." ++ "bump") = ".Counter.bump" from rfl, ew1, ew2, ew3]
+  rfl
 
 theorem resolve_init : ctxT.resolveMethod "Counter" "__init__" = some f_counter_init := by
-  simp only [ctxT, ctxOf, CounterProgram, Ctx.resolveMethod, Program.table, List.map,
-        f_counter_init, f_counter_bump, f_counter_total, List.filter]
-  rw [show ("." ++ "Counter" ++ "." ++ "__init__") = ".Counter.__init__" from rfl, ew4, ew5, ew6]
+  rfl
 
 
 

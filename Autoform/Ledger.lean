@@ -319,7 +319,7 @@ def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
     -- Mirrors `Ctx.resolveMethod`, which takes the *first* match. Still an upper bound:
     -- it asks only whether some class defines the name, not whether *this* receiver's
     -- class does — a static ledger has no receiver.
-    ctx.table.any (fun q => q.1.endsWith ("." ++ n))
+    ctx.table.any (fun q => strEndsWith q.1 ("." ++ n))
   else
     -- Mirrors `Ctx.resolve` exactly, ambiguity and all: two suffix matches resolve to
     -- nothing, so two matches must not count as resolvable.

@@ -733,6 +733,54 @@ structure Ctx where
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
 
+/-! ### Name matching the kernel can compute
+
+Every name lookup below used `String.endsWith`/`String.splitOn`. Those are well-founded
+recursions over byte positions, and the kernel does not unfold well-founded recursion, so
+any proof *by computation* (`decide`, `rfl`, `cbv`) that reached a resolve MISS -- the
+suffix scan -- or a class-value's short name did not terminate. Three cachetools
+constructors had to be excluded from the generated conformance module for exactly this
+reason, and `BuiltinBase.lean` had to state its resolution facts as `#guard`s. The helpers
+here do the same work on `List Char`, by structural recursion only: `String.toList` reduces
+on a literal, `List.reverse`/`List.isPrefixOf`/`List.take` reduce structurally, so a
+concrete lookup now reduces in the kernel. `strEndsWith_eq_endsWith` is the proof that
+nothing else changed. -/
+
+/-- `suffix` is a suffix of `s`, decided on the character lists. -/
+def strEndsWith (s suffix : String) : Bool := suffix.toList.isSuffixOf s.toList
+
+/-- The structural test agrees with the library's byte-position one. -/
+theorem strEndsWith_eq_endsWith (s suffix : String) : strEndsWith s suffix = s.endsWith suffix := by
+  unfold strEndsWith String.endsWith
+  rw [Bool.eq_iff_iff, List.isSuffixOf_iff_suffix, String.Slice.endsWith_string_iff,
+      String.copy_toSlice]
+
+/-- The last dotted segment of a character list; the whole list when there is no dot,
+the empty list when the dot is last -- the same answers as `(s.splitOn ".").getLastD s`. -/
+def lastDotSegment : List Char → List Char → List Char
+  | [],          acc => acc.reverse
+  | '.' :: rest, _   => lastDotSegment rest []
+  | c :: rest,   acc => lastDotSegment rest (c :: acc)
+
+/-- Everything before the last `.`; empty when there is none -- the same answer as
+`".".intercalate (s.splitOn ".").dropLast`. -/
+def dropLastDotSegment (cs : List Char) : List Char :=
+  match cs.reverse.dropWhile (· != '.') with
+  | []          => []
+  | _ :: before => before.reverse
+
+-- Agreement with the `splitOn` forms this replaces, on the shapes Joern emits: a file
+-- part with dots, the `<meta>` marker, a bare name, a trailing dot.
+#guard String.mk (lastDotSegment "cachetools/__init__.py:<module>.Cache".toList []) == "Cache"
+#guard String.mk (lastDotSegment "Cache".toList []) == "Cache"
+#guard String.mk (lastDotSegment "a.b.".toList []) == ""
+#guard String.mk (dropLastDotSegment "d.py:<module>.C.make".toList) == "d.py:<module>.C"
+#guard String.mk (dropLastDotSegment "make".toList) == ""
+#guard strEndsWith "cnt.py:<module>.Counter.bump" ".Counter.bump" == true
+#guard strEndsWith "cnt.py:<module>.Counter.__init__" ".Counter.bump" == false
+#guard strEndsWith "x" "" == true
+#guard strEndsWith "" ".x" == false
+
 /-- Resolve a callable by exact name, else by suffix.
 
 Joern emits fully-qualified names like `pkg/mod.py:<module>.Cls.meth`, while call sites
@@ -747,12 +795,13 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
     -- allocated across the whole table — on Django's 10,623 functions that made the
     -- ledger run 363s, 55x the cost of a corpus 5x smaller. This is still linear per
     -- lookup (the asymptotic fix is an index on `Ctx`, recorded as an open item), but
-    -- it no longer allocates and it exits early on the ambiguous case.
+    -- it no longer allocates and it exits early on the ambiguous case. The suffix test
+    -- is `strEndsWith`, so a concrete miss REDUCES in the kernel (see above).
     let suffix := "." ++ n
     let rec go : FuncTable → Option Func → Option Func
       | [],           acc      => acc
-      | (k, f) :: ps, none     => if k.endsWith suffix then go ps (some f) else go ps none
-      | (k, _) :: ps, some f   => if k.endsWith suffix then none else go ps (some f)
+      | (k, f) :: ps, none     => if strEndsWith k suffix then go ps (some f) else go ps none
+      | (k, _) :: ps, some f   => if strEndsWith k suffix then none else go ps (some f)
     go ctx.table none
 
 /-! ## The calling convention
@@ -988,8 +1037,12 @@ split the whole name, because the FILE part contains dots
 (`cachetools/__init__.py:<module>.Cache<meta>`). Named rather than inlined so that proofs
 about the `mcall` case have a term to talk about. -/
 def classNameOfValue (g : String) : String :=
-  let base := if g.endsWith "<meta>" then g.dropRight 6 else g
-  (base.splitOn ".").getLastD base
+  -- Structural on the character list (`lastDotSegment`), for the same reason as
+  -- `strEndsWith`: this runs on every method call through a class value, and a proof by
+  -- computation that reaches it must be able to unfold it.
+  let cs := g.toList
+  let base := if strEndsWith g "<meta>" then (cs.reverse.drop 6).reverse else cs
+  String.mk (lastDotSegment base [])
 
 /-- A `@classmethod`: the recovered signature says the receiver is the class. -/
 def Func.isClassMethod (fn : Func) : Bool :=
@@ -1003,18 +1056,18 @@ qualified one -- `d.py:<module>.C.make` -- so dropping its last dotted segment a
 the exporter's `<meta>` marker gives exactly the value `typeValue` emits for `C`. Splitting
 on `.` is safe here because the file part's dots are never the LAST segment. -/
 def Func.ownerClassValue (fn : Func) : Val :=
-  .fn (".".intercalate (fn.name.splitOn ".").dropLast ++ "<meta>")
+  .fn (String.mk (dropLastDotSegment fn.name.toList) ++ "<meta>")
 
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
-  match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
+  match ctx.table.filter (fun p => strEndsWith p.1 ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
-  ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
+  ctx.table.any (fun p => strEndsWith p.1 ("." ++ cls ++ "." ++ meth))
 
 /-- The user-class method a container operation on an ORDINARY instance dispatches to.
 
