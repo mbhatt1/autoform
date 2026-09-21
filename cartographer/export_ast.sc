@@ -148,6 +148,15 @@ import scala.annotation.tailrec
 import ast, builtins, json, struct, symtable, sys
 source = sys.stdin.read()
 tree = ast.parse(source)
+# `raise X from Y` sets `__cause__` on the raised exception. Core represents an
+# exception as the *name* of its class, so there is no object to carry a cause and no
+# way to read one back -- which makes the assignment unobservable, but only if nothing
+# tries to observe it. Checked rather than assumed: if this module touches any of the
+# chaining attributes, every `raise ... from ...` in it keeps holing.
+reads_exception_chain = any(
+    isinstance(n, ast.Attribute)
+    and n.attr in ('__cause__', '__context__', '__suppress_context__')
+    for n in ast.walk(tree))
 symbols = symtable.symtable(source, '<source>', 'exec')
 exceptions = {name: value for name, value in vars(builtins).items()
               if isinstance(value, type) and issubclass(value, BaseException)}
@@ -317,7 +326,15 @@ def visit(node, scopes):
         class_refs[f'{node.lineno}:{node.col_offset + 1}'] = node.id
     if isinstance(node, ast.Raise):
         value = node.exc
-        if node.cause is not None:
+        # `from None` is the idiom for SUPPRESSING chaining, and suppressing something
+        # Core does not represent is a no-op. `None` is a constant, so evaluating it
+        # cannot raise or have an effect -- which is what makes dropping it sound here
+        # and not for a general cause expression, where CPython evaluates the cause
+        # after the exception and propagates anything it raises.
+        suppressed_cause = (isinstance(node.cause, ast.Constant)
+                            and node.cause.value is None
+                            and not reads_exception_chain)
+        if node.cause is not None and not suppressed_cause:
             info = {'kind': 'hole', 'label': 'op:raise-cause'}
         elif value is None:
             info = {'kind': 'hole', 'label': 'op:raise-bare'}

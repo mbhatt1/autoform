@@ -146,3 +146,50 @@ def test_python_signature_gaps(tmp_path, numeric_env):
                '  first | decide +kernel | fail "default definition was silently skipped"\n')
     (tmp_path / 'Proofs.lean').write_text(proofs)
     run(['lake', 'env', 'lean', tmp_path / 'Proofs.lean'], ROOT, numeric_env)
+
+
+def _decode(source: str) -> dict:
+    """Run the exporter's embedded Python source-metadata decoder on `source`."""
+    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
+    result = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
+                            input=source, text=True, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+class TestRaiseFromNone:
+    """`raise X from None` is the idiom for SUPPRESSING exception chaining.
+
+    Core represents an exception as the name of its class, so there is no object to
+    carry a `__cause__` and no way to read one back — suppressing something that is not
+    represented is a no-op, and CPython agrees: `raise X` and `raise X from None` both
+    produce the same exception with `__cause__` None. A general cause expression is a
+    different matter, since CPython evaluates it after the exception and propagates
+    anything it raises, so those keep holing.
+    """
+
+    def test_from_none_is_not_a_hole(self):
+        raises = _decode('def f():\n    raise ValueError("x") from None\n')['raises']
+        assert [r['kind'] for r in raises.values()] == ['constructor']
+
+    def test_a_real_cause_still_holes(self):
+        """CPython evaluates the cause and propagates what it raises; dropping it would
+        be a wrong answer, not a missing one."""
+        raises = _decode('def f(e):\n    raise ValueError("x") from e\n')['raises']
+        assert [r['label'] for r in raises.values()] == ['op:raise-cause']
+
+    def test_a_module_that_reads_the_chain_keeps_holing(self):
+        """The no-op argument only holds while nothing observes the chain. One read
+        anywhere in the module withdraws it for every `raise ... from ...` in that
+        module."""
+        source = ('def g(exc):\n    return exc.__cause__\n\n'
+                  'def f():\n    raise ValueError("x") from None\n')
+        raises = _decode(source)['raises']
+        assert [r['label'] for r in raises.values()] == ['op:raise-cause']
+
+    def test_suppress_context_also_counts_as_reading_the_chain(self):
+        source = ('def g(exc):\n    return exc.__suppress_context__\n\n'
+                  'def f():\n    raise ValueError("x") from None\n')
+        raises = _decode(source)['raises']
+        assert [r['label'] for r in raises.values()] == ['op:raise-cause']
