@@ -1669,6 +1669,14 @@ def main():
     # the basis would make new rates look comparable to old ones when they are not.
     wasm_mode = "--wasm" in argv
     if wasm_mode: argv.remove("--wasm")
+    # `--language js|ts|java|go|kotlin|python|c` names the runtime explicitly. The
+    # extension vote stays the default because it cannot be wrong silently -- it refuses
+    # on a mixed or unknown corpus -- but a corpus whose files carry no extension the
+    # table knows (a generated fixture, a `.mjs`-only package renamed by a bundler)
+    # needs a way to say what it is. The override is RECORDED in conformance.json.
+    lang_override = None
+    if "--language" in argv:
+        i = argv.index("--language"); lang_override = argv[i + 1]; del argv[i:i + 2]
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
     funcs = deep_json.load(ast_path)
@@ -1683,6 +1691,15 @@ def main():
     lang, exts = detect_language(funcs)
     RUNTIME = {"python": "cpython", "c": "cc", "java": "jvm", "go": "go",
                "js": "node", "ts": "node", "kotlin": "kotlin"}
+    if lang_override is not None:
+        if lang_override not in RUNTIME:
+            print("REFUSING to run: --language %r is not one of %s"
+                  % (lang_override, sorted(RUNTIME)))
+            return 2
+        if lang is not None and lang != lang_override:
+            print("  --language %s overrides the extension vote (%s); the override is "
+                  "recorded in conformance.json" % (lang_override, lang))
+        lang = lang_override
     if lang is None:
         print("REFUSING to run: cannot identify the corpus language from its file "
               "extensions %s. Defaulting to CPython would report agreement between the "
@@ -1732,6 +1749,37 @@ def main():
                       "cases reaching a hole remain inconclusive. Static hole counts "
                       "are unchanged. Coverage and rates differ from the earlier "
                       "hole-free-only sampling population.")
+
+    # Each non-Python runtime backend samples its own domain and calls its own surface;
+    # naming that basis per runtime is what stops a Node rate being read as if it were
+    # measured the way the CPython trace was.
+    if lang in ("js", "ts"):
+        BASIS = "node-numeric-pool-v1"
+        BASIS_NOTE = ("Node calls each module-scope function of the corpus on a fixed numeric "
+                      "pool (0, 1, -1, 2^31-1, 2^32, 32, 64, -3.75, Infinity, NaN) cycled per "
+                      "parameter -- NOT the corpus's own tests. Numbers are compared as IEEE "
+                      "doubles (Core's small-integer representation of a JS Number is widened "
+                      "before comparison). Functions returning objects, arrays or promises, "
+                      "and functions not reachable at module scope, are skipped and COUNTED "
+                      "under backend_skipped. TypeScript runs through "
+                      "`node --experimental-strip-types`: erasable annotations only.")
+    elif lang in ("java", "kotlin"):
+        BASIS = "jvm-primitive-static-v1"
+        BASIS_NOTE = ("Only static methods whose whole signature is primitive-or-String are "
+                      "called, reflectively, on a fixed pool per type (0, 1, MAX, MIN, 31, 32, "
+                      "63, 64 for integers; a fixed string list; 0.0, 1.5, -2.25, 2^24, -0.0 "
+                      "for floats). Instance methods, non-primitive signatures and files that "
+                      "do not compile against the corpus's own source roots are skipped and "
+                      "COUNTED; no third-party classpath is supplied. Kotlin compiles a "
+                      "@JvmStatic thunk per function and goes through the same driver.")
+    elif lang == "go":
+        BASIS = "go-package-func-v1"
+        BASIS_NOTE = ("Package-level functions with scalar parameters (integers, bool, "
+                      "string, float) and at most one scalar result are called from a "
+                      "generated `_test.go` in a private copy of the module, on a fixed "
+                      "per-type pool (0, 1, -1, MAX, MIN, 2, 31, 32, 63, 64 for integers). "
+                      "Methods, variadics, multi-value returns and non-scalar types are "
+                      "skipped and COUNTED under backend_skipped.")
 
     if is_c:
         BASIS = "c-native-zero-boundary-v3"
@@ -2025,7 +2073,7 @@ def main():
               "ast": os.path.abspath(ast_path), "runtime": runtime,
               "runtime_version": runtime_version(lang),
               "measurement_basis": BASIS, "measurement_basis_note": BASIS_NOTE,
-              "language": lang, "extensions": exts,
+              "language": lang, "language_override": lang_override, "extensions": exts,
               "backend": runtime, "backend_status": backend_status,
               "backend_info": backend_info,
               "backend_skipped": dict(list(backend_skipped.items())[:40]),
