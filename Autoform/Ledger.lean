@@ -447,12 +447,22 @@ def contractedCallees : Dialect → List String
       -- argument, no other effect".
       [ "functools.update_wrapper" ]
   | .cLike =>
-      -- assumed, all pure and total on their documented domains:
+      -- assumed, all pure and total on their documented domains. C keeps only its own;
+      -- Java and Go have their own dialects now (below), listed here too because a
+      -- corpus rendered before the split still carries `.cLike`.
       [ "strlen"                    -- C: bytes before the NUL; a `Val.str` length
       , "Objects.requireNonNull"    -- Java: identity on a non-null argument
       , "requireNonNull"            --   (the same call after a static import)
       , "Math.max", "Math.min", "Math.abs"  -- Java: the integer operations Core has
       , "fmt.Sprintf", "Sprintf"    -- Go: a formatted string with no other effect
+      , "strings.ToUpper", "strings.ToLower", "strings.TrimSpace" ]
+  | .java =>
+      -- assumed, pure and total on their documented domains:
+      [ "Objects.requireNonNull", "requireNonNull"   -- identity on a non-null argument
+      , "Math.max", "Math.min", "Math.abs" ]          -- the integer operations Core has
+  | .go =>
+      -- assumed, pure and total:
+      [ "fmt.Sprintf", "Sprintf"    -- a formatted string with no other effect
       , "strings.ToUpper", "strings.ToLower", "strings.TrimSpace" ]
   | .javascript =>
       -- assumed, pure and total:
