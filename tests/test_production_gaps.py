@@ -341,3 +341,43 @@ class TestLiteralParameterDefaults:
         seed = semantics.index('fn.literalDefaults.foldl')
         positional = semantics.index('let ps    := fn.posParams', seed)
         assert seed < positional
+
+
+
+class TestBoxedContainerExporterWiring:
+    """The exporter emissions held back until containers were boxed.
+
+    Before the switchover a `del xs[i]` translated to `Stmt.delIndex` would have swapped
+    a STATIC hole for a statement that holed at RUN time: identical behaviour, a smaller
+    static hole count, and a hole-freedom number that improved while nothing became
+    translated. Now that a Python list literal allocates and `delIndex` mutates the
+    payload in place, the statement runs, so it is emitted -- for Python only, because
+    only Python boxes.
+    """
+
+    def test_python_del_index_emits_delIndex(self):
+        src = EXPORTER.read_text()
+        assert 'case (x: AstNode) :: Nil if pyFile && asIndex(x).isDefined =>' in src
+        assert 'ujson.Obj("k" -> "delIndex", "a" -> expr(recv), "i" -> expr(idx))' in src
+        # The non-Python case keeps the hole: a C aggregate is a value with no identity.
+        assert 'holeS("op:delete-index")' in src
+
+    def test_renderer_knows_the_delIndex_shape(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'render_lean', Path(__file__).resolve().parents[1] / 'cartographer/render_lean.py')
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        head, kids = mod.stmt_shape({'k': 'delIndex',
+                                     'a': {'k': 'name', 'v': 'xs'},
+                                     'i': {'k': 'int', 'v': '0'}})
+        assert head == '.delIndex'
+        assert [k for k, _ in kids] == ['e', 'e']
+
+    def test_adjacent_string_literals_fold_to_one_str(self):
+        """`"a" "b"` is one value. An f-string uses the same operator with non-literal
+        parts and keeps a hole -- folding it would need `str()` semantics per part."""
+        src = EXPORTER.read_text()
+        assert 'mfn == "<operator>.stringExpressionList"' in src
+        assert 'parts.nonEmpty && parts.forall(_.isDefined)' in src
+        assert 'hole("op:stringExpressionList:non-literal-part")' in src

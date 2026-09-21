@@ -478,6 +478,29 @@ it already exists. With that lemma the side condition becomes a statement about 
 concrete table, decidable by `rfl` for every corpus, and the 284 collapse the same way the
 switchover's 163 collapsed to 3.
 
+### 15. Three small exporter labels, dispositioned
+
+* **`op:delete-index` — closed for Python.** `del xs[i]` / `del d[k]` lower to
+  `Stmt.delIndex` now that containers box (see `docs/boxed-containers.md` for why it was
+  held back). C aggregates keep the hole: no identity to delete from.
+* **`op:stringExpressionList` — safe subset.** `"a" "b"`, Python's implicit concatenation
+  of adjacent literals, folds to one `.str` when every part is a plain string literal. An
+  f-string arrives through the same operator with interpolated parts, and folding it would
+  need `str()` conversion semantics per part; it keeps a hole, now labelled
+  `op:stringExpressionList:non-literal-part` so the count says which shape it was.
+* **`call:computed-callee` — documented, not closed.** This is `f(x)(y)`: the callee is
+  itself the result of a call. `Expr.call` is by NAME and Core has no "apply this value"
+  form, so there is no Core term to emit. Closing it needs an `Expr.apply : Expr → List
+  Expr → Expr` constructor in the trusted semantics, a Lean change outside this exporter
+  pass. Emitting `call ""` was tried once and was worse than the hole -- it typechecked,
+  counted as translated, and resolved to nothing at run time.
+* **`mcall:<m>:unboxed-container` — documented, not closed.** After the switchover the one
+  remaining source of an unboxed `Val.dict` in a Python program is `bindParams` itself:
+  `**kwargs` is built as a value at the kwarg binding in `Semantics.lean`, not allocated.
+  A mutating method on `kwargs` (`kwargs.pop(...)`) therefore still holes. Making
+  `bindParams` allocate would give it a heap argument -- the `applyBinop` re-typing
+  problem -- so it is recorded here rather than done.
+
 ## Verdict
 
 **"Universal" is aspirational, not currently true.** Precisely:
