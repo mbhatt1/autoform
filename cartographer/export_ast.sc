@@ -6039,9 +6039,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                    (c.matches("""[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*""") ||
                     c == "."))
             hole("import:operand")
-          // `b'...'` / `rb"..."`: a **bytes** literal. Core has `str` and no `bytes`, and
-          // the two are not interchangeable in Python 3 (`b'a' == 'a'` is `False`), so
-          // this is a missing *type*, not a parsing failure, and the label says which.
+          // `b'...'` / `rb"..."`: a **bytes** literal. Python Language Reference §2.5.5
+          // (Bytes literals): they "produce an instance of the bytes type instead of the
+          // str type" and "may only contain ASCII characters". Core has `str` and no
+          // `bytes`, and the two are not interchangeable in Python 3 (`b'a' == 'a'` is
+          // `False`), so encoding one as a `Val.str` would be a wrong TYPE -- the silent
+          // kind of error; this is a missing value type, not a parsing failure, and the
+          // label says which. A `Val.bytes` touches every exhaustive match over `Val`
+          // (FuelMono, ExcSafe, Ledger, Basis); it stays a hole until that is done.
           else if (pyFile && c.matches("""(?i)(b|rb|br)['"].*"""))
             hole("lit:bytes")
           // `...` — the `Ellipsis` singleton, which Python uses as a stub body and as a
@@ -7006,6 +7011,28 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       ujson.Obj("k" -> "listE", "items" -> exprs(kids))
     else if (mfn == "<operator>.tupleLiteral")
       ujson.Obj("k" -> "tupleE", "items" -> exprs(kids))
+    // Python Language Reference §6.2.7 (Set displays): "its elements are evaluated from
+    // left to right and added to the set object"; the library reference (Set Types):
+    // "A set object is an unordered collection of distinct hashable objects". Core has
+    // no set value, so the model is a dict whose values are all `unit`: `in`, `len` and
+    // iteration are the dict's own on its keys, `add`/`discard`/`remove` are
+    // `Stdlib.method` arms, and `dictE` deduplicates keys (`Stdlib.dictOfPairs`), which
+    // is the "distinct". `{}` is a DICT (§6.2.7) and never reaches this branch; the set
+    // OPERATORS (`|`, `&`, `-`, `^`) still hole at the operator, on purpose.
+    else if (pyFile && mfn == "<operator>.setLiteral" && kids.nonEmpty)
+      ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr.from(kids.map { k =>
+        ujson.Arr(expr(k), ujson.Obj("k" -> "unit"))
+      }))
+    // Python Language Reference §6.11 (Boolean operations): `x and y` "first evaluates x;
+    // if x is false, its value is returned; otherwise, y is evaluated and the resulting
+    // value is returned" -- the operators "return the last evaluated argument", not a
+    // bool. pysrc2cpg flattens `a and b and c` into ONE call with three operands, which
+    // is why the two-operand branch below missed it. The grammar is left-recursive
+    // (`and_test: and_test "and" not_test`), so the chain folds left; each `&&`/`||` is
+    // Core's short-circuit VALUE operator under `Dialect.boolOpsAreValues`.
+    else if ((mfn == "<operator>.logicalAnd" || mfn == "<operator>.logicalOr") && kids.size > 2)
+      kids.map(expr).reduceLeft((a, b) =>
+        ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> a, "b" -> b))
     else if (mfn == "<operator>.dictLiteral")
       // The Python frontend emits `{}` here and fills it with indexed stores; a
       // dictLiteral with children would be a shape we have not seen and must not guess at.
@@ -9189,8 +9216,29 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // A comprehension in a prelude-aware position -- most often a call's argument, where
     // `genExpEager` says whether a generator expression may be lowered as a list.
     case b: Block =>
-      comprehensionLowering(b, eagerGen = genExpEager).getOrElse((Nil, expr(b)))
+      comprehensionLowering(b, eagerGen = genExpEager).getOrElse(blockExprV(b))
     case other => (Nil, expr(other))
+  }
+
+  /** `blockExpr` for a position that HAS a prelude (`exprV`: an argument, an assigned
+    * value). The frontend's temporary bindings are hoisted into the prelude IN ORDER
+    * instead of being substituted, so an impure `tmpN = e` -- a method call, an
+    * allocation, a walrus target -- is evaluated exactly once and in its original order
+    * relative to the block's other statements; `blockExpr` had to hole these as
+    * `expr:BLOCK-impure` because plain `expr` has nowhere to put a statement. Anything
+    * that is not a single-target assignment (a comprehension's loop, a generator) keeps
+    * `blockExpr`'s labels, and the C++ constructor shape keeps `ctorAlloc`. The ordering
+    * caveat is `exprV`'s own: a hoisted prelude runs before sibling arguments to its
+    * LEFT are read, which Python would evaluate first (docs/languages.md §16.D). */
+  def blockExprV(b: Block): (List[ujson.Obj], ujson.Obj) = {
+    val ks = kidsOf(b).filterNot(_.isInstanceOf[Local])
+    val hoistable = ks.nonEmpty && ctorAlloc(ks).isEmpty && ks.init.forall {
+      case c: Call if callName(c) == "<operator>.assignment" =>
+        kidsOf(c) match { case (_: Identifier) :: _ :: Nil => true; case _ => false }
+      case _ => false
+    }
+    if (!hoistable) (Nil, blockExpr(b))
+    else (stmts(ks.init), expr(ks.last))
   }
 
   /** Translate a statement list, merging the two-statement C++ stack-construction shape
@@ -9407,6 +9455,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case _ => holeS("op:" + callName(c).stripPrefix("<operator>.") + ":arity")
       }
     case c: Call if callName(c) == "<operator>.pass" => skip
+    // Python Language Reference §7.3 (The assert statement): `assert expression` "is
+    // equivalent to `if __debug__: if not expression: raise AssertionError`", and
+    // `assert expression1, expression2` to `... raise AssertionError(expression2)`.
+    // `__debug__` "is True under normal circumstances, False when optimization is
+    // requested (command line option -O)"; the oracle's CPython runs without `-O`, so the
+    // check is on. The message is evaluated only on failure -- the else-branch gives that.
+    case c: Call if pyFile && callName(c) == "<operator>.assert" && kidsOf(c).nonEmpty =>
+      val ks = kidsOf(c)
+      ujson.Obj("k" -> "ifte", "c" -> expr(ks.head), "t" -> skip,
+                "e" -> ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
+                         "op" -> "py:exception:AssertionError",
+                         "a" -> ujson.Obj("k" -> "tupleE", "items" -> exprs(ks.tail)))))
     case c: Call if callName(c) == "<operator>.raise" =>
       if (pyFile) pythonRaise(c)
       else kidsOf(c).headOption match {
