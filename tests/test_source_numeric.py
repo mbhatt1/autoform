@@ -512,7 +512,9 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
                 if s.startswith('float:') else int(s) for s in actual.splitlines()]
     assert observed == expected
     (tmp_path / "Proofs.lean").write_text(header + proofs)
-    run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env)
+    # Kernel computation over a boxed-container program is slow under machine load; the
+    # receiver-gap test already allows 600 s for the same kind of run.
+    run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env, timeout=600)
 
     # The target model is evidence, not a host-size guess. Removing it refuses
     # target-sized arithmetic while preserving fixed-width Java/Go operations.

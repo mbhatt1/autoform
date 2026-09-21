@@ -52,6 +52,16 @@ def test_receiver_source_signature_metadata():
     assert records['positional_collect']['positionalOnly'] == ['self']
 
 
+def encode_native(outcome):
+    """CPython's outcome in the driver's print format: ints, tuples of ints, exceptions."""
+    if 'exception' in outcome:
+        return 'exception:' + outcome['exception']
+    value = outcome['value']
+    if isinstance(value, tuple):
+        return 'value:tuple:' + ','.join(str(v) for v in value)
+    return 'value:' + str(value)
+
+
 def test_source_python_receiver_gaps(tmp_path, numeric_env):
     if os.environ.get('AUTOFORM_TEST_JOERN') != '1':
         pytest.skip('set AUTOFORM_TEST_JOERN=1 for Python receiver binding')
@@ -115,8 +125,10 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
             f'(evalExpr {context} 512 [] [] '
             f'(.call "receivers.py:<module>.Receiver.{name}" {args})).2',
         ])
-        if name == 'positional_collect':
-            want = 'value:2' if 'value' in outcome else 'exception:TypeError'
+        if name in ('positional_collect', 'static', 'class_named', 'class_self'):
+            # These translate, so the model must reproduce CPython: the value (an int, or
+            # `static`'s `(self, a)` tuple of ints) or the arity `TypeError`.
+            want = encode_native(outcome)
         else:
             want = 'hole:' + GAP
         expected.extend([want, want])
@@ -128,6 +140,8 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
         driver += (f'  match {call} with\n'
                    '  | .hole label => IO.println ("hole:" ++ label)\n'
                    '  | .val (.int value) => IO.println ("value:" ++ toString value)\n'
+                   '  | .val (.tuple vs) => IO.println ("value:tuple:" ++ ",".intercalate '
+                   '(vs.map (fun v => match v with | .int i => toString i | _ => "?")))\n'
                    '  | .exn (.str name) => IO.println ("exception:" ++ name)\n'
                    '  | other => IO.println ("unexpected:" ++ reprStr other)\n')
     (tmp_path / 'Observe.lean').write_text(driver)
