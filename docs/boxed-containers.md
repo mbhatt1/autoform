@@ -478,6 +478,34 @@ What was left: three `Cachetools` specs, which now carry the conjunct explicitly
 `Expr.index` must unbox as well. `xs[0]` reads through a `Val.ref` after the switchover
 and holes without it.
 
+## 6c. What the switchover did to the corpus: nothing measurable, and that is the result
+
+The oracle was re-run on `cachetools` immediately after the switchover, against CPython,
+same corpus and same command as the tracked baseline:
+
+    209/209 agree, 0 divergences, 256 INCONCLUSIVE
+
+`conformance.json` came back **byte-identical to the committed file**. Not "close" — git
+reports the working tree clean after the run.
+
+Two things follow, and the second is more useful than the first.
+
+**No regression, in the strongest available form.** Boxing every Python list and dict
+literal, rerouting `==` through the heap, unboxing at four call sites and changing what
+`for` iterates did not move a single compared case.
+
+**And no improvement either, because containers were never this corpus's limit.** The
+inconclusive cases are `call:set`, `call:type`, `mcall:warnings.warn`, `expr:genExp` —
+unmodelled builtins and generator expressions. Not one of them is a container-identity
+case. The aliasing that now works (§6b) is real and checked against CPython, and
+`cachetools` does not exercise it in any case the oracle can reach.
+
+This is the same lesson `README.md` states as "coverage, not agreement, is the limit",
+arriving from a new direction: a capability can be genuinely added, verified against the
+runtime, and leave every headline number exactly where it was. A migration judged by
+whether the number moved would have been abandoned at step 1 — and a migration that
+*claimed* the number moved would have been wrong.
+
 ## 7. Migration cost, measured
 
 Counts taken from this repository, not estimated:
