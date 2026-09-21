@@ -307,78 +307,103 @@ change. Recorded as a known defect rather than silently carried.
 * Java `char` arithmetic (16-bit unsigned) under a 32-bit signed config.
 * Go `&^` (and-not) and unsigned `uint` arithmetic under a signed config.
 
-### 10. Python `except` dispatch holes on an exception it cannot name
+### 10. Python attribute and exception semantics
 
-`cartographer/export_ast.sc` lowers Python `try`/`except` into a dispatch that compares
-the pending exception against `Stdlib.excNames` **as a string**, and holes
-(`control:TRY-exception-representation`) when it is not one of them. That is 29 holes on
-a fresh `cachetools` export — the largest single Python hole class after literal defaults.
+Five findings from the production-readiness pass (STRATEGY.md §57), consolidated because
+they are one story: Core represents an exception as the *name* of its class and an object
+as a bag of fields, and every item below is a place where Python's attribute or exception
+model is richer than that. Each "done" names the `#guard`, theorem or test that makes it
+so; `tests/test_documentation_claims.py` checks those names still exist.
 
-The guard looks redundant, and establishing whether it is was worth doing properly,
-because "obviously every exception is one of those names" is exactly the sort of claim
-this project keeps finding to be false. Every producer of an exception value in
-`Autoform/Lang/Core/Stdlib.lean` is now pinned by a theorem:
+#### 10.1 `except` dispatch holes on an exception it cannot name — and every producer is pinned
 
-* `makeException_excSafe` — holes on any name outside `excNames`, and otherwise yields
-  that name (or a `TypeError` from argument validation).
-* `raiseValue_excSafe` — raising a string is a `TypeError` as in CPython, an object
-  holes, and a builtin class reference is routed through `makeException`.
-* `python_shiftCount_trap` (`Numeric.lean`) — the one exit that was **not** safe. A
-  numeric trap becomes `.exn (.str r)`, and the Python shift-count trap carried the prose
-  `"negative shift count"`, so `except ValueError:` could not match it. Fixed; the
-  theorem is what keeps it fixed.
+`cartographer/export_ast.sc` lowers `try`/`except` into a dispatch that compares the
+pending exception against `Stdlib.excNames` **as a string**, and holes
+(`control:TRY-exception-representation`) when it is not one of them. On a fresh
+`cachetools` export that is the largest remaining Python hole class (34 at last count —
+up from 29, because whole-function holes stopped masking it).
 
-**What still blocks removing the guard** is `Stmt.raise`. `execStmt` raises its operand's
-evaluated value directly, without passing it through `raiseValue`, so nothing in the
-semantics prevents an arbitrary `Val` becoming an exception. Today the Python exporter
-only ever emits `Stmt.raise` with a `py:exception:<Name>` constructor or a re-raise of an
-already-caught value, so the programs it produces are safe — but that is a property of
-the *exporter*, not of Core, and the guard is what stands in for the missing proof.
-Removing it needs a well-formedness predicate on programs plus a preservation argument
-over the interpreter. Until then the dispatch holes, which is the conservative direction:
-it refuses to catch rather than catching the wrong thing.
+The guard looked redundant — "obviously every exception Core makes is one of those
+names" — and checking that claim found it false in one place (10.2). Every producer of an
+exception value in Core is now a theorem rather than an assumption:
 
-### 11. `nonlocal` is an exporter gap, not a semantics gap
+* `makeException_excSafe` (`Stdlib.lean`) — holes on any name outside `excNames`, and
+  otherwise yields that name, or a `TypeError` from argument validation;
+* `raiseValue_excSafe` (`Stdlib.lean`) — raising a string is a `TypeError` as in CPython,
+  an object holes, a builtin class reference routes through `makeException`;
+* `python_shiftCount_trap` (`Numeric.lean`) — the one exit that was not safe; see 10.2.
 
-`scope:nonlocal-write` holes every `nonlocal` write — 8 on a cachetools export, all of
-them the `hits += 1` counters in `_cached.py`. The exporter comment explains that
-`Expr.closure` captures by value, so a write cannot reach the frame owning the variable,
-and emitting an `assign` would compute the wrong answer silently.
+`test_every_exception_producer_in_core_is_pinned_by_a_theorem` asserts all three exist and
+that `ExcSafe` is stated over `excNames` itself, not a restatement that could drift from
+the list the exporter's dispatch actually compares to.
 
-That is right about `assign` and wrong about what Core can express. Capturing a `Val.ref`
-by value still shares the object behind it, which is precisely a closure cell: `boxNew`
-allocates, `field`/`setField` read and write. `Autoform/Lang/Core/Semantics.lean` carries
-the worked program as a `#guard_msgs` — two calls through a closure, owning frame observes
-both writes, `2`. It is checked on every build rather than asserted here, because "the
-semantics can already do this" is the kind of claim that rots.
+**The guard stays**, and the reason is exact: `Stmt.raise` raises its operand's evaluated
+value directly, without passing it through `raiseValue`, so nothing in the *semantics*
+stops an arbitrary `Val` becoming an exception. The Python exporter only ever emits
+`Stmt.raise` with a `py:exception:<Name>` constructor or a re-raise of an already-caught
+value, so the programs it produces are safe — but that is a property of the exporter, and
+the guard stands in for the missing proof. Removing it needs a well-formedness predicate
+on programs plus a preservation argument over the interpreter; the re-raise case makes
+that an environment invariant, not a syntactic check. Until then the dispatch holes,
+which is the conservative direction: it refuses to catch rather than catching the wrong
+thing.
 
-**Done.** The exporter now boxes the name in the scope that defines it and lets the
-closure share the cell, reusing the `boxedLocals` machinery that already existed for C
-address-taken locals. Two sets per function: the enclosing scope's names get the box and
-the allocation prologue, the closure's get the same `field`/`setField` treatment and
-explicitly NO prologue — allocating there would rebind the name to a fresh box and
+#### 10.2 A Python trap named itself in prose
+
+`numToE` turns a numeric trap into `.exn (.str r)`, and `r` is read downstream as the
+exception's class name. `NumConfig.python` traps on shift count and the trap carried
+`"negative shift count"`:
+
+| | `1 << -1` |
+|---|---|
+| CPython | `ValueError: negative shift count` |
+| Core, before | `.exn (.str "negative shift count")` |
+| Core, now | `.exn (.str "ValueError")` |
+
+So `except ValueError:` around a negative shift silently stopped catching. The dialect
+table at the top of `Numeric.lean` said `ValueError` the whole time; the implementation
+did not deliver it, and nothing compared the two. **Done**: `NumConfig.shiftCountFault :
+Option String`, `none` by default so no other dialect changes and C's negative shift stays
+UB. `python_shiftCount_trap` is the theorem; `test_python_negative_shift_raises_valueerror_by_name`
+guards the config.
+
+#### 10.3 `nonlocal` — an exporter gap, not a semantics gap, and now closed
+
+`scope:nonlocal-write` holed every `nonlocal` write; on cachetools all 8 were the
+`hits += 1` counters in `_cached.py`. The exporter comment said `Expr.closure` captures
+by value, so a write cannot reach the frame owning the variable, and an `assign` would be
+silently wrong. Right about `assign`, wrong about Core: capturing a `Val.ref` by value
+still shares the object behind it, which is precisely a closure cell. `Semantics.lean`
+carries the worked program as a `#guard_msgs` (`cellProg`: two calls through a closure,
+owning frame observes both writes, `2`), checked on every build.
+
+**Done.** The exporter boxes the name in the scope that defines it and lets the closure
+share the cell, reusing `boxedLocals`, the machinery that existed for C address-taken
+locals. Two sets per function: the enclosing scope's names get the box and the allocation
+prologue; the closure's (`capturedBoxes`) get the same `field`/`setField` treatment and
+explicitly **no** prologue — allocating there would rebind the name to a fresh box and
 destroy the alias.
 
-The safety condition is the whole content, and it is checked rather than assumed. The box
-must exist when the closure captures it, so the enclosing function must bind the name by a
-plain assignment at the top level of its body **before the first nested `def`**. A binding
-inside an `if`, or after the `def`, does not dominate the capture: the parent leaves the
-name a plain value, and telling the closure it is boxed would read a field off an integer.
-Those keep the hole. One level of nesting; deeper chains keep it too.
+The safety condition is the whole content, and it is checked rather than assumed: the box
+must exist when the closure captures it, so the enclosing function must bind the name by
+a plain assignment at the top level of its body **before the first nested `def`**. A
+binding inside an `if`, or after the `def`, does not dominate the capture; the parent
+leaves the name a plain value, and telling the closure it is boxed would read a field off
+an integer. Those keep the hole, as do chains deeper than one level. End to end:
+`counter()` with a `nonlocal hits` increment called twice returns `2`, as in CPython; the
+`if`-bound variant still holes. `TestNonlocalBoxing` pins both directions.
 
-On cachetools this closes all 8 sites — every one is the decorator idiom, `hits = misses =
-0` before `def wrapper`. Checked end to end: `counter()` with a `nonlocal hits` increment
-called twice returns `2`, as in CPython, and the `if`-bound variant still holes.
+Two bugs recorded because they were silent. The first draft translated the unsafe case,
+because the child's set came from its declaration alone instead of being intersected with
+what the parent actually boxed. And `globalDeclNames` strips the literal prefix
+`global`, so on `nonlocal x` it returned the name `"nonlocal x"`; the membership test
+failed and the hole stayed — harmless that time, one edit from wrong. It has its own
+parser, `nonlocalDeclNames`.
 
-One bug worth recording, because it was silent in the first pass: `globalDeclNames` strips
-the literal prefix `global`, so on `nonlocal x` it returns the name `"nonlocal x"`. The
-membership test then failed and the hole stayed — the harmless direction that time, but
-the same parser was one edit away from deciding a name WAS boxed when it was not.
-
-### 12. A `@property` read was a silent wrong answer, and is now a hole
+#### 10.4 A `@property` read was a silent wrong answer; it is a hole, and the general case is priced
 
 `c.currsize` calls a getter in Python. Core has no descriptor protocol, so the exporter
-lowered it to a plain field read — and `Cache.__init__` stores the name-mangled
+lowered it to a field read — and `Cache.__init__` stores the name-mangled
 `_Cache__currsize`, so a field called `currsize` does not exist. `evalExpr` answers a
 missing field on an ordinary object with `unit`, **silently**, with no hole:
 
@@ -387,96 +412,64 @@ missing field on an ordinary object with `unit`, **silently**, with no hole:
 | CPython | `1` |
 | Core | `unit` |
 
-Both confirmed by execution, not by reading. This is the failure class the whole project
-is organised against — well-typed, hole-free, and wrong — and it was inside the tracked
-corpus, where `make_info` reads `cache.currsize` and `cache.maxsize`, and the ledger
-counted the enclosing functions as translated.
+Both by execution. This is the failure class the whole project is organised against —
+well-typed, hole-free, and wrong — and it was inside the tracked corpus, where
+`make_info` reads `cache.currsize` and `cache.maxsize` and the ledger counted those
+functions as translated.
 
-The exporter now holes any attribute read whose name is a `@property` anywhere in the same
-file (`call:python-property-access`). Conservative by name rather than by receiver type,
-because Python attribute access is not statically resolvable in general and over-holing is
-the safe direction. On cachetools this *raises* the hole count, 108 to 126 across 18 read
-sites — which is the point: the coverage was never real, and a number that drops when a
-silent wrong answer is corrected was measuring the wrong thing.
+**Done, in the conservative direction**: the exporter holes any attribute read whose name
+is a `@property` anywhere in the same file (`call:python-property-access`). By name rather
+than by receiver type, because Python attribute access is not statically resolvable in
+general and over-holing is the safe side. On cachetools this *raised* the hole count, 108
+to 126 across 18 sites — the coverage was never real. `TestPropertyAccessHoles` asserts
+**both** lowering paths refuse it: patching `callExpr` alone changed nothing, because a
+plain `return c.prop` goes through `exprV`.
 
-Two consequences worth stating plainly:
+**The tracked corpus still has the defect.** `ast-Cachetools.json` predates the change, so
+its `make_info` still computes with `unit`. One more reason a tracked AST is evidence
+about the exporter that produced it (`docs/integrity.md`).
 
-* **The tracked corpus still has the defect.** `ast-Cachetools.json` was exported before
-  this change, so its `make_info` still reads `currsize` as a field and still computes with
-  `unit`. The fix lands in future exports only, which is one more entry on the list of
-  reasons the tracked ASTs are evidence about the exporter that produced them.
-* Closing the hole properly — making `c.prop` call the getter — is descriptor dispatch in
-  `evalExpr`'s field case, and it needs the receiver's class. That is a Core change on the
-  hottest path in the interpreter, and it is not what this entry did.
+*The general case is priced, not done.* Any missing attribute on an ordinary object is
+`unit` where Python raises `AttributeError`. Making it hole breaks **171 declarations
+across 36 files, 136 of them generated specs**, because `applyFunc_ret_field_self` in
+`SpecsGen/Basis.lean` states "an accessor returns the field it names" for every heap,
+including receivers that lack the field. Restricting the lemma is two lines; re-stating
+the generated specs built on it means changing `synth_specs.py` and regenerating. And
+the harder question is which answer is *right*: holing is conservative, `AttributeError`
+is faithful, and choosing depends on whether Core's object model is complete for a
+translated program — a claim about the project, not a refactor.
 
-### 13. The `@property` bug is an instance; the general case is priced
+#### 10.5 Property dispatch: implemented, proved fuel-monotone, blocked on provability
 
-Item 12 is one symptom of a rule in `evalExpr`: a missing field on an **ordinary** object
-evaluates to `unit`. Python does not do that.
-
-| | `c.missing` where `c` has no such attribute |
-|---|---|
-| CPython | `AttributeError: 'C' object has no attribute 'missing'` |
-| Core | `unit` |
-
-Module objects already hole here (`module-attr:<f>`), and the comment beside that case
-says ordinary objects keep `unit` "so no existing corpus changes" — which is exactly the
-reason to check what changing it costs rather than leave it at a comment.
-
-**Measured.** Making an ordinary missing field hole (`attr:<f>`) breaks **171 declarations
-across 36 files, 136 of them in generated `SpecsGen` specs** (every `V8Base` part plus
-`Cachetools`). The direct cause is `applyFunc_ret_field_self` and its documented twin in
-`SpecsGen/Basis.lean`: they state "an accessor returns the field it names" for *every*
-heap, including receivers that do not have the field, where the claim today is that the
-accessor returns `unit`. Restricting them to receivers that actually have the field — two
-lines, and a better theorem — is not the expensive part; re-stating the 136 generated
-specs that depend on the unrestricted form is, and that means changing `synth_specs.py`
-and regenerating them.
-
-So the general case is **not** closed here, and the cost is on record rather than guessed
-at. Two notes for whoever takes it:
-
-* Holing is the conservative option, not the faithful one. If Core's object model is
-  complete for a translated program then `AttributeError` is the *correct* answer and a
-  hole understates what is known; if it is not complete, a hole is right and
-  `AttributeError` would be a fresh wrong answer. Deciding that is the real work, and it
-  is a decision about what the project claims, not a refactor.
-* The instance that was actually observed — `@property` — is fixed at the exporter (§12),
-  which needed no Core change and no spec regeneration.
-
-### 14. Property dispatch: implemented, proved fuel-monotone, blocked on one lemma
-
-§12 holes a `@property` read rather than computing `unit`. Making it *work* — running the
-getter, which is what Python does — was implemented end to end and reverted. The semantics
-are not the hard part, and it is worth recording what is.
+Making `c.prop` *run* its getter — what Python does — was built end to end, twice, and
+reverted both times. The semantics were never the hard part.
 
 **What worked.** On a field miss, `evalExpr` resolves the getter and applies it to the
 receiver. `FuelMono`'s `.field` case, previously `exact hy` because the case was
-fuel-free, was extended to the explicit nested proof a recursive branch needs, and it
-goes through.
+fuel-free, extended to the explicit nested proof a recursive branch needs, and goes
+through.
 
-**Two designs, and the second is the one to keep.** A `Ctx.properties : List (String ×
-String)` field cost **289 broken declarations**, because every `Ctx` literal in
-`Contracts.lean` then disagreed with `ctxOf` about a field it did not mention. Registering
-the getter in the *existing* function table under a marker name no source language can
-spell — `<property>currsize` — needs no new field anywhere, so every `Ctx` term and every
-proof that reduces one stays byte-identical. That is the version that should be built.
+**Design one: a `Ctx.properties` field.** 289 broken declarations — every `Ctx` literal in
+`Contracts.lean` disagreed with `ctxOf` and `runFunc` about a field it did not mention.
+Not a semantics problem; a handful of construction sites that stopped agreeing.
 
-**What blocks it.** `applyFunc_ret_field_self` and its twin claim "an accessor returns the
-field it names" for every receiver, and a class with a property of that name now answers a
-call instead. Excluding it needs a side condition of the shape
-`ctx.resolveMethod o.cls (propertyGetter fld) = none`, and that cannot be discharged by
-`rfl`: `o.cls` is universally quantified, and `resolveMethod` falls back to `Ctx.resolve`,
-which suffix-matches over the whole table. Without a discharge the obligation lands on 284
-declarations across the generated specs.
+**Design two: a marker name in the existing table**, `<property>currsize`, which no source
+language can spell. No new field anywhere, every `Ctx` term byte-identical, and the same
+dialect gate that turned the switchover's 163 into 3 collapses all 120 `V8Base` accessor
+uses, leaving three in `Cachetools`. Those three **cannot discharge their side
+condition**. It is `ctx.resolve (propertyGetter fld) = none` — a proof that a name is
+*absent* from the table — and `Ctx.resolve` suffix-matches with `String` operations the
+kernel will not reduce cheaply. `rfl` fails at 209 entries; so does `simp` with
+`Ctx.resolve`, `Ctx.resolve.go` and the table unfolded. Finding a name is cheap because it
+short-circuits; proving one is not there is a full scan.
 
-The missing piece is small and identified: a characterisation lemma saying `Ctx.resolve`
-returns `none` when no table entry's name ends with the sought suffix.
-`FuelMono.resolve_go_mem` — "the suffix scanner only ever returns a function drawn from the
-list it scanned, or the accumulator it started with" — is exactly the building block, and
-it already exists. With that lemma the side condition becomes a statement about the
-concrete table, decidable by `rfl` for every corpus, and the 284 collapse the same way the
-switchover's 163 collapsed to 3.
+So the recommendation is design one after all. Absence is then `[] = []`, decidable with
+no `String` reduction, and the 289 are the cost of aligning `ctxOf`, `runFunc` and the
+`Ctx` literals in `Contracts.lean` on one more defaulted field — a job of the same shape as
+`builtinBases`, which already threads through exactly those sites. The lesson is the one
+this file keeps recording in other forms: a design that is cheaper to *write* can be far
+more expensive to *prove*, and which one matters is not visible until the proof is
+attempted.
 
 ## Verdict
 
