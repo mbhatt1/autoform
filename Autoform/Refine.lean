@@ -828,10 +828,15 @@ theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
     (ho : h₂.get r = some o)
     (hcap : o.captured = [])
-    (hm : ctx.resolveMethod o.cls m = some fn) :
+    (hm : ctx.resolveMethod o.cls m = some fn)
+    -- A `@classmethod` takes the class as its first positional instead of the instance
+    -- under `self`, so this equation is about ordinary methods only. Every method any
+    -- corpus proves through this lemma is one, and the hypothesis is `rfl` on a concrete
+    -- `Func` -- stated so the day it is not, the lemma stops applying rather than lying.
+    (hcm : fn.isClassMethod = false := by rfl) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
       = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
-  simp [evalExpr, hr, has, ho, hm, hcap]
+  simp [evalExpr, hr, has, ho, hm, hcap, hcm]
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
