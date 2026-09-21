@@ -223,10 +223,13 @@ plus two `substS` matches in `Contracts.lean` and one `FuelMono` case — mechan
 the only real content is the `execStmt` case itself. Evaluation order here is target then
 index; there is no RHS, so `setIndex`'s surprise does not arise.
 
-The exporter is deliberately NOT yet emitting it. `op:delete-index` stays a hole until
-containers are boxed, because translating it now would turn a static hole into a statement
-that holes at run time — the same behaviour, a smaller static hole count, and a
-hole-freedom number that improved without anything being translated.
+The exporter now emits it, for Python only. It was held back until the switchover on
+purpose: before containers boxed, translating `del xs[i]` would have turned a static hole
+into a statement that holed at run time — the same behaviour, a smaller static hole count,
+and a hole-freedom number that improved without anything being translated. With list and
+dict literals allocating, `delIndex` mutates the payload in place, so the statement runs.
+Under any other dialect the container is a value with no identity, and `op:delete-index`
+stays a hole.
 
 Semantics mirror `setIndex`: `.dict` → `dictDel`, missing key → `KeyError`; `.list` →
 `dropAt`, out of range → `IndexError`; `.tuple`/non-container → `TypeError`. Both helpers

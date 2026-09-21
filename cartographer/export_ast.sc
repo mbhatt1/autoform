@@ -7323,6 +7323,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           else hole("op:sizeOf:" + addrKind(ty))
       }
     }
+    // `"a" "b"` -- Python's implicit concatenation of ADJACENT string literals arrives as
+    // `<operator>.stringExpressionList` over the parts. When every part is a plain
+    // string literal the value is their concatenation and nothing else, so it is one
+    // `.str`. An f-string takes the same operator with non-literal parts, and folding
+    // those would need `str()` conversion semantics for each interpolated value; that
+    // keeps a hole, with a label that says which shape it was rather than the generic
+    // operator name.
+    else if (pyFile && mfn == "<operator>.stringExpressionList") {
+      val parts = kidsOf(c).map {
+        case l: Literal => pyStringLit(l.code.trim)
+        case _          => None
+      }
+      if (parts.nonEmpty && parts.forall(_.isDefined))
+        ujson.Obj("k" -> "str", "v" -> parts.map(_.get).mkString)
+      else hole("op:stringExpressionList:non-literal-part")
+    }
     else if (mfn.startsWith("<operator>"))
       hole("op:" + opLabel(mfn))
     // `import x` / `from p import x`: a binding, not a call. See `importValue`.
@@ -9014,8 +9030,17 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case c: Call if callName(c) == "<operator>.delete" =>
       kidsOf(c) match {
         case (i: Identifier) :: Nil => ujson.Obj("k" -> "del", "x" -> i.name)
-        // `del d[k]` / `del o.f` remove a binding from a container or object; Core's
-        // `del` only unbinds a variable, so translating them would be a lie.
+        // `del d[k]` / `del xs[i]` on a boxed container: `Stmt.delIndex` (boxed
+        // containers, docs/boxed-containers.md §2). Python only, because only Python
+        // boxes -- under any other dialect the container is a value with no identity to
+        // delete from, and the hole stays. Deliberately NOT emitted before the
+        // switchover: then it would have swapped a static hole for a statement that
+        // holed at run time, a smaller count for identical behaviour.
+        case (x: AstNode) :: Nil if pyFile && asIndex(x).isDefined =>
+          val (recv, idx) = asIndex(x).get
+          ujson.Obj("k" -> "delIndex", "a" -> expr(recv), "i" -> expr(idx))
+        // `del o.f` removes a binding from an object; Core's `del` only unbinds a
+        // variable, so translating it would be a lie.
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")
         case (x: AstNode) :: Nil if asField(x).isDefined => holeS("op:delete-field")
         case (x: Call) :: Nil if callName(x).startsWith("<operator>") =>
