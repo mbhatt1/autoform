@@ -719,8 +719,10 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         -- is fuel-free, so both sides scrutinise the same term: a hole closes by `exact hy`,
         -- and the success branch is the pre-existing proof with `base'` for the base.
         rcases hseed : seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with l | base'
-        · rw [hseed] at hy ⊢; exact hy
-        rw [hseed] at hy ⊢
+        · rw [hseed] at hy; exact hy
+        rw [hseed] at hy
+        -- the goal still holds `match Sum.inr base' with …`; reduce it to the arm before splitting
+        dsimp only at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
@@ -732,8 +734,10 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
         rcases hseed : seedClassAttrDefaults ctx h fn cap vs kws with l | base'
-        · rw [hseed] at hy ⊢; exact hy
-        rw [hseed] at hy ⊢
+        · rw [hseed] at hy; exact hy
+        rw [hseed] at hy
+        -- the goal still holds `match Sum.inr base' with …`; reduce it to the arm before splitting
+        dsimp only at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)

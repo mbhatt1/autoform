@@ -381,7 +381,11 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
         · rcases hgg : h.get ctx.globals with _ | g
           · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
                   props_any_false_of_all_ne (hprop hd)]
-          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcls hd o g hgr hgg,
+          · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
+            -- class-attribute miss in the same form or the rewrite cannot fire.
+            have hcm := hcls hd o g hgr hgg
+            simp only [classAttrKey] at hcm
+            simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]
@@ -441,7 +445,11 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
         · rcases hgg : h.get ctx.globals with _ | g
           · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, Option.bind,
                   props_any_false_of_all_ne (hprop hd)]
-          · simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcls hd o g hgr hgg,
+          · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
+            -- class-attribute miss in the same form or the rewrite cannot fire.
+            have hcm := hcls hd o g hgr hgg
+            simp only [classAttrKey] at hcm
+            simp [hgr, hf, hc, hm, hbox hd o hgr, Payload.toVal, hd, hgg, hcm,
                   Option.bind, props_any_false_of_all_ne (hprop hd)]
         · simp [hgr, hf, hc, hm, hd]
       · simp [hgr, hf, hc, hm]

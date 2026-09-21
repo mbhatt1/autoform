@@ -534,7 +534,9 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
   obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
   refine ⟨v, ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
-  simp +decide only [hne, applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams,
+  simp +decide only [hne, applyFunc, seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults, selfEnv,
+        bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams,
+        Option.map, Option.getD, List.length, Bool.and_false, Bool.true_and, Bool.or_false, Bool.false_or,
         Val.unbuiltin, execStmt, f_cachetools___init___py__module___TimedCache_expire,
         Env.set, List.filter, List.any, Option.isNone, bne_iff_ne, ne_eq,
         reduceCtorEq, not_false_eq_true, decide_true, Bool.and_self]
