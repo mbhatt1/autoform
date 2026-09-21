@@ -79,17 +79,6 @@ import scala.annotation.tailrec
   )
   val rightShiftOps = Set("<operator>.arithmeticShiftRight", "<operator>.logicalShiftRight")
 
-  /** The Core operator for a binary call. JavaScript equality is the one place the CPG
-    * operator name is not enough: `===` and `==` are both `<operator>.equals`, and they
-    * are different algorithms (ECMA-262 §7.2.14 IsStrictlyEqual vs §7.2.13
-    * IsLooselyEqual). The call's `code` still carries the source spelling. */
-  def binopFor(c: Call): String = {
-    val o = binops(callName(c))
-    if (jsLikeFile && (o == "==" || o == "!=")) {
-      val strict = c.code.contains("===") || c.code.contains("!==")
-      if (o == "==") (if (strict) "js:===" else "js:==") else (if (strict) "js:!==" else "js:!=")
-    } else o
-  }
   val assignRightShiftOps = Set("<operator>.assignmentArithmeticShiftRight",
                                 "<operator>.assignmentLogicalShiftRight")
 
@@ -247,7 +236,7 @@ def builtin_name(name, scopes):
                    for n in ast.walk(tree))
 
 def binding_ok(node):
-    """May `except E as N:` bind `N` to the value Core has -- the exception's CLASS NAME?
+    '''May `except E as N:` bind `N` to the value Core has -- the exception's CLASS NAME?
 
     Reference §8.4.1: the target is bound to the exception object and cleared at the end
     of the clause. Core's exception value is the class name (there is no payload), so the
@@ -257,7 +246,7 @@ def binding_ok(node):
     which the exporter turns into `exception:payload:*` holes. Any OTHER use would let a
     string stand in for an object -- `return N`, `x = N`, `N == y`, `f(N)` -- so the whole
     handler keeps its `control:TRY-handler-binding` hole.
-    """
+    '''
     name = node.name
     module = ast.Module(body=node.body, type_ignores=[])
     parents = {}
@@ -1176,26 +1165,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     pyClassBases.contains(name) && excAncestors(name, bb).contains("BaseException")
   def corpusExceptionClasses(bb: Map[String, List[String]]): List[String] =
     pyClassBases.keys.filter(isCorpusException(_, bb)).toList.sorted
-  /** Every represented name -- builtin or corpus -- that is one of `types` or derives from
-    * one: the `except` clause's accepted set, closed over both hierarchies. */
-  def acceptedFor(types: List[String], info: ujson.Value): List[String] = {
-    val bb = excBasesOf(info)
-    val builtin = representedOf(info).filter(n => types.contains(n) || bb.getOrElse(n, Nil).exists(types.contains))
-    val corpus  = corpusExceptionClasses(bb).filter(c => types.contains(c) || excAncestors(c, bb).exists(types.contains))
-    (builtin ++ corpus).distinct.sorted
-  }
-  /** Names bound by an enclosing `except E as name:` while its handler is translated. A
-    * read of `name.attr` or `str(name)` inside is a payload read Core cannot answer. */
   var exceptionBindings: Set[String] = Set.empty
   /** The pending-exception temporaries of the `except` handlers currently being
     * translated, innermost first: what a bare `raise` re-raises (reference §7.8, "The
     * raise statement": "If no expressions are present, `raise` re-raises the exception
     * that is currently being handled"). */
   var pendingExceptions: List[String] = Nil
-  def isExcBinding(n: AstNode): Boolean = n match {
-    case i: Identifier => exceptionBindings.contains(localName(i.name))
-    case _             => false
-  }
 
   // ---- lexical scope analysis ------------------------------------------------
   //
@@ -5888,7 +5863,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // the finite, once-each approximation of exactly that; a cycle falls back to name order,
   // which is also what Python does when a cyclic import reads a not-yet-bound name --
   // the read fails.
-  val importEdges = collection.mutable.LinkedHashMap.empty[String, collection.mutable.LinkedHashSet[String]]
+  lazy val importEdges = collection.mutable.LinkedHashMap.empty[String, collection.mutable.LinkedHashSet[String]]
   def currentModuleFull: String = currentFile + ":<module>"
   def recordImportEdge(target: String): Unit =
     if (target != currentModuleFull && pyModuleFullNames.contains(target))
@@ -5967,6 +5942,18 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * hole, honestly, until this is checked; `switchStmt` is applied everywhere else. */
   def goFile: Boolean = currentFile.toLowerCase.endsWith(".go")
   def javaFile: Boolean = currentFile.toLowerCase.endsWith(".java")
+
+  /** The Core operator for a binary call. JavaScript equality is the one place the CPG
+    * operator name is not enough: `===` and `==` are both `<operator>.equals`, and they
+    * are different algorithms (ECMA-262 §7.2.14 IsStrictlyEqual vs §7.2.13
+    * IsLooselyEqual). The call's `code` still carries the source spelling. */
+  def binopFor(c: Call): String = {
+    val o = binops(callName(c))
+    if (jsLikeFile && (o == "==" || o == "!=")) {
+      val strict = c.code.contains("===") || c.code.contains("!==")
+      if (o == "==") (if (strict) "js:===" else "js:==") else (if (strict) "js:!==" else "js:!=")
+    } else o
+  }
 
   /** Decode the escapes of a Python (non-raw) string segment, as the lexer does
     * (Lexical analysis § "String and Bytes literals", the escape-sequence table):
@@ -6133,6 +6120,24 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // corpus).
   def localName(n: String): String = if ((cppFile || jsLikeFile || javaFile) && n == "this") "self" else n
 
+  /** `except E as N:` binds N (Python §8.4.1) -- an identifier that is one of the handler bindings.
+    * Lives beside `localName`: a script `def` may not forward-reference a later `def` across a `val`. */
+  def isExcBinding(n: AstNode): Boolean = n match {
+    case i: Identifier => exceptionBindings.contains(localName(i.name))
+    case _             => false
+  }
+
+
+  /** Every represented name -- builtin or corpus -- that is one of `types` or derives from
+    * one: the `except` clause's accepted set, closed over both hierarchies. */
+  def acceptedFor(types: List[String], info: ujson.Value): List[String] = {
+    val bb = excBasesOf(info)
+    val builtin = representedOf(info).filter(n => types.contains(n) || bb.getOrElse(n, Nil).exists(types.contains))
+    val corpus  = corpusExceptionClasses(bb).filter(c => types.contains(c) || excAncestors(c, bb).exists(types.contains))
+    (builtin ++ corpus).distinct.sorted
+  }
+  /** Names bound by an enclosing `except E as name:` while its handler is translated. A
+    * read of `name.attr` or `str(name)` inside is a payload read Core cannot answer. */
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
     *
