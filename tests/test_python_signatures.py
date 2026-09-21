@@ -203,9 +203,9 @@ class TestStaticMethodBinding:
     decorator can change what calling the name MEANS, and Core injects an ordinary
     receiver under `self`. `staticmethod` is the one case where the decorator's entire
     content is "bind no receiver" — which `isMethod: False` already expresses exactly, so
-    there is no residue left to model. `@property` is the opposite and must keep holing:
-    it changes an attribute ACCESS into a call, which is descriptor behaviour Core has no
-    representation for.
+    there is no residue left to model. `@property` changes an attribute ACCESS into a
+    call; Core dispatches it through `Program.properties`, so it is reported under its own
+    key rather than as an unmodelled decorator.
     """
 
     def test_a_static_method_is_reported_as_a_plain_function(self):
@@ -219,14 +219,18 @@ class TestStaticMethodBinding:
         assert sig['staticMethod'] is True
         assert sig['required'] == ['a', 'b']
 
-    def test_a_property_still_holes(self):
+    def test_a_property_is_its_own_kind_not_a_residue(self):
+        """`@property` turns an attribute ACCESS into a call. Core dispatches that now
+        (`Program.properties`), so like `@staticmethod` it leaves no decorator residue to
+        refuse; it is reported under its own key instead."""
         source = ('class C:\n'
                   '    @property\n'
                   '    def f(self):\n'
                   '        return 1\n')
         sig = next(iter(_decode(source)['signatures'].values()))
         assert sig['isMethod'] is True
-        assert sig['decorated'] is True
+        assert sig['property'] is True
+        assert sig['decorated'] is False
         assert sig['staticMethod'] is False
 
     def test_staticmethod_alongside_another_decorator_still_holes(self):

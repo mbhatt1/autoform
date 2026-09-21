@@ -34,11 +34,12 @@ def test_receiver_source_signature_metadata():
         'absent': None, 'keyword': None, 'renamed': 'receiver', 'star_self': None,
         'static': 'self', 'class_named': 'cls', 'class_self': 'self', 'collect': 'self',
     }
-    # `static` is deliberately absent. `@staticmethod`'s entire meaning is "bind no
-    # receiver", which `isMethod: False` already says, so it leaves no decorator residue
-    # for Core to refuse -- unlike `@classmethod`, which substitutes the class for the
-    # receiver and is still unmodelled.
-    assert {name for name in SUBJECTS if records[name]['decorated']} == {
+    # Nothing here is `decorated`. `@staticmethod`'s entire meaning is "bind no
+    # receiver", which `isMethod: False` already says, and `@classmethod` substitutes
+    # the class for the receiver, which `applyFunc` now does (`receiverKind: class`); so
+    # neither leaves a decorator residue for Core to refuse.
+    assert {name for name in SUBJECTS if records[name]['decorated']} == set()
+    assert {name for name in SUBJECTS if records[name]['classMethod']} == {
         'class_named', 'class_self'}
     assert records['static']['staticMethod'] is True
     assert records['static']['isMethod'] is False
@@ -66,7 +67,13 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
          '--param', 'cpgPath=cpg.bin', '--param', 'out=ast.json'],
         tmp_path, numeric_env, timeout=600)
     functions = {row['name']: row for row in json.loads((tmp_path / 'ast.json').read_text())}
-    for name in SUBJECTS:
+    # The two `@classmethod`s translate: the class is bound as the first positional, so
+    # they are not receiver gaps any more and carry the signature that says so.
+    for name in ('class_named', 'class_self'):
+        function = functions[f'receivers.py:<module>.Receiver.{name}']
+        assert function['body'] != {'k': 'holeS', 'label': GAP}
+        assert function['pythonSignature']['receiverKind'] == 'class'
+    for name in (n for n in SUBJECTS if n not in ('class_named', 'class_self')):
         function = functions[f'receivers.py:<module>.Receiver.{name}']
         assert function['body'] == {'k': 'holeS', 'label': GAP}
         assert 'pythonSignature' not in function

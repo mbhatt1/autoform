@@ -89,9 +89,15 @@ def test_doctor_treats_a_missing_language_runtime_as_a_warning_that_names_the_la
     assert 'JavaScript' in ' '.join(node['disables'])
     assert not any(problem.startswith('node:') for problem in report['problems'])
     assert any(warning.startswith('node:') for warning in report['warnings'])
-    # A missing [machine] extra is likewise a warning with an install line.
-    assert report['tools']['pypcode']['required'] is False
-    assert 'autoform-lean[machine]' in report['tools']['pypcode']['hint']
+    # A missing [machine] extra is likewise a warning with an install line. The extra is
+    # a Python package, not a PATH entry, so an empty PATH does not remove it: on a machine
+    # that has it the entry is healthy and carries no hint at all.
+    pypcode = report['tools']['pypcode']
+    assert pypcode['required'] is False
+    if pypcode['status'] == 'ok':
+        assert 'hint' not in pypcode
+    else:
+        assert 'autoform-lean[machine]' in pypcode['hint']
 
 
 def test_doctor_human_summary_gives_an_install_line_per_problem(tmp_path):
