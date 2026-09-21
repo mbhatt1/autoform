@@ -621,6 +621,14 @@ inductive DefaultValue where
   | fnref : String → DefaultValue
   deriving Repr, Inhabited
 
+/-! A class-attribute default -- `def pop(self, key, default=__marker)` where
+`__marker = object()` is a class attribute -- is deliberately NOT a third constructor
+here. `DefaultValue.toVal` is total and heap-free, and `bindParams` folds it without a
+heap, which is what every accessor theorem's `hdef : fn.literalDefaults = []` and the
+reducible calling-convention proofs rest on. A class attribute has no heap-free value, so
+it lives in `PythonSignature.classAttrDefaults` and is resolved by `applyFunc`, which has
+the heap. Two fields with one job each, rather than one field whose `toVal` is partial. -/
+
 def DefaultValue.toVal : DefaultValue → Val
   | .lit l   => l.toVal
   | .fnref f => .fn f
@@ -648,6 +656,20 @@ structure PythonSignature where
   keeps its meaning: `bindParams` folds an empty list into the base environment and
   reduces to exactly the term it had before. -/
   defaults : List (String × DefaultValue) := []
+  /-- Parameters whose default is a **class attribute** of the enclosing class:
+  `(parameter, class short name, mangled attribute name)`, so `def pop(self, key,
+  default=__marker)` inside `class Cache` records `("default", "Cache", "_Cache__marker")`.
+
+  Not a `DefaultValue`, on purpose: its value is on the heap, and reading it is what
+  `applyFunc` does -- `bindParams` stays heap-free. The value is time-invariant in the way
+  a literal is (the class attribute is bound once, when the class body runs, and re-read
+  at call time gives the same object), which is what lets it be bound at call time; the
+  common case is a sentinel, `__marker = object()`, whose entire meaning is "an object no
+  caller can pass", and identity is exactly what a fresh heap cell has.
+
+  Empty by default, so every corpus rendered before this field existed applies no class
+  attribute anywhere and `applyFunc` reduces to the term it had. -/
+  classAttrDefaults : List (String × String × String) := []
   /-- Lexical method classification from Python source. `none` retains the
   historical naming heuristic for models without this information. -/
   isMethod : Option Bool := none

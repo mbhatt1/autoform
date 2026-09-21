@@ -892,20 +892,22 @@ theorem uproj_cachetools___init___py__module__Cache_maxsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.maxsize" 5
       (fun h self _ => ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
-        ∀ o, h.get r = some o → o.payload = .none)
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        ∀ o g, h.get r = some o → h.get (ctxOf P).globals = some g →
+          g.fields.find? (·.1 == classAttrKey o.cls "_Cache__maxsize") = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_Cache__maxsize")
                                    | _      => .ret .unit
                            | _  => .raise (.str "TypeError"))) := by
-  rintro h _ args ⟨r, rfl, hmod, hbox⟩
+  rintro h _ args ⟨r, rfl, hmod, hbox, hcls⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl]
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_maxsize "_Cache__maxsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (hcls := fun _ => hcls)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_maxsize]
@@ -1046,20 +1048,22 @@ theorem uproj_cachetools___init___py__module__Cache_currsize :
     MRefines P "cachetools/__init__.py:<module>.Cache.currsize" 5
       (fun h self _ => ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
-        ∀ o, h.get r = some o → o.payload = .none)
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        ∀ o g, h.get r = some o → h.get (ctxOf P).globals = some g →
+          g.fields.find? (·.1 == classAttrKey o.cls "_Cache__currsize") = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_Cache__currsize")
                                    | _      => .ret .unit
                            | _  => .raise (.str "TypeError"))) := by
-  rintro h _ args ⟨r, rfl, hmod, hbox⟩
+  rintro h _ args ⟨r, rfl, hmod, hbox, hcls⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module__Cache_currsize "_Cache__currsize" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (hcls := fun _ => hcls)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module__Cache_currsize]
@@ -1562,20 +1566,22 @@ theorem uproj_cachetools___init___py__module___TimedCache_timer :
     MRefines P "cachetools/__init__.py:<module>._TimedCache.timer" 5
       (fun h self _ => ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
-        ∀ o, h.get r = some o → o.payload = .none)
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        ∀ o g, h.get r = some o → h.get (ctxOf P).globals = some g →
+          g.fields.find? (·.1 == classAttrKey o.cls "_TimedCache__timer") = none)
       (fun h self args => (h, match args with
                            | [] => match self with
                                    | .ref r => .ret (fieldOf h r "_TimedCache__timer")
                                    | _      => .ret .unit
                            | _  => .raise (.str "TypeError"))) := by
-  rintro h _ args ⟨r, rfl, hmod, hbox⟩
+  rintro h _ args ⟨r, rfl, hmod, hbox, hcls⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ f_cachetools___init___py__module___TimedCache_timer rfl]
   cases args with
   | nil =>
     simpa [Nat.add_comm, Nat.add_left_comm] using
-      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox)
+      applyFunc_doc_ret_field_self (ctxOf P) k h f_cachetools___init___py__module___TimedCache_timer "_TimedCache__timer" _ rfl rfl rfl rfl r [] rfl hmod (fun _ => hbox) (hcls := fun _ => hcls)
   | cons a as =>
     simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected,
       Autoform.Refine.Outcome.toEResult, f_cachetools___init___py__module___TimedCache_timer]

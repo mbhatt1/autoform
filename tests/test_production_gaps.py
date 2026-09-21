@@ -341,3 +341,33 @@ class TestLiteralParameterDefaults:
         seed = semantics.index('fn.literalDefaults.foldl')
         positional = semantics.index('let ps    := fn.posParams', seed)
         assert seed < positional
+
+
+class TestClassAttributeDefaultRendering:
+    """`classAttrDefaults` is rendered as `(parameter, class, mangled attribute)`, and the
+    renderer refuses the shapes that would let the two default fields disagree."""
+
+    def render(self, signature, params):
+        return TestLiteralParameterDefaults().render(signature, params)
+
+    def test_a_class_attribute_default_renders(self):
+        text = self.render(
+            {'positionalOnly': [], 'keywordOnly': [], 'required': ['key'], 'isMethod': True,
+             'classAttrDefaults': [['default', 'Cache', '_Cache__marker']]},
+            ['key', 'default'])
+        assert 'classAttrDefaults := [("default", "Cache", "_Cache__marker")]' in text
+
+    def test_a_parameter_cannot_have_two_defaults(self):
+        with pytest.raises(ValueError, match='class-attribute defaults'):
+            self.render(
+                {'positionalOnly': [], 'keywordOnly': [], 'required': [],
+                 'defaults': [['d', {'k': 'unit'}]],
+                 'classAttrDefaults': [['d', 'C', '_C__m']]},
+                ['d'])
+
+    def test_a_required_parameter_cannot_have_a_class_attribute_default(self):
+        with pytest.raises(ValueError, match='class-attribute defaults'):
+            self.render(
+                {'positionalOnly': [], 'keywordOnly': [], 'required': ['d'],
+                 'classAttrDefaults': [['d', 'C', '_C__m']]},
+                ['d'])

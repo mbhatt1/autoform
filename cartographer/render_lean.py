@@ -596,7 +596,7 @@ def render_func(f, nm) -> list:
         signature = f['pythonSignature']
         keys = ('positionalOnly', 'keywordOnly', 'required')
         if (not isinstance(signature, dict) or not set(keys) <= set(signature)
-                or set(signature) - set(keys) - {'isMethod', 'defaults'}):
+                or set(signature) - set(keys) - {'isMethod', 'defaults', 'classAttrDefaults'}):
             raise ValueError('invalid Python signature fields')
         if 'isMethod' in signature and type(signature['isMethod']) is not bool:
             raise ValueError('invalid Python method classification')
@@ -628,6 +628,24 @@ def render_func(f, nm) -> list:
                 raise ValueError('invalid Python defaults')
             rendered = ', '.join(f'({lean_str(nm)}, {lean_default(v)})' for nm, v in defaults)
             fields += ', defaults := [' + rendered + ']'
+        class_attrs = signature.get('classAttrDefaults') or []
+        if class_attrs:
+            # `(parameter, class, mangled attribute)`. A parameter has ONE default, so it
+            # may not also appear in `defaults`; and a defaulted parameter is not
+            # `required`, for the same reason as above.
+            lit_names = {d[0] for d in (signature.get('defaults') or [])}
+            names = [d[0] for d in class_attrs]
+            if (not isinstance(class_attrs, list)
+                    or not all(isinstance(d, list) and len(d) == 3
+                               and all(isinstance(x, str) for x in d) for d in class_attrs)
+                    or len(set(names)) != len(names)
+                    or not set(names) <= ordinary
+                    or set(names) & set(signature['required'])
+                    or set(names) & lit_names):
+                raise ValueError('invalid Python class-attribute defaults')
+            rendered = ', '.join(f'({lean_str(p)}, {lean_str(c)}, {lean_str(a)})'
+                                 for p, c, a in class_attrs)
+            fields += ', classAttrDefaults := [' + rendered + ']'
         variadic.append('  , pythonSignature := some { ' + fields + ' }')
     return [
         f"/-- `{f['name']}`  (from `{f.get('file','?')}`) -/",

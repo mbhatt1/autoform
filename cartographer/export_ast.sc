@@ -192,6 +192,10 @@ KeyboardInterrupt LookupError MemoryError NameError NotImplementedError Overflow
 RecursionError ReferenceError RuntimeError StopIteration StopAsyncIteration SyntaxError
 SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'''.split()
 tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
+# `(class, mangled attribute)` for every class-level `NAME = object()`: a sentinel whose
+# whole meaning is a fresh identity. The exporter allocates each as a fresh heap cell in
+# the module-objects initialiser under `<classattr>Class.attr`.
+class_attr_sentinels = []
 
 def builtin_name(name, scopes):
     # A local assignment anywhere in a function hides the builtin. Global and
@@ -320,7 +324,7 @@ def _direct_nonlocals(st):
 # (`math.inf`, `time.monotonic`) must still hole: emitting the literal half would give a
 # function that binds some defaults and silently ignores others, which is a wrong answer
 # rather than a missing one.
-def literal_defaults(node):
+def literal_defaults(node, scopes):
     positional = list(zip([a.arg for a in [*node.args.posonlyargs, *node.args.args]]
                           [len(node.args.posonlyargs) + len(node.args.args)
                            - len(node.args.defaults):], node.args.defaults))
@@ -329,17 +333,20 @@ def literal_defaults(node):
     defaults = positional + keyword
     if not defaults:
         return {'defaults': False, 'defaultValues': []}
-    values = [(name, _default_value(d)) for name, d in defaults]
+    values = [(name, _default_value(d, scopes)) for name, d in defaults]
     if any(lit is None for _, lit in values):
         return {'defaults': True, 'defaultValues': []}
     return {'defaults': False, 'defaultValues': [[name, lit] for name, lit in values]}
 
 
 # The on-disk literal for an `ast.Constant`, or None if it is not one we model.
-def _default_value(node):
+def _default_value(node, scopes=()):
     lit = constant_literal(node)
     if lit is not None:
         return lit
+    attr = class_attribute_default(node, scopes)
+    if attr is not None:
+        return attr
     dotted = dotted_name(node)
     if dotted is None:
         return None
@@ -362,6 +369,42 @@ def constant_literal(node):
     if isinstance(v, float):
         return {'k': 'float', 'v': str(struct.unpack('<Q', struct.pack('<d', v))[0])}
     return None
+
+
+# `def pop(self, key, default=__marker)` inside `class Cache`, where `__marker = object()`
+# is bound in the class body. The default's value is that class attribute -- bound once
+# when the class body runs and the same object at every later lookup, so it is
+# time-invariant the way a literal is; but it lives on the heap, so Core resolves it in
+# `applyFunc`, not `bindParams`. Recorded as (class, mangled attribute) so the reader and
+# the writer of the globals-frame key agree. Only a bare name that symtable says is
+# ASSIGNED in the enclosing class scope qualifies; a name read from further out is not a
+# class attribute and falls through to the ordinary (hole) path.
+def class_attribute_default(node, scopes):
+    if not (isinstance(node, ast.Name) and scopes and scopes[-1].get_type() == 'class'):
+        return None
+    cls = scopes[-1]
+    # `symtable` has ALREADY applied the private-name rule inside a class scope: the
+    # symbol for `__marker` in `class Cache` is `_Cache__marker`, and looking up the
+    # source spelling raises `KeyError`. Look up the mangled name -- which is also the
+    # attribute name the module initialiser writes, so the two cannot disagree.
+    mangled = mangle(node.id, cls.get_name())
+    try:
+        sym = cls.lookup(mangled)
+    except KeyError:
+        return None
+    if not (sym.is_assigned() and sym.is_local()):
+        return None
+    return {'k': 'classAttr', 'cls': cls.get_name(), 'attr': mangled}
+
+
+# CPython's private-name rule, exactly: two or more leading underscores and at most one
+# trailing one, mangled to `_<Class><name>` with the class's own leading underscores
+# stripped. Mirrors the exporter's Scala `mangleName`.
+def mangle(name, cls):
+    if name.startswith('__') and not name.endswith('__'):
+        bare = cls.lstrip('_')
+        return name if not bare else '_' + bare + name
+    return name
 
 
 # A dotted name used as a default -- `keys.hashkey`, `Cache.__getitem__`. The VALUE is a
@@ -388,6 +431,16 @@ def inner_scope(node, name, scopes):
     return scopes + children
 
 def visit(node, scopes):
+    if isinstance(node, ast.ClassDef):
+        for st in node.body:
+            if (isinstance(st, ast.Assign) and len(st.targets) == 1
+                    and isinstance(st.targets[0], ast.Name)
+                    and isinstance(st.value, ast.Call)
+                    and isinstance(st.value.func, ast.Name) and st.value.func.id == 'object'
+                    and not st.value.args and not st.value.keywords
+                    and builtin_name('object', scopes)):
+                class_attr_sentinels.append(
+                    {'cls': node.name, 'attr': mangle(st.targets[0].id, node.name)})
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
         # `@staticmethod` is not an arbitrary decorator: its entire meaning is "bind no
         # receiver", which is exactly what `isMethod: False` already says to Core. So a
@@ -428,7 +481,7 @@ def visit(node, scopes):
             'required': [a.arg for a in [*node.args.posonlyargs, *node.args.args]
                 [:len(node.args.posonlyargs) + len(node.args.args) - len(node.args.defaults)]] +
                 [a.arg for a, v in zip(node.args.kwonlyargs, node.args.kw_defaults) if v is None],
-            **literal_defaults(node),
+            **literal_defaults(node, scopes),
             **nonlocal_boxes(node)}
         # Defaults and decorators belong to the defining scope. The function's
         # parameters and local assignments only shadow names inside its body.
@@ -508,7 +561,8 @@ visit(tree, [symbols])
 print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   'signatures': signatures,
                   'exceptions': sorted(represented),
-                  'properties': sorted(properties)}, sort_keys=True))
+                  'properties': sorted(properties),
+                  'classAttrSentinels': class_attr_sentinels}, sort_keys=True))
 """
   val pythonHandlerCache = collection.mutable.Map.empty[String, Option[ujson.Value]]
   def pythonHandlers(file: String): Option[ujson.Value] =
@@ -1216,11 +1270,29 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         moduleMembers(m).map { case (f, v) =>
           ujson.Obj("k" -> "setField", "r" -> moduleRef(m), "f" -> f, "v" -> v)
         })
+      // Class-level sentinels -- `__marker = object()` in a class body. A class body is
+      // not run as a function in Core, so the binding is written here, under the key
+      // `Semantics.classAttrKey` reads, as a FRESH heap cell: `boxNew` allocates
+      // unconditionally with no constructor dispatch, which is exactly what a sentinel is
+      // (an identity no caller can produce). `Expr.alloc "object"` would be wrong here:
+      // `resolveMethod` falls back to a suffix match on `__init__` and could run some
+      // class's constructor on it. Only the `= object()` shape is written; any other
+      // class-level initialiser stays unrepresented and a default naming it holes at the
+      // call (`default:<p>:class-attr-unresolved`) rather than being guessed at.
+      val sentinels: List[ujson.Value] = pyModuleFullNames.flatMap { m =>
+        pythonHandlers(m.stripSuffix(":<module>")).toList.flatMap { info =>
+          info.obj.get("classAttrSentinels").toList.flatMap(_.arr.toList).map { e =>
+            ujson.Obj("k" -> "setGlobal",
+                      "x" -> ("<classattr>" + e("cls").str + "." + e("attr").str),
+                      "e" -> ujson.Obj("k" -> "boxNew", "e" -> ujson.Obj("k" -> "unit")))
+          }
+        }
+      }
       // Same iterative right-to-left construction as `seqOf`, and the same reason: an
       // O(1)-JVM-stack loop in place of `foldRight`, for this feature's second unbounded
       // producer of the same "seq" shape (research.md item 2).
       val body: ujson.Value = {
-        val xs = (allocs ++ sets).toArray
+        val xs = (allocs ++ sets ++ sentinels).toArray
         if (xs.length > maxSeqChainLen) maxSeqChainLen = xs.length
         var acc: ujson.Value = ujson.Obj("k" -> "skip")
         var i = xs.length - 1
@@ -10732,12 +10804,23 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               })
             case None => ujson.Arr()
           }
+          // A class-attribute default (`default=__marker`) is not a value `bindParams`
+          // can seed: it is on the heap, and `applyFunc` reads it from the globals frame
+          // under `<classattr>Class.attr`. It travels in its own field, as
+          // `(parameter, class, mangled attribute)`, and is excluded from `defaults`.
+          val isClassAttr = (d: ujson.Value) => d.arr(1).obj.get("k").exists(_.str == "classAttr")
+          val classAttrDefaults: ujson.Value = ujson.Arr.from(
+            literalDefaults.arr.filter(isClassAttr).map { d =>
+              ujson.Arr(d.arr(0), d.arr(1)("cls"), d.arr(1)("attr"))
+            }.toList)
+          val valueDefaults: ujson.Value = ujson.Arr.from(literalDefaults.arr.filterNot(isClassAttr).toList)
           if (defaultsUnresolved) refuseBinding("call:python-defaults")
           else obj("pythonSignature") = ujson.Obj.from(
             List("positionalOnly", "keywordOnly", "required").map { key =>
               key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
             } ++ List("isMethod" -> signature("isMethod")) ++
-              (if (literalDefaults.arr.nonEmpty) List("defaults" -> literalDefaults) else Nil))
+              (if (valueDefaults.arr.nonEmpty) List("defaults" -> valueDefaults) else Nil) ++
+              (if (classAttrDefaults.arr.nonEmpty) List("classAttrDefaults" -> classAttrDefaults) else Nil))
         }
       }
     }

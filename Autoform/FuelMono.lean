@@ -654,6 +654,12 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
+        -- Class-attribute defaults are seeded from the heap before `bindParams`. The seed
+        -- is fuel-free, so both sides scrutinise the same term: a hole closes by `exact hy`,
+        -- and the success branch is the pre-existing proof with `base'` for the base.
+        rcases hseed : seedClassAttrDefaults ctx h fn (selfEnv self?) vs kws with l | base'
+        · rw [hseed] at hy ⊢; exact hy
+        rw [hseed] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)
@@ -664,6 +670,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
         · rw [if_pos hk] at hy ⊢; exact hy
         rw [if_neg hk] at hy ⊢
+        rcases hseed : seedClassAttrDefaults ctx h fn cap vs kws with l | base'
+        · rw [hseed] at hy ⊢; exact hy
+        rw [hseed] at hy ⊢
         split at hy <;> first
           | (cases hy; exact absurd rfl hne)
           | (rw [ihS _ hctx _ _ _ hfree _ _ (by assumption)

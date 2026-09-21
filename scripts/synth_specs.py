@@ -1107,34 +1107,38 @@ PROOF_PROJ = """theorem %(id)s :
     MRefines P %(name)s 4
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
-        ∀ o, h.get r = some o → o.payload = .none)
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        ∀ o g, h.get r = some o → h.get (ctxOf P).globals = some g →
+          g.fields.find? (·.1 == classAttrKey o.cls %(field)s) = none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod, hbox⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hcls⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod (fun _ => hbox) (hsig := by rfl)
+      hmod (fun _ => hbox) (hsig := by rfl) (hcls := fun _ => hcls)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
     MRefines P %(name)s 5
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
-        ∀ o, h.get r = some o → o.payload = .none)
+        (∀ o, h.get r = some o → o.payload = .none) ∧
+        ∀ o g, h.get r = some o → h.get (ctxOf P).globals = some g →
+          g.fields.find? (·.1 == classAttrKey o.cls %(field)s) = none)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod, hbox⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hcls⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod (fun _ => hbox) (hsig := by rfl)
+      [] rfl hmod (fun _ => hbox) (hsig := by rfl) (hcls := fun _ => hcls)
 """
 
 def select_proof_fuel(cands, module):
