@@ -1595,7 +1595,8 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            -- a pre-capture. A name the body never bound is, in CPython,
                            -- an `AttributeError`; answering `unit` for it is the silent
                            -- wrong answer, naming the miss is the honest one. Ordinary
-                           -- objects keep the documented `unit` behaviour.
+                           -- objects fall through to the arms below: `AttributeError`
+                           -- under `.python` (Language Reference §3.2.11), `unit` elsewhere.
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
@@ -1635,13 +1636,28 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                              -- because only Python has class bodies and because that is
                              -- what keeps every `.cLike` accessor theorem out of the side
                              -- condition this adds. Not recursive, so fuel-monotonicity of
-                             -- `.field` is unchanged. A miss stays the documented `unit`
-                             -- (docs/languages.md §13 prices changing that separately).
+                             -- `.field` is unchanged.
+                             --
+                             -- A miss after all of that RAISES. Python Language Reference
+                             -- §3.2.11 "Class instances": the instance dictionary, then the
+                             -- class attributes, then `__getattr__` if the class has one;
+                             -- §3.3.2 `object.__getattribute__` "should either return the
+                             -- (computed) attribute value or raise an `AttributeError`
+                             -- exception"; Library Reference "Built-in Exceptions":
+                             -- `AttributeError` is "raised when an attribute reference or
+                             -- assignment fails". Core has no `__getattr__`, so the miss is
+                             -- the exception. The differential oracle priced the old
+                             -- `unit` answer on click 8.2.1 (`ShellComplete.source_vars`,
+                             -- docs/languages.md §10.9 and §16.A).
                              else if ctx.dialect == .python then
                                match (h₁.get ctx.globals).bind
                                        (fun g => g.fields.find? (·.1 == classAttrKey o.cls f)) with
                                | some (_, v) => (h₁, .val v)
-                               | none        => (h₁, .val .unit)
+                               | none        => (h₁, .exn (.str "AttributeError"))
+                             -- Every other dialect keeps `unit`: in JavaScript a missing
+                             -- property IS `undefined` (ECMA-262 §10.1.8.1
+                             -- OrdinaryGet step 3: "If desc is undefined, return
+                             -- undefined"), and Core spells `undefined` as `.unit`.
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -2730,9 +2746,10 @@ example : runFunc boxProg 200 "ns.narrow" [] = .val (.int 88) := by rfl
 example : runFunc boxProg 200 "ns.pick" [] = .val (.int 8) := by rfl
 
 /-! **The known hazard, stated rather than hidden.** `Expr.field` on an object that has
-no such field returns `unit`, not a hole — see the `.field` case above. So a C++ class
-whose constructor the exporter could not find translates to an object every one of whose
-fields reads `unit`, and nothing downstream will say so.
+no such field returns `unit` under `.cLike`, not a hole — see the `.field` case above
+(under `.python` the same miss raises `AttributeError`, docs/languages.md §16.A). So a C++
+class whose constructor the exporter could not find translates to an object every one of
+whose fields reads `unit`, and nothing downstream will say so.
 
 That is why `emit` renames C++ constructors to `__init__` instead of leaving `Expr.alloc`
 to allocate an empty object, and why `alloc:builtin-base:*` refuses construction it cannot
@@ -3068,8 +3085,9 @@ holds the function value. -/
 #guard_msgs in #eval runMain modProg 200 [modInit] "main.ref" []
 
 /-! The honesty check, and the reason a module object carries a marker class at all. An
-ordinary object answers `unit` for a field it does not have (`ns.unset`, above); a module
-object names the miss. Module-level *data* is absent from a module object on purpose —
+ordinary `.cLike` object answers `unit` for a field it does not have (`ns.unset`, above)
+and a Python one raises `AttributeError` (`attrMissProg`, below); a module object names
+the miss as a hole in every dialect. Module-level *data* is absent from a module object on purpose —
 Core has one globals frame for the whole program, so a module-level constant is not
 module-scoped and its value would have to be captured before the module body computed it
 — and this is what stops that decision from becoming a silent `unit`. -/
@@ -3844,5 +3862,53 @@ private def goProg : Program :=
 #guard match runFunc goProg 300 "destructure" [] with | .val (.int 34) => true | _ => false
 #guard match runFunc goProg 300 "cond" [] with | .val (.int 3) => true | _ => false
 #guard match runFunc goProg 300 "forever" [] with | .val (.int 6) => true | _ => false
+
+/-! ## A missing attribute raises `AttributeError`
+
+Python Language Reference §3.2.11 and §3.3.2, Library Reference "Built-in Exceptions".
+Every expectation below is CPython's; the JavaScript one is Node's (`undefined`). -/
+private def attrMissProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.C.__init__", params := []
+      , body := .setField (.name "self") "present" (.lit (.int 1)) }
+    , { name := "m.py:<module>.C.p", params := []
+      , body := .ret (.lit (.int 7)) }
+    -- `C().x`  -- CPython: AttributeError
+    , { name := "m.py:<module>.missing", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "x")) }
+    -- `try: C().x  except AttributeError as e: return e`  -- the handler binds the class name
+    , { name := "m.py:<module>.caught", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.tryCatch (.ret (.field (.name "c") "x")) "e" (.ret (.name "e"))) }
+    -- `C().present`  -- an instance attribute still reads
+    , { name := "m.py:<module>.present", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "present")) }
+    -- `C().p` with `p` a `@property`  -- the getter still runs
+    , { name := "m.py:<module>.viaProperty", params := []
+      , body := .seq (.assign "c" (.alloc "C" []))
+                     (.ret (.field (.name "c") "p")) } ]
+  , properties := [("C", "p")] }
+
+#guard match runFunc attrMissProg 200 "m.py:<module>.missing" [] with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.caught" [] with
+       | .val (.str "AttributeError") => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.present" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc attrMissProg 200 "m.py:<module>.viaProperty" [] with
+       | .val (.int 7) => true | _ => false
+
+-- JavaScript: `({}).x` is `undefined`, not an exception (ECMA-262 OrdinaryGet).
+private def jsMissProg : Program :=
+  { dialect := .javascript
+  , funcs :=
+    [ { name := "K.constructor", params := [], body := .skip }
+    , { name := "missing", params := []
+      , body := .seq (.assign "o" (.alloc "K" []))
+                     (.ret (.field (.name "o") "x")) } ] }
+#guard match runFunc jsMissProg 200 "missing" [] with | .val .unit => true | _ => false
 
 end Autoform.Core

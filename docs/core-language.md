@@ -70,12 +70,16 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 
 * **Objects are the only mutable things.** Everything else is a value. Field writes go
   through `Heap.setField`, which conses a new binding onto the object's field list.
-* **Reads of absent things are `unit`**, not an error: `Env.get` on an unbound name,
-  `Heap.getField` on an absent field, `Heap.get` on a dangling ref. This is Python-shaped
-  and is one of the places where a wrong answer is possible; the differential oracle
-  catches it (private name mangling was this bug).
-* **Field lookup order** is the object's own fields, then the bindings its class captured,
-  then `unit`.
+* **Reads of absent things are `unit`** at the heap level: `Env.get` on an unbound name,
+  `Heap.getField` on an absent field, `Heap.get` on a dangling ref. `Expr.field` layers
+  the language rule on top: under `.python` an attribute that is found nowhere raises
+  `AttributeError` (Language Reference §3.2.11/§3.3.2, `docs/languages.md` §16.A); under
+  `.javascript` it is `undefined` = `unit` (ECMA-262 OrdinaryGet). The differential oracle
+  is what settled the Python answer (private name mangling was the first bug it found
+  here, a missing attribute answering `unit` the latest).
+* **Field lookup order** (`Expr.field`) is the object's own fields, then the bindings its
+  class captured, then a `@property` getter, then a class attribute; after that,
+  `AttributeError` under `.python` and `unit` elsewhere.
 * **Globals live on the heap, not in `Env`.** Module-level bindings must be mutable and
   must outlive any single call, so they occupy a distinguished object (`cls = "<globals>"`)
   at `Ctx.globals`. `runMain` allocates it first, so it is ref 0, and any harness building

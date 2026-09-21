@@ -347,23 +347,22 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
     (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
-    -- A `@property` of this name turns the attribute read into a CALL, so the accessor
-    -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
-    -- so a concrete program can `decide` it, and the default discharges it outright for
-    -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
-    (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
-      intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
     -- `bindParams`, and the accessor claim is about a call that reaches its body.
     (hcad : fn.classAttrDefaults = [] := by rfl)
-    -- A class attribute of the accessor's own field name would be read through the
-    -- instance when the instance field is missing, and the claim below says `unit` there.
-    -- Python-only, like `hbox`, so the default discharges it for every `.cLike` corpus;
-    -- a Python spec carries it as a domain conjunct (`synth_specs.py` emits it).
-    (hcls : ctx.dialect = .python → ∀ o g, h.get r = some o → h.get ctx.globals = some g →
-        g.fields.find? (·.1 == classAttrKey o.cls fld) = none := by
+    -- Under Python the receiver HAS the field (or captures it): a miss now raises
+    -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
+    -- `.field`), so "an accessor returns the field it names" is a claim about receivers
+    -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
+    -- answers there. A hit is found before the `@property` and class-attribute arms, which
+    -- is why this ONE premise replaced the `hprop`/`hcls` pair. Python-only, like `hbox`,
+    -- so the default discharges it for every `.cLike` corpus; a Python spec carries it as
+    -- a domain conjunct (`synth_specs.py` emits it).
+    (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
+        (o.fields.find? (·.1 == fld)).isSome = true ∨
+        (o.captured.find? (·.1 == fld)).isSome = true := by
       intro hc; exact absurd hc (by decide)) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
@@ -378,16 +377,10 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · have hbx : ctx.dialect.boxesContainers = true := by rw [hd]; rfl
-          rcases hgg : h.get ctx.globals with _ | g
-          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, Option.bind,
-                  props_any_false_of_all_ne (hprop hd)]
-          · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
-            -- class-attribute miss in the same form or the rewrite cannot fire.
-            have hcm := hcls hd o g hgr hgg
-            simp only [classAttrKey] at hcm
-            simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
-                  Option.bind, props_any_false_of_all_ne (hprop hd)]
+        · -- Both lookups missed: `hfld` says that cannot happen under Python.
+          exfalso
+          have hhit := hfld hd o hgr
+          simp [hf, hc] at hhit
         · by_cases hbx : ctx.dialect.boxesContainers = true
           · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
           · -- JavaScript boxes containers, so a dialect that does not box is not it and
@@ -417,23 +410,22 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- for every `.cLike` corpus -- which is every `V8Base` spec that uses this lemma.
     (hbox : ctx.dialect.boxesContainers = true → ∀ o, h.get r = some o → o.payload = .none := by
       intro hc; exact absurd hc (by decide))
-    -- A `@property` of this name turns the attribute read into a CALL, so the accessor
-    -- claim is not about it. Stated over `fld` alone -- not over the receiver's class --
-    -- so a concrete program can `decide` it, and the default discharges it outright for
-    -- every `.cLike` corpus, which is every `V8Base` spec that uses this lemma.
-    (hprop : ctx.dialect = .python → ctx.properties.all (fun p => p.2 != fld) = true := by
-      intro hc; exact absurd hc (by decide))
     (hsig : signatureRejected fn args [] = false := by rfl)
     (hdef : fn.literalDefaults = [] := by rfl)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
     -- `bindParams`, and the accessor claim is about a call that reaches its body.
     (hcad : fn.classAttrDefaults = [] := by rfl)
-    -- A class attribute of the accessor's own field name would be read through the
-    -- instance when the instance field is missing, and the claim below says `unit` there.
-    -- Python-only, like `hbox`, so the default discharges it for every `.cLike` corpus;
-    -- a Python spec carries it as a domain conjunct (`synth_specs.py` emits it).
-    (hcls : ctx.dialect = .python → ∀ o g, h.get r = some o → h.get ctx.globals = some g →
-        g.fields.find? (·.1 == classAttrKey o.cls fld) = none := by
+    -- Under Python the receiver HAS the field (or captures it): a miss now raises
+    -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
+    -- `.field`), so "an accessor returns the field it names" is a claim about receivers
+    -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
+    -- answers there. A hit is found before the `@property` and class-attribute arms, which
+    -- is why this ONE premise replaced the `hprop`/`hcls` pair. Python-only, like `hbox`,
+    -- so the default discharges it for every `.cLike` corpus; a Python spec carries it as
+    -- a domain conjunct (`synth_specs.py` emits it).
+    (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
+        (o.fields.find? (·.1 == fld)).isSome = true ∨
+        (o.captured.find? (·.1 == fld)).isSome = true := by
       intro hc; exact absurd hc (by decide)) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
@@ -448,16 +440,10 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
-        · have hbx : ctx.dialect.boxesContainers = true := by rw [hd]; rfl
-          rcases hgg : h.get ctx.globals with _ | g
-          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, Option.bind,
-                  props_any_false_of_all_ne (hprop hd)]
-          · -- `classAttrKey` is `@[simp]`, so the goal carries the unfolded key; state the
-            -- class-attribute miss in the same form or the rewrite cannot fire.
-            have hcm := hcls hd o g hgr hgg
-            simp only [classAttrKey] at hcm
-            simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd, hgg, hcm,
-                  Option.bind, props_any_false_of_all_ne (hprop hd)]
+        · -- Both lookups missed: `hfld` says that cannot happen under Python.
+          exfalso
+          have hhit := hfld hd o hgr
+          simp [hf, hc] at hhit
         · by_cases hbx : ctx.dialect.boxesContainers = true
           · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
           · -- JavaScript boxes containers, so a dialect that does not box is not it and
