@@ -450,6 +450,11 @@ inductive Expr where
   | field  : Expr → String → Expr
   /-- Method call on a receiver: `e.m(args)`. Dispatch is on the receiver's class. -/
   | mcall  : Expr → String → List Expr → Expr
+  /-- Call of a COMPUTED callee: `f(x)(y)`, `d["k"](3)`, `make()(v)`. `call` is by name;
+  this applies whatever VALUE the callee expression evaluates to -- a function, a closure,
+  a boxed function object -- and holes (`call:value:not-callable`) on anything else.
+  Arguments use the same three argument forms as `call`. -/
+  | callValue : Expr → List Expr → Expr
   /-- Object construction: `Cls(args)`, running `Cls.__init__` if one is known. -/
   | alloc  : String → List Expr → Expr
   /-- A function, method or class used as a value (`METHOD_REF` / `TYPE_REF`). -/
@@ -853,6 +858,7 @@ def holes : Expr → List String
   | .field a _    => holes a
   | .call _ as    => holesL as
   | .mcall r _ as => holes r ++ holesL as
+  | .callValue f as => holes f ++ holesL as
   | .alloc _ as   => holesL as
   | .listE as     => holesL as
   | .tupleE as    => holesL as
@@ -892,6 +898,7 @@ def size : Expr → Nat
   | .field a _    => 1 + size a
   | .call _ as    => 1 + sizeL as
   | .mcall r _ as => 1 + size r + sizeL as
+  | .callValue f as => 1 + size f + sizeL as
   | .alloc _ as   => 1 + sizeL as
   | .listE as     => 1 + sizeL as
   | .tupleE as    => 1 + sizeL as

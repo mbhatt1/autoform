@@ -91,6 +91,14 @@ class TestParenthesisation:
         assert render_lean.stmt({"k": "brk"}) == ".brk"
         assert render_lean.expr({"k": "unit"}) == "(.lit .unit)"
 
+    def test_value_callee_renders_the_callee_as_an_expression(self, render_lean):
+        """`f(x)(y)`: the callee is an expression child, not a string atom like `call`'s."""
+        node = {"k": "callV", "f": {"k": "call", "f": "mk", "args": [{"k": "int", "v": "10"}]},
+                "args": [{"k": "int", "v": "2"}]}
+        assert render_lean.expr(node) == '(.callValue (.call "mk" [(.lit (.int 10))]) [(.lit (.int 2))])'
+        head, kids = render_lean.expr_shape(node)
+        assert head == ".callValue" and [k for k, _ in kids] == ["e", "es"]
+
     def test_every_wrapped_output_balances(self, render_lean):
         node = {"k": "ifte", "c": {"k": "binop", "op": "<",
                                    "a": {"k": "name", "v": "i"},

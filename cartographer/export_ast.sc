@@ -7599,15 +7599,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             // be a guess.
             case None => (if (c.name.isEmpty) boundMethodCall(c, callee, args) else None)
               .getOrElse {
-              // A call with no callee name is not a call we can emit. `Expr.call` is *by
-              // name*; there is no "apply this value", so `f(x)(y)` — a callee that is
-              // itself computed — has no Core form. Emitting `call ""` (as this did) was
-              // worse than a hole: it type-checked, counted as translated, and then
-              // resolved to nothing at run time. That is the silently-wrong category the
-              // ledger exists to prevent, so it is now a hole that says which shape it was.
+              // A call with no callee name. `Expr.call` is *by name*; a callee that is
+              // itself COMPUTED -- `f(x)(y)`, `d["k"](3)`, `make()(v)` -- is applied as a
+              // VALUE through `Expr.callValue`, which dispatches on what the callee
+              // evaluates to and holes (`call:value:not-callable`) at run time on anything
+              // that is not a function, closure or boxed function object. Emitting
+              // `call ""` (as this once did) was worse than either: it type-checked,
+              // counted as translated, and resolved to nothing. Only a callee that is a
+              // `Call` node is lowered this way: a bare identifier already reaches the
+              // named `call` path above, a field read is an `mcall`, and any other
+              // callee shape stays the hole that says which shape it was.
               if (c.name.isEmpty)
-                hole(if (callee.exists(_.isInstanceOf[Call])) "call:computed-callee"
-                     else "call:no-callee-name")
+                callee match {
+                  case Some(cl: Call) =>
+                    ujson.Obj("k" -> "callV", "f" -> expr(cl), "args" -> argExprs(args, kwArgs))
+                  case _ => hole("call:no-callee-name")
+                }
               // Joern often resolves the callee to a method of this program. Emitting that
               // `fullName` rather than the short name is what makes `_wrapper` in
               // `_cached.py` distinguishable from `_wrapper` in `_cachedmethod.py`:

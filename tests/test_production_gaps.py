@@ -617,7 +617,7 @@ class TestValueDunders:
     is `a.__bool__()` or, failing that, `a.__len__() != 0`. Core used to answer identity,
     a hole and a hole -- silent wrong answers for any class that defines the dunder. These
     pin the shape of the dispatch; the CPython comparisons themselves are the `#guard`s
-    over `dunderProg` in Semantics.lean, checked on every build."""
+    over `valueDunderProg` in Semantics.lean, checked on every build."""
 
     SEMANTICS = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
 
@@ -651,10 +651,10 @@ class TestValueDunders:
         assert '| "str",  _       => .exn (.str "TypeError")' in self.SEMANTICS
 
     def test_every_protocol_has_a_cpython_guard(self):
-        guards = self.SEMANTICS.split('private def dunderProg', 1)[1].split('/-! ## JavaScript', 1)[0]
+        guards = self.SEMANTICS.split('private def valueDunderProg', 1)[1].split('/-! ## JavaScript', 1)[0]
         for subject in ('eqTrue', 'eqFalse', 'neFalse', 'ltTrue', 'geHole', 'lenC', 'boolC',
                         'boolZ', 'hashH', 'strH', 'identityQ', 'lenQ'):
-            assert f'#guard match runFunc dunderProg 200 "{subject}" []' in guards, subject
+            assert f'#guard match runFunc valueDunderProg 200 "{subject}" []' in guards, subject
 
     def test_the_proofs_follow_the_dispatch(self):
         fuelmono = (ROOT / 'Autoform/FuelMono.lean').read_text()
@@ -718,3 +718,35 @@ class TestJavaScriptLowering:
         assert 'runFunc jsProg 300 "objLit" []' in sem
         excsafe = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/ExcSafe.lean').read_text()
         assert 'theorem jsContainerField_ne_exn' in excsafe
+
+
+class TestValueCallees:
+    """`f(x)(y)`: a callee that is itself a call is applied as a VALUE.
+
+    The hole `call:computed-callee` stood for "Core has no apply-this-value form". It has
+    one now (`Expr.callValue`), so the exporter lowers a `Call` callee to it and only an
+    unnamed callee of some other shape stays a hole. What must never come back is the
+    `call ""` emission this replaced: it type-checked and resolved to nothing.
+    """
+
+    def test_exporter_lowers_a_call_callee_to_callV(self):
+        src = EXPORTER.read_text()
+        assert 'case Some(cl: Call) =>' in src
+        assert 'ujson.Obj("k" -> "callV", "f" -> expr(cl), "args" -> argExprs(args, kwArgs))' in src
+        assert 'case _ => hole("call:no-callee-name")' in src
+        assert '"call:computed-callee"' not in src
+        assert 'ujson.Obj("k" -> "call", "f" -> ""' not in src
+
+    def test_semantics_dispatches_on_the_value_and_refuses_non_callables(self):
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        assert '| n+1, h, ρ, .callValue fe args =>' in sem
+        assert '.hole "call:value:not-callable"' in sem
+        # CPython-checked pins: `mk(10)(2)` is 12, `d["k"](3)` is 6.
+        assert 'runFunc valueCallProg 200 "chained" [] with | .val (.int 12)' in sem
+        assert 'runFunc valueCallProg 200 "fromDict" [] with | .val (.int 6)' in sem
+        syntax = (ROOT / 'Autoform/Lang/Core/Syntax.lean').read_text()
+        assert '| callValue : Expr → List Expr → Expr' in syntax
+        # The ledger neither counts a value call as a resolvable NAME nor forgets it.
+        ledger = (ROOT / 'Autoform/Ledger.lean').read_text()
+        assert '| .callValue f as => eCalls f ++ eCallsL as' in ledger
+        assert '| .callValue f as => 1 + eRisk f + eRiskL as' in ledger

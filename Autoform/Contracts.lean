@@ -116,6 +116,7 @@ def substE (σ : Impl) : Expr → Expr
   | .field a f     => .field (substE σ a) f
   | .call f as     => .call f (substEL σ as)
   | .mcall r m as  => .mcall (substE σ r) m (substEL σ as)
+  | .callValue f as => .callValue (substE σ f) (substEL σ as)
   | .alloc c as    => .alloc c (substEL σ as)
   | .listE as      => .listE (substEL σ as)
   | .tupleE as     => .tupleE (substEL σ as)
@@ -210,6 +211,7 @@ theorem substE_nil : ∀ e : Expr, substE [] e = e
   | .field a f     => by rw [substE, substE_nil a]
   | .call f as     => by rw [substE, substEL_nil as]
   | .mcall r m as  => by rw [substE, substE_nil r, substEL_nil as]
+  | .callValue f as => by rw [substE, substE_nil f, substEL_nil as]
   | .alloc c as    => by rw [substE, substEL_nil as]
   | .listE as      => by rw [substE, substEL_nil as]
   | .tupleE as     => by rw [substE, substEL_nil as]

@@ -1761,6 +1761,42 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
+  | n+1, h, ρ, .callValue fe args =>
+      -- `f(x)(y)`, `d["k"](3)`: the callee is a VALUE. Evaluate it first (CPython's order),
+      -- then the arguments, then dispatch exactly as `call` does for a name bound to a
+      -- function value: a `.fn` resolves and applies (with the unbound-method and
+      -- `@classmethod` rules), a `.clos` applies with its captures, a boxed function object
+      -- calls what it carries. Anything else is not callable and says so. There is no
+      -- builtin fallback: a builtin reached as a value has no name to look up.
+      match evalExpr ctx n h ρ fe with
+      | (h₁, .val fv) =>
+        match evalList ctx n h₁ ρ args with
+        | (h₂, .inl r)  => (h₂, r)
+        | (h₂, .inr (vs, kws)) =>
+          match fv with
+          | .fn g      => match ctx.resolve g with
+                          | some fn =>
+                            if fn.isClassMethod then
+                              applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                            else if fn.isMethod && fn.vararg.isNone
+                               && vs.length == fn.params.length + 1 then
+                              applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                            else applyFunc ctx n h₂ fn none vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .clos g cap => match ctx.resolve g with
+                          | some fn => applyClosure ctx n h₂ fn cap vs kws
+                          | none    => (h₂, .hole s!"call:{g}")
+          | .ref addr  =>
+            match unboxFn h₂ addr with
+            | some (.fn g)      => match ctx.resolve g with
+                                   | some fn => applyFunc ctx n h₂ fn none vs kws
+                                   | none    => (h₂, .hole s!"call:{g}")
+            | some (.clos g cap) => match ctx.resolve g with
+                                    | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                    | none    => (h₂, .hole s!"call:{g}")
+            | _ => (h₂, .hole "call:value:not-callable")
+          | _ => (h₂, .hole "call:value:not-callable")
+      | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
@@ -3104,6 +3140,41 @@ private def cellProg : Program :=
 
 /-- info: Autoform.Core.EResult.val (Autoform.Core.Val.int 2) -/
 #guard_msgs in #eval runFunc cellProg 200 "outer" []
+
+/-! ## Value-callees: `f(x)(y)`, `d["k"](3)`, and a non-callable
+
+`Expr.callValue` applies whatever its callee EVALUATES to. Every expectation is CPython's:
+`mk(10)(2)` runs the closure `mk` returned; a function fetched out of a dict is called
+with the dict's element as callee; calling `5` is a `TypeError` in CPython and a named
+hole here, because Core does not raise on its own behalf for a shape it cannot dispatch. -/
+private def valueCallProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "inner", params := ["y"]
+      , body := .ret (.binop "+" (.name "y") (.name "k")) }
+    , { name := "mk", params := ["k"]
+      , body := .ret (.closure "inner") }
+    , { name := "twice", params := ["x"]
+      , body := .ret (.binop "*" (.name "x") (.lit (.int 2))) }
+    -- `mk(10)(2)`: the callee is itself a call.
+    , { name := "chained", params := []
+      , body := .ret (.callValue (.call "mk" [.lit (.int 10)]) [.lit (.int 2)]) }
+    -- `d = {"k": twice}; d["k"](3)`: the callee is an index into a dict of functions.
+    , { name := "fromDict", params := []
+      , body :=
+          .seq (.assign "d" (.dictE [(.lit (.str "k"), .fnref "twice")]))
+               (.ret (.callValue (.index (.name "d") (.lit (.str "k"))) [.lit (.int 3)])) }
+    -- `5(1)`: not callable.
+    , { name := "notCallable", params := []
+      , body := .ret (.callValue (.lit (.int 5)) [.lit (.int 1)]) } ] }
+
+-- mk(10)(2)  -- CPython 12
+#guard match runFunc valueCallProg 200 "chained" [] with | .val (.int 12) => true | _ => false
+-- d["k"](3)  -- CPython 6
+#guard match runFunc valueCallProg 200 "fromDict" [] with | .val (.int 6) => true | _ => false
+-- 5(1)       -- CPython TypeError; Core: a named hole, never a value
+#guard match runFunc valueCallProg 200 "notCallable" [] with
+       | .hole "call:value:not-callable" => true | _ => false
 
 /-! ## Boxed containers, step 3: `setIndex` on a heap payload
 

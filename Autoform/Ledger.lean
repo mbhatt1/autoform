@@ -62,6 +62,8 @@ def eCalls : Expr → List (Bool × String)
   | .binop _ a b      => eCalls a ++ eCalls b
   | .unop _ a         => eCalls a
   | .call f as        => (false, f) :: eCallsL as
+  -- A computed callee has no NAME to resolve; the callee expression may itself call.
+  | .callValue f as => eCalls f ++ eCallsL as
   | .index a b        => eCalls a ++ eCalls b
   | .field a _        => eCalls a
   | .mcall r m as     => (true, m) :: eCalls r ++ eCallsL as
@@ -108,6 +110,7 @@ def eRisk : Expr → Nat
   | .mcall r _ as     => 1 + eRisk r + eRiskL as
   | .binop _ a b      => 1 + eRisk a + eRisk b   -- may hit `ub:` under a fixed-width dialect
   | .call _ as        => 1 + eRiskL as           -- may fail to resolve
+  | .callValue f as => 1 + eRisk f + eRiskL as  -- the value may not be callable
   | .unop _ a         => eRisk a
   | .alloc _ as       => 1 + eRiskL as
   | .fnref _          => 0
@@ -225,6 +228,7 @@ def eCallees : Expr → List (Bool × String × String)
   | .binop _ a b      => eCallees a ++ eCallees b
   | .unop _ a         => eCallees a
   | .call f as        => (false, f, f) :: eCalleesL as
+  | .callValue f as   => eCallees f ++ eCalleesL as
   | .index a b        => eCallees a ++ eCallees b
   | .field a _        => eCallees a
   | .mcall r m as     => (true, m, calleeKey r m) :: eCallees r ++ eCalleesL as

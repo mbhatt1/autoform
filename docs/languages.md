@@ -660,12 +660,17 @@ an instance needs `__next__` state, a generator-shaped frame (Milestone 4). `in`
   f-string arrives through the same operator with interpolated parts, and folding it would
   need `str()` conversion semantics per part; it keeps a hole, now labelled
   `op:stringExpressionList:non-literal-part` so the count says which shape it was.
-* **`call:computed-callee` — documented, not closed.** This is `f(x)(y)`: the callee is
-  itself the result of a call. `Expr.call` is by NAME and Core has no "apply this value"
-  form, so there is no Core term to emit. Closing it needs an `Expr.apply : Expr → List
-  Expr → Expr` constructor in the trusted semantics, a Lean change outside this exporter
-  pass. Emitting `call ""` was tried once and was worse than the hole -- it typechecked,
-  counted as translated, and resolved to nothing at run time.
+* **`call:computed-callee` — closed.** This is `f(x)(y)`: the callee is itself the
+  result of a call. `Expr.call` is by NAME; `Expr.callValue : Expr → List Expr → Expr`
+  (`Syntax.lean`) applies what the callee EVALUATES to -- a `.fn` (with the same
+  unbound-method and `@classmethod` rules as a name bound to one), a `.clos` with its
+  captures, a boxed function object -- and holes `call:value:not-callable` on anything
+  else, so `5(1)` is a named hole where CPython raises `TypeError`. `#guard`s in
+  `Semantics.lean` (`valueCallProg`) pin `mk(10)(2)` and `d["k"](3)` to CPython's
+  answers; `FuelMono` and `ExcSafe` cover the new clause. The exporter emits it only when
+  the callee node is itself a `Call`; an unnamed callee of any other shape stays
+  `call:no-callee-name`. Emitting `call ""` was tried once and was worse than the hole --
+  it typechecked, counted as translated, and resolved to nothing at run time.
 * **`mcall:<m>:unboxed-container` — documented, not closed.** After the switchover the one
   remaining source of an unboxed `Val.dict` in a Python program is `bindParams` itself:
   `**kwargs` is built as a value at the kwarg binding in `Semantics.lean`, not allocated.

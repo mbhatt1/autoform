@@ -167,6 +167,8 @@ def expr_shape(n):
     # step's direction". See `Expr.slice` in `Syntax.lean`.
     if k == "slice":  return ".slice", [("e", f('a')), ("e", f('lo')), ("e", f('hi')), ("e", f('st'))]
     if k == "call":   return ".call", [("atom", lean_str(f('f'))), ("es", f('args'))]
+    # `f(x)(y)`, `d["k"](3)`: the callee is an EXPRESSION, not a name. See `Expr.callValue`.
+    if k == "callV":  return ".callValue", [("e", f('f')), ("es", f('args'))]
     if k == "hole":   return ".hole", [("atom", lean_str(f('label')))]
     # `003-box-address-taken-locals`: unconditional, constructor-free box allocation.
     # See `data-model.md` for the on-disk shape and `Expr.boxNew` (`Syntax.lean`) for

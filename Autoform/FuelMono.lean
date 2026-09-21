@@ -630,6 +630,78 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                    | (rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
                                       exact hy)
                            · rw [if_neg hk] at hy ⊢; exact hy)
+        | callValue fe args =>
+            -- `f(x)(y)`: the callee is evaluated (one `evalExpr`), then the arguments (one
+            -- `evalList`), then the value dispatches exactly as a `call` on a name bound
+            -- to a function value does -- the same three `applyFunc` shapes for a `.fn`,
+            -- `applyClosure` for a `.clos`, and the boxed-function-object unwrapping.
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ fe with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val fv =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalList ctx k h₁ ρ args with ⟨h₂, s⟩
+                rw [hB] at hy
+                cases s with
+                | inl r₂ =>
+                    cases r₂ <;> first
+                      | (cases hy; exact absurd rfl hne)
+                      | (rw [ihL _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+                | inr vs =>
+                    rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
+                    dsimp only at hy ⊢
+                    cases fv
+                    case fn g =>
+                        dsimp only at hy ⊢
+                        cases hres2 : Ctx.resolve ctx g with
+                        | some fn2 =>
+                            rw [hres2] at hy
+                            dsimp only at hy ⊢
+                            by_cases hcm : fn2.isClassMethod = true
+                            · rw [if_pos hcm] at hy ⊢
+                              exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                            · rw [if_neg hcm] at hy ⊢
+                              split at hy
+                              · next hc =>
+                                  simp only [hc, if_true]
+                                  exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                              · next hc =>
+                                  simp only [hc, if_false, Bool.false_eq_true]
+                                  exact ihF _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                        | none => rw [hres2] at hy; exact hy
+                    case clos g cap =>
+                        dsimp only at hy ⊢
+                        cases hres2 : Ctx.resolve ctx g with
+                        | some fn2 => rw [hres2] at hy; exact ihC _ hctx _ _ (hctx.1 _ _ hres2) _ _ _ _ _ hy hne
+                        | none => rw [hres2] at hy; exact hy
+                    case ref addr =>
+                        dsimp only at hy ⊢
+                        cases hub : unboxFn h₂ addr with
+                        | none => rw [hub] at hy; exact hy
+                        | some fv2 =>
+                            rw [hub] at hy
+                            cases fv2
+                            case fn g2 =>
+                                dsimp only at hy ⊢
+                                cases hr3 : Ctx.resolve ctx g2 with
+                                | some fn3 =>
+                                    rw [hr3] at hy
+                                    exact ihF _ hctx _ _ (hctx.1 _ _ hr3) _ _ _ _ _ hy hne
+                                | none => rw [hr3] at hy; exact hy
+                            case clos g2 cap2 =>
+                                dsimp only at hy ⊢
+                                cases hr3 : Ctx.resolve ctx g2 with
+                                | some fn3 =>
+                                    rw [hr3] at hy
+                                    exact ihC _ hctx _ _ (hctx.1 _ _ hr3) _ _ _ _ _ hy hne
+                                | none => rw [hr3] at hy; exact hy
+                            all_goals (dsimp only at hy ⊢; exact hy)
+                    all_goals (dsimp only at hy ⊢; exact hy)
         | mcall recv m args =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ recv with ⟨h₁, r₁⟩
