@@ -6018,6 +6018,17 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           else if (charLiteralIsNumeric && c.length >= 3 && c.head == '\'' && c.last == '\'' &&
                    charLiteralValue(unquoted).isDefined)
             intLit(charLiteralValue(unquoted).get)
+          // A Go RAW string literal. Go spec, "String literals": "Raw string literals are
+          // character sequences between back quotes, as in `foo`. [...] the value of a raw
+          // string literal is the string composed of the uninterpreted (implicitly UTF-8-
+          // encoded) characters between the quotes; in particular, backslashes have no
+          // special meaning and the string may contain newlines. Carriage return characters
+          // ('\r') inside raw string literals are discarded from the raw string value."
+          // So: strip the back quotes, drop `\r`, process nothing else. `DefaultTableFormat`
+          // in the Go corpus is this shape; it was `lit:unquoted` because it does not start
+          // with a quote character.
+          else if (goFile && c.length >= 2 && c.head == '`' && c.last == '`')
+            ujson.Obj("k" -> "str", "v" -> c.drop(1).dropRight(1).replace("\r", ""))
           else if (c.headOption.exists(ch => ch == '"' || ch == '\''))
             ujson.Obj("k" -> "str", "v" -> unquoted)
           else if (c.isEmpty) ujson.Obj("k" -> "unit")
@@ -8082,7 +8093,33 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
 
   def forStmt(cs: ControlStructure): ujson.Obj = {
     val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
-    if (ks.size != 4) holeS("control:FOR:elided-clause")
+    // Go spec, "For statements": "A "for" statement specifies repeated execution of a
+    // block. There are three forms: The iteration may be controlled by a single
+    // condition, a "for" clause, or a "range" clause." The four-child shape below is the
+    // "for" clause (init; cond; post; body), shared with C/Java/JS. The other two Go
+    // forms:
+    //   * `for cond { body }` -- two children, the first a `bool`-typed expression: the
+    //     condition is "simply an expression" and the loop is `while`. Gated on the
+    //     static type BECAUSE a `range` loop can also arrive with two children (its
+    //     clause and its body), and a range clause is not a boolean: misreading it as a
+    //     condition would be the silent-wrong-answer this exporter exists to refuse.
+    //   * `for { body }` -- one child: "If the condition is absent, it is equivalent to
+    //     the boolean value true."
+    //   * `range` stays a hole with its own name. Its iteration ORDER over a map "is not
+    //     specified and is not guaranteed to be the same from one iteration to the next"
+    //     (same section), so even once the clause's shape is known, a program that
+    //     observes that order is out of contract; over a slice the order is index order.
+    if (goFile && ks.size == 2 && !ks(0).isInstanceOf[Block] && staticTypeOf(ks(0)) == "bool")
+      outsideLoopScope {
+        val (condPrelude, cond) = exprV(ks(0))
+        conditionedLoop(condPrelude, cond, stmt(ks(1)))
+      }
+    else if (goFile && ks.size == 1)
+      outsideLoopScope {
+        ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true), "body" -> stmt(ks(0)))
+      }
+    else if (goFile && ks.size != 4) holeS("control:FOR:range")
+    else if (ks.size != 4) holeS("control:FOR:elided-clause")
     else outsideLoopScope {
       val (condPrelude, cond) = exprV(ks(1))
       val step = stmt(ks(2))
@@ -9333,6 +9370,56 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     seqOf(condPrelude ++ init ++ List(breakBlockStmt))
   }
 
+  /** Go multi-value assignment: `a, b = b, a`, `x, y := f()`, `v, ok := m[k]`.
+    *
+    * Go spec, "Assignment statements": "The assignment proceeds in two phases. First,
+    * the operands of index expressions and pointer indirections (including implicit
+    * pointer indirections in selectors) on the left and the expressions on the right
+    * are all evaluated in the usual order. Second, the assignments are carried out in
+    * left-to-right order." So every right-hand value lands in a fresh temporary BEFORE
+    * any target is written -- `a, b = b, a` is the swap, not `a = b; b = a`.
+    *
+    * Two source shapes, both arriving as ONE `<operator>.assignment` whose children are
+    * all the operands: (1) as many right-hand expressions as targets -- the children
+    * split evenly; (2) a single multi-valued expression (a call returning a tuple,
+    * `v.(T)`, `m[k]`, `<-ch`) -- its static type is a tuple `(T1, T2)`, and Core sees
+    * the value as a `Val.tuple`, so the targets index it. A child list that is neither
+    * is `assign:arity:go-shape`, not a guess. Targets are identifiers (boxed or not),
+    * which is every case in the Go corpus; a field or index TARGET keeps
+    * `assign:arity:target-shape`, because its own operands belong to phase one and this
+    * lowering does not evaluate them there yet. */
+  def goTupleAssign(ks: List[AstNode]): ujson.Obj = {
+    def isTupleTyped(n: AstNode): Boolean = { val t = staticTypeOf(n); t.startsWith("(") && t.contains(",") }
+    def name(v: String): ujson.Obj = ujson.Obj("k" -> "name", "v" -> v)
+    def store(target: AstNode, v: ujson.Obj): Option[ujson.Obj] = target match {
+      case i: Identifier =>
+        val nm = localName(i.name)
+        Some(if (isBoxed(nm)) ujson.Obj("k" -> "setField", "r" -> boxRef(nm), "f" -> "v", "v" -> v)
+             else ujson.Obj("k" -> "assign", "x" -> nm, "e" -> v))
+      case _ => None
+    }
+    if (ks.size >= 3 && isTupleTyped(ks.last)) {
+      // (2): phase one evaluates the one multi-valued expression, once.
+      val targets = ks.init
+      val (prelude, v) = valueOf(ks.last)
+      val tmp = freshExprVTemp()
+      val stores = targets.zipWithIndex.map { case (t, i) =>
+        store(t, ujson.Obj("k" -> "index", "a" -> name(tmp), "b" -> intLit(BigInt(i)))) }
+      if (stores.exists(_.isEmpty)) holeS("assign:arity:target-shape")
+      else seqOf(prelude ++ (ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> v) :: stores.flatten))
+    } else if (ks.size >= 4 && ks.size % 2 == 0) {
+      // (1): phase one evaluates every right-hand expression, in order, into temporaries.
+      val (targets, rhss) = ks.splitAt(ks.size / 2)
+      val temps = rhss.map(_ => freshExprVTemp())
+      val phaseOne = rhss.zip(temps).flatMap { case (r, tmp) =>
+        val (prelude, v) = valueOf(r)
+        prelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> v) }
+      val stores = targets.zip(temps).map { case (t, tmp) => store(t, name(tmp)) }
+      if (stores.exists(_.isEmpty)) holeS("assign:arity:target-shape")
+      else seqOf(phaseOne ++ stores.flatten)
+    } else holeS("assign:arity:go-shape")
+  }
+
   def stmt(n: AstNode): ujson.Obj = unwrapMacro(n) match {
     case b: Block =>
       val kids = kidsOf(b)
@@ -9379,8 +9466,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case None => ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))
       }
     case c: Call if callName(c) == "<operator>.assignment" =>
-      kidsOf(c) match {
+      kidsOf(c).filterNot(_.isInstanceOf[Local]) match {
         case lhs :: rhs :: Nil => assignTo(lhs, rhs, None)
+        // Go's `a, b = ...` / `x, y := ...`: all operands are children of one assignment.
+        case ks if goFile && ks.size >= 3 => goTupleAssign(ks)
         case _                 => holeS("assign:arity")
       }
     case c: Call if augOps.contains(callName(c)) =>
@@ -9591,6 +9680,15 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // block itself never had behaviour to drop. This is the same call `case m: MethodRef`
     // and `case t: TypeRef` already make one line below.
     case nb: NamespaceBlock => skip
+    // An import declaration is a *dependency* statement, not behaviour. Go spec, "Import
+    // declarations": "An import declaration states that the source file containing the
+    // declaration depends on functionality of the imported package and enables access to
+    // exported identifiers of that package." The names it brings into scope are resolved
+    // by `Ctx.resolve`/the module-object machinery on use; the imported package's own
+    // initialisation (`init`, package-level variables) belongs to that package, which is
+    // outside the exported program either way. Java/Kotlin/JS `import` is the same kind of
+    // declaration. Was `stmt:IMPORT`, 39 of the 149 holes on the Go corpus.
+    case _: Import     => skip
     case other         => holeS("stmt:" + other.label)
   }
 

@@ -3691,4 +3691,60 @@ private def jsProg : Program :=
 #guard "xy".utf16At (-1) == none
 #guard ("😀".utf16At 0).any Nat.isUTF16Surrogate
 
+/-! ## Go: tuple assignment and the `for` forms, checked against `go run`
+
+These are the Core shapes `cartographer/export_ast.sc`'s `goTupleAssign` and `forStmt`
+emit for Go source, run under `.go`. Every expectation is `go1.20.6`'s output for the
+program in the comments (`.tmp_gospec/main.go` while this was written).
+
+* Go spec, "Assignment statements": "The assignment proceeds in two phases. First, the
+  operands of index expressions and pointer indirections [...] on the left and the
+  expressions on the right are all evaluated in the usual order. Second, the assignments
+  are carried out in left-to-right order." -- hence the temporaries: `a, b = b, a` swaps.
+* Go spec, "For statements": "The iteration may be controlled by a single condition, a
+  "for" clause, or a "range" clause." [...] "If the condition is absent, it is
+  equivalent to the boolean value true." -/
+private def goProg : Program :=
+  { dialect := .go
+  , funcs :=
+    -- a, b := 1, 2; a, b = b, a; return a*10 + b        -- go: 21
+    [ { name := "swap", params := []
+      , body :=
+          .seq (.assign "a" (.lit (.int 1)))
+          (.seq (.assign "b" (.lit (.int 2)))
+          (.seq (.assign "$t0" (.name "b"))
+          (.seq (.assign "$t1" (.name "a"))
+          (.seq (.assign "a" (.name "$t0"))
+          (.seq (.assign "b" (.name "$t1"))
+                (.ret (.binop "+" (.binop "*" (.name "a") (.lit (.int 10))) (.name "b")))))))) }
+    -- func pair() (int, int) { return 3, 4 }; x, y := pair(); return x*10 + y   -- go: 34
+    , { name := "pair", params := []
+      , body := .ret (.tupleE [.lit (.int 3), .lit (.int 4)]) }
+    , { name := "destructure", params := []
+      , body :=
+          .seq (.assign "$t" (.call "pair" []))
+          (.seq (.assign "x" (.index (.name "$t") (.lit (.int 0))))
+          (.seq (.assign "y" (.index (.name "$t") (.lit (.int 1))))
+                (.ret (.binop "+" (.binop "*" (.name "x") (.lit (.int 10))) (.name "y"))))) }
+    -- i := 0; for i < 3 { i = i + 1 }; return i          -- go: 3
+    , { name := "cond", params := []
+      , body :=
+          .seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.binop "<" (.name "i") (.lit (.int 3)))
+                       (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
+                (.ret (.name "i"))) }
+    -- i := 0; for { i = i + 2; if i > 4 { break } }; return i   -- go: 6
+    , { name := "forever", params := []
+      , body :=
+          .seq (.assign "i" (.lit (.int 0)))
+          (.seq (.loop (.lit (.bool true))
+                       (.seq (.assign "i" (.binop "+" (.name "i") (.lit (.int 2))))
+                             (.ifte (.binop ">" (.name "i") (.lit (.int 4))) .brk .skip)))
+                (.ret (.name "i"))) } ] }
+
+#guard match runFunc goProg 300 "swap" [] with | .val (.int 21) => true | _ => false
+#guard match runFunc goProg 300 "destructure" [] with | .val (.int 34) => true | _ => false
+#guard match runFunc goProg 300 "cond" [] with | .val (.int 3) => true | _ => false
+#guard match runFunc goProg 300 "forever" [] with | .val (.int 6) => true | _ => false
+
 end Autoform.Core

@@ -750,3 +750,47 @@ class TestValueCallees:
         ledger = (ROOT / 'Autoform/Ledger.lean').read_text()
         assert '| .callValue f as => eCalls f ++ eCallsL as' in ledger
         assert '| .callValue f as => 1 + eRisk f + eRiskL as' in ledger
+
+
+class TestGoAndCLowering:
+    """Slice I of the interpreter push: Go statements the exporter used to hole and the
+    Core shapes they lower to, each grounded in a quoted section of the Go specification
+    (see the comments at the rules). The Core side is `goProg` in `Semantics.lean`,
+    checked against `go run` on every build; these pin the exporter rules, which no
+    in-repo test can execute without Joern."""
+
+    def test_import_declarations_are_not_behaviour(self):
+        src = EXPORTER.read_text()
+        assert 'case _: Import     => skip' in src
+        assert '"Import\n    // declarations"' in src or 'Go spec, "Import' in src
+
+    def test_go_raw_strings_drop_carriage_returns_and_nothing_else(self):
+        src = EXPORTER.read_text()
+        assert "else if (goFile && c.length >= 2 && c.head == '`' && c.last == '`')" in src
+        assert 'c.drop(1).dropRight(1).replace("\\r", "")' in src
+
+    def test_go_tuple_assignment_is_two_phase(self):
+        src = EXPORTER.read_text()
+        assert 'def goTupleAssign(ks: List[AstNode]): ujson.Obj' in src
+        # the spec sentence the temporaries exist for
+        assert 'The assignment proceeds in two phases' in src
+        # every right-hand value into a temporary before any target is written
+        assert 'val temps = rhss.map(_ => freshExprVTemp())' in src
+        # the single multi-valued form indexes a tuple; anything else is a named hole
+        assert '"k" -> "index", "a" -> name(tmp), "b" -> intLit(BigInt(i))' in src
+        assert 'holeS("assign:arity:go-shape")' in src
+        assert 'holeS("assign:arity:target-shape")' in src
+        assert 'case ks if goFile && ks.size >= 3 => goTupleAssign(ks)' in src
+
+    def test_go_for_forms_are_type_gated(self):
+        src = EXPORTER.read_text()
+        # `for cond {}` only when the first child IS a boolean; a range clause is not
+        assert 'goFile && ks.size == 2 && !ks(0).isInstanceOf[Block] && staticTypeOf(ks(0)) == "bool"' in src
+        assert 'else if (goFile && ks.size == 1)' in src
+        assert 'holeS("control:FOR:range")' in src
+
+    def test_core_guards_exist_for_every_lowered_shape(self):
+        sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
+        block = sem.split('private def goProg', 1)[1]
+        for subject, value in (('swap', 21), ('destructure', 34), ('cond', 3), ('forever', 6)):
+            assert f'#guard match runFunc goProg 300 "{subject}" [] with | .val (.int {value})' in block, subject
