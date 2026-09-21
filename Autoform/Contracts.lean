@@ -745,6 +745,14 @@ theorem satisfiable_raises_zeroDiv :
 Both are `RefinesUnder`, at the concrete fuel bound 14, on the unrestricted domain. -/
 
 set_option maxHeartbeats 2000000 in
+/-! **Re-land note (cachetools v7.1.7, current exporter).** These theorems used to claim
+`methodkey` for *every* argument list (`fun _ => True`). That was never its domain:
+`methodkey(self, *args, **kwargs)` requires `self`, and CPython raises `TypeError` for
+`methodkey()`. The old render carried `pythonSignature = none`, so `signatureRejected_legacy`
+discharged the check by `rfl` and the over-broad domain was invisible. The fresh export
+records the signature (`required = ["self"]`), and the theorems are stated for `args ≠ []`
+-- the domain they always had. -/
+
 /-- **`methodkey` refines a total Lean specification, under one contract.**
 
 Assuming only that the starred-unpack construct returns *some* value without touching the
@@ -757,13 +765,6 @@ uniform over all implementations meeting the contract, which is the strongest fo
 mechanism can deliver — and here it happens to be available, because `_HashedTuple` has no
 `__init__` in the translated program, so the unpacked arguments are not observable in the
 result. That is a fact about `cachetools`'s translation, discovered by the proof. -/
-/-! **Re-land note (cachetools v7.1.7, current exporter).** These theorems used to claim
-`methodkey` for *every* argument list (`fun _ => True`). That was never its domain:
-`methodkey(self, *args, **kwargs)` requires `self`, and CPython raises `TypeError` for
-`methodkey()`. The old render carried `pythonSignature = none`, so `signatureRejected_legacy`
-discharged the check by `rfl` and the over-broad domain was invisible. The fresh export
-records the signature (`required = ["self"]`), and the theorems are stated for `args ≠ []`
--- the domain they always had. -/
 theorem methodkey_refinesUnder_value :
     RefinesUnder [pureValueContract "op:starredUnpack"] keysProgramHoled "cachetools/keys.py:<module>.methodkey" 14
       (fun args => args ≠ []) (fun _ => .ret (.ref 0)) := by
@@ -860,7 +861,7 @@ comes with a witness that the assumption can be met. -/
 theorem methodkey_raise_result :
     Satisfiable [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled ∧
     RefinesUnder [raisesContract "op:starredUnpack" (.str "ZeroDivisionError")] keysProgramHoled
-      "cachetools/keys.py:<module>.methodkey" 14 (fun _ => True)
+      "cachetools/keys.py:<module>.methodkey" 14 (fun args => args ≠ [])
       (fun _ => .raise (.str "ZeroDivisionError")) :=
   ⟨satisfiable_raises_zeroDiv, methodkey_refinesUnder_raise _⟩
 

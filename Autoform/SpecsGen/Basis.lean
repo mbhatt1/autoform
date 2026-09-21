@@ -286,6 +286,22 @@ def fieldOf (h : Heap) (r : Ref) (f : String) : Val :=
                                | none        => .unit
   | none => .unit
 
+/-- If no property in the list has the name `f`, then no `(cls, f)` pair is in it for any
+class. This is the bridge from the side condition an accessor theorem can `decide` on a
+concrete program -- which mentions only `f` -- to the `(o.cls, f)` test `evalExpr` makes,
+which mentions a receiver the theorem quantifies over. -/
+private theorem props_any_false_of_all_ne {ps : List (String × String)} {c f : String}
+    (h : ps.all (fun p => p.2 != f) = true) :
+    ps.any (fun p => p.1 == c && p.2 == f) = false := by
+  induction ps with
+  | nil => rfl
+  | cons p ps ih =>
+    simp only [List.all_cons, Bool.and_eq_true] at h
+    have hne : (p.2 == f) = false := by
+      have := h.1
+      cases hb : (p.2 == f) <;> simp_all [bne]
+    simp [List.any_cons, hne, ih h.2]
+
 /-- **An accessor returns the field it names**, for every heap, every receiver and every
 argument list, at every fuel budget of at least four.
 
@@ -319,22 +335,6 @@ Signature-aware calls additionally require `signatureRejected fn args [] = false
 The generated proof establishes this by kernel reduction; it cannot infer call
 validity merely from the body shape.
 -/
-/-- If no property in the list has the name `f`, then no `(cls, f)` pair is in it for any
-class. This is the bridge from the side condition an accessor theorem can `decide` on a
-concrete program -- which mentions only `f` -- to the `(o.cls, f)` test `evalExpr` makes,
-which mentions a receiver the theorem quantifies over. -/
-private theorem props_any_false_of_all_ne {ps : List (String × String)} {c f : String}
-    (h : ps.all (fun p => p.2 != f) = true) :
-    ps.any (fun p => p.1 == c && p.2 == f) = false := by
-  induction ps with
-  | nil => rfl
-  | cons p ps ih =>
-    simp only [List.all_cons, Bool.and_eq_true] at h
-    have hne : (p.2 == f) = false := by
-      have := h.1
-      cases hb : (p.2 == f) <;> simp_all [bne]
-    simp [List.any_cons, hne, ih h.2]
-
 theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     (fld : String) (hb : fn.body = .ret (.field (.name "self") fld))
     (hp : fn.params = []) (hv : fn.vararg = none) (hkw : fn.kwarg = none)
