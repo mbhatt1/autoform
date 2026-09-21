@@ -262,6 +262,17 @@ def inner_scope(node, name, scopes):
 
 def visit(node, scopes):
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        # `@staticmethod` is not an arbitrary decorator: its entire meaning is "bind no
+        # receiver", which is exactly what `isMethod: False` already says to Core. So a
+        # method whose ONLY decorator is an unshadowed `staticmethod` is reported as a
+        # plain function rather than refused as unmodelled binding -- the decorator has
+        # no residue left to model. Any other decorator, or `staticmethod` alongside
+        # one, still holes: `@property` and friends change what an attribute access
+        # MEANS, and that is descriptor behaviour Core does not have.
+        decorators = getattr(node, 'decorator_list', [])
+        static_method = (len(decorators) == 1 and isinstance(decorators[0], ast.Name)
+                         and decorators[0].id == 'staticmethod'
+                         and builtin_name('staticmethod', scopes))
         parameters = [a.arg for a in [*node.args.posonlyargs, *node.args.args,
             *([node.args.vararg] if node.args.vararg else []), *node.args.kwonlyargs,
             *([node.args.kwarg] if node.args.kwarg else [])]]
@@ -272,8 +283,9 @@ def visit(node, scopes):
             'positional_only': bool(node.args.posonlyargs),
             'keyword_only': bool(node.args.kwonlyargs),
             'firstPositional': next((a.arg for a in [*node.args.posonlyargs, *node.args.args]), None),
-            'decorated': bool(getattr(node, 'decorator_list', [])),
-            'isMethod': scopes[-1].get_type() == 'class',
+            'decorated': bool(getattr(node, 'decorator_list', [])) and not static_method,
+            'isMethod': scopes[-1].get_type() == 'class' and not static_method,
+            'staticMethod': static_method,
             'privateParameters': bool(class_scopes and class_scopes[-1].get_name().lstrip('_')
                 and any(name.startswith('__') and not name.endswith('__') for name in parameters)),
             'parameters': parameters,

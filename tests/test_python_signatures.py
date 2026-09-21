@@ -34,7 +34,7 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        positionalOnly=[], keywordOnly=[], required=['a'])
+        staticMethod=False, positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
     # holes the definition. A LITERAL default is modelled, so it clears the flag and
     # appears in `defaultValues` instead -- binding it at call time is indistinguishable
@@ -193,3 +193,67 @@ class TestRaiseFromNone:
                   'def f():\n    raise ValueError("x") from None\n')
         raises = _decode(source)['raises']
         assert [r['label'] for r in raises.values()] == ['op:raise-cause']
+
+
+class TestStaticMethodBinding:
+    """`@staticmethod` is a binding directive, not an unmodelled decorator.
+
+    Core refuses a decorated method as `call:python-receiver-signature` because a
+    decorator can change what calling the name MEANS, and Core injects an ordinary
+    receiver under `self`. `staticmethod` is the one case where the decorator's entire
+    content is "bind no receiver" — which `isMethod: False` already expresses exactly, so
+    there is no residue left to model. `@property` is the opposite and must keep holing:
+    it changes an attribute ACCESS into a call, which is descriptor behaviour Core has no
+    representation for.
+    """
+
+    def test_a_static_method_is_reported_as_a_plain_function(self):
+        source = ('class C:\n'
+                  '    @staticmethod\n'
+                  '    def f(a, b):\n'
+                  '        return a\n')
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['isMethod'] is False
+        assert sig['decorated'] is False
+        assert sig['staticMethod'] is True
+        assert sig['required'] == ['a', 'b']
+
+    def test_a_property_still_holes(self):
+        source = ('class C:\n'
+                  '    @property\n'
+                  '    def f(self):\n'
+                  '        return 1\n')
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['isMethod'] is True
+        assert sig['decorated'] is True
+        assert sig['staticMethod'] is False
+
+    def test_staticmethod_alongside_another_decorator_still_holes(self):
+        """The exemption is for a decorator with no residue. Two decorators have one."""
+        source = ('class C:\n'
+                  '    @staticmethod\n'
+                  '    @other\n'
+                  '    def f(a):\n'
+                  '        return a\n')
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['staticMethod'] is False
+        assert sig['decorated'] is True
+
+    def test_a_shadowed_staticmethod_is_not_the_builtin(self):
+        """`staticmethod = something_else` at module scope means the name no longer
+        denotes the binding directive, so the exemption must not apply."""
+        source = ('staticmethod = None\n\n'
+                  'class C:\n'
+                  '    @staticmethod\n'
+                  '    def f(a):\n'
+                  '        return a\n')
+        sig = [s for s in _decode(source)['signatures'].values() if s['name'] == 'f'][0]
+        assert sig['staticMethod'] is False
+        assert sig['decorated'] is True
+
+    def test_an_ordinary_method_is_unchanged(self):
+        source = 'class C:\n    def f(self, a):\n        return a\n'
+        sig = next(iter(_decode(source)['signatures'].values()))
+        assert sig['isMethod'] is True
+        assert sig['decorated'] is False
+        assert sig['staticMethod'] is False

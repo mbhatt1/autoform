@@ -34,8 +34,18 @@ def test_receiver_source_signature_metadata():
         'absent': None, 'keyword': None, 'renamed': 'receiver', 'star_self': None,
         'static': 'self', 'class_named': 'cls', 'class_self': 'self', 'collect': 'self',
     }
+    # `static` is deliberately absent. `@staticmethod`'s entire meaning is "bind no
+    # receiver", which `isMethod: False` already says, so it leaves no decorator residue
+    # for Core to refuse -- unlike `@classmethod`, which substitutes the class for the
+    # receiver and is still unmodelled.
     assert {name for name in SUBJECTS if records[name]['decorated']} == {
-        'static', 'class_named', 'class_self'}
+        'class_named', 'class_self'}
+    assert records['static']['staticMethod'] is True
+    assert records['static']['isMethod'] is False
+    # The adversarial part of this fixture: `@staticmethod def static(self, a)`. With no
+    # receiver to bind, `self` is an ORDINARY PARAMETER and must not be stripped --
+    # CPython binds `C.static(1, 2)` to `self=1, a=2`.
+    assert records['static']['required'] == ['self', 'a']
     assert records['keyword']['keywordOnly'] == ['self']
     assert records['star_self']['parameters'] == ['self']
     assert records['positional_collect']['positionalOnly'] == ['self']
