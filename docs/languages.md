@@ -901,3 +901,49 @@ standard shape (C: "The break statement, when encountered anywhere in statement,
 the switch statement" — fallthrough otherwise, cppreference *switch statement*), so the
 14 are shapes it refuses (`consumeLabels`' "defensive only" arm), which cannot be
 identified without the CPG. All of these are counted, not hidden.
+
+#### 16.J Assignment expressions, decorators, TS/Kotlin leftovers
+
+Measured on the tracked ASTs before this change: TS `op:assignment` 26 and
+`op:notNullAssert` 11 (`ast-LangTS.json`), Kotlin `stmt:METHOD` 2 (`ast-LangKt.json`),
+Python `call:python-decorator-binding` 19, `call:python-defaults` 10 and
+`function:python-default-evaluation` 3 (`ast-Click.json`). Each is resolved against the
+language's own specification, cited beside the rule in `cartographer/export_ast.sc`:
+
+* **`@overload` stubs are a raise, not a hole.** `typing.overload` at run time binds
+  the name to a dummy that raises `NotImplementedError` for any call, and the following
+  un-decorated definition rebinds the name
+  ([typing.overload](https://docs.python.org/3/library/typing.html#typing.overload)).
+  The stub therefore translates completely: permissive collectors (no arity `TypeError`
+  can answer first) and a body of `raise NotImplementedError` through the
+  `py:exception:` constructor. Its `...` defaults are no gap: the dummy never binds them.
+  17 of click's 19 decorator holes and 8 of its 10 default holes are these stubs
+  (`command`, `group`, `Context.lookup_default`, `Command.main`, `Parameter.get_default`,
+  `get_current_context`); re-measure with `scripts/lang_matrix.py` after re-export.
+* **External decorators are named.** Language Reference §8.7: `@f def g` is `g = f(g)`,
+  evaluated when the definition executes. A decorator the program defines still holes as
+  `call:python-decorator-binding` (applying it at definition time is the next step); one
+  from outside the program (`contextlib.contextmanager` on `augment_usage_errors`,
+  `functools.wraps(f)`) is `decorator:external:<dotted name>` — a different gap with its
+  own count. A decorated method is this gap, not `call:python-receiver-signature`.
+* **Negative numeric defaults are literals.** `def read(self, n=-1)`: §8.7 evaluates the
+  default once when the `def` executes, so `-1` is the constant −1 and binds like any
+  literal. `-True` is deliberately not one.
+* **Kotlin local functions.** The Kotlin specification ("Local function declaration")
+  says a local function may capture the enclosing scope and sees a captured `var`'s later
+  reassignment — capture is by reference. Core's `Expr.closure` captures by VALUE at the
+  definition, so the lowering (`name = closure(body)`, the body exported as its own
+  function) is emitted only when every captured name is assigned at most once in the
+  enclosing function and never by the local function; otherwise
+  `kotlin:local-fn-capture-mutated`. Top-level functions in the `.kt` file initialiser
+  were already `skip` (separate exports); the tracked `ast-LangKt.json` predates that.
+* **TS `x!`** was already `x` in both `expr` and `exprV` (ECMA-262 has no such operator;
+  TypeScript erases it); the tracked AST predates the rule.
+* **TS `op:assignment` (26) is NOT closed here.** `if`/`while` conditions and `return`
+  already splice `exprV`'s prelude, and `assignAsValue` handles a name, field or index
+  target with ECMA-262 §13.15.2's value (the assigned value) — so the 26 come from a
+  target shape or an `expr`-only position this pass could not see without the CPG.
+  Logical assignment (`??=`, `||=`, `&&=`; §13.15.2: the right side is evaluated only
+  when the left does not decide, and the expression's value is then the left operand) is
+  likewise unmodelled until the frontend's operator names for them are confirmed on a
+  real export. Both need a Joern run, which this pass did not have.

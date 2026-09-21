@@ -34,7 +34,8 @@ mapper = lambda a=2: a
     assert records['ordinary'] == dict(name='ordinary', defaults=False, defaultValues=[],
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
-        staticMethod=False, property=False, classMethod=False, receiverThenCollectors=False,
+        staticMethod=False, property=False, classMethod=False, decoratorNames=[],
+        overloadStub=False, receiverThenCollectors=False,
         nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what
@@ -752,3 +753,55 @@ class TestReceiverThenCollectors:
             broken = dict(fn, pythonSignature=dict(fn['pythonSignature'], **bad))
             with pytest.raises(ValueError):
                 mod.render_func(broken, 'f_m_py__module__C_f')
+
+
+class TestOverloadStubsAndDecoratorNames:
+    """`@typing.overload` at run time binds the name to a dummy that raises
+    `NotImplementedError` for any call; the un-decorated definition that follows rebinds
+    it (docs.python.org/3/library/typing.html#typing.overload). The decoder names it so
+    the exporter can translate the stub as exactly that raise, and records every
+    decorator's dotted name so an external decorator is labelled rather than lumped."""
+
+    def test_overload_through_a_module_alias_and_bare(self):
+        source = ('import typing as t\n'
+                  'from typing import overload\n'
+                  '@t.overload\n'
+                  'def f(x: int) -> int: ...\n'
+                  '@overload\n'
+                  'def f(x: str) -> str: ...\n'
+                  'def f(x): return x\n')
+        recs = list(_decode(source)['signatures'].values())
+        assert [r['overloadStub'] for r in recs] == [True, True, False]
+        assert recs[0]['decoratorNames'] == ['t.overload']
+        assert recs[1]['decoratorNames'] == ['overload']
+
+    def test_a_local_overload_is_not_typings(self):
+        source = ('def overload(f): return f\n'
+                  '@overload\n'
+                  'def f(x): return x\n')
+        rec = list(_decode(source)['signatures'].values())[1]
+        assert rec['overloadStub'] is False and rec['decoratorNames'] == ['overload']
+
+    def test_decorator_call_and_expression_shapes(self):
+        source = ('import functools\n'
+                  'def deco(f): return f\n'
+                  '@functools.wraps(deco)\n'
+                  '@deco\n'
+                  '@(lambda g: g)\n'
+                  'def f(x): return x\n')
+        rec = next(r for r in _decode(source)['signatures'].values() if r['name'] == 'f')
+        assert rec['decoratorNames'] == ['functools.wraps', 'deco', '<expr>']
+        assert rec['decorated'] is True and rec['overloadStub'] is False
+
+    def test_negative_numeric_defaults_are_literals(self):
+        """`def read(self, n=-1)`: `-1` is evaluated once when the `def` executes
+        (Language Reference §8.7) to the constant -1, so it binds like a literal."""
+        source = ('def read(n=-1, x=-2.5, flag=-True): ...\n')
+        rec = next(iter(_decode(source)['signatures'].values()))
+        # `-True` is not a numeric constant in our sense and keeps the definition holed.
+        assert rec['defaults'] is True
+        source = ('def read(n=-1, x=-2.5): ...\n')
+        rec = next(iter(_decode(source)['signatures'].values()))
+        assert rec['defaults'] is False
+        assert rec['defaultValues'][0] == ['n', {'k': 'int', 'v': '-1'}]
+        assert rec['defaultValues'][1][0] == 'x' and rec['defaultValues'][1][1]['k'] == 'float'

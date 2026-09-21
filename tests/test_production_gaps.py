@@ -839,3 +839,34 @@ class TestGoAndCLowering:
         block = sem.split('private def goProg', 1)[1]
         for subject, value in (('swap', 21), ('destructure', 34), ('cond', 3), ('forever', 6)):
             assert f'#guard match runFunc goProg 300 "{subject}" [] with | .val (.int {value})' in block, subject
+
+class TestSliceJDefinitionTimeSemantics:
+    """Constructs whose meaning is fixed at DEFINITION time, pinned to the specification
+    that fixes it: `typing.overload` stubs (docs.python.org/3/library/typing.html#typing.overload:
+    the runtime dummy raises `NotImplementedError`, the following definition rebinds the
+    name), decorators (Language Reference §8.7: `@f def g` is `g = f(g)`), negative
+    numeric defaults (§8.7: defaults are evaluated once when the `def` executes), and
+    Kotlin local functions (Kotlin spec, "Local function declaration": capture by
+    reference). The decoder-level checks are in tests/test_python_signatures.py."""
+
+    def test_an_overload_stub_is_a_raise_not_a_hole(self):
+        src = EXPORTER.read_text()
+        assert 'case Some(s) if s.obj.get("overloadStub").exists(_.bool) => None' in src
+        assert 'obj("vararg") = "<overload-stub-args>"' in src
+        assert '"op" -> "py:exception:NotImplementedError",' in src
+        # the stub is checked BEFORE every binding gap, so a decorated stub inside a class
+        # does not fall back to the receiver-signature refusal
+        assert 'if (overloadStub) None' in src
+
+    def test_an_external_decorator_is_named(self):
+        src = EXPORTER.read_text()
+        assert 'externalDecorator.map(d => "decorator:external:" + d).getOrElse("call:python-decorator-binding")' in src
+        # a decorated method is a decorator gap, not a receiver gap
+        assert 'else if (signature("decorated").bool) Some(decoratorGap)' in src
+
+    def test_kotlin_local_functions_close_over_an_unmutated_scope_only(self):
+        src = EXPORTER.read_text()
+        assert 'holeS("kotlin:local-fn-capture-mutated")' in src
+        assert 'frees.filter(n => assignCount(p, n) > 1)' in src
+        # top-level Kotlin functions in the file initialiser are separate exports
+        assert 'case m: Method if moduleScope && List(".kt", ".kts").exists(currentFile.endsWith) => skip' in src
