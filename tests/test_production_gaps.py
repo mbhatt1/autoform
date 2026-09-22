@@ -1240,7 +1240,7 @@ class TestStrReprFormat:
 
 
 class TestPreludesEverywhere:
-    """Slice R4 (docs/languages.md §17.R4): an impure frontend block in ANY operand position
+    """Slice R4 (docs/languages.md §17.R4): supported effectful operand positions
     hoists into the enclosing prelude instead of holing as `expr:BLOCK-impure`, and the
     hoist keeps Python's left-to-right evaluation order (Language Reference §6.16) by
     completing every earlier non-literal operand into a temporary first. Behavioural
@@ -1249,10 +1249,11 @@ class TestPreludesEverywhere:
     """
     SRC = EXPORTER.read_text()
 
-    def test_call_shaped_operands_are_threaded_for_call_mcall_and_alloc(self):
-        assert 'val shapeOk = (kind == "call" || kind == "mcall" || kind == "alloc") &&' in self.SRC
-        # receiver first, then positionals, then keywords -- §6.3.4's order
-        assert '// operands in evaluation order: receiver, positionals, keywords' in self.SRC
+    def test_call_shaped_operands_include_computed_callees(self):
+        assert 'val shapeOk = Set("call", "mcall", "alloc", "callV").contains(kind) &&' in self.SRC
+        # callee/receiver first, then positionals, then keywords -- §6.3.4's order
+        assert '// operands in evaluation order: callee/receiver, positionals, keywords' in self.SRC
+        assert 'calleeV.foreach(f => out("f") = f)' in self.SRC
         assert 'recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) }' in self.SRC
         assert 'case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value' in self.SRC
         assert 'case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value' in self.SRC

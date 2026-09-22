@@ -1248,11 +1248,14 @@ Checked against CPython 3.11 by the `#guard` table in `Stdlib.lean`; the former 
 #### 17.R4 Statement effects in expression operands
 
 Recovered from the interrupted interpreter work and validated against real Joern
-output. `exprV` now carries intermediate statements through method receivers,
-positional and keyword arguments, constructor arguments, list/tuple displays,
+output. `exprV` now carries intermediate statements through computed callees, method
+receivers, positional and keyword arguments, constructor arguments, list/tuple displays,
 membership/identity operands and slice bounds. Earlier operands are evaluated into
 fresh temporaries before later operands' statements run. Nested frontend blocks retain
-their final expression's statements too.
+their final expression's statements too. For `make_function()(argument)`, the
+computed function runs before the argument's statements; a callee or earlier argument
+that raises prevents later effects. The source comparisons cover both exception paths
+and selecting a function from a container that a later argument reassigns.
 
 The contract is Python's [evaluation order](https://docs.python.org/3/reference/expressions.html#evaluation-order).
 This includes effects and exceptions from earlier operands, not just their final

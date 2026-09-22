@@ -9598,7 +9598,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       if (isPythonProperty(f)) (pr, hole("call:python-property-access"))
       else (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> f))
     // Every operand of a call-shaped expression -- a NAMED call's positionals, a method
-    // call's RECEIVER and arguments, a class allocation's arguments, and the KEYWORD
+    // call's RECEIVER and arguments, a computed CALLEE, a class allocation's arguments, and the KEYWORD
     // arguments of any of them -- is threaded through `exprV`, so an impure frontend
     // block (`x = f(a, (y := g()))`, `obj.m(k=h())`, `Cls(a, [t for t in xs])`) hoists
     // into this position's prelude instead of holing as `expr:BLOCK-impure`. The call
@@ -9619,13 +9619,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val kids = kidsOf(c)
       val posArgs = namedCallReceiver(c).toList ++ kids.filter(k => aidx(k) >= 1 && !isKeywordArg(k))
       val kwArgs = kids.filter(isKeywordArg)
+      val calleeNode = kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption)
       val recvNode: Option[AstNode] =
-        if (kind == "mcall") kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption).flatMap(asField).map(_._1)
+        if (kind == "mcall") calleeNode.flatMap(asField).map(_._1)
         else None
+      val valueCalleeNode = if (kind == "callV") calleeNode else None
       val argsArr = baseline.value.get("args").flatMap(_.arrOpt).map(_.toList).getOrElse(Nil)
-      val shapeOk = (kind == "call" || kind == "mcall" || kind == "alloc") &&
+      val shapeOk = Set("call", "mcall", "alloc", "callV").contains(kind) &&
         argsArr.length == posArgs.length + kwArgs.length &&
-        (kind != "mcall" || recvNode.isDefined)
+        (kind != "mcall" || recvNode.isDefined) &&
+        (kind != "callV" || valueCalleeNode.isDefined)
       if (!shapeOk) (Nil, baseline)
       else {
         // A generator expression handed to one of these is exhausted at once and in
@@ -9633,8 +9636,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // `c.name` is the bare callee: `tuple` for `tuple(...)`, `join` for `sep.join(...)`.
         val savedEager = genExpEager
         genExpEager = kind == "call" && genExpConsumers.contains(c.name)
-        // operands in evaluation order: receiver, positionals, keywords
+        // operands in evaluation order: callee/receiver, positionals, keywords
         val recur: List[(List[ujson.Obj], ujson.Value, Option[String])] =
+          valueCalleeNode.toList.map { f => val (pf, fe) = exprV(f); (pf, fe: ujson.Value, Some("<callee>")) } ++
           recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) } ++
           posArgs.map {
             case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
@@ -9672,7 +9676,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             (v, tag)
           }
           val recvV = saved.collectFirst { case (v, Some("<recv>")) => v }
-          val argVals = saved.filter(_._2 != Some("<recv>")).map {
+          val calleeV = saved.collectFirst { case (v, Some("<callee>")) => v }
+          val argVals = saved.filterNot(p => p._2 == Some("<recv>") || p._2 == Some("<callee>")).map {
             case (v, None)                   => v
             case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value
             case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value
@@ -9680,6 +9685,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           val out = ujson.Obj.from(baseline.value.toSeq)
           out("args") = ujson.Arr.from(argVals)
           recvV.foreach(r => out("recv") = r)
+          calleeV.foreach(f => out("f") = f)
           (prelude, out)
         }
       }

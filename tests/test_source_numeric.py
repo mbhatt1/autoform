@@ -278,6 +278,39 @@ def delHoist(a, b):
 def keywordSnapshot(a, b):
     box = EffectBox(a)
     return pair(x=box.get(), y=box.bump(b).get())
+def makePair(box):
+    box.v = box.v + 1
+    return pair
+def pairBack(x, y):
+    return y * 10 + x
+def failFactory():
+    raise ValueError
+def valueCallOrder(a, b):
+    box = EffectBox(a)
+    return makePair(box)(box.get(), box.bump(b).get())
+def valueCallKeyword(a, b):
+    box = EffectBox(a)
+    return makePair(box)(x=box.get(), y=box.bump(b).get())
+def valueCallCalleeEffect(a, b):
+    box = EffectBox(a)
+    return makePair(box.bump(b))(box.get(), box.bump(1).get())
+def valueCallSnapshot(a, b):
+    fs = [pair, pairBack]
+    return fs[0](a, (fs := [pairBack, pair]) and b)
+def valueCallCalleeFailure(a, b):
+    box = EffectBox(a)
+    try:
+        failFactory()(box.bump(b).get())
+    except ValueError:
+        return box.v
+    return -999
+def valueCallArgumentFailure(a, b):
+    box = EffectBox(a)
+    try:
+        makePair(box)(a // 0, box.bump(b).get())
+    except ZeroDivisionError:
+        return box.v
+    return -999
 '''),
     "java": ("JAVASRC", "Numbers.java", '''public class Numbers {
   public static long add(long a, long b) { return a + b; }
@@ -465,7 +498,13 @@ CASES = {
                ("forHoist", [9, 3]), ("forHoist", [-9, 3]),
                ("sliceHoist", [9, 3]), ("sliceHoist", [-9, 3]),
                ("delHoist", [9, 3]), ("delHoist", [-9, 3]),
-               ("keywordSnapshot", [9, 3]), ("keywordSnapshot", [-9, 3])],
+               ("keywordSnapshot", [9, 3]), ("keywordSnapshot", [-9, 3]),
+               ("valueCallOrder", [9, 3]), ("valueCallOrder", [-9, 3]),
+               ("valueCallKeyword", [9, 3]), ("valueCallKeyword", [-9, 3]),
+               ("valueCallCalleeEffect", [9, 3]), ("valueCallCalleeEffect", [-9, 3]),
+               ("valueCallSnapshot", [9, 3]), ("valueCallSnapshot", [-9, 3]),
+               ("valueCallCalleeFailure", [9, 3]), ("valueCallCalleeFailure", [-9, 3]),
+               ("valueCallArgumentFailure", [9, 3]), ("valueCallArgumentFailure", [-9, 3])],
     "java": [("add", [2147483647, 1]), ("add", [9223372036854775807, 1]),
              ("div", [-9223372036854775808, -1]), ("shift", [1, 32]),
              ("shift", [1, -1]), ("unsigned", [-1, 1]),
