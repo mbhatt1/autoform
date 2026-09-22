@@ -2514,7 +2514,15 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * `char[311]` is one of these: an array decays to a pointer. */
   def isPointerType(ty: String): Boolean = {
     val b = bareType(ty)
-    b.endsWith("*") || b.matches(""".*\[.*\]""") || b == "std.nullptr_t"
+    // Go spells a pointer type with the star FIRST -- spec "Pointer types": `PointerType =
+    // "*" BaseType` -- so `*main.T`/`*int` are pointers; C/C++/Java spell it last. Without
+    // this every Go pointer read as `opaque-type` and none of the interior-pointer rules
+    // below (`addrKind`, `pointerStructFieldOperand`, `castTargetIsPointer`) could fire on
+    // a Go file. Written against `currentFile` (a var declared above) rather than `goFile`
+    // (a def declared far below): a script `def` may not forward-reference a later `def`
+    // across a `val`.
+    val go = currentFile.toLowerCase.endsWith(".go")
+    b.endsWith("*") || (go && b.startsWith("*")) || b.matches(""".*\[.*\]""") || b == "std.nullptr_t"
   }
 
   /** Integer types whose width is fixed by the **language**, not by the target.

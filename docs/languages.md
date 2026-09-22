@@ -1245,3 +1245,40 @@ Checked against CPython 3.11 by the `#guard` table in `Stdlib.lean`; the former 
 `TypeError`, both represented), and the builtins still leave the heap unchanged
 (`builtin_heap_unchanged`).
 
+
+#### 17.R8 Go and C pointers with the CPG shapes (2026-09-21)
+
+**What the measurement actually was.** The tracked `ast-LangGo.json` / `ast-LangC.json`
+carry the OLD bare labels (`op:addressOf`, `op:indirection`, `op:cast` -- 44/12, 28/18)
+with no `:shape:kind` suffix: they were exported before the exporter's interior-pointer
+machinery (`boxedLocals`, `ptrAliases`, `ptrIrefNames`, `irefField`/`irefIndex`/
+`derefIref`/`setDerefIref`, `castTargetIsPointer`, the labelled `op:addressOf:<shape>:<kind>`
+holes) existed. Those counts therefore measure a different exporter, and this pass did not
+run Joern; the honest statement is what is now IN PLACE for a re-export, not a delta.
+
+**Go, done.** The boxing/alias/iref path is language-agnostic except for one fact it asks
+of every type: `isPointerType`. Go spells a pointer type with the star first (spec "Pointer
+types": `PointerType = "*" BaseType`, so `*main.T`, `*int`), where C/C++/Java spell it last;
+until now every Go pointer read as `opaque-type` and no pointer rule could fire on a Go
+file. Fixed in `cartographer/export_ast.sc` (`isPointerType`). With it, `x := 1; p := &x`
+boxes `x` at its binding (the dominance rule the C path and Python's `nonlocal` already
+apply), `*p` resolves through the alias, `&s.f` / `&a[i]` are `irefField` / `irefIndex`,
+`*p = v` is `setDerefIref`. Core needed no new clause: `goPtrProg` in `Semantics.lean`
+runs those clauses under `.go` and pins `go1.20.6`'s answers (`ptrLocal` 5, `ptrField` 11,
+`ptrIndex` 14, `ptrAlias` 3), with the spec sentences ("Address operators", "Selectors")
+quoted beside them.
+
+**Go, not done, and why.** `&T{...}` (a pointer to a composite literal) and `for range`
+depend on gosrc2cpg's spelling of the composite literal and of the range clause, which is
+not derivable from the Go spec and was not observed in this pass; both keep their holes
+(`op:addressOf:call:*`, `control:FOR:range`). Map iteration order, when `range` lands, is
+out of contract by the spec's own sentence ("is not specified and is not guaranteed to be
+the same from one iteration to the next").
+
+**C, unchanged.** The 28/18/14 `sds` holes are bare labels from the old export; the current
+exporter's `op:indirection:<kind>`, `castTargetIsPointer` and `switchStmt` paths cover
+much of `sds` already and the residue (pointer arithmetic on `char *` cursors beyond the
+`strCursorParams` shapes, pointer casts between distinct pointer types, `switch` bodies
+whose labels are not `CASTCaseStatement`/`CASTDefaultStatement`) needs the CPG to name.
+C17 §6.5.6 (pointer arithmetic) and §6.8.4.2 (fallthrough) are the contracts a future pass
+must meet; none of them is guessed here.
