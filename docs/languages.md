@@ -1245,6 +1245,46 @@ Checked against CPython 3.11 by the `#guard` table in `Stdlib.lean`; the former 
 `TypeError`, both represented), and the builtins still leave the heap unchanged
 (`builtin_heap_unchanged`).
 
+#### 17.R4 Statement effects in expression operands
+
+Recovered from the interrupted interpreter work and validated against real Joern
+output. `exprV` now carries intermediate statements through method receivers,
+positional and keyword arguments, constructor arguments, list/tuple displays,
+membership/identity operands and slice bounds. Earlier operands are evaluated into
+fresh temporaries before later operands' statements run. Nested frontend blocks retain
+their final expression's statements too.
+
+The contract is Python's [evaluation order](https://docs.python.org/3/reference/expressions.html#evaluation-order).
+This includes effects and exceptions from earlier operands, not just their final
+values. A preceding `*args` or `**kwargs` expansion still refuses a later hoisted
+effect: saving the iterable or mapping would not save the expansion. This change does
+not extend the existing eager-generator consumer set to method calls. Suspended
+generators remain required for the arbitrary-codebase goal.
+
+`assert` keeps its message's statements inside the failure branch; conditions run
+before the test. Loop iterables run once before iteration. `del` receivers and indexes
+and non-Python raise operands also carry statements in source order. Conditional
+expression branches and short-circuit operands keep their conditional execution.
+
+The runtime comparison exposed two further defects. Python type recovery can name an
+unnamed context-manager call `Held..__init__`; an empty callee name must not turn into
+an allocation. The exporter now lets its existing bound-method recovery handle that
+shape. `tuple` can now read a boxed container without losing references to its nested
+mutable elements. This does not establish general context-manager exception
+suppression or lazy-generator correctness.
+
+Validation commands:
+
+```sh
+AUTOFORM_TEST_JOERN=1 .venv/bin/python -m pytest tests/test_source_numeric.py -k 'joern_native_numeric and python' -q
+.venv/bin/python -m pytest tests/test_source_numeric.py -k tuple_from_boxed -q
+```
+
+The source test compares the results with CPython and proves every Python observation
+in Lean's kernel, including receiver reassignment, keyword ordering, constructor
+arguments, display ordering, slicing, deletion, assertion messages, short-circuiting,
+loop iterables and the normal context-manager path. Re-export a corpus with
+`scripts/reland_corpus.sh` before claiming updated corpus conformance or coverage.
 
 #### 17.R8 Go and C pointers with the CPG shapes (2026-09-21)
 

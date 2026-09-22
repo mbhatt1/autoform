@@ -834,13 +834,13 @@ def knowsFree (d : Dialect) (name : String) : Bool :=
   | .python => freeNames.contains name
 
 /-- The free builtins whose arguments the interpreter reads THROUGH a boxed container
-(`Val.unbox`) before calling `builtin`. All of them return a scalar computed from the
-container's contents -- `len(s)` is "the length (the number of items) of an object"
-(library reference, Built-in Functions) -- so unboxing neither creates nor destroys an
-identity. A builtin that returns a container is not on this list on purpose. -/
+(`Val.unbox`) before calling `builtin`. Scalar observations preserve the container's
+identity. `tuple` makes an immutable sequence of the same elements: shallow unboxing
+preserves references to nested mutable objects. Mutable-container constructors need
+allocation and are not on this list. -/
 @[simp] def unboxesArgs (name : String) : Bool :=
   name == "len" || name == "sum" || name == "min" || name == "max" ||
-  name == "bool" || name == "any" || name == "all"
+  name == "bool" || name == "any" || name == "all" || name == "tuple"
 
 /-- The builtin bodies. Call `builtin`, not this: only `builtin` carries the `knowsFree`
 guard that keeps the ledger honest. -/

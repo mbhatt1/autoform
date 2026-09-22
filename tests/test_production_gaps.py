@@ -363,7 +363,8 @@ class TestBoxedContainerExporterWiring:
     def test_python_del_index_emits_delIndex(self):
         src = EXPORTER.read_text()
         assert 'case (x: AstNode) :: Nil if pyFile && asIndex(x).isDefined =>' in src
-        assert 'ujson.Obj("k" -> "delIndex", "a" -> expr(recv), "i" -> expr(idx))' in src
+        # operands threaded in order (§16.R4): receiver then index, each may hoist a prelude
+        assert 'seqOf(prelude :+ ujson.Obj("k" -> "delIndex", "a" -> vals(0), "i" -> vals(1)))' in src
         # The non-Python case keeps the hole: a C aggregate is a value with no identity.
         assert 'holeS("op:delete-index")' in src
 
@@ -492,7 +493,7 @@ class TestComprehensionLowering:
     def test_a_generator_expression_lowers_only_where_it_is_consumed_at_once(self):
         src = EXPORTER.read_text()
         assert 'case "gen" if !eagerGen    => (Nil, hole("expr:genExp"))' in src
-        assert 'genExpEager = genExpConsumers.contains(c.name)' in src
+        assert 'genExpEager = kind == "call" && genExpConsumers.contains(c.name)' in src
         for consumer in ('"tuple"', '"sum"', '"sorted"', '"join"', '"any"', '"all"'):
             assert consumer in src.split('val genExpConsumers', 1)[1].split(')', 1)[0], consumer
         # stored or returned: `valueOf` asks with eagerGen = false
@@ -1084,7 +1085,8 @@ class TestSliceDPythonLabels:
         assert '"op" -> "py:exception:AssertionError"' in src
         assert 'Python Language Reference §7.3 (The assert statement)' in src
         # the message is evaluated only on failure: it sits in the else-branch
-        assert '"c" -> expr(ks.head), "t" -> skip,' in src
+        # the condition's prelude hoists before the test (§16.R4); the message stays lazy
+        assert 'seqOf(condPrelude :+ ujson.Obj("k" -> "ifte", "c" -> condV, "t" -> skip,' in src
 
     def test_a_set_display_is_a_unit_valued_dict_with_distinct_keys(self):
         src = EXPORTER.read_text()
@@ -1235,6 +1237,54 @@ class TestStrReprFormat:
         src = EXPORTER.read_text()
         assert 'case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))' in src
         assert 'else hole("op:stringExpressionList:non-literal-part")' in src
+
+
+class TestPreludesEverywhere:
+    """Slice R4 (docs/languages.md §17.R4): an impure frontend block in ANY operand position
+    hoists into the enclosing prelude instead of holing as `expr:BLOCK-impure`, and the
+    hoist keeps Python's left-to-right evaluation order (Language Reference §6.16) by
+    completing every earlier non-literal operand into a temporary first. Behavioural
+    check: `test_joern_native_numeric[python]` (`argOrder`, `kwHoist`, `ctorHoist`,
+    `tupleHoist`, `inHoist`), CPython-compared; these pin the exporter side.
+    """
+    SRC = EXPORTER.read_text()
+
+    def test_call_shaped_operands_are_threaded_for_call_mcall_and_alloc(self):
+        assert 'val shapeOk = (kind == "call" || kind == "mcall" || kind == "alloc") &&' in self.SRC
+        # receiver first, then positionals, then keywords -- §6.3.4's order
+        assert '// operands in evaluation order: receiver, positionals, keywords' in self.SRC
+        assert 'recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) }' in self.SRC
+        assert 'case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value' in self.SRC
+        assert 'case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value' in self.SRC
+
+    def test_earlier_operands_are_completed_before_a_later_effect(self):
+        # the order rule: everything before the LAST effectful operand is saved, literals excepted
+        assert 'if (i < lastEffect && !isLit) {' in self.SRC
+        assert 'val literalKinds = Set("int", "str", "bool", "float", "unit")' in self.SRC
+        # the starred refusal survives: an expansion cannot be saved by saving its container
+        assert '(Nil, hole("call:effect-after-starred"))' in self.SRC
+
+    def test_displays_and_membership_thread_their_operands(self):
+        assert 'def threadInOrder(ops: List[AstNode]): (List[ujson.Obj], List[ujson.Value])' in self.SRC
+        assert '(pyFile && callName(c) == "<operator>.setLiteral")) && kidsOf(c).nonEmpty =>' in self.SRC
+        assert 'Set("<operator>.in", "<operator>.notIn", "<operator>.is", "<operator>.isNot").contains(callName(c))' in self.SRC
+        # nothing to hoist -> byte-identical to `expr`
+        assert self.SRC.count('if (prelude.isEmpty) (Nil, expr(c))   // byte-identical when nothing hoists') == 2
+
+    def test_statement_positions_hoist_only_what_always_runs(self):
+        # assert: condition hoists, message stays lazy (§7.3 evaluates it only on failure)
+        assert 'val (condPrelude, condV) = exprV(ks.head)' in self.SRC
+        assert '"e" -> seqOf(messagePrelude :+ ujson.Obj("k" -> "raise"' in self.SRC
+        # for-in iterable, del target, non-Python raise
+        assert 'kidsOf(c).find(aidx(_) == -1).flatMap(asField).map { case (r, _) => exprV(r) }' in self.SRC
+        assert 'val (prelude, vals) = threadInOrder(List(recv, idx))' in self.SRC
+        assert 'seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" -> v))' in self.SRC
+
+    def test_lazy_positions_are_untouched(self):
+        """`and`/`or` right operands and conditional branches already run their preludes
+        only on the taken path (§6.11, §6.13); this slice must not have flattened them."""
+        assert 'if (op == "&&" || op == "||") {' in self.SRC
+        assert '"t" -> seqOf(tPrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> tE)),' in self.SRC
 
 
 

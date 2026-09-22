@@ -7988,7 +7988,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // call's name as the class. An explicit `super().__init__(...)` keeps name
       // `__init__` and is a method call, not an allocation.
       val ctor: Option[String] =
-        if (mfn.endsWith(".__init__") && c.name != "__init__") Some(c.name)
+        // Python's type recovery can attach `Held..__init__` to the unnamed
+        // calls of a saved context-manager method. An empty call name is not a
+        // constructor; let boundMethodCall recover its receiver and method.
+        if (mfn.endsWith(".__init__") && c.name.nonEmpty && c.name != "__init__") Some(c.name)
         else callee match {
           case Some(i: Identifier) if classNames.contains(i.name) && i.name == c.name => Some(i.name)
           case _                                                                      => None
@@ -8373,10 +8376,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case b: Block =>
           kidsOf(b) match {
             case Nil => None
-            case ks  => iterSource(ks.last).map { case (_, e) => (ks.init.map(stmt), e) }
+            case ks  => iterSource(ks.last).map { case (prelude, e) => (ks.init.map(stmt) ++ prelude, e) }
           }
         case c: Call if c.name == "__iter__" =>
-          kidsOf(c).find(aidx(_) == -1).flatMap(asField).map { case (r, _) => (Nil, expr(r)) }
+          // the iterable's own prelude (an impure block, a walrus) runs once, before the loop
+          kidsOf(c).find(aidx(_) == -1).flatMap(asField).map { case (r, _) => exprV(r) }
         case _ => None
       }
       for {
@@ -9442,6 +9446,30 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def sliceBoundV(b: AstNode): (List[ujson.Obj], ujson.Obj) =
     if (isNoneBound(b)) (Nil, ujson.Obj("k" -> "unit")) else exprV(b)
 
+  /** Thread a list of sibling operands through `exprV` in source order, hoisting every
+    * prelude and completing each non-literal operand that precedes the LAST effectful one
+    * into a fresh temporary -- Python Language Reference §6.16, "Python evaluates
+    * expressions from left to right", is the contract a hoisted prelude must not break. */
+  def threadInOrder(ops: List[AstNode]): (List[ujson.Obj], List[ujson.Value]) = {
+    threadValuesInOrder(ops.map(exprV))
+  }
+
+  def threadValuesInOrder(recur: List[(List[ujson.Obj], ujson.Obj)]): (List[ujson.Obj], List[ujson.Value]) = {
+    val lastEffect = recur.lastIndexWhere(_._1.nonEmpty)
+    val literalKinds = Set("int", "str", "bool", "float", "unit")
+    var prelude = List.empty[ujson.Obj]
+    val vals = recur.zipWithIndex.map { case ((pa, ae), i) =>
+      prelude = prelude ++ pa
+      val isLit = literalKinds.contains(ae("k").str)
+      if (i < lastEffect && !isLit) {
+        val tmp = freshExprVTemp()
+        prelude = prelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> ae)
+        ujson.Obj("k" -> "name", "v" -> tmp): ujson.Value
+      } else ae: ujson.Value
+    }
+    (prelude, vals)
+  }
+
   def exprV(n: AstNode): (List[ujson.Obj], ujson.Obj) = unwrapMacro(n) match {
     case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
@@ -9547,10 +9575,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case c: Call if callName(c) == "<operator>.slice" && pyFile &&
                     asSlice(c).exists(_._2.size == 3) =>
       val (recv, bounds) = asSlice(c).get
-      val (pa, ae) = exprV(recv)
-      val bs = bounds.map(sliceBoundV)
-      (pa ++ bs.flatMap(_._1),
-       ujson.Obj("k" -> "slice", "a" -> ae, "lo" -> bs(0)._2, "hi" -> bs(1)._2, "st" -> bs(2)._2))
+      val (prelude, vals) = threadValuesInOrder(exprV(recv) :: bounds.map(sliceBoundV))
+      (prelude, ujson.Obj("k" -> "slice", "a" -> vals(0),
+        "lo" -> vals(1), "hi" -> vals(2), "st" -> vals(3)))
     case c: Call if indexOps.contains(callName(c)) && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
       val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
@@ -9570,57 +9597,117 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       // `return c.prop` actually takes.
       if (isPythonProperty(f)) (pr, hole("call:python-property-access"))
       else (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> f))
-    // An ordinary named call's positional arguments (research.md §3, point 2,
-    // "function-call arguments"). Delegates the actual call classification to
-    // `expr`/`callExpr` unchanged (ctor/mcall/`<fakeNew>`/class-body and every other
-    // special form are simply not touched here, and fall to the base case below) --
-    // only the positional-argument VALUES are threaded through `exprV`, and only when
-    // at least one of them actually has a prelude to hoist; otherwise this returns
-    // `expr(c)` verbatim; byte-identical to today.
-    case c: Call if !callName(c).startsWith("<operator>") && callName(c) != "<unknownFullName>" =>
+    // Every operand of a call-shaped expression -- a NAMED call's positionals, a method
+    // call's RECEIVER and arguments, a class allocation's arguments, and the KEYWORD
+    // arguments of any of them -- is threaded through `exprV`, so an impure frontend
+    // block (`x = f(a, (y := g()))`, `obj.m(k=h())`, `Cls(a, [t for t in xs])`) hoists
+    // into this position's prelude instead of holing as `expr:BLOCK-impure`. The call
+    // classification itself is `expr`/`callExpr`'s, unchanged: only the operand VALUES
+    // are replaced, and only when at least one operand carries a prelude; otherwise this
+    // returns `expr(c)` verbatim.
+    //
+    // Evaluation order is the contract (Python Language Reference §6.16: "Python
+    // evaluates expressions from left to right"; §6.3.4: the primary is evaluated
+    // before the arguments, positional arguments before keyword arguments). A hoisted
+    // prelude runs BEFORE the whole call, so every operand evaluated earlier in source
+    // order than the last effectful one is completed into a fresh temporary first --
+    // that keeps its value (and its own exceptions) ahead of the later effects. A
+    // literal needs no such save: re-reading it observes nothing.
+    case c: Call if !callName(c).startsWith("<operator>") =>
       val baseline = expr(c)
-      val posArgs = namedCallReceiver(c).toList ++
-        kidsOf(c).filter(k => aidx(k) >= 1 && !isKeywordArg(k))
-      val ok = baseline.value.get("k").exists(_.str == "call") &&
-               baseline.value.get("args").flatMap(_.arrOpt).exists(_.length >= posArgs.length)
-      if (!ok) (Nil, baseline)
+      val kind = baseline.value.get("k").map(_.str).getOrElse("")
+      val kids = kidsOf(c)
+      val posArgs = namedCallReceiver(c).toList ++ kids.filter(k => aidx(k) >= 1 && !isKeywordArg(k))
+      val kwArgs = kids.filter(isKeywordArg)
+      val recvNode: Option[AstNode] =
+        if (kind == "mcall") kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption).flatMap(asField).map(_._1)
+        else None
+      val argsArr = baseline.value.get("args").flatMap(_.arrOpt).map(_.toList).getOrElse(Nil)
+      val shapeOk = (kind == "call" || kind == "mcall" || kind == "alloc") &&
+        argsArr.length == posArgs.length + kwArgs.length &&
+        (kind != "mcall" || recvNode.isDefined)
+      if (!shapeOk) (Nil, baseline)
       else {
-        val argsArr = baseline("args").arr.toList
         // A generator expression handed to one of these is exhausted at once and in
         // full, so lowering it as a list is unobservable (`comprehensionLowering`).
         // `c.name` is the bare callee: `tuple` for `tuple(...)`, `join` for `sep.join(...)`.
         val savedEager = genExpEager
-        genExpEager = genExpConsumers.contains(c.name)
-        val recur = posArgs.map {
-          case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
-            (List.empty[ujson.Obj], argExpr(sc))
-          case a =>
+        genExpEager = kind == "call" && genExpConsumers.contains(c.name)
+        // operands in evaluation order: receiver, positionals, keywords
+        val recur: List[(List[ujson.Obj], ujson.Value, Option[String])] =
+          recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) } ++
+          posArgs.map {
+            case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
+              (List.empty[ujson.Obj], argExpr(sc), None)
+            case a =>
+              val (pa, ae) = exprV(a)
+              (pa, if (pa.isEmpty) argExpr(a) else ae: ujson.Value, None)
+          } ++
+          kwArgs.map { a =>
             val (pa, ae) = exprV(a)
-            (pa, if (pa.isEmpty) argExpr(a) else ae: ujson.Value)
-        }
+            (pa, ae: ujson.Value, Some(argName(a).getOrElse("")))
+          }
         genExpEager = savedEager
         val lastEffect = recur.lastIndexWhere(_._1.nonEmpty)
         if (lastEffect < 0) (Nil, baseline)
         // Expanding an iterable can itself fail or read mutable state. Saving
         // just its container before a later effect would not save the expansion.
-        else if (recur.take(lastEffect).exists { case (_, e) =>
-          e.objOpt.flatMap(_.get("k")).exists(_.str == "starred")
+        else if (recur.take(lastEffect).exists { case (_, e, tag) =>
+          tag.contains("<keyword_dict>") || e.objOpt.flatMap(_.get("k")).exists(_.str == "starred")
         }) (Nil, hole("call:effect-after-starred"))
         else {
+          val literalKinds = Set("int", "str", "bool", "float", "unit")
           var prelude = List.empty[ujson.Obj]
-          val savedArgs = recur.zipWithIndex.map { case ((pa, ae), i) =>
+          val saved = recur.zipWithIndex.map { case ((pa, ae, tag), i) =>
             prelude = prelude ++ pa
-            if (i < lastEffect) {
-              // Complete this argument before running a later argument's lifted
-              // assignments. This also preserves exceptions from earlier calls.
-              val tmp = freshExprVTemp()
-              prelude = prelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> ae)
-              ujson.Obj("k" -> "name", "v" -> tmp): ujson.Value
-            } else ae
+            val isLit = ae.objOpt.flatMap(_.get("k")).exists(k => literalKinds.contains(k.str))
+            val v: ujson.Value =
+              if (i < lastEffect && !isLit) {
+                // Complete this operand before running a later operand's lifted
+                // statements. This also preserves exceptions from earlier operands.
+                val tmp = freshExprVTemp()
+                prelude = prelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> ae)
+                ujson.Obj("k" -> "name", "v" -> tmp)
+              } else ae
+            (v, tag)
           }
-          (prelude, ujson.Obj("k" -> "call", "f" -> baseline("f"),
-            "args" -> ujson.Arr.from(savedArgs ++ argsArr.drop(posArgs.length))))
+          val recvV = saved.collectFirst { case (v, Some("<recv>")) => v }
+          val argVals = saved.filter(_._2 != Some("<recv>")).map {
+            case (v, None)                   => v
+            case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value
+            case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value
+          }
+          val out = ujson.Obj.from(baseline.value.toSeq)
+          out("args") = ujson.Arr.from(argVals)
+          recvV.foreach(r => out("recv") = r)
+          (prelude, out)
         }
+      }
+    // Displays: Python §6.2.5/§6.2.6/§6.2.7 -- "elements are evaluated from left to
+    // right". Same order discipline as a call's operands. `{k: v}` is the frontend's
+    // `{}` plus stores and never carries children here.
+    case c: Call if (callName(c) == "<operator>.listLiteral" || callName(c) == "<operator>.tupleLiteral" ||
+                     (pyFile && callName(c) == "<operator>.setLiteral")) && kidsOf(c).nonEmpty =>
+      val (prelude, vals) = threadInOrder(kidsOf(c))
+      if (prelude.isEmpty) (Nil, expr(c))   // byte-identical when nothing hoists
+      else {
+        val node = callName(c) match {
+          case "<operator>.listLiteral"  => ujson.Obj("k" -> "listE", "items" -> ujson.Arr.from(vals))
+          case "<operator>.tupleLiteral" => ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr.from(vals))
+          case _ => ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr.from(vals.map(v => ujson.Arr(v, ujson.Obj("k" -> "unit")))))
+        }
+        (prelude, node)
+      }
+    // `a in b` / `a is b`: two operands, left before right (§6.16); the left is completed
+    // into a temporary when the right carries a prelude.
+    case c: Call if Set("<operator>.in", "<operator>.notIn", "<operator>.is", "<operator>.isNot").contains(callName(c)) &&
+                    kidsOf(c).size == 2 =>
+      val (prelude, vals) = threadInOrder(kidsOf(c))
+      if (prelude.isEmpty) (Nil, expr(c))   // byte-identical when nothing hoists
+      else {
+        val k = if (callName(c) == "<operator>.in" || callName(c) == "<operator>.notIn") "inOp" else "isOp"
+        val neg = callName(c) == "<operator>.notIn" || callName(c) == "<operator>.isNot"
+        (prelude, ujson.Obj("k" -> k, "neg" -> neg, "a" -> vals(0), "b" -> vals(1)))
       }
     // `009-reduce-remaining-holes-4`: `c ? t : e` where `t`/`e` may themselves need
     // a prelude -- SQLite's own extremely common "optional vtable method" idiom,
@@ -9696,7 +9783,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       case _ => false
     }
     if (!hoistable) (Nil, blockExpr(b))
-    else (stmts(ks.init), expr(ks.last))
+    else {
+      val prefix = stmts(ks.init)
+      val (lastPrelude, lastValue) = exprV(ks.last)
+      (prefix ++ lastPrelude, lastValue)
+    }
   }
 
   /** Translate a statement list, merging the two-statement C++ stack-construction shape
@@ -9972,14 +10063,20 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // check is on. The message is evaluated only on failure -- the else-branch gives that.
     case c: Call if pyFile && callName(c) == "<operator>.assert" && kidsOf(c).nonEmpty =>
       val ks = kidsOf(c)
-      ujson.Obj("k" -> "ifte", "c" -> expr(ks.head), "t" -> skip,
-                "e" -> ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
+      // The condition always runs, so its prelude hoists before the test; the message
+      // is evaluated only on failure (§7.3), so it stays where it is.
+      val (condPrelude, condV) = exprV(ks.head)
+      val (messagePrelude, messageVals) = threadInOrder(ks.tail)
+      seqOf(condPrelude :+ ujson.Obj("k" -> "ifte", "c" -> condV, "t" -> skip,
+                "e" -> seqOf(messagePrelude :+ ujson.Obj("k" -> "raise", "e" -> ujson.Obj("k" -> "unop",
                          "op" -> "py:exception:AssertionError",
-                         "a" -> ujson.Obj("k" -> "tupleE", "items" -> exprs(ks.tail)))))
+                         "a" -> ujson.Obj("k" -> "tupleE", "items" -> ujson.Arr.from(messageVals)))))))
     case c: Call if callName(c) == "<operator>.raise" =>
       if (pyFile) pythonRaise(c)
       else kidsOf(c).headOption match {
-        case Some(e) => ujson.Obj("k" -> "raise", "e" -> expr(e))
+        case Some(e) =>
+          val (prelude, v) = exprV(e)
+          seqOf(prelude :+ ujson.Obj("k" -> "raise", "e" -> v))
         // A bare `raise` re-raises the exception in flight; Core has no such notion.
         case None    => holeS("op:raise-bare")
       }
@@ -9994,7 +10091,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // holed at run time, a smaller count for identical behaviour.
         case (x: AstNode) :: Nil if pyFile && asIndex(x).isDefined =>
           val (recv, idx) = asIndex(x).get
-          ujson.Obj("k" -> "delIndex", "a" -> expr(recv), "i" -> expr(idx))
+          val (prelude, vals) = threadInOrder(List(recv, idx))
+          seqOf(prelude :+ ujson.Obj("k" -> "delIndex", "a" -> vals(0), "i" -> vals(1)))
         // `del o.f` removes a binding from an object; Core's `del` only unbinds a
         // variable, so translating it would be a lie.
         case (x: AstNode) :: Nil if isOp(x, "<operator>.indexAccess") => holeS("op:delete-index")

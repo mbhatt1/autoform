@@ -1,0 +1,91 @@
+{
+  "base_revision": "40c9a8e9c345bffa7a79aae0763e9b6ffa2baf2c",
+  "source": "/tmp/corp_click/click",
+  "scope": "same CPG, exporter comparison only; not a corpus re-land or runtime conformance claim",
+  "commands": [
+    "joern-parse /tmp/corp_click/click --language PYTHONSRC --output cpg.bin",
+    "joern --script export-before.sc --param cpgPath=cpg.bin --param out=before.json",
+    "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=after.json"
+  ],
+  "sha256": {
+    "before.json": "33359ea3e551efacc697e82bbc2d1797705a15845b6e1aa9c4beebd1ce3a56f5",
+    "after.json": "e8e62d6a90a86d7e0703764145345e6c90dd592fb6017bc1efbe56c18ce0b700",
+    "export-before.sc": "03b30f14cd0b974ac5c4cd3054b5217eef570239675e6bbe649c1430f03527dc",
+    "export_ast.sc": "e234617067b7f7357a7c82bb0a26354e3b56a9d94e80e17660260632602f510f"
+  },
+  "before": {
+    "funcs": 549,
+    "holes": 100,
+    "hole_free": 476,
+    "causes": {
+      "lit:bytes": 8,
+      "exception:payload:filename": 2,
+      "exception:payload:errno": 1,
+      "lit:unquoted": 1,
+      "expr:BLOCK-prelude": 2,
+      "control:TRY-handler-binding": 3,
+      "expr:genExp": 15,
+      "decorator:external:contextlib.contextmanager": 5,
+      "decorator:external:contextmanager": 5,
+      "control:TRY-handler-type": 6,
+      "op:starredUnpack": 6,
+      "expr:BLOCK-impure": 25,
+      "exception:payload:exit_code": 2,
+      "op:raise-cause": 4,
+      "call:python-receiver-signature": 2,
+      "op:delete-field": 1,
+      "scope:nonlocal-write": 2,
+      "op:formatString:nested-spec": 4,
+      "call:python-decorator-binding": 3,
+      "expr:comprehension-position": 1,
+      "exception:payload:strerror": 1,
+      "lit:ellipsis": 1
+    }
+  },
+  "after": {
+    "funcs": 549,
+    "holes": 77,
+    "hole_free": 490,
+    "causes": {
+      "lit:bytes": 8,
+      "exception:payload:filename": 2,
+      "exception:payload:errno": 1,
+      "lit:unquoted": 1,
+      "expr:BLOCK-prelude": 2,
+      "control:TRY-handler-binding": 3,
+      "expr:genExp": 15,
+      "decorator:external:contextlib.contextmanager": 5,
+      "decorator:external:contextmanager": 5,
+      "control:TRY-handler-type": 6,
+      "op:starredUnpack": 6,
+      "exception:payload:exit_code": 2,
+      "op:raise-cause": 4,
+      "call:python-receiver-signature": 2,
+      "op:delete-field": 1,
+      "scope:nonlocal-write": 2,
+      "op:formatString:nested-spec": 4,
+      "call:python-decorator-binding": 3,
+      "expr:comprehension-position": 1,
+      "expr:BLOCK-impure": 2,
+      "exception:payload:strerror": 1,
+      "lit:ellipsis": 1
+    }
+  },
+  "newly_hole_free": [
+    "core.py:<module>.Command.parse_args",
+    "core.py:<module>.Group.resolve_command",
+    "core.py:<module>.Group.shell_complete",
+    "core.py:<module>.Parameter.type_cast_value.convert",
+    "core.py:<module>.Option.get_help_record",
+    "parser.py:<module>._Argument.process",
+    "parser.py:<module>._OptionParser._match_long_opt",
+    "parser.py:<module>._OptionParser._get_value_from_state",
+    "types.py:<module>.DateTime.convert",
+    "types.py:<module>._NumberParamTypeBase.convert",
+    "types.py:<module>._NumberRangeBase.convert",
+    "types.py:<module>.BoolParamType.convert",
+    "types.py:<module>.UUIDParameterType.convert",
+    "types.py:<module>.Tuple.convert"
+  ],
+  "regressed_hole_free": []
+}

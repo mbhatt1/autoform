@@ -61,6 +61,25 @@ def test_python_sequence_index_kernel(tmp_path, numeric_env):
     run(['lake', 'env', 'lean', path], ROOT, numeric_env)
 
 
+def test_tuple_from_boxed_container_kernel(tmp_path, numeric_env):
+    code = r'''import Autoform.Lang.Core.Semantics
+open Autoform.Core
+example : (evalExpr { dialect := .python, table := [] } 20 [] []
+    (.call "tuple" [.listE [.lit (.int 1), .lit (.int 2)]])).2
+    = .val (.tuple [.int 1, .int 2]) := by rfl
+example : (evalExpr { dialect := .python, table := [] } 20 [] []
+    (.call "tuple" [.dictE [(.lit (.str "a"), .lit (.int 1))]])).2
+    = .val (.tuple [.str "a"]) := by rfl
+-- Copy the outer sequence, keeping the inner object's identity.
+example : (evalExpr { dialect := .python, table := [] } 20 [] []
+    (.call "tuple" [.listE [.listE [.lit (.int 1)]]])).2
+    = .val (.tuple [.ref 0]) := by rfl
+'''
+    path = tmp_path / "TupleFromBoxed.lean"
+    path.write_text(code)
+    run(['lake', 'env', 'lean', path], ROOT, numeric_env)
+
+
 def test_typed_numeric_kernel(tmp_path, numeric_env):
     # Boundary values and refusal cases. These are kernel proofs, not native_decide.
     code = '''import Autoform.Lang.Core.Semantics
@@ -185,6 +204,80 @@ def withStmt(a, b):
     with h as v:
         b = b + v
     return b * 10 + h.v
+class EffectBox:
+    def __init__(self, v):
+        self.v = v
+    def bump(self, d):
+        self.v = self.v + d
+        return self
+    def get(self):
+        return self.v
+    def combine(self, x, y):
+        return self.v * 100 + x * 10 + y
+def pair(x, y):
+    return x * 10 + y
+def argOrder(a, b):
+    box = EffectBox(a)
+    return pair(box.get(), box.bump(b).get())
+def kwHoist(a, b):
+    box = EffectBox(a)
+    return pair(y=box.bump(b).get(), x=box.get())
+def ctorHoist(a, b):
+    box = EffectBox(a)
+    other = EffectBox(box.bump(b).get())
+    return other.v * 10 + box.v
+def tupleHoist(a, b):
+    box = EffectBox(a)
+    t = (box.get(), box.bump(b).get(), box.get())
+    return t[0] * 100 + t[1] * 10 + t[2]
+def inHoist(a, b):
+    box = EffectBox(a)
+    return 1 if box.get() in [box.bump(b).get()] else 0
+def methodHoist(a, b):
+    box = EffectBox(a)
+    return box.combine(box.get(), box.bump(b).get())
+def receiverHoist(a, b):
+    box = EffectBox(a)
+    other = EffectBox(b)
+    return box.combine(box.get(), (box := other).get())
+def listHoist(a, b):
+    box = EffectBox(a)
+    xs = [box.get(), box.bump(b).get(), box.get()]
+    return xs[0] * 100 + xs[1] * 10 + xs[2]
+def shortHoist(a, b):
+    box = EffectBox(a)
+    x = a and box.bump(b).get()
+    return x * 10 + box.v
+def branchHoist(a, b):
+    box = EffectBox(a)
+    x = box.bump(b).get() if a else box.get()
+    return x * 10 + box.v
+def assertHoist(a, b):
+    box = EffectBox(a)
+    try:
+        assert box.bump(b).get(), box.bump(100).get()
+    except AssertionError:
+        return box.v
+    return box.v
+def forHoist(a, b):
+    box = EffectBox(a)
+    out = 0
+    for x in [box.get(), box.bump(b).get()]:
+        out = out * 10 + x
+    return out
+def sliceHoist(a, b):
+    xs = [a, b, a + b]
+    other = [b, a, a - b]
+    out = xs[0:len(xs := other)]
+    return out[0] * 10 + out[1]
+def delHoist(a, b):
+    xs = [a, b]
+    other = [b, a]
+    del xs[len(xs := other) - 2]
+    return other[0] * 100 + other[1]
+def keywordSnapshot(a, b):
+    box = EffectBox(a)
+    return pair(x=box.get(), y=box.bump(b).get())
 '''),
     "java": ("JAVASRC", "Numbers.java", '''public class Numbers {
   public static long add(long a, long b) { return a + b; }
@@ -352,7 +445,27 @@ CASES = {
                ("genTuple", [9, 3]), ("genTuple", [-9, 3]),
                ("genSum", [9, 3]), ("genSum", [-9, 3]),
                # `with` is the frontend's own `__enter__`/`try`-`finally`-`__exit__` lowering.
-               ("withStmt", [9, 3]), ("withStmt", [-9, 3])],
+               ("withStmt", [9, 3]), ("withStmt", [-9, 3]),
+               # Preludes everywhere (§17.R4): an operand whose frontend lowering is an
+               # impure block (a method call on a call result) hoists, and the operands
+               # evaluated BEFORE it are completed first -- `box.get()` must read the
+               # pre-bump value (Language Reference §6.16) in every position: positional
+               # argument, keyword argument, constructor argument, tuple display, `in`.
+               ("argOrder", [9, 3]), ("argOrder", [-9, 3]),
+               ("kwHoist", [9, 3]), ("kwHoist", [-9, 3]),
+               ("ctorHoist", [9, 3]), ("ctorHoist", [-9, 3]),
+               ("tupleHoist", [9, 3]), ("tupleHoist", [-9, 3]),
+               ("inHoist", [9, 3]), ("inHoist", [9, 0]),
+               ("methodHoist", [9, 3]), ("methodHoist", [-9, 3]),
+               ("receiverHoist", [9, 3]), ("receiverHoist", [-9, 3]),
+               ("listHoist", [9, 3]), ("listHoist", [-9, 3]),
+               ("shortHoist", [0, 3]), ("shortHoist", [9, 3]),
+               ("branchHoist", [0, 3]), ("branchHoist", [9, 3]),
+               ("assertHoist", [9, 3]), ("assertHoist", [-3, 3]),
+               ("forHoist", [9, 3]), ("forHoist", [-9, 3]),
+               ("sliceHoist", [9, 3]), ("sliceHoist", [-9, 3]),
+               ("delHoist", [9, 3]), ("delHoist", [-9, 3]),
+               ("keywordSnapshot", [9, 3]), ("keywordSnapshot", [-9, 3])],
     "java": [("add", [2147483647, 1]), ("add", [9223372036854775807, 1]),
              ("div", [-9223372036854775808, -1]), ("shift", [1, 32]),
              ("shift", [1, -1]), ("unsigned", [-1, 1]),
@@ -519,8 +632,8 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
                 proofs += f"example : {calls[i]} = .val (.int ({expected[i]})) := by first | rfl | cbv\n"
     if language in ("python", "java", "js"):
         for i, (name, _) in enumerate(CASES[language]):
-            if name.startswith(("call", "aug", "index", "cast", "shiftWrapped", "shiftNested")):
-                if language == "python" and name == "augField":
+            if language == "python" or name.startswith(("call", "aug", "index", "cast", "shiftWrapped", "shiftNested")):
+                if language == "python":
                     # Kernel computation avoids elaborator unification expanding
                     # the heap/constructor trace. The expected integer still comes
                     # independently from CPython, and every other outcome fails.
