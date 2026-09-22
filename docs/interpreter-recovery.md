@@ -24,7 +24,7 @@ source tests; earlier successful build messages do not establish semantic fideli
 
 The expression work additionally exposed missing boxed-input support for `tuple`,
 and empty-name context-manager calls misclassified as allocations. Both have runtime
-regressions now. General context-manager exception suppression, stored generators,
+regressions now. General context-manager exception suppression, generator expressions,
 function/method name collisions and the other slices still need work.
 
 Decorator inspection used a fresh CPG in `/tmp/autoform-decorator-recovery/`.
@@ -60,9 +60,45 @@ pytest tests/test_source_generators.py -q` with `lake` on PATH.
 Remaining gaps are explicit: `generator:yieldFromS`, `generator:close`,
 `generator:throw`, `generator:return-value`, `generator:free-variable-cells`,
 `generator:closure-frame` and `generator:async`. Return values need exception payloads;
-free variables need shared cells. Suspended `for` uses the existing `iter`/`next`
-protocol: user iterators and other translated generators can run, but ordinary container
-iterator objects are still missing from Core. Existing eager generator-expression
+free variables need shared cells. Suspended `for` uses the `iter`/`next`
+protocol. `Autoform/Lang/Core/Iteration.lean` now provides heap-backed list, tuple,
+string and dictionary iterators, sequence fallback through `__getitem__`, and
+callable/sentinel iteration. Positions and exhaustion survive across calls; list
+mutations remain visible. Dictionary value replacement is allowed, size errors remain
+sticky, and same-size key-layout changes retain `iterator:dict-keys-changed` because
+Core does not represent CPython's dictionary slots. An `__iter__` method that returns
+a list now raises `TypeError`, as Python requires an iterator result.
+Synthetic loops retain their own iterator references; nested dictionary, iterator and
+sequence-protocol loops cannot overwrite an enclosing loop's hidden state.
+
+The synthetic protocol methods execute through ordinary Core calls without entering
+the source function table. Callable/sentinel iteration follows CPython's
+[iterator implementation](https://github.com/python/cpython/blob/3.14/Objects/iterobject.c):
+compare sentinel first, skip equality for identical objects, and preserve exhaustion
+if a callback re-enters the iterator. Unknown identity that can affect equality retains
+`iterator:sentinel-identity`; unknown custom exception ancestry retains
+`iterator:exception-hierarchy`. Runtime frame fields are not exposed by the pure
+`getattr`/`hasattr` models. Source comparisons and kernel proofs live in
+`tests/test_source_iterators.py` using `examples/python_control/iterators.py`.
+
+Passing an ordinary bound method as a callback also now preserves its receiver.
+The source tests exposed Joern type-recovery reference nodes appended alongside real
+arguments; the exporter excludes those duplicate metadata nodes while retaining the
+source expression and its effects. Source methods read from instances become callable
+values with the receiver captured, following Python's
+[instance-method rules](https://docs.python.org/3/reference/datamodel.html#instance-methods).
+Taking a builtin iterator's synthetic method as a value remains the explicit
+`field:runtime-method` gap; calling that method directly is supported.
+
+Validation of the iterator extension on 2026-09-22 passed the source-to-CPython
+comparisons and kernel proofs, the nested-loop kernel regression, the full Python
+test suite and `lake build`. The strict `Autoform.Runtime` audit passed with stable
+source and compiled artifacts throughout its fresh kernel replay. The docs and spec
+freshness checks passed; tracked renders remained byte-identical. This is a scoped
+validation result: the repository-wide audit and the stale corpus provenance records
+remain separate gates, and this extension does not meet the arbitrary-codebase goal.
+
+Existing eager generator-expression
 consumer recognition also needs correction: `any`/`all` can stop early,
 `enumerate`/`zip` are lazy, and `len` does not consume a generator. Even `sum` interleaves
 accumulation with item production.
@@ -78,6 +114,10 @@ proofs, the long-body lowering regression, `lake build`, the full Python test su
 the render round-trip tests, and the strict `Autoform.Runtime` audit with fresh kernel
 replay. The existing tracked renders remain byte-identical. A repository-wide fresh
 kernel audit is a separate gate and must finish before being reported as passed.
+The full audit started before the iterator work completed its fresh kernel replay,
+but its final verdict was `FAIL`: it correctly detected that the checked source and
+compiled artifacts changed during that run. That audit cannot establish the current
+tree's integrity; the replacement run must use a stable build.
 
 Keep execution structurally recursive on explicit fuel. Lean's
 [recursion reference](https://lean-lang.org/doc/reference/latest/Definitions/Recursive-Definitions/)

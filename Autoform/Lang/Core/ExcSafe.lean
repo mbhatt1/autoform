@@ -348,6 +348,17 @@ theorem builtinDunderResult_excSafe (f m : String) (v : Val) {w : Val} :
   repeat' split at h
   all_goals first | (cases h; exact Stdlib.excSafe_str (by decide)) | cases h
 
+theorem checkedBuiltinDunderResult_excSafe (ctx : Ctx) (heap : Heap) (f m : String)
+    (v : Val) {w : Val} :
+    checkedBuiltinDunderResult ctx heap f m v = .exn w → ExcSafe w := by
+  intro h
+  unfold checkedBuiltinDunderResult at h
+  repeat' split at h
+  all_goals first
+    | exact builtinDunderResult_excSafe _ _ _ h
+    | (cases h; exact Stdlib.excSafe_str (by decide))
+    | cases h
+
 /-- A JavaScript property read on a container never raises: a key, a length, or
 `undefined`. -/
 theorem jsContainerField_ne_exn (p : Payload) (f : String) {v : Val} :
@@ -438,12 +449,15 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact ihRef _ hd (by assumption))
   | (cases hy; exact pythonRaise_excSafe (by assumption))
   | (cases hy; exact (Stdlib.builtin_excSafe hd _ _ _ _ _ (by assumption)).weaken)
+  | (cases hy; exact (Iteration.builtin_excSafe _ _ _ _ (by assumption)).weaken)
+  | (cases hy; exact (Iteration.containerMethod_excSafe _ _ _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Stdlib.method_pure_excSafe hd _ _ _ _ _ _ (by assumption)).weaken)
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | (cases hy; exact (listSetSlice_excSafe (by assumption)).weaken)
   | exact (builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
+  | exact (checkedBuiltinDunderResult_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))

@@ -126,7 +126,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `delIndex : Expr → Expr → Stmt` | `del e[i]`. The same shape as `setIndex` one argument shorter: payload deletion, or `c.__delitem__(i)` under `.python` when the class defines it, else `delIndex:immutable-containers`. |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
-| `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
+| `forIn : String → Expr → Stmt → Stmt` | Python uses live container iteration or the instance iterator/sequence protocol; unboxed sequences use `Val.iterable`. Unsupported non-iterables are `forIn:non-iterable`. Joern desugars Python `for` and comprehensions into an iterator protocol plus a `WHILE`; the exporter reconstructs `forIn` from that shape. |
 | `ret` / `brk` / `cont` | Return, break, continue — each its own `Ctl` outcome. |
 | `tryCatch : Stmt → String → Stmt → Stmt` | `try/except as x`. Catches **exceptions only**: `ret`/`brk`/`cont` pass straight through, or every `try` containing a `return` would break. |
 | `tryFinally : Stmt → Stmt → Stmt` | The finalizer runs on every language-level exit, using the locals at that point. Its assignments survive resuming a pending exit; its own abnormal exit replaces the pending outcome. Interpreter holes and exhausted fuel propagate without running the finalizer — Python's rule, so `try: return 1 finally: return 2` returns 2. |
@@ -312,6 +312,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `call:python-signature-metadata`, `function:python-signature-metadata` | The source signature is unavailable or cannot be matched to its CPG method. Missing metadata cannot imply that the calling convention is supported. |
 | `entry:<name>` | `runFunc`/`runMain` could not resolve the requested entry point. |
 | `field:<f>:non-object`, `setField:<f>:non-object` | Attribute read/write on a non-reference. |
+| `field:runtime-method`, `field:method-unresolved` | Taking an unsupported synthetic method as a value, or a method declaration whose body cannot be resolved. Ordinary source method values preserve their bound receiver. |
 | `mcall:<Cls>.<m>` | No such method on the receiver's class. |
 | `mcall:<m>:non-object` | Method call on a value the modelled stdlib does not cover. |
 | `mcall:<m>:unboxed-container` | A *mutating* container method. Honouring it would update a temporary, because the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`. |
@@ -319,6 +320,11 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
 | `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched — including an instance whose class defines no `__contains__`. |
 | `forIn:non-iterable` | Iterating a non-iterable. |
+| `iterator:dict-keys-changed` | A dictionary's key layout changed without changing its size; CPython slot traversal is not represented. Value replacement is supported. |
+| `iterator:sentinel-identity` | Callable/sentinel iteration needs identity that Core cannot decide and that can affect equality, such as two unboxed NaNs. |
+| `iterator:exception-hierarchy` | A sequence or callable iterator caught a user exception whose ancestry its synthetic handler cannot determine. |
+| `iterator:result-protocol` | An `__iter__` result has no translated `__next__`, but inherited or metaclass behavior is not represented well enough to prove it absent. Known non-iterator builtin results raise `TypeError`. |
+| `iterator:invalid-index`, `iterator:source-kind-changed`, `iterator:dangling-reference` | A malformed internal iterator state. Source-created iterators keep these fields private. |
 | `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
 | `numeric:unknown-type:<op>` | Joern did not supply enough type information to choose an integer width and signedness. |

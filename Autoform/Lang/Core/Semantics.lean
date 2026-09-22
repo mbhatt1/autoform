@@ -2,6 +2,7 @@ import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Numeric
 import Autoform.Lang.Core.TypedNumeric
 import Autoform.Lang.Core.Stdlib
+import Autoform.Lang.Core.Iteration
 
 /-!
 # Core — semantics
@@ -1217,6 +1218,9 @@ def stripSig (k : String) : String :=
 
 /-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
+  match if ctx.dialect == .python then Iteration.resolveMethod cls meth else none with
+  | some fn => some fn
+  | none =>
   match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
@@ -1224,6 +1228,7 @@ def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
+  (ctx.dialect == .python && (Iteration.resolveMethod cls meth).isSome) ||
   ctx.table.any (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth))
 
 /-- The constructor a class instance creation runs. Python spells it `__init__`; Java
@@ -1472,12 +1477,16 @@ does; everything else names exactly one method. -/
                   | none   => pick "__len__"
       -- `iter(object)`: "the single argument must be a collection object which supports
       -- the iterable protocol (the `__iter__()` method)" -- library/functions.html#iter.
-      -- The sequence-protocol fallback (`__getitem__` from 0) needs an iterator OBJECT
-      -- to hand back, which Core has no representation for; it stays the builtin hole.
+      -- The sequence-protocol fallback (`__getitem__` from 0) allocates an iterator
+      -- through the private factory method, retaining the receiver and its position.
       -- `next(iterator)`: "Retrieve the next item from the iterator by calling its
       -- `__next__()` method" -- library/functions.html#next; the two-argument form is
       -- `nextDefaultTarget` below.
-      | "iter" => pick "__iter__"
+      | "iter" => match pick "__iter__" with
+                  | some target => some target
+                  | none => if ctx.classDefines o.cls "__getitem__" then
+                              some (r, Iteration.factoryClass, "__iter__")
+                            else none
       | "next" => pick "__next__"
       | _      => none
     | none => none
@@ -1516,9 +1525,9 @@ arguments from `0` until `IndexError`. An iterator is driven as `library/stdtype
 "Iterator Types" says: `__next__()` "Return the next item from the iterator. If there are
 no further items, raise the `StopIteration` exception."
 
-Core drives a user iterator with a STATEMENT it synthesises and runs through `execStmt`,
-rather than with a ninth interpreter function: the iterator is bound to a name no source
-language can spell, each step is `x = it.__next__()` inside a `tryCatch` whose handler
+Core drives a user iterator with a statement it synthesises and runs through `execStmt`.
+Each iterator reference has its own private binding, so nested loops cannot replace it
+through a shared temporary. Each step is `x = it.__next__()` inside a `tryCatch` whose handler
 breaks on `StopIteration` and re-raises anything else, and the body follows. `break`,
 `continue` and `return` in the body mean what §8.3 says because `.loop` already gives them
 that meaning, and "names in the target list are not deleted when the loop is finished"
@@ -1533,21 +1542,26 @@ def iterTmp : String := "$iter"
 def idxTmp  : String := "$idx"
 def excTmp  : String := "$exc"
 
+/-- Two loops may share a binding only when they share the same iterator object. -/
+def iteratorBinding (r : Ref) : String := iterTmp ++ toString r
+
 /-- `for x in it` over an ITERATOR (`__next__`), as one Core statement. -/
-def nextDriver (x : String) (body : Stmt) : Stmt :=
+def nextDriver (x : String) (body : Stmt) (iterator : Expr := .name iterTmp) : Stmt :=
   .loop (.lit (.bool true))
-    (.seq (.tryCatch (.assign x (.mcall (.name iterTmp) "__next__" [])) excTmp
+    (.seq (.tryCatch (.assign x (.mcall iterator "__next__" [])) excTmp
              (.ifte (.binop "==" (.name excTmp) (.lit (.str "StopIteration")))
                     .brk (.raise (.name excTmp))))
           body)
 
-/-- `for x in s` over a SEQUENCE-PROTOCOL object (`__getitem__` from `0` until
-`IndexError`), as one Core statement. -/
+/-- Legacy sequence driver. Source `for` now allocates a sequence iterator and uses
+`nextDriver`, keeping each loop's position independent during nesting. -/
 def seqDriver (x : String) (body : Stmt) : Stmt :=
   .seq (.assign idxTmp (.lit (.int 0)))
     (.loop (.lit (.bool true))
       (.seq (.tryCatch (.assign x (.index (.name iterTmp) (.name idxTmp))) excTmp
-               (.ifte (.binop "==" (.name excTmp) (.lit (.str "IndexError")))
+               (.ifte (.binop "||"
+                         (.binop "==" (.name excTmp) (.lit (.str "IndexError")))
+                         (.binop "==" (.name excTmp) (.lit (.str "StopIteration"))))
                       .brk (.raise (.name excTmp))))
       (.seq (.assign idxTmp (.binop "+" (.name idxTmp) (.lit (.int 1))))
             body)))
@@ -1569,6 +1583,14 @@ return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
   | "bool", .int i  => if m == "__len__" then .val (.bool (i != 0)) else .exn (.str "TypeError")
   | "bool", _       => .exn (.str "TypeError")
   | _, _            => .val v
+
+/-- __iter__ must return an iterator, not merely another iterable. -/
+def checkedBuiltinDunderResult (ctx : Ctx) (h : Heap) (f m : String) (v : Val) : EResult :=
+  if f == "iter" then
+    if (ctx.dunderOn h v "__next__").isSome then .val v
+    else if Iteration.unknownResultProtocol h v then .hole "iterator:result-protocol"
+    else .exn (.str "TypeError")
+  else builtinDunderResult f m v
 
 mutual
 
@@ -1909,7 +1931,20 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                match (h₁.get ctx.globals).bind
                                        (fun g => g.fields.find? (·.1 == classAttrKey o.cls f)) with
                                | some (_, v) => (h₁, .val v)
-                               | none        => (h₁, .exn (.str "AttributeError"))
+                               | none =>
+                                   -- Reading an ordinary method produces a bound callable.
+                                   -- Class membership must be checked before suffix lookup:
+                                   -- an unrelated method with the same name is not a match.
+                                   if ctx.classDefines o.cls f then
+                                     match ctx.resolveMethod o.cls f with
+                                     | some fn =>
+                                         if fn.name.startsWith "<runtime>." then
+                                           (h₁, .hole "field:runtime-method")
+                                         else if fn.isMethod && !fn.isClassMethod then
+                                           (h₁, .val (.clos fn.name [("self", .ref r)]))
+                                         else (h₁, .val (.fn fn.name))
+                                     | none => (h₁, .hole "field:method-unresolved")
+                                   else (h₁, .exn (.str "AttributeError"))
                              -- Every other dialect keeps `unit`: in JavaScript a missing
                              -- property IS `undefined` (ECMA-262 §10.1.8.1
                              -- OrdinaryGet step 3: "If desc is undefined, return
@@ -2039,7 +2074,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                 match ctx.resolveMethod cls m with
                 | some fn =>
                   match applyFunc ctx n h₁ fn (some (.ref r)) [] [] with
-                  | (h₂, .val v) => (h₂, builtinDunderResult f m v)
+                  | (h₂, .val v) => (h₂, checkedBuiltinDunderResult ctx h₂ f m v)
                   | (h₂, e)      => (h₂, e)
                 | none => (h₁, .hole s!"call:{f}:dunder-unresolved")
               else (h₁, .hole s!"call:{f}:keyword-to-builtin")
@@ -2058,7 +2093,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               let vs' := if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs
               match Stdlib.builtin ctx.dialect h₁ f vs' with
               | some (h₂, r) => (h₂, r)
-              | none         => (h₁, .hole s!"call:{f}")
+              | none         =>
+                  match Iteration.builtin ctx.dialect h₁ f vs with
+                  | some result => result
+                  | none => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
   | n+1, h, ρ, .callValue fe args =>
       -- `f(x)(y)`, `d["k"](3)`: the callee is a VALUE. Evaluate it first (CPython's order),
@@ -2102,6 +2140,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
         | (h₂, .inr (vs, kws)) =>
+          match Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws with
+          | some result => result
+          | none =>
           match h₂.get r with
           | none   => (h₂, .hole "mcall:dangling-ref")
           | some o =>
@@ -2223,6 +2264,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         | (h₂, .inl e)  => (h₂, e)
         | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
         | (h₂, .inr (vs, [])) =>
+          match Iteration.containerMethod ctx.dialect h₂ recv m vs [] with
+          | some result => result
+          | none =>
           match Stdlib.method ctx.dialect h₂ recv m vs with
           | some (h₃, .pure r)       => (h₃, r)
           -- A mutating container method cannot be honoured while containers are values:
@@ -2801,32 +2845,35 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
                 | some (ri, fn) =>
                     match applyFunc ctx n h₁ fn (some (.ref ri)) [] [] with
                     | (h₂, .val it) =>
-                        match it with
-                        | .ref r₂ =>
-                            match h₂.payload r₂ with
-                            | .none =>
-                                match ctx.dunderOn h₂ it "__next__" with
-                                | some _ => execStmt ctx n h₂ (ρ.set iterTmp it) (nextDriver x body)
-                                | none   =>
-                                    match it.iterable with
-                                    | some vs => execFor ctx n h₂ ρ x vs body
-                                    | none    => (h₂, .hole "forIn:iter-returned-non-iterator")
-                            | _ => execForRef ctx n h₂ ρ x r₂ 0 ((h₂.get r₂).elim 0 (·.version)) body
-                        | _ =>
-                            match it.iterable with
-                            | some vs => execFor ctx n h₂ ρ x vs body
-                            | none    => (h₂, .hole "forIn:iter-returned-non-iterator")
+                        match ctx.dunderOn h₂ it "__next__" with
+                        | some (rit, _) =>
+                            let binding := iteratorBinding rit
+                            execStmt ctx n h₂ (ρ.set binding it) (nextDriver x body (.name binding))
+                        | none =>
+                            if Iteration.unknownResultProtocol h₂ it then
+                              (h₂, .hole "iterator:result-protocol")
+                            else (h₂, .exn (.str "TypeError") ρ)
                     | (h₂, .exn e)     => (h₂, .exn e ρ)
                     | (h₂, .hole l)    => (h₂, .hole l)
                     | (h₂, .outOfFuel) => (h₂, .outOfFuel)
                 | none =>
                     match ctx.dunderOn h₁ v "__getitem__" with
-                    | some _ => execStmt ctx n h₁ (ρ.set iterTmp v) (seqDriver x body)
+                    | some _ =>
+                        let (h₂, iterator) := h₁.alloc (Iteration.sequenceObject v)
+                        let binding := iteratorBinding iterator
+                        execStmt ctx n h₂ (ρ.set binding (.ref iterator)) (nextDriver x body (.name binding))
                     | none   =>
                         match v.iterable with
                         | some vs => execFor ctx n h₁ ρ x vs body
                         | none    => (h₁, .hole "forIn:non-iterable")
-            | _     => execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
+            | .dict kvs =>
+                if ctx.dialect == .python then
+                  let (h₂, iterator) := h₁.alloc (Iteration.dictionaryObject (.ref r) kvs)
+                  let binding := iteratorBinding iterator
+                  execStmt ctx n h₂ (ρ.set binding (.ref iterator)) (nextDriver x body (.name binding))
+                else execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
+            | .list _ | .tuple _ =>
+                execForRef ctx n h₁ ρ x r 0 ((h₁.get r).elim 0 (·.version)) body
         | _ =>
             match v.iterable with
             | some vs => execFor ctx n h₁ ρ x vs body
@@ -2842,15 +2889,11 @@ explicit that it must not survive boxing: landing boxing beside a snapshot loop 
 introduce a silent wrong answer in the same change that removes one. So this re-reads the
 payload at every step instead of copying it once.
 
-The two containers differ, and CPython is the authority for both:
-
-* a `list` iterator holds the object and an index, so appending during the loop extends
-  it and deleting shortens it -- no error, just a different number of iterations;
-* a `dict` iterator raises `RuntimeError: dictionary changed size during iteration`.
-  `Obj.version` exists for this: the version is recorded when the loop starts and checked
-  at every step, which turns an invisible wrong answer into a modelled exception.
-
-A `tuple` payload is immutable, so re-reading it is the same as a snapshot. -/
+A list loop holds the object and an index, so appending during the loop extends it
+and deleting shortens it. A tuple payload is immutable, so re-reading it is the same
+as a snapshot. Python dictionary loops use `Iteration.dictionaryObject` and
+`nextDriver` instead: replacing a value must not invalidate an iterator. The legacy
+version-based dictionary branch below serves the other dialects only. -/
 def execForRef (ctx : Ctx) :
     Nat → Heap → Env → String → Ref → Nat → Nat → Stmt → Heap × Ctl
   | 0,   h, _, _, _, _, _, _ => (h, .outOfFuel)
@@ -4258,8 +4301,8 @@ private def iterProg : Program :=
 -- break at 2: acc = 1, and `x` survives the loop  -- CPython (1, 2)
 #guard match runFunc iterProg 400 "breaks" [] with
        | .val (.tuple [.int 1, .int 2]) => true | _ => false
--- 7 + 8                                       -- CPython 15
-#guard match runFunc iterProg 400 "viaList" [] with | .val (.int 15) => true | _ => false
+-- CHANGED: a list returned by __iter__ is not itself an iterator in CPython.
+#guard match runFunc iterProg 400 "viaList" [] with | .exn (.str "TypeError") => true | _ => false
 -- 0 + 10                                      -- CPython 10
 #guard match runFunc iterProg 400 "viaSeq" [] with | .val (.int 10) => true | _ => false
 -- next() past the end                         -- CPython StopIteration

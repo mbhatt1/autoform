@@ -797,6 +797,13 @@ def getAttr (h : Heap) (r : Ref) (f : String) : Option Val :=
   | none   => none
   | some o => (o.fields.find? (·.1 == f)).map (·.2)
 
+/-- Generator/iterator fields are interpreter state, not Python instance attributes.
+Their complete public reflection protocols are not modelled yet. -/
+def opaqueRuntimeAttributes (h : Heap) (r : Ref) : Bool :=
+  match h.get r with
+  | some o => o.cls == "<generator>" || o.cls.startsWith "<builtin-"
+  | none => false
+
 /-! ### The name predicate, and why it is a *guard* rather than a list
 
 The ledger needs to know which callee names this file answers, so that `Ctx.resolvable`
@@ -911,9 +918,12 @@ def builtinCore (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     -- isinstance, only where the answer is certain.
     | "isinstance", [x, .fn t] => (isInstance x t).map (fun b => (h, .val (.bool b)))
     -- getattr / hasattr: present attributes only.
-    | "getattr", [.ref r, .str f]     => (getAttr h r f).map (fun x => (h, .val x))
-    | "getattr", [.ref r, .str f, dv] => v ((getAttr h r f).getD dv)
-    | "hasattr", [.ref r, .str f]     => (getAttr h r f).map (fun _ => (h, .val (.bool true)))
+    | "getattr", [.ref r, .str f]     =>
+        if opaqueRuntimeAttributes h r then none else (getAttr h r f).map (fun x => (h, .val x))
+    | "getattr", [.ref r, .str f, dv] =>
+        if opaqueRuntimeAttributes h r then none else v ((getAttr h r f).getD dv)
+    | "hasattr", [.ref r, .str f]     =>
+        if opaqueRuntimeAttributes h r then none else (getAttr h r f).map (fun _ => (h, .val (.bool true)))
     -- Container constructors.
     | "list",  []  => v (.list [])
     | "list",  [x] => (elems x).map (fun es => (h, .val (.list es)))
@@ -1596,6 +1606,7 @@ theorem builtin_heap_unchanged {d : Dialect} {h h' : Heap} {n : String} {as : Li
           (try split at hb) <;> (try simp_all) <;>
           (try (obtain ⟨_, h1, _⟩ := hb; exact h1.symm)) <;>
           (try (obtain ⟨_, _, h1, _⟩ := hb; exact h1.symm)) <;>
+          (try (obtain ⟨_, _, _, h1, _⟩ := hb; exact h1.symm)) <;>
           (try (rcases hb with ⟨_, h1, _⟩ | ⟨_, h1, _⟩ <;> exact h1.symm)) <;>
           (try (rename_i hx; exact hx.2.1.symm))
 

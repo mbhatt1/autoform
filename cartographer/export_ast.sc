@@ -6520,6 +6520,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
 
   def isKeywordArg(n: AstNode): Boolean = argName(n).isDefined
 
+  /** Python type recovery adds METHOD_REF/TYPE_REF metadata beside an existing
+    * argument (negative source order, a fresh positive argument index, same code).
+    * It is not another evaluated operand. Keep the original source expression so
+    * runtime method binding and receiver effects are preserved. */
+  def callOperands(c: Call): List[AstNode] = {
+    val kids = kidsOf(c)
+    if (!pyFile || callName(c).startsWith("<operator>")) kids
+    else kids.filterNot { n =>
+      val reference = n.isInstanceOf[MethodRef] || n.isInstanceOf[TypeRef]
+      reference && n.order < 0 && kids.exists { source =>
+        source.id != n.id && source.order >= 0 && source.code == n.code &&
+          (aidx(source) >= 1 || isKeywordArg(source))
+      }
+    }
+  }
+
   /** One positional argument, recognising `*e`. Outside an argument list a starred
     * unpack has no Core form and stays the hole it was. */
   def argExpr(n: AstNode): ujson.Value = n match {
@@ -7191,7 +7207,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   }
 
   def callExpr(c: Call): ujson.Obj = {
-    val kids = kidsOf(c)
+    val kids = callOperands(c)
     val mfn  = callName(c)
     // A `char*` is an address, not a string value. Core has one `Val.str` for Python's
     // `str` and C's `char*`, and its `+` concatenates while `<`/`>`/`==` compare contents
@@ -9645,7 +9661,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case c: Call if !callName(c).startsWith("<operator>") =>
       val baseline = expr(c)
       val kind = baseline.value.get("k").map(_.str).getOrElse("")
-      val kids = kidsOf(c)
+      val kids = callOperands(c)
       val posArgs = namedCallReceiver(c).toList ++ kids.filter(k => aidx(k) >= 1 && !isKeywordArg(k))
       val kwArgs = kids.filter(isKeywordArg)
       val calleeNode = kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption)

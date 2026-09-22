@@ -309,33 +309,29 @@ Both fall out of the design without a special case.
 
 ## 4. Iteration
 
-`for x in xs` currently reads `Val.iterable : Val → Option (List Val)` and iterates a
-*snapshot*. After boxing there is a choice:
+`execForRef` iterates a boxed list live, re-reading its payload at each index.
+Appending can extend the loop; deleting can shorten it. A tuple payload is immutable,
+so re-reading equals a snapshot. Unboxed sequences use `execFor`.
 
-* **CPython's `list_iterator` holds the list object and an index.** Appending during
-  iteration extends the loop; deleting shortens it. Modelling this means `execFor` carries
-  `(Ref, Nat)` rather than `List Val` and re-reads the payload each step.
-* **CPython's `dict` iterator raises** `RuntimeError: dictionary changed size during
-  iteration`. This is what `Obj.version` is for: the iterator records the version at
-  creation and the loop head compares. Cheap, and it turns a currently-invisible wrong
-  answer into a modelled exception.
+Python dictionary loops now allocate an `Iteration.dictionaryObject` and use the
+ordinary `__next__` driver. Replacing values preserves iteration. A size change raises
+`RuntimeError` and remains an error on subsequent calls, even after size is restored.
+A changed key layout at unchanged size is `iterator:dict-keys-changed`: Core has no
+representation of CPython's dictionary slots, so it cannot faithfully predict which
+keys are visited after deletions and insertions. The old `Obj.version` check rejected
+valid value updates; that branch in `execForRef` is now used only by other dialects.
 
-**Landed.** `execForRef` iterates a boxed container live: a `list` re-reads the payload
-at each index (so appending extends the loop and deleting shortens it, as CPython's
-`list_iterator` does), a `dict` records `Obj.version` at loop entry and raises
-`RuntimeError` when it changes, and a `tuple` payload is immutable so re-reading equals a
-snapshot. Everything unboxed keeps `execFor`.
+Explicit `iter(container)` and `container.__iter__()` allocate heap objects that retain
+the source reference and index. Once exhausted, an iterator stays exhausted even if
+the source grows. These objects also support `next(iterator, default)` and iteration
+inside suspended generator frames. Sequence-protocol and callable/sentinel iterators
+run user callbacks through the same fuel-bounded evaluator.
 
 Cost: an eighth clause in `FuelMono`'s simultaneous induction — live iteration is a
 separate recursive function, so it needs its own fuel-monotonicity case rather than
 riding on `execFor`'s — and one statement change, `execStmt_forIn_val`, which now carries
 `hbox` saying the subject is not a boxed container. Every corpus discharges `hbox`
 vacuously today.
-
-Snapshot iteration must not be retained past this change. It is currently harmless because
-nothing can mutate a container mid-loop; boxing is what makes the case reachable. Landing
-boxing and snapshot iteration together would introduce a silent wrong answer in the same
-commit that removes one.
 
 For an unboxed `Val.tuple` or `Val.str`, snapshot iteration remains exactly right.
 

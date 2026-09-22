@@ -336,7 +336,7 @@ def Ctx.resolvable (isMethod : Bool) (ctx : Ctx) (n : String) : Bool :=
     -- modelled per receiver shape (`pop` is answered on a dict, refused on a str), and a
     -- static ledger has no receiver. Its author measured the pure methods as worth +1
     -- function, so excluding them costs almost nothing and buys an honest number.
-    || Stdlib.knowsFree ctx.dialect n
+    || Stdlib.knowsFree ctx.dialect n || Iteration.knowsFree ctx.dialect n
 
 /-! ## Making call closure linear instead of quadratic
 
@@ -402,7 +402,7 @@ def ResolveIndex.resolvable (idx : ResolveIndex) (dialect : Dialect)
     (isMethod : Bool) (n : String) : Bool :=
   if isMethod then idx.suffixCount.getD n 0 ≥ 1
   else idx.exact.contains n || idx.suffixCount.getD n 0 == 1
-       || Stdlib.knowsFree dialect n
+       || Stdlib.knowsFree dialect n || Iteration.knowsFree dialect n
 
 /-- Hole-free **and** every call target resolves inside the program.
 

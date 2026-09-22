@@ -856,6 +856,16 @@ theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     simp [execStmt, ha, he, hd]
   · simp [execStmt, ha, he, hd]
 
+/-- CHANGED: built-in container iteration precedes source method resolution. -/
+theorem evalExpr_mcall_container (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {result : Heap × EResult}
+    {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
+    (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
+    (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
+    (hm : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = some result) :
+    evalExpr ctx (k+1) h ρ (.mcall recv m args) = result := by
+  simp [evalExpr, hr, has, hm]
+
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
     {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
@@ -868,10 +878,13 @@ theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     -- under `self`, so this equation is about ordinary methods only. Every method any
     -- corpus proves through this lemma is one, and the hypothesis is `rfl` on a concrete
     -- `Func` -- stated so the day it is not, the lemma stops applying rather than lying.
-    (hcm : fn.isClassMethod = false := by rfl) :
+    (hcm : fn.isClassMethod = false := by rfl)
+    -- The corresponding source-method equation applies when the built-in container
+    -- protocol did not handle the call. Concrete non-__iter__ methods reduce this.
+    (hiter : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = none := by rfl) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
       = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
-  simp [evalExpr, hr, has, ho, hm, hcap, hcm]
+  simp [evalExpr, hr, has, hiter, ho, hm, hcap, hcm]
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}

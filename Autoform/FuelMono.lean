@@ -32,6 +32,12 @@ def tfFreeS : Stmt → Bool
   | .tryCatch b _ hd => tfFreeS b && tfFreeS hd
   | _                => true
 
+private theorem iterationMethod_tfFree {cls name : String} {fn : Func}
+    (h : Iteration.resolveMethod cls name = some fn) : tfFreeS fn.body = true := by
+  unfold Iteration.resolveMethod at h
+  repeat' split at h
+  all_goals cases h <;> rfl
+
 /-- A context every one of whose *reachable* function bodies is `tryFinally`-free.
 
 Stated in terms of the two resolution functions rather than of `ctx.table` because those
@@ -797,6 +803,11 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     | inr vs =>
                         rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
                         dsimp only at hy ⊢
+                        cases him : Iteration.containerMethod ctx.dialect h₂ (.ref rr) m vs.1 vs.2 with
+                        | some result => rw [him] at hy; exact hy
+                        | none =>
+                        rw [him] at hy
+                        dsimp only at hy ⊢
                         cases hget : Heap.get h₂ rr with
                         | none => rw [hget] at hy; exact hy
                         | some o =>
@@ -1551,43 +1562,18 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                             | val it =>
                                 rw [ihF _ hctx _ _ (hctx.2 _ _ _ hrm) _ _ _ _ _ hF (by simp)]
                                 dsimp only at hy ⊢
-                                cases it with
-                                | ref r₂ =>
-                                    dsimp only at hy ⊢
-                                    cases hpay₂ : h₂.payload r₂ with
-                                    | none =>
-                                        rw [hpay₂] at hy
-                                        dsimp only at hy ⊢
-                                        cases hdn : ctx.dunderOn h₂ (Val.ref r₂) "__next__" with
-                                        | some _ =>
-                                            rw [hdn] at hy
-                                            exact ihS _ hctx _ _ _ (by simp [nextDriver, controlCovered, hb]) _ _ hy hne
-                                        | none =>
-                                            rw [hdn] at hy
-                                            dsimp only at hy ⊢
-                                            cases hit : Val.iterable (Val.ref r₂) with
-                                            | none => rw [hit] at hy; exact hy
-                                            | some vs =>
-                                                rw [hit] at hy
-                                                exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
-                                    | list _ | dict _ | tuple _ =>
-                                        rw [hpay₂] at hy
-                                        dsimp only at hy ⊢
-                                        exact ihRef _ hctx _ _ _ _ _ _ _ hb _ _ hy hne
-                                | _ =>
-                                    dsimp only at hy ⊢
-                                    cases hit : Val.iterable _ with
-                                    | none => rw [hit] at hy; exact hy
-                                    | some vs =>
-                                        rw [hit] at hy
-                                        exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
+                                cases hdn : ctx.dunderOn h₂ it "__next__" with
+                                | some _ =>
+                                    rw [hdn] at hy
+                                    exact ihS _ hctx _ _ _ (by simp [nextDriver, controlCovered, hb]) _ _ hy hne
+                                | none => rw [hdn] at hy; exact hy
                         | none =>
                             rw [hdi] at hy
                             dsimp only at hy ⊢
                             cases hdg : ctx.dunderOn h₁ (Val.ref rr) "__getitem__" with
                             | some _ =>
                                 rw [hdg] at hy
-                                exact ihS _ hctx _ _ _ (by simp [seqDriver, controlCovered, hb]) _ _ hy hne
+                                exact ihS _ hctx _ _ _ (by simp [nextDriver, controlCovered, hb]) _ _ hy hne
                             | none =>
                                 rw [hdg] at hy
                                 dsimp only at hy ⊢
@@ -1596,7 +1582,15 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                                 | some vs =>
                                     rw [hit] at hy
                                     exact ihR _ hctx _ _ _ _ _ hb _ _ hy hne
-                    | list _ | dict _ | tuple _ =>
+                    | dict _ =>
+                        rw [hpay] at hy
+                        dsimp only at hy ⊢
+                        by_cases hp : ctx.dialect == .python
+                        · simp only [hp, if_pos] at hy ⊢
+                          exact ihS _ hctx _ _ _ (by simp [nextDriver, controlCovered, hb]) _ _ hy hne
+                        · simp only [hp, if_neg] at hy ⊢
+                          exact ihRef _ hctx _ _ _ _ _ _ _ hb _ _ hy hne
+                    | list _ | tuple _ =>
                         rw [hpay] at hy
                         dsimp only at hy ⊢
                         exact ihRef _ hctx _ _ _ _ _ _ _ hb _ _ hy hne
@@ -1722,13 +1716,21 @@ theorem tfFree_of_table {ctx : Ctx}
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr
   split at hr
-  · rename_i a f rest hfilt
-    have hmem : (a, f) ∈ ctx.table.filter
-        (fun p => strEndsWith (stripSig p.1) ("." ++ c ++ "." ++ m)) := by
-      rw [hfilt]; exact List.mem_cons_self
-    have : f = fn := by simpa using hr
-    exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1
-  · exact hres m fn hr
+  · rename_i f hprivate
+    have hp : Iteration.resolveMethod c m = some f := by
+      split at hprivate
+      · exact hprivate
+      · cases hprivate
+    cases hr
+    exact iterationMethod_tfFree hp
+  · split at hr
+    · rename_i a f rest hfilt
+      have hmem : (a, f) ∈ ctx.table.filter
+          (fun p => strEndsWith (stripSig p.1) ("." ++ c ++ "." ++ m)) := by
+        rw [hfilt]; exact List.mem_cons_self
+      have : f = fn := by simpa using hr
+      exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1
+    · exact hres m fn hr
 
 /-! ## Public statements
 

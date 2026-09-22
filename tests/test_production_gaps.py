@@ -891,21 +891,22 @@ class TestIterationProtocol:
         # __iter__ first, then the sequence protocol, then the structural fallback
         assert 'match ctx.dunderOn h₁ v "__iter__" with' in self.SEMANTICS
         assert 'match ctx.dunderOn h₁ v "__getitem__" with' in self.SEMANTICS
-        assert 'execStmt ctx n h₁ (ρ.set iterTmp v) (seqDriver x body)' in self.SEMANTICS
+        assert 'h₁.alloc (Iteration.sequenceObject v)' in self.SEMANTICS
+        assert 'ρ.set binding it) (nextDriver x body (.name binding))' in self.SEMANTICS
 
     def test_the_iterator_is_driven_by_a_synthesised_statement(self):
         """No ninth interpreter function: the driver is a Core statement over names no
         source can spell, so FuelMono's statement IH covers it."""
         assert 'def iterTmp : String := "$iter"' in self.SEMANTICS
-        assert 'def nextDriver (x : String) (body : Stmt) : Stmt :=' in self.SEMANTICS
+        assert 'def nextDriver (x : String) (body : Stmt) (iterator : Expr' in self.SEMANTICS
         assert '(.lit (.str "StopIteration")))' in self.SEMANTICS
         assert 'def seqDriver (x : String) (body : Stmt) : Stmt :=' in self.SEMANTICS
         assert '(.lit (.str "IndexError")))' in self.SEMANTICS
         assert 'simp [nextDriver, controlCovered, hb]' in self.FUELMONO
-        assert 'simp [seqDriver, controlCovered, hb]' in self.FUELMONO
 
     def test_iter_and_next_builtins_and_the_default_form(self):
-        assert '| "iter" => pick "__iter__"' in self.SEMANTICS
+        assert '| "iter" => match pick "__iter__" with' in self.SEMANTICS
+        assert 'some (r, Iteration.factoryClass, "__iter__")' in self.SEMANTICS
         assert '| "next" => pick "__next__"' in self.SEMANTICS
         assert 'def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val)' in self.SEMANTICS
         assert '| (h₂, .exn (.str "StopIteration")) => (h₂, .val d)' in self.SEMANTICS

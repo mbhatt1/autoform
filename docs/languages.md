@@ -568,13 +568,15 @@ loop's iterable is left alone, because Python evaluates it in the enclosing scop
 `compNoLeak` in `tests/test_source_numeric.py` reads the outer `x` afterwards and is
 compared against CPython.
 
-**A generator expression lowers only where laziness is unobservable.** `(x for x in xs)`
-is lazy and Core has no representation for a suspended frame. Handed directly to a
-consumer that exhausts it at once and in full — `tuple(g)`, `list(g)`, `sum(g)`, `any`,
-`all`, `sorted`, `min`, `max`, `len`, `"".join(g)` (the set is `genExpConsumers`) — it is
-materialised as a list, which is observationally equal for a finite iterable with no
-side effects in its body. Stored, returned, or passed anywhere else it stays
-`expr:genExp`. `typedkey`'s two `tuple(type(v) for ...)` are the consumed shape.
+**Generator-expression lowering still needs correction.** The historical
+`genExpConsumers` name set replaces selected immediate generator arguments with lists.
+That is not a sufficient condition for equivalence: `any` and `all` can stop early,
+`sum` interleaves accumulation with item production, `enumerate` and `zip` are lazy,
+and `len` rejects a generator. Later arguments and shadowed consumer names also matter.
+Stored, returned, or otherwise unrecognised expressions remain `expr:genExp`.
+`typedkey`'s two `tuple(type(v) for ...)` use the eager path. Suspended frames now exist
+for ordinary generator functions (§16.F), but have not yet replaced this expression
+lowering. Its static hole count is not a general fidelity claim.
 
 **`with` was already translating; the approximation is now named.** The frontend lowers
 `with cm as x: body` to `__enter__`/`try`–`finally`/`__exit__()` itself, and the exporter
@@ -646,9 +648,8 @@ TestValueDunders` pins the shape.
 
 **Not done, and named.** Only the LEFT operand dispatches: CPython's reflected fallback
 (`b.__gt__(a)` when `a.__lt__(b)` returns `NotImplemented`) is not modelled, and
-`NotImplemented` has no value in Core. `__iter__` is out of scope here — iteration over
-an instance needs `__next__` state, a generator-shaped frame (Milestone 4). `in`, `[]`,
-`[]=` and `del []` are the container half of the protocol and land separately.
+`NotImplemented` has no value in Core. Stateful iteration is described in §16.F;
+`in`, `[]`, `[]=` and `del []` are the container half of the protocol.
 
 ### 15. Three small exporter labels, dispositioned
 
@@ -950,58 +951,43 @@ language's own specification, cited beside the rule in `cartographer/export_ast.
 
 #### 16.F Iteration protocol and generators
 
-**The iteration protocol is modelled; generators are not.** `for x in obj` on an ordinary
-instance now does what the language reference says the `for` statement does
-([§8.3](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement): "An
-iterator is created for that iterable. The first item provided by the iterator is then
-assigned to the target list ... When the iterator is exhausted ... the loop terminates"),
-creating the iterator as `iter()` does
-([functions.html#iter](https://docs.python.org/3/library/functions.html#iter): the
-`__iter__()` method, else the sequence protocol -- `__getitem__()` with integer arguments
-from `0`) and driving it as the [Iterator Types](https://docs.python.org/3/library/stdtypes.html#iterator-types)
-section prescribes (`__next__()` "Return the next item from the iterator. If there are no
-further items, raise the `StopIteration` exception"). `iter(x)` and `next(x)` on such an
-instance call the dunders; `next(x, default)` returns the default on `StopIteration`
-([functions.html#next](https://docs.python.org/3/library/functions.html#next)).
+Python `iter` and `next` now use heap-backed iterator objects. Lists, tuples,
+strings and dictionaries retain their source and position. List changes remain visible;
+exhaustion is permanent. Dictionary value replacement is allowed, size changes raise a
+sticky `RuntimeError`, and same-size key-layout changes remain
+`iterator:dict-keys-changed` because Core does not represent CPython's dictionary slots.
 
-*How.* Core does not grow a ninth interpreter function. The loop over a user iterator is a
-statement Core synthesises (`nextDriver` / `seqDriver` in `Semantics.lean`) and runs
-through `execStmt`: the iterator is bound to a name no Python source can spell (`$iter`),
-each step is `x = $iter.__next__()` inside a `tryCatch` whose handler `break`s on
-`StopIteration` and re-raises anything else, and the body follows. `break`, `continue`
-and `return` in the body therefore mean exactly what §8.3 says because `Stmt.loop`
-already gives them that meaning, and the target keeps its last value ("names in the
-target list are not deleted when the loop is finished"). `FuelMono` covers the new arms
-(`__iter__` is one `applyFunc`; the drivers go through the statement IH); `ExcSafe`
-covers them because the only new raise is a re-raise of a caught, represented name.
-Checked against CPython 3.11 by the `iterProg` guards: a counter iterator sums to 6,
-`break` at 2 leaves `x == 2`, `__iter__` returning a list, a sequence-protocol object,
-`next()` past the end raising `StopIteration`, `next(it, 99)`, `next(iter(c))`.
+Ordinary source instances dispatch through `__iter__` and `__next__`, with sequence
+fallback through `__getitem__`. An `__iter__` result must itself provide `__next__`;
+returning a list now raises `TypeError`. Sequence iterators stop on `IndexError` or
+`StopIteration`. `next(iterator, default)` handles exhaustion. Callable/sentinel
+iteration invokes its callback lazily, compares the sentinel first, preserves identity
+shortcuts and retains exhaustion across reentrant callbacks. These rules follow the
+[Python iterator protocol](https://docs.python.org/3/library/stdtypes.html#iterator-types)
+and [CPython iterator implementation](https://github.com/python/cpython/blob/3.14/Objects/iterobject.c).
 
-*Not modelled, stated.* The `for ... else` clause is the exporter's lowering, unchanged.
-`iter()` on a sequence-protocol object returns an iterator OBJECT in Python; Core has no
-value for one, so `iter(seq)` stays the builtin hole while `for` over it works. Nothing
-enforces "once `__next__()` raises `StopIteration` it must continue to do so" -- that is
-the iterator author's obligation, which CPython does not enforce either.
+The synthetic protocol methods run through ordinary Core calls. Each loop uses a
+binding specific to its iterator reference, keeping nested loops independent. Fuel
+monotonicity and exception safety cover the new paths. Source comparisons and kernel
+proofs are in `tests/test_source_iterators.py`; a small nested-loop kernel regression
+also runs without Joern. Unknown exception ancestry and relevant unknown identity
+remain explicit holes. Taking a builtin iterator's synthetic method as a value is
+`field:runtime-method`; direct calls are supported. An object result with unresolved
+inherited or metaclass iterator behavior is `iterator:result-protocol`. General class-level rebinding of
+special methods and inherited dispatch still need the broader object-model work.
 
-**Generators** ([§6.2.10](https://docs.python.org/3/reference/expressions.html#yield-expressions)):
-"When a generator function is called, it returns an iterator known as a generator ... The
-execution starts when one of the generator's methods is called. At that time, the execution
-proceeds to the first yield expression, where it is suspended again." A suspended frame is
-the one thing Core's interpreter cannot represent -- `execStmt` runs a statement to its
-outcome -- so a faithful model needs either a resumable statement cursor (a `Val.gen`
-holding a saved environment and a continuation over `Stmt`) or an eager lowering that is
-only observationally equal when the body is finite and effect-free and the consumer
-exhausts it. The exporter already takes the eager route for a generator EXPRESSION whose
-consumer is immediate (§10.6, `genExpConsumers`); extending it to generator FUNCTIONS
-needs a syntactic effect-freeness proof on the body (no calls except to pure builtins, no
-attribute writes, a provably terminating loop) before `yield v` may be lowered to
-`__gen.append(v)`. That check is not written; a generator function stays whatever hole the
-exporter gives its `yield` today (none of cachetools, requests or click contains one --
-jinja2 does, and its export will name the label) rather than become a silently eager
-wrong answer. This is recorded here as the next item, with the two designs and the
-observational argument, so that whoever lands it does not have to rediscover which one is
-honest.
+Ordinary generator functions now compile to suspended heap frames through
+`cartographer/generator_lowering.py`. Creation leaves the body unexecuted, and
+`__next__`/`send` resume saved locals and control state, including exception handlers
+and `finally` continuations. The implementation shares protocol helpers without adding
+them to source-function coverage. `tests/test_source_generators.py` compares actual
+Joern exports with CPython and proves the observations by kernel reduction.
+
+`yield from`, `close`, `throw`, return payloads, shared free-variable cells, closure
+frames and async generators retain named gaps. Generator expressions still use the
+incomplete eager lowering described in §10.6. See the
+[recovery record](interpreter-recovery.md) for implementation details and validation
+scope; these additions do not establish arbitrary-codebase completion.
 
 #### 16.C `except ... as e` binding and corpus-defined exception classes
 
