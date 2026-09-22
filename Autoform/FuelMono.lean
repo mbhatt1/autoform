@@ -35,8 +35,12 @@ def tfFreeS : Stmt → Bool
 private theorem iterationMethod_tfFree {cls name : String} {fn : Func}
     (h : Iteration.resolveMethod cls name = some fn) : tfFreeS fn.body = true := by
   unfold Iteration.resolveMethod at h
-  repeat' split at h
-  all_goals cases h <;> rfl
+  split at h
+  · unfold Iteration.consumerBody at h
+    repeat' split at h
+    all_goals cases h <;> rfl
+  · repeat' split at h
+    all_goals cases h <;> rfl
 
 /-- A context every one of whose *reachable* function bodies is `tryFinally`-free.
 

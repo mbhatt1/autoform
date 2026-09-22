@@ -94,20 +94,46 @@ Validation of the iterator extension on 2026-09-22 passed the source-to-CPython
 comparisons and kernel proofs, the nested-loop kernel regression, the full Python
 test suite and `lake build`. The strict `Autoform.Runtime` audit passed with stable
 source and compiled artifacts throughout its fresh kernel replay. The docs and spec
-freshness checks passed; tracked renders remained byte-identical. This is a scoped
-validation result: the repository-wide audit and the stale corpus provenance records
-remain separate gates, and this extension does not meet the arbitrary-codebase goal.
+freshness checks passed; tracked renders remained byte-identical. The full strict audit
+then passed on an independent frozen copy of commit `bbe15f03c0e9596ff68b197dab4aab90390ffbab`,
+with stable artifacts and fresh kernel replay of the complete `Autoform` import closure.
+The [audit record](../artifacts/interpreter-recovery/iterator-audit.json) identifies that
+revision and the complete local report. It excludes subsequent generator-expression
+changes. Stale corpus provenance remains a separate gate, and this extension does not
+meet the arbitrary-codebase goal.
 
-Existing eager generator-expression
-consumer recognition also needs correction: `any`/`all` can stop early,
-`enumerate`/`zip` are lazy, and `len` does not consume a generator. Even `sum` interleaves
-accumulation with item production.
+Generator expressions now use the same frame compiler. Following Python's
+[expression rules](https://docs.python.org/3/reference/expressions.html#generator-expressions),
+creation evaluates the leftmost iterable and prepares its iterator; the body and
+later clauses stay suspended. The exporter no longer chooses eagerness from a consumer
+name. Core consumers resume through the ordinary interpreter, including short-circuit
+truth tests for `any`/`all` and exact integer accumulation for `sum`. A custom length hint
+retains `iterator:length-hint`; non-integer sums retain `iterator:sum-type`. Shared
+free-variable cells retain `genexpr:free-variable-cells`, and async expressions retain
+`genexpr:async`. Historical ASTs must be re-exported to remove eager lowering.
+Implicit protocol calls use reserved names so source bindings of `iter`/`next` cannot
+replace them. Source and kernel regressions live in
+`tests/test_source_generator_expressions.py`.
 
 Frame methods reside in `Program.auxiliaryFuncs`, outside the source-function coverage
 denominator. The original operations and explicit translation refusals remain in the
 owning function's `analysisBody`; the interpreter executes `body`. Contract substitution
 updates both bodies and the auxiliary methods. The source-to-Core translation remains
 tested code, not a proved compiler.
+The language coverage report, external-call ranking and differential harness use this
+same source analysis. Generated helpers participate in call resolution without entering
+the source population, and lowering refusals cannot disappear from hole counts.
+
+Validation of the generator-expression extension on 2026-09-22 passed `lake build`,
+the full Python suite, the opt-in source comparisons and kernel proofs for generator
+expressions, the existing generator/iterator source regressions, and the Python numeric
+source comparison. The strict `Autoform.Runtime` audit passed with fresh replay and
+stable artifacts. The final expression test proves a sufficient smaller fuel budget in
+the kernel and transports that result to the native run's fuel using the proved
+monotonicity theorem; no native observation is accepted as a proof. Reporting regressions
+also check suspended-body calls, lowering refusals and deeply nested ASTs. A separate
+full strict audit of this checkpoint is still required; the passing iterator audit above
+does not cover this extension.
 
 Validation of this generator slice on 2026-09-22 passed the source comparison and kernel
 proofs, the long-body lowering regression, `lake build`, the full Python test suite,
@@ -125,8 +151,8 @@ explains that `partial` definitions are opaque to kernel reduction and that well
 recursion may impose additional kernel reduction cost. A continuation datatype with a
 fuel-bounded step function fits the existing trusted interpreter and its computation
 proofs. The frame compiler reuses the existing fuel-bounded interpreter rather than
-introducing host-language coroutines or opaque execution. This does not establish that
-the existing eager generator-expression cases are sound.
+introducing host-language coroutines or opaque execution. Generated-expression factories
+remain auxiliary functions, and their source bodies remain visible in coverage analysis.
 
 The exploratory Click comparison is recorded in
 [`click-prelude-export.json`](../artifacts/interpreter-recovery/click-prelude-export.json).

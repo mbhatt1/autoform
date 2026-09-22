@@ -490,14 +490,12 @@ class TestComprehensionLowering:
         # the first iterable is evaluated in the enclosing scope and is NOT renamed
         assert '"x" -> compName(x), "e" -> o("e"),' in src
 
-    def test_a_generator_expression_lowers_only_where_it_is_consumed_at_once(self):
+    def test_a_generator_expression_preserves_suspension_for_every_consumer(self):
         src = EXPORTER.read_text()
-        assert 'case "gen" if !eagerGen    => (Nil, hole("expr:genExp"))' in src
-        assert 'genExpEager = kind == "call" && genExpConsumers.contains(c.name)' in src
-        for consumer in ('"tuple"', '"sum"', '"sorted"', '"join"', '"any"', '"all"'):
-            assert consumer in src.split('val genExpConsumers', 1)[1].split(')', 1)[0], consumer
-        # stored or returned: `valueOf` asks with eagerGen = false
-        assert 'comprehensionLowering(b, eagerGen = false)' in src
+        assert '"k" -> "genExpr"' in src
+        assert 'genExpConsumers' not in src
+        assert 'genExpEager' not in src
+        assert 'comprehensionLowering(b)' in src
         # a plain-`expr` position has no prelude slot and says so
         assert 'hole("expr:comprehension-position")' in src
 
@@ -905,9 +903,9 @@ class TestIterationProtocol:
         assert 'simp [nextDriver, controlCovered, hb]' in self.FUELMONO
 
     def test_iter_and_next_builtins_and_the_default_form(self):
-        assert '| "iter" => match pick "__iter__" with' in self.SEMANTICS
+        assert '| "iter" | "<python-iter>" => match pick "__iter__" with' in self.SEMANTICS
         assert 'some (r, Iteration.factoryClass, "__iter__")' in self.SEMANTICS
-        assert '| "next" => pick "__next__"' in self.SEMANTICS
+        assert '| "next" | "<python-next>" => pick "__next__"' in self.SEMANTICS
         assert 'def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val)' in self.SEMANTICS
         assert '| (h₂, .exn (.str "StopIteration")) => (h₂, .val d)' in self.SEMANTICS
 
@@ -1106,7 +1104,7 @@ class TestSliceDPythonLabels:
     def test_impure_block_preludes_are_hoisted_only_where_a_prelude_exists(self):
         src = EXPORTER.read_text()
         assert 'def blockExprV(b: Block)' in src
-        assert 'comprehensionLowering(b, eagerGen = genExpEager).getOrElse(blockExprV(b))' in src
+        assert 'comprehensionLowering(b).getOrElse(blockExprV(b))' in src
         # plain `expr` still has no slot and keeps the label
         assert 'if (bad.isEmpty) bad = "expr:BLOCK-impure"' in src
 

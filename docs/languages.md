@@ -568,15 +568,21 @@ loop's iterable is left alone, because Python evaluates it in the enclosing scop
 `compNoLeak` in `tests/test_source_numeric.py` reads the outer `x` afterwards and is
 compared against CPython.
 
-**Generator-expression lowering still needs correction.** The historical
-`genExpConsumers` name set replaces selected immediate generator arguments with lists.
-That is not a sufficient condition for equivalence: `any` and `all` can stop early,
-`sum` interleaves accumulation with item production, `enumerate` and `zip` are lazy,
-and `len` rejects a generator. Later arguments and shadowed consumer names also matter.
-Stored, returned, or otherwise unrecognised expressions remain `expr:genExp`.
-`typedkey`'s two `tuple(type(v) for ...)` use the eager path. Suspended frames now exist
-for ordinary generator functions (§16.F), but have not yet replaced this expression
-lowering. Its static hole count is not a general fidelity claim.
+**Generator expressions retain their suspension.** The exporter records a `genExpr`
+node with lexical-scope metadata; the renderer compiles it to an auxiliary generator
+factory. The first iterable and its iterator are prepared at creation. Resumption uses
+that same iterator without repeating `__iter__`, and evaluates the body and subsequent
+clauses lazily. The factory does not add a source function to the coverage denominator;
+the body remains in its owner's `analysisBody`.
+
+The old consumer-name shortcut has been removed. Core drives `list`, `tuple`, integer
+`sum`, `any` and `all` through ordinary iteration when given generator objects. Truth
+tests and accumulation happen between yielded items, and `any`/`all` stop when their
+answer is known. `len(generator)` raises `TypeError`. Custom length hints, non-integer
+accumulation, and captured free-variable cells remain explicit gaps. Other consumers
+retain their existing runtime gaps; a matching callee name never makes evaluation
+eager. Historical ASTs containing eager list lowering require a full source re-export.
+The source and kernel regressions are `tests/test_source_generator_expressions.py`.
 
 **`with` was already translating; the approximation is now named.** The frontend lowers
 `with cm as x: body` to `__enter__`/`try`–`finally`/`__exit__()` itself, and the exporter
@@ -984,8 +990,10 @@ them to source-function coverage. `tests/test_source_generators.py` compares act
 Joern exports with CPython and proves the observations by kernel reduction.
 
 `yield from`, `close`, `throw`, return payloads, shared free-variable cells, closure
-frames and async generators retain named gaps. Generator expressions still use the
-incomplete eager lowering described in §10.6. See the
+frames and async generators retain named gaps. Generator expressions use the suspended
+frame lowering described in §10.6. Implicit iteration uses reserved protocol operations,
+so user bindings named `iter` or `next` cannot replace the machinery of a `for` loop.
+See the
 [recovery record](interpreter-recovery.md) for implementation details and validation
 scope; these additions do not establish arbitrary-codebase completion.
 

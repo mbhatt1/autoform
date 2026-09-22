@@ -14,7 +14,7 @@ It mirrors the ledger's resolvability rule rather than re-deciding it:
 
 * a free call `f` resolves when `f` is a table key verbatim, or is the dotted tail of
   exactly ONE key (`Ctx.resolve`'s unique-suffix rule), or -- under `.python` -- is a
-  modelled builtin (`Stdlib.freeNames`, read from `Stdlib.lean` so the two cannot drift);
+  modelled builtin (`Stdlib.freeNames` and `Iteration.freeNames`, read from Lean);
 * a method call `m` resolves when SOME key ends in `.m` (`Ctx.resolveMethod` takes the
   first match; the ledger has no receiver to do better).
 
@@ -31,20 +31,31 @@ import argparse, collections, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STDLIB = os.path.join(ROOT, "Autoform", "Lang", "Core", "Stdlib.lean")
+ITERATION = os.path.join(ROOT, "Autoform", "Lang", "Core", "Iteration.lean")
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+sys.path.insert(0, os.path.join(ROOT, "cartographer"))
+import deep_json
+from generator_lowering import lower_generators
 
 
-def _lean_string_list(src: str, name: str) -> list[str]:
+def _lean_string_list(src: str, name: str, path: str) -> list[str]:
     """The string literals of `def <name> : List String := [...]` in a Lean file. Reads the
     block up to the first blank line, which is how these lists are laid out."""
     m = re.search(r"^def %s : List String :=\n(.*?)\n\n" % re.escape(name), src, re.S | re.M)
     if not m:
-        raise SystemExit("external_callees: could not find `def %s` in %s" % (name, STDLIB))
+        raise SystemExit("external_callees: could not find `def %s` in %s" % (name, path))
     return re.findall(r'"([^"]*)"', m.group(1))
 
 
 def python_free_names() -> set[str]:
-    src = open(STDLIB, encoding="utf-8").read()
-    return set(_lean_string_list(src, "excNames")) | set(_lean_string_list(src, "freeNames"))
+    names = set()
+    for path, definitions in [(STDLIB, ("excNames", "freeNames")),
+                              (ITERATION, ("freeNames",))]:
+        with open(path, encoding="utf-8") as stream:
+            src = stream.read()
+        for definition in definitions:
+            names.update(_lean_string_list(src, definition, path))
+    return names
 
 
 def dialect_of(ast: list[dict]) -> str:
@@ -80,7 +91,7 @@ class Resolver:
 
 def walk(node, out: list, holes: list):
     """Collect (kind, key) for every call site and every hole label under `node`."""
-    if isinstance(node, dict):
+    for node in deep_json.dict_nodes(node):
         k = node.get("k")
         if k == "call":
             out.append(("call", node.get("f", "")))
@@ -90,17 +101,14 @@ def walk(node, out: list, holes: list):
             out.append(("mcall", (r, node.get("m", ""))))
         elif k in ("hole", "holeS"):
             holes.append(node.get("label", "?"))
-        for v in node.values():
-            walk(v, out, holes)
-    elif isinstance(node, list):
-        for v in node:
-            walk(v, out, holes)
 
 
 def analyse(path: str) -> dict:
-    ast = json.load(open(path, encoding="utf-8"))
+    ast = lower_generators(deep_json.load(path))
     dialect = dialect_of(ast)
-    names = [f["name"] for f in ast]
+    # Program.table includes auxiliary frame functions; Program.funcs does not.
+    helpers = [helper for f in ast for helper in f.get("generatorHelpers", [])]
+    names = [f["name"] for f in ast + helpers]
     res = Resolver(names, dialect)
     sites = collections.Counter()
     blocks = collections.Counter()
@@ -108,7 +116,7 @@ def analyse(path: str) -> dict:
     hole_free_blocked = 0
     for f in ast:
         calls, holes = [], []
-        walk(f.get("body"), calls, holes)
+        walk(f.get("analysisBody", f.get("body")), calls, holes)
         ext = []
         for kind, key in calls:
             if kind == "call":

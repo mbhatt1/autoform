@@ -1462,6 +1462,12 @@ does; everything else names exactly one method. -/
       if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none else
       let pick (m : String) : Option (Ref × String × String) :=
         if ctx.classDefines o.cls m then some (r, o.cls, m) else none
+      if Iteration.consumes f &&
+          (ctx.classDefines o.cls "__iter__" || ctx.classDefines o.cls "__getitem__") then
+        some (r, Iteration.consumerClass, f)
+      else if f == "len" && (Iteration.iteratorClass o.cls || o.cls == "<generator>") then
+        some (r, Iteration.consumerClass, "<length-error>")
+      else
       match f with
       | "len"  => pick "__len__"
       | "hash" => pick "__hash__"
@@ -1482,12 +1488,12 @@ does; everything else names exactly one method. -/
       -- `next(iterator)`: "Retrieve the next item from the iterator by calling its
       -- `__next__()` method" -- library/functions.html#next; the two-argument form is
       -- `nextDefaultTarget` below.
-      | "iter" => match pick "__iter__" with
+      | "iter" | "<python-iter>" => match pick "__iter__" with
                   | some target => some target
                   | none => if ctx.classDefines o.cls "__getitem__" then
                               some (r, Iteration.factoryClass, "__iter__")
                             else none
-      | "next" => pick "__next__"
+      | "next" | "<python-next>" => pick "__next__"
       | _      => none
     | none => none
   | _ => none
@@ -1499,7 +1505,7 @@ instance whose class defines `__next__`. -/
 def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
     Option (Ref × Func × Val) :=
   match f, vs with
-  | "next", [it, d] =>
+  | "next", [it, d] | "<python-next>", [it, d] =>
       match ctx.dunderOn h it "__next__" with
       | some (r, fn) => some (r, fn, d)
       | none         => none
@@ -1586,7 +1592,7 @@ return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
 
 /-- __iter__ must return an iterator, not merely another iterable. -/
 def checkedBuiltinDunderResult (ctx : Ctx) (h : Heap) (f m : String) (v : Val) : EResult :=
-  if f == "iter" then
+  if Iteration.isIter f then
     if (ctx.dunderOn h v "__next__").isSome then .val v
     else if Iteration.unknownResultProtocol h v then .hole "iterator:result-protocol"
     else .exn (.str "TypeError")

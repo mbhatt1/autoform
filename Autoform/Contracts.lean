@@ -689,7 +689,7 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
   rw [show ("." ++ "__init__") = ".__init__" from by rfl]
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
-  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass,
+  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
     Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass]
 
 /-- Nor a `<init>` (the JavaScript/Java constructor name `Ctx.resolveCtor` tries second). -/
@@ -703,7 +703,7 @@ theorem resolveMethod_hashedTuple_initJs (e : Expr) :
   rw [show ("." ++ "<init>") = ".<init>" from by rfl]
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
-  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass,
+  simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
     Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass]
 
 /-- So `Expr.alloc "_HashedTuple"` runs no constructor at all. -/

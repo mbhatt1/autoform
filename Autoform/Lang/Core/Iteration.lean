@@ -19,6 +19,17 @@ def dataClass : String := "<builtin-container-iterator>"
 def sequenceClass : String := "<builtin-sequence-iterator>"
 def callableClass : String := "<builtin-callable-iterator>"
 def factoryClass : String := "<builtin-sequence-iterator-factory>"
+def consumerClass : String := "<builtin-iterator-consumer>"
+
+/-- Implicit protocol operations cannot be rebound by source names `iter` or `next`. -/
+def isIter (name : String) : Bool := name == "iter" || name == "<python-iter>"
+def isNext (name : String) : Bool := name == "next" || name == "<python-next>"
+
+def consumes (name : String) : Bool :=
+  name == "list" || name == "tuple" || name == "sum" || name == "any" || name == "all"
+
+def plainLengthHint (cls : String) : Bool :=
+  cls == "<generator>" || cls == dataClass || cls == callableClass
 
 def iteratorClass (cls : String) : Bool :=
   cls == dataClass || cls == sequenceClass || cls == callableClass
@@ -86,7 +97,8 @@ def dataNext (h : Heap) (r : Ref) : Heap × EResult :=
 
 /-- Stateful builtins are kept separate from `Stdlib.builtin`'s heap-preserving models. -/
 def freeNames : List String :=
-  ["iter", "next", "<iterator-next>", "<sequence-iter>", "<iterator-identical>"]
+  ["iter", "next", "<python-iter>", "<python-next>", "<iterator-next>", "<sequence-iter>",
+   "<iterator-identical>", "<iterator-tuple>", "<iterator-sum-add>", "<iterator-length-hint>"]
 
 def knowsFree (d : Dialect) (name : String) : Bool :=
   d == .python && freeNames.contains name
@@ -107,7 +119,7 @@ def builtin (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     Option (Heap × EResult) :=
   if !knowsFree d name then none else
   match name, args with
-  | "iter", [source] => newData h source
+  | "iter", [source] | "<python-iter>", [source] => newData h source
   | "iter", [callable, sentinel] =>
     match callable with
     | .fn _ | .clos _ _ => some (allocate h callableClass callable [("<sentinel>", sentinel)])
@@ -115,6 +127,20 @@ def builtin (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     | _ => some (h, .exn (.str "TypeError"))
   | "<sequence-iter>", [source] => some (allocate h sequenceClass source)
   | "<iterator-identical>", [a, b] => some (h, sentinelIdentity a b)
+  | "<iterator-tuple>", [source] =>
+      match source.unbox h with
+      | .list items => some (h, .val (.tuple items))
+      | _ => some (h, .hole "iterator:tuple-source")
+  | "<iterator-sum-add>", [.int total, .int item] => some (h, .val (.int (total + item)))
+  | "<iterator-sum-add>", [.int total, .bool item] =>
+      some (h, .val (.int (total + if item then 1 else 0)))
+  | "<iterator-sum-add>", [_, _] => some (h, .hole "iterator:sum-type")
+  | "<iterator-length-hint>", [.ref r] =>
+      match h.get r with
+      | some object =>
+          if plainLengthHint object.cls then some (h, .val .unit)
+          else some (h, .hole "iterator:length-hint")
+      | none => some (h, .hole "iterator:dangling-reference")
   | "<iterator-next>", [.ref r] =>
     match h.get r with
     | some object => if object.cls == dataClass then some (dataNext h r) else none
@@ -171,6 +197,32 @@ def callableNextBody : Stmt :=
           (.ifte (.call "bool" [.binop "==" (field "<sentinel>") (.name "<value>")]) stopBody
             (.ret (.name "<value>"))))))
 
+/-- Consumers resume one item at a time, so truth tests and accumulation interleave
+with generator effects. Length hints are harmless only for known runtime iterators;
+an unknown user __length_hint__/__len__ is an explicit gap. Sum currently models exact
+integer accumulation, retaining a hole for custom addition and floating compensation. -/
+def consumerBody (name : String) : Option Stmt :=
+  if name == "list" || name == "tuple" then
+    some (.seq (.expr (.call "<iterator-length-hint>" [self]))
+      (.seq (.assign "<items>" (.listE []))
+        (.seq (.forIn "<item>" self
+          (.expr (.mcall (.name "<items>") "append" [.name "<item>"])))
+          (.ret (if name == "list" then .name "<items>"
+                 else .call "<iterator-tuple>" [.name "<items>"])))))
+  else if name == "sum" then
+    some (.seq (.assign "<total>" (.lit (.int 0)))
+      (.seq (.forIn "<item>" self (.assign "<total>"
+        (.call "<iterator-sum-add>" [.name "<total>", .name "<item>"])))
+        (.ret (.name "<total>"))))
+  else if name == "any" then
+    some (.seq (.forIn "<item>" self
+      (.ifte (.name "<item>") (.ret (.lit (.bool true))) .skip)) (.ret (.lit (.bool false))))
+  else if name == "all" then
+    some (.seq (.forIn "<item>" self
+      (.ifte (.name "<item>") .skip (.ret (.lit (.bool false))))) (.ret (.lit (.bool true))))
+  else if name == "<length-error>" then some (raiseName "TypeError")
+  else none
+
 private def method (cls name : String) (body : Stmt) : Func :=
   { name := "<runtime>." ++ cls ++ "." ++ name, params := [], body := body,
     pythonSignature := some { isMethod := some true } }
@@ -178,7 +230,8 @@ private def method (cls name : String) (body : Stmt) : Func :=
 /-- Reserved classes cannot be declared in Python source. Their methods do not enter
 the ordinary function table or interfere with suffix resolution of source names. -/
 def resolveMethod (cls name : String) : Option Func :=
-  if cls == factoryClass && name == "__iter__" then
+  if cls == consumerClass then (consumerBody name).map (method cls name)
+  else if cls == factoryClass && name == "__iter__" then
     some (method cls name (.ret (.call "<sequence-iter>" [self])))
   else if iteratorClass cls && name == "__iter__" then
     some (method cls name (.ret self))

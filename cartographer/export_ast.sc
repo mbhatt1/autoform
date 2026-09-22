@@ -201,6 +201,7 @@ SystemError SystemExit TypeError UnboundLocalError ValueError ZeroDivisionError'
 exception_bases = {name: [b.__name__ for b in value.__mro__[1:] if b is not object]
                    for name, value in exceptions.items()}
 tries, raises, class_refs, signatures, properties = {}, {}, {}, {}, set()
+genexpressions = {}
 # `(class, name)` for every `@property` getter defined by a decorator inside a class body,
 # and the names of properties Core can NOT dispatch -- `x = property(getx)` at class
 # level, where the getter is not syntactically a method of the class. The first list
@@ -663,6 +664,21 @@ def visit(node, scopes):
         kind = {ast.ListComp: 'listcomp', ast.SetComp: 'setcomp',
                 ast.DictComp: 'dictcomp', ast.GeneratorExp: 'genexpr'}[type(node)]
         nested = inner_scope(node, kind, scopes)
+        if isinstance(node, ast.GeneratorExp):
+            local_symbols = nested[-1].get_symbols()
+            metadata = {
+                'locals': sorted(s.get_name() for s in local_symbols if s.is_local()),
+                'captures': sorted(s.get_name() for s in local_symbols if s.is_free()),
+                'parameters': ['<genexpr-iterator>'],
+                'async': any(g.is_async for g in node.generators)
+                         or any(isinstance(n, ast.Await) for n in ast.walk(node))}
+            # Joern starts an unparenthesized call argument at the element, while
+            # CPython includes the call's opening parenthesis. Record both anchors;
+            # ambiguous anchors are refused instead of borrowing another scope.
+            for anchor in {(node.lineno, node.col_offset + 1),
+                           (node.elt.lineno, node.elt.col_offset + 1)}:
+                key = '%d:%d' % anchor
+                genexpressions[key] = None if key in genexpressions else metadata
         for index, generator in enumerate(node.generators):
             if index:
                 visit(generator.iter, nested)
@@ -724,6 +740,7 @@ def visit(node, scopes):
 visit(tree, [symbols])
 print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                   'signatures': signatures,
+                  'genexpressions': genexpressions,
                   'exceptions': sorted(represented),
                   'properties': sorted(properties),
                   'propertyPairs': sorted(property_pairs),
@@ -792,15 +809,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // `006-reduce-remaining-holes`, Story 3: counter for `freshExprVTemp`'s
   // never-collides synthetic name (a postfix increment/decrement used as a value).
   var exprVTempCounter: Int = 0
-  /** Set while `exprV` walks the positional arguments of a call that CONSUMES its
-    * argument at once (`tuple(...)`, `sum(...)`, ...): the one position where a generator
-    * expression may be lowered eagerly. See `comprehensionLowering`. */
-  var genExpEager: Boolean = false
-  /** Builtins and methods that consume an iterable argument immediately and completely. */
-  val genExpConsumers: Set[String] =
-    Set("tuple", "list", "set", "frozenset", "sum", "any", "all", "sorted", "min", "max",
-        "len", "dict", "join", "enumerate", "zip", "reversed")
-
   /** Kernel declaration macros that emit METADATA, not code.
     *
     * `MODULE_LICENSE("GPL")` writes a string into an ELF section read by the module
@@ -8341,17 +8349,31 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * Under `.python` a list literal allocates, so `tmp0.append(e)` writes through the
     * payload and `tmp0` afterwards IS the comprehension.
     *
-    * A generator expression is lazy and has no Core representation; lowering it as a
-    * list is observationally equal only when it is consumed at once and in full --
-    * `tuple(g)`, `sum(g)`, `sorted(g)`, `"".join(g)` -- which is what `genExpEager`
-    * marks. Stored or returned (`g = (x for x in xs)`, `return (x for ...)`) it stays
-    * `expr:genExp`: a consumer could observe laziness, or never exhaust it. A set
+    * Generator expressions retain a separate suspension node. The renderer's frame
+    * compiler evaluates the first iterable at creation and suspends the body; consumer
+    * names do not justify replacing a lazy expression with an eager list. A set
     * comprehension stays `expr:setComp`: Core has no set value. */
-  def comprehensionLowering(b: Block, eagerGen: Boolean): Option[(List[ujson.Obj], ujson.Obj)] =
+  def comprehensionLowering(b: Block): Option[(List[ujson.Obj], ujson.Obj)] =
     comprehensionParts(b).map { case (tmp, kind, loop) =>
       kind match {
         case "set"                 => (Nil, hole("expr:setComp"))
-        case "gen" if !eagerGen    => (Nil, hole("expr:genExp"))
+        case "gen" =>
+          pythonSourceInfo(b, "genexpressions").filter(_ != ujson.Null) match {
+            case None => (Nil, hole("genexpr:source-metadata"))
+            case Some(metadata) =>
+              val parts = seqStmts(renameCompBinders(stmt(loop)))
+                .filterNot(_("k").str == "skip")
+              if (parts.isEmpty || parts.last("k").str != "forIn")
+                (Nil, hole("genexpr:outer-loop-shape"))
+              else {
+                val value = ujson.Obj("k" -> "genExpr", "sink" -> localName(tmp),
+                  "body" -> parts.last, "generator" -> metadata)
+                val result = freshExprVTemp()
+                // Only preparation of the first iterable runs outside the frame.
+                (parts.init :+ ujson.Obj("k" -> "assign", "x" -> result, "e" -> value),
+                 ujson.Obj("k" -> "name", "v" -> result))
+              }
+          }
         case _ =>
           val init =
             if (kind == "dict") ujson.Obj("k" -> "dictE", "pairs" -> ujson.Arr())
@@ -8380,7 +8402,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         case None =>
           // A comprehension in a STORED position: `ys = [..]`, `return [..]`. The loop
           // variable must not leak here either, so this goes through the same lowering.
-          comprehensionLowering(b, eagerGen = false).getOrElse(all match {
+          comprehensionLowering(b).getOrElse(all match {
             case Nil  => (Nil, hole("expr:empty-block"))
             case ks   => (stmts(ks.init), expr(ks.last))
           })
@@ -9676,11 +9698,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         (kind != "callV" || valueCalleeNode.isDefined)
       if (!shapeOk) (Nil, baseline)
       else {
-        // A generator expression handed to one of these is exhausted at once and in
-        // full, so lowering it as a list is unobservable (`comprehensionLowering`).
-        // `c.name` is the bare callee: `tuple` for `tuple(...)`, `join` for `sep.join(...)`.
-        val savedEager = genExpEager
-        genExpEager = kind == "call" && genExpConsumers.contains(c.name)
         // operands in evaluation order: callee/receiver, positionals, keywords
         val recur: List[(List[ujson.Obj], ujson.Value, Option[String])] =
           valueCalleeNode.toList.map { f => val (pf, fe) = exprV(f); (pf, fe: ujson.Value, Some("<callee>")) } ++
@@ -9696,7 +9713,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             val (pa, ae) = exprV(a)
             (pa, ae: ujson.Value, Some(argName(a).getOrElse("")))
           }
-        genExpEager = savedEager
         val lastEffect = recur.lastIndexWhere(_._1.nonEmpty)
         if (lastEffect < 0) (Nil, baseline)
         // Expanding an iterable can itself fail or read mutable state. Saving
@@ -9809,10 +9825,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                     bareType(staticTypeOf(kidsOf(c)(0))) == "void" &&
                     !pureExpr(kidsOf(c)(1)) =>
       exprV(kidsOf(c)(1))
-    // A comprehension in a prelude-aware position -- most often a call's argument, where
-    // `genExpEager` says whether a generator expression may be lowered as a list.
+    // A comprehension in a position that can preserve its evaluation prelude.
     case b: Block =>
-      comprehensionLowering(b, eagerGen = genExpEager).getOrElse(blockExprV(b))
+      comprehensionLowering(b).getOrElse(blockExprV(b))
     case other => (Nil, expr(other))
   }
 

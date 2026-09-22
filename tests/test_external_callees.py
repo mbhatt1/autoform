@@ -60,7 +60,8 @@ def test_resolver_mirrors_the_ledgers_three_arms(mod):
 
 def test_python_builtins_are_read_from_stdlib_not_hardcoded(mod):
     names = mod.python_free_names()
-    assert {"len", "abs", "isinstance", "KeyError", "ValueError"} <= names
+    assert {"len", "abs", "isinstance", "KeyError", "ValueError",
+            "iter", "next", "<python-iter>", "<python-next>"} <= names
 
 
 def test_external_callees_are_keyed_by_receiver_and_counted(mod, tmp_path):
@@ -107,3 +108,30 @@ def test_cli_writes_json(mod, tmp_path, capsys):
     data = json.loads(out.read_text())
     assert data["ranking"][0]["callee"] == "strlen"
     assert "| 1 | `strlen` |" in capsys.readouterr().out
+
+
+def test_generator_analysis_keeps_source_calls_and_resolves_helpers(mod, tmp_path):
+    from generator_lowering import name, node
+    generator = _fn("m.py:<module>.stream", node("yieldS", e=_call("remote")))
+    generator["generator"] = {"locals": [], "captures": [], "parameters": []}
+    expression = _fn("m.py:<module>.expression", _ret(node("genExpr", sink="tmp",
+        generator={"locals": ["x"], "captures": []}, body=node("forIn", x="x",
+            e=node("listE", items=[]), body=node("exprS", e=_mcall(
+                name("tmp"), "append", _call("remote")))))))
+    path = tmp_path / "ast-generators.json"
+    path.write_text(json.dumps([generator, expression]))
+    report = mod.analyse(str(path))
+    assert report["functions"] == 2
+    assert report["hole_free_but_open"] == 2
+    assert report["external_callees"] == {"remote": {"sites": 2, "blocks": 2}}
+
+
+def test_deep_source_does_not_exhaust_the_python_stack(mod, tmp_path):
+    depth = 2500
+    body = ('{"k":"seq","a":{"k":"skip"},"b":' * depth
+            + '{"k":"ret","e":{"k":"call","f":"remote","args":[]}}'
+            + '}' * depth)
+    path = tmp_path / "ast-deep.json"
+    path.write_text('[{"name":"deep","file":"m.c","params":[],"body":' + body + '}]')
+    assert mod.analyse(str(path))["external_callees"] == {
+        "remote": {"sites": 1, "blocks": 1}}

@@ -22,10 +22,13 @@ Usage:
 """
 import json, sys, os, glob, collections
 import deep_json
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "cartographer"))
+from generator_lowering import analysis_functions
 
 # Same extension -> dialect table as `cartographer/render_lean.py`. Duplicated
-# deliberately: this script measures the pipeline, so it must not import from it and
-# inherit a change silently.
+# deliberately: this script measures the pipeline, so its dialect vote must not
+# silently inherit a change to the renderer's extension table.
 DIALECT = {".py": "python", ".c": "cLike", ".h": "cLike", ".cpp": "cLike",
            ".cc": "cLike", ".cxx": "cLike", ".hh": "cLike", ".hpp": "cLike",
            ".java": "java", ".kt": "java", ".go": "go",
@@ -56,7 +59,9 @@ def func_stats(f):
     return nodes, holes, causes
 
 def analyse(path):
-    funcs = deep_json.load(path)
+    # Match Func.analyzedBody: suspended operations and lowering refusals count,
+    # generated frame helpers do not add source functions to the denominator.
+    funcs = analysis_functions(deep_json.load(path))
     exts = collections.Counter(os.path.splitext(f.get("file", ""))[1] for f in funcs)
     votes = collections.Counter(DIALECT[e] for e in exts.elements() if e in DIALECT)
     dialect = votes.most_common(1)[0][0] if votes else "python (defaulted)"

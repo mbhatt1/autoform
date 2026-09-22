@@ -90,6 +90,7 @@ class FrameCompiler:
         self.locals = set(metadata["locals"])
         self.captures = metadata["captures"]
         self.parameters = metadata["parameters"]
+        self.locals.update(self.parameters)
         self.cls = "<generator>"
         self.resume_name = "<generator>." + function["name"] + ".<resume>"
         self.nodes = {}
@@ -225,9 +226,11 @@ class FrameCompiler:
             body = self.compile(statement["body"], head, normal, head, returning, exceptional)
             exhausted = self.put(node("ifte", c=compare(field("<exception>"), string("StopIteration")),
                                       t=self.goto(normal), e=self.goto(exceptional)), exceptional)
-            self.put(seq(self.local_set(statement["x"], node("call", f="next", args=[self.expression(name(iterator))])),
+            self.put(seq(self.local_set(statement["x"], node("call", f="<python-next>", args=[self.expression(name(iterator))])),
                          self.goto(body)), exhausted, head)
-            return self.put(seq(self.local_set(iterator, node("call", f="iter", args=[self.expression(statement["e"])])),
+            source = self.expression(statement["e"])
+            initial = source if statement.get("iteratorReady") else node("call", f="<python-iter>", args=[source])
+            return self.put(seq(self.local_set(iterator, initial),
                                 self.goto(head)), exceptional)
         if kind in ("yieldFromS", "breakBlock"):
             raise UnsupportedGenerator("generator:" + kind)
@@ -310,33 +313,107 @@ class FrameCompiler:
         return self.function
 
 
+def lower_expressions(function):
+    """Turn generator expressions into auxiliary factories without eager consumption.
+
+    The first iterator is made as the factory argument, in the enclosing environment.
+    Its frame starts with that iterator already prepared, so resumption does not call
+    __iter__ a second time. Free variables still require cells and are refused.
+    """
+    factories, analysis = [], []
+
+    def rewrite(value):
+        if value.get("k") != "genExpr":
+            return value
+        metadata = value.get("generator")
+        if not isinstance(metadata, dict):
+            return node("hole", label="genexpr:source-metadata")
+        if metadata.get("captures"):
+            return node("hole", label="genexpr:free-variable-cells")
+        if metadata.get("async"):
+            return node("hole", label="genexpr:async")
+        source = value.get("body", {})
+        if source.get("k") != "forIn":
+            return node("hole", label="genexpr:outer-loop-shape")
+        sink = value.get("sink")
+        yields = 0
+
+        def suspend(item):
+            nonlocal yields
+            expression = item.get("e", {})
+            if (item.get("k") == "exprS" and expression.get("k") == "mcall"
+                    and expression.get("m") == "append"
+                    and expression.get("recv") == name(sink)
+                    and len(expression.get("args", [])) == 1):
+                yields += 1
+                return node("yieldS", e=expression["args"][0])
+            return item
+
+        body = transform(source, suspend)
+        if yields != 1 or any(item == name(sink) for item in walk(body)):
+            return node("hole", label="genexpr:yield-shape")
+        iterator = "<genexpr-iterator>"
+        body.update(e=name(iterator), iteratorReady=True)
+        factory_name = function["name"] + ".<genexpr>" + str(len(factories))
+        factory = {"name": factory_name, "file": function.get("file", ""),
+                   "sourceOwner": function["name"], "params": [iterator],
+                   "body": body, "generator": {**metadata, "parameters": [iterator]},
+                   "pythonSignature": {"isMethod": False, "positionalOnly": [iterator],
+                                       "keywordOnly": [], "required": [iterator]}}
+        try:
+            compiled = FrameCompiler(factory).finish()
+        except UnsupportedGenerator as error:
+            return node("hole", label=str(error))
+        factories.extend(compiled.pop("generatorHelpers"))
+        factories.append(compiled)
+        analysis.append(compiled["analysisBody"])
+        return node("call", f=factory_name,
+                    args=[node("call", f="<python-iter>", args=[source["e"]])])
+
+    if not any(item.get("k") == "genExpr" for item in walk(function["body"])):
+        return function, [], []
+    return {**function, "body": transform(function["body"], rewrite)}, factories, analysis
+
+
 def lower_generators(functions):
     lowered = []
     helpers = {}
     for function in functions:
+        function, expression_helpers, expression_analysis = lower_expressions(function)
         if not function.get("generator"):
             if any(item.get("k") in ("yieldS", "yieldFromS") for item in walk(function["body"])):
                 function = dict(function)
                 function["body"] = node("holeS", label="generator:missing-metadata")
-            lowered.append(function)
-            continue
-        if function["body"].get("k") == "holeS":
-            lowered.append(function)
-            continue
-        try:
-            compiled = FrameCompiler(function).finish()
+        elif function["body"].get("k") != "holeS":
+            try:
+                function = FrameCompiler(function).finish()
+            except UnsupportedGenerator as error:
+                function = {**function, "body": node("holeS", label=str(error))}
+        candidates = expression_helpers + function.get("generatorHelpers", [])
+        if candidates:
+            function = dict(function)
             unique_helpers = []
-            for helper in compiled["generatorHelpers"]:
+            for helper in candidates:
                 previous = helpers.get(helper["name"])
                 if previous is None:
                     helpers[helper["name"]] = helper
                     unique_helpers.append(helper)
                 elif previous != helper:
                     raise ValueError("conflicting generator helper: " + helper["name"])
-            compiled["generatorHelpers"] = unique_helpers
-            lowered.append(compiled)
-        except UnsupportedGenerator as error:
-            refused = dict(function)
-            refused["body"] = node("holeS", label=str(error))
-            lowered.append(refused)
+            function["generatorHelpers"] = unique_helpers
+        if expression_analysis:
+            function = {**function, "analysisBody": seq(
+                function.get("analysisBody", function["body"]), *expression_analysis)}
+        lowered.append(function)
     return lowered
+
+
+def analysis_functions(functions):
+    """Source population with the same analyzed bodies as the rendered Lean ledger.
+
+    Input is the exported AST, before lowering. Helpers stay outside the population;
+    lowering refusals and suspended body operations remain visible to coverage tools.
+    This view is for analysis and source-runtime sampling, never execution/rendering.
+    """
+    return [{**function, "body": function.get("analysisBody", function["body"])}
+            for function in lower_generators(functions)]

@@ -34,6 +34,9 @@ import wasm_backend
 import runtime_backends
 import deep_json
 import struct
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "cartographer"))
+from generator_lowering import analysis_functions
 
 random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
@@ -1689,7 +1692,9 @@ def main():
         i = argv.index("--language"); lang_override = argv[i + 1]; del argv[i:i + 2]
     ast_path, src_root, lean_mod = argv[0], argv[1], argv[2]
     ncases = int(argv[3]) if len(argv) > 3 else 5
-    funcs = deep_json.load(ast_path)
+    # Static coverage and sampling use the same source bodies as the Lean ledger,
+    # including refusals introduced when suspended generators are lowered.
+    funcs = analysis_functions(deep_json.load(ast_path))
     module_tag = lean_mod
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     generated = os.path.join(repo, "Autoform", "Generated", lean_mod + ".lean")
