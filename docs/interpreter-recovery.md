@@ -88,6 +88,13 @@ workspace `/tmp/autoform-valuecall-validation` and module `ValueCallRecovery`.
 Current integrity checks must continue to distinguish stale and missing evidence.
 `check_provenance.py` rejects the four tracked Python corpora whose exporter pin is
 stale; regenerate their complete evidence with `scripts/reland_corpus.sh`. Do not
-update only their hashes. Local scratch ASTs without manifest entries are reported
+update only their hashes. The re-land script now validates the selected artifact with
+`check_provenance.py --strict --artifact ast-<Module>.json`, so unrelated stale corpora
+do not interrupt that corpus's regeneration. It records specification pins only with
+`check_specs_fresh.py --record --corpus <Module>`. Default checks remain repository-wide;
+the selected checks explicitly report their scope and cannot establish the full gate.
+Regression checks live in `tests/test_reland_scope.py`.
+
+Local scratch ASTs without manifest entries are reported
 as unverifiable by `check_render.py`. The docs/spec freshness checks do not establish
 that the current interpreter agrees with every source corpus.

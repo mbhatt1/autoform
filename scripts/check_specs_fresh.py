@@ -49,7 +49,7 @@ product that legitimately does not exist in a fresh clone; it is reported as SKI
 does not fail. Tracked theorems pinned to a corpus nobody can see is a different thing,
 and it now has its own name.
 
-Usage:  scripts/check_specs_fresh.py [--record]
+Usage:  scripts/check_specs_fresh.py [--record] [--corpus Module ...]
 Exit:   0 all specs current; 1 at least one stale; 2 nothing checkable;
         3 all checkable specs current, but a tracked spec module has no verifiable corpus.
 """
@@ -125,15 +125,24 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--record", action="store_true",
                     help="pin the current corpus hashes (only after re-generating)")
+    ap.add_argument("--corpus", action="append", choices=sorted(set(SPECS.values())),
+                    help="check or record only specifications for this corpus; repeatable")
     a = ap.parse_args()
     man = json.load(open(MANIFEST))
     specs = man.setdefault("specs", {})
     stale, unchecked, unverifiable, skipped, ok = [], [], [], [], 0
+    seen_corpora = set()
+    if a.corpus:
+        print("SCOPE  selected corpora only: " + ", ".join(sorted(set(a.corpus))) +
+              ". Other specification pins are unchanged and unchecked.")
 
     for spec, corpus in SPECS.items():
+        if a.corpus and corpus not in a.corpus:
+            continue
         if not os.path.exists(os.path.join(ROOT, "Autoform", spec + ".lean")) and \
            not os.path.isdir(os.path.join(ROOT, "Autoform", spec)):
             continue
+        seen_corpora.add(corpus)
         cur, src = corpus_hash(man, corpus)
         if cur is None:
             # The corpus cannot be hashed from the tree. Whether that is acceptable
@@ -145,7 +154,7 @@ def main() -> int:
             tracked = True if True in answers else (
                 None if None in answers else False)
             rec = specs.get(spec, {}).get("corpus_ast_sha256")
-            if tracked is False:
+            if tracked is False and not a.corpus:
                 skipped.append(f"{spec}: corpus {corpus} — {src}; spec module is not "
                                f"tracked in git, so nothing in the repository depends on it")
             else:
@@ -174,7 +183,18 @@ def main() -> int:
         else:
             ok += 1
 
+    missing_selected = set(a.corpus or []) - seen_corpora
+    if missing_selected:
+        print("check_specs_fresh: selected corpora have no specification modules: " +
+              ", ".join(sorted(missing_selected)), file=sys.stderr)
+        return 2
     if a.record:
+        if a.corpus and (not ok or unverifiable):
+            for u in unverifiable:
+                print(f"UNVERIFIABLE {u}", file=sys.stderr)
+            print("check_specs_fresh: selected specification pins not recorded; "
+                  "missing specification or corpus evidence.", file=sys.stderr)
+            return 2
         json.dump(man, open(MANIFEST, "w"), indent=1, sort_keys=True)
         print(f"check_specs_fresh: pinned {ok} spec module(s)")
         return 0
@@ -192,6 +212,9 @@ def main() -> int:
         return 1
     if not ok and (unchecked or unverifiable):
         print("\ncheck_specs_fresh: nothing could be checked.", file=sys.stderr)
+        return 2
+    if a.corpus and not ok and not stale:
+        print("check_specs_fresh: no selected specification could be checked.", file=sys.stderr)
         return 2
     if unverifiable:
         print(f"\ncheck_specs_fresh: {ok} spec module(s) match their corpus, but "

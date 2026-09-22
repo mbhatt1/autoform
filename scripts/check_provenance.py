@@ -52,6 +52,7 @@ Two things this check deliberately does NOT claim:
     pass.  `--strict` refuses to accept the baseline at all.
 
 Usage:  scripts/check_provenance.py [--strict] [--verify-source] [--root .]
+                                  [--artifact ast-Module.json ...]
 Exit:   0 everything attributed or explicitly baselined; 1 a violation; 2 nothing checked.
 """
 from __future__ import annotations
@@ -117,6 +118,9 @@ def main() -> int:
                     help="treat baselined (unattributed) artifacts as failures")
     ap.add_argument("--verify-source", action="store_true",
                     help="re-derive source_revision where the source tree is present")
+    ap.add_argument("--artifact", action="append", default=[],
+                    help="check only this artifact basename during regeneration; repeatable. "
+                         "Does not establish repository-wide provenance")
     a = ap.parse_args()
     root = Path(a.root).resolve()
     P.REPO = root
@@ -139,6 +143,17 @@ def main() -> int:
     artifacts: list[Path] = []
     for g in P.JOERN_ARTIFACT_GLOBS:
         artifacts.extend(sorted(Path(p) for p in glob.glob(str(root / g))))
+    selected = set(a.artifact)
+    if selected:
+        available = {p.name for p in artifacts}
+        missing = selected - available
+        if missing:
+            print("FAIL  selected artifact(s) absent or not recognized: " +
+                  ", ".join(sorted(missing)), file=sys.stderr)
+            return 1
+        artifacts = [p for p in artifacts if p.name in selected]
+        print("SCOPE  selected artifacts only: " + ", ".join(sorted(selected)) +
+              ". Repository-wide provenance was not checked.")
     if not artifacts:
         # Silence must never read as success: finding no artifacts at all means the
         # check looked in the wrong place, not that everything is attributed.
@@ -166,7 +181,9 @@ def main() -> int:
 
     for art in artifacts:
         rel = art.name
-        is_local = kind.get(str(art.relative_to(root))) == "ignored"
+        # Explicit selection requests validation even for a local ignored artifact.
+        # Otherwise an absent record could make a targeted regeneration check vacuous.
+        is_local = not selected and kind.get(str(art.relative_to(root))) == "ignored"
         rp = prov_dir / (rel + ".prov.json")
         actual = P.sha256_file(art)
         if not rp.exists():
@@ -245,6 +262,8 @@ def main() -> int:
         attributed += 1
 
     for rp in sorted(prov_dir.glob("*.prov.json")) if prov_dir.is_dir() else []:
+        if selected and rp.name.removesuffix(".prov.json") not in selected:
+            continue
         if rp.name not in seen_records:
             art = rp.name[: -len(".prov.json")]
             if not (root / art).exists():

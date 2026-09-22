@@ -85,7 +85,10 @@ removed = d["artifacts"].pop(f"ast-{mod}.json", None)
 json.dump(d, open(path, "w"), indent=1); open(path, "a").write("\n")
 print("    backlog entry", "removed" if removed else "absent", f"for ast-{mod}.json")
 PYEOF
-"$PYTHON" scripts/check_provenance.py | tail -2
+# Other corpora can still carry the previous exporter pin while this one is being
+# regenerated. Validate this artifact fully now; the repository-wide gate below is
+# still required before claiming the whole re-land complete.
+"$PYTHON" scripts/check_provenance.py --strict --artifact "ast-$MOD.json"
 
 echo "==> [4/9] render"
 "$PYTHON" cartographer/render_lean.py "ast-$MOD.json" "Autoform/Generated/$MOD.lean" "$MOD"
@@ -121,7 +124,7 @@ lake build "Autoform.SpecsGen.$MOD" 2>&1 | tail -2
 # generated module was just regenerated against the new AST and the hand-written
 # `Specs/<M>Spec.lean` was just rebuilt against it (step 6), so re-pinning here IS the
 # documented case for --record; it prints the digest it overwrites.
-"$PYTHON" scripts/check_specs_fresh.py --record | tail -3
+"$PYTHON" scripts/check_specs_fresh.py --record --corpus "$MOD"
 
 echo "==> [9/9] ledger"
 sed "s/@MODULE@/$MOD/g" scripts/ledger.lean.tmpl > "$WORK/Ledger.lean"
@@ -133,6 +136,7 @@ cat <<EOT
 ==> re-land of $MOD staged in the working tree. Before committing, still run:
       scripts/check_docs.py          # documented figures now quote the new ledger/conformance
       scripts/check_render.py        # 0 mismatched, and $MOD verified
+      scripts/check_provenance.py    # repository-wide; other corpora may need re-landing
       scripts/audit_all.py --strict  # axiom sweep + leanchecker --fresh
       scripts/mutate.py Autoform/Generated/$MOD.lean Autoform.Generated.$MOD \\
         --spec-file Autoform/Specs/${MOD}Spec.lean --spec-module Autoform.Specs.${MOD}Spec
