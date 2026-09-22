@@ -1236,3 +1236,27 @@ class TestStrReprFormat:
         assert 'case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))' in src
         assert 'else hole("op:stringExpressionList:non-literal-part")' in src
 
+
+
+class TestGoPointersOnInteriorPointerClauses:
+    """Slice R8: Go pointers ride the C interior-pointer machinery. The one Go-specific fact
+    the exporter needed is the SPELLING of a pointer type -- Go's star comes first
+    (spec "Pointer types": `PointerType = "*" BaseType`) -- because every downstream rule
+    (`addrKind`, `pointerStructFieldOperand`, `castTargetIsPointer`) asks `isPointerType`.
+    The Core side is pinned by the `goPtrProg` `#guard`s in `Semantics.lean`, whose expected
+    values are `go run`'s."""
+
+    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+    SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
+
+    def test_go_pointer_types_are_star_prefixed(self):
+        assert 'val go = currentFile.toLowerCase.endsWith(".go")' in self.EXP
+        assert 'b.endsWith("*") || (go && b.startsWith("*"))' in self.EXP
+        assert 'spec "Pointer types"' in self.EXP
+
+    def test_core_delivers_go_pointer_semantics_on_the_c_clauses(self):
+        assert 'private def goPtrProg : Program :=' in self.SEM
+        assert '{ dialect := .go' in self.SEM.split('private def goPtrProg', 1)[1][:200]
+        for g, v in (('ptrLocal', 5), ('ptrField', 11), ('ptrIndex', 14), ('ptrAlias', 3)):
+            assert f'#guard match runFunc goPtrProg 300 "{g}" [] with | .val (.int {v})' in self.SEM, g
+        assert 'Spec, "Address operators"' in self.SEM and 'Spec, "Selectors"' in self.SEM

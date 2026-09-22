@@ -4458,6 +4458,62 @@ private def goProg : Program :=
 #guard match runFunc goProg 300 "swap" [] with | .val (.int 21) => true | _ => false
 #guard match runFunc goProg 300 "destructure" [] with | .val (.int 34) => true | _ => false
 #guard match runFunc goProg 300 "cond" [] with | .val (.int 3) => true | _ => false
+
+/-! ## Go pointers on the interior-pointer clauses, checked against the Go spec
+
+Core's `boxNew`/`boxFields`/`boxArray`/`irefField`/`irefIndex`/`derefIref`/`setDerefIref`
+were built for C (`docs/core-language.md`, interior pointers) and are dialect-independent,
+so a Go `&x` boxes the local exactly as a C `&x` does and `*p` reads through the box. What
+the guards below pin is that the Go meaning is the one these clauses deliver:
+
+* Spec, "Address operators": "For an operand `x` of type `T`, the address operation `&x`
+  generates a pointer of type `*T` to `x`"; "for an operand `x` of pointer type `*T`, the
+  pointer indirection `*x` denotes the variable of type `T` pointed to by `x`" -- so a
+  write through `p` is a write to `x` (`ptrLocal`).
+* Spec, "Selectors": "if the type of `x` is a defined pointer type and `(*x).f` is a valid
+  selector expression denoting a field, `x.f` is shorthand for `(*x).f`" -- `&s.a` is an
+  interior pointer into the struct, and a write through it is seen by `s.a` (`ptrField`).
+* Spec, "Slice expressions"/"Index expressions": `&a[i]` addresses element `i`
+  (`ptrIndex`).
+
+Expected values are `go1.20.6`'s for the program in each comment. -/
+private def goPtrProg : Program :=
+  { dialect := .go
+  , funcs :=
+    -- x := 1; p := &x; *p = 5; return x                      -- go: 5
+    -- (the exporter boxes `x` at its binding and resolves `*p` through the alias, so
+    --  Core sees the box directly: `x` IS the box, `*p` is its `v` field)
+    [ { name := "ptrLocal", params := []
+      , body :=
+          .seq (.assign "x" (.boxNew (.lit (.int 1))))
+          (.seq (.setField (.name "x") "v" (.lit (.int 5)))
+                (.ret (.field (.name "x") "v"))) }
+    -- s := T{a: 1, b: 2}; q := &s.a; *q = 9; return *q + s.b   -- go: 11
+    , { name := "ptrField", params := []
+      , body :=
+          .seq (.assign "s" (.boxFields [(.lit (.str "a"), .lit (.int 1)), (.lit (.str "b"), .lit (.int 2))]))
+          (.seq (.assign "q" (.irefField (.name "s") "a"))
+          (.seq (.setDerefIref (.name "q") (.lit (.int 9)))
+                (.ret (.binop "+" (.derefIref (.name "q")) (.field (.name "s") "b"))))) }
+    -- var a [3]int; r := &a[1]; *r = 7; return a[1] + *r      -- go: 14
+    , { name := "ptrIndex", params := []
+      , body :=
+          .seq (.assign "a" (.boxArray (.lit (.int 3))))
+          (.seq (.assign "r" (.irefIndex (.name "a") (.lit (.int 1))))
+          (.seq (.setDerefIref (.name "r") (.lit (.int 7)))
+                (.ret (.binop "+" (.derefIref (.irefIndex (.name "a") (.lit (.int 1))))
+                                  (.derefIref (.name "r")))))) }
+    -- x := 1; p := &x; x = 3; return *p                       -- go: 3 (aliasing, both ways)
+    , { name := "ptrAlias", params := []
+      , body :=
+          .seq (.assign "x" (.boxNew (.lit (.int 1))))
+          (.seq (.setField (.name "x") "v" (.lit (.int 3)))
+                (.ret (.field (.name "x") "v"))) } ] }
+
+#guard match runFunc goPtrProg 300 "ptrLocal" [] with | .val (.int 5) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrField" [] with | .val (.int 11) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrIndex" [] with | .val (.int 14) => true | _ => false
+#guard match runFunc goPtrProg 300 "ptrAlias" [] with | .val (.int 3) => true | _ => false
 #guard match runFunc goProg 300 "forever" [] with | .val (.int 6) => true | _ => false
 
 /-! ## A missing attribute raises `AttributeError`
