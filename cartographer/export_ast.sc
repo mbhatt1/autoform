@@ -146,7 +146,7 @@ import scala.annotation.tailrec
   // execute the target. Keep it embedded so direct Joern invocations and installed
   // workspaces use exactly the same decoder without a working-directory dependency.
   val pythonHandlerDecoder = """
-import ast, builtins, json, struct, symtable, sys
+import ast, builtins, collections, json, struct, symtable, sys
 source = sys.stdin.read()
 tree = ast.parse(source)
 # `raise X from Y` sets `__cause__` on the raised exception. Core represents an
@@ -181,7 +181,56 @@ reads_exception_chain = any(
     isinstance(n, ast.Attribute)
     and n.attr in ('__cause__', '__context__', '__suppress_context__')
     for n in ast.walk(tree))
-symbols = symtable.symtable(source, '<source>', 'exec')
+def lexical_scopes(source, tree):
+    # Public symtable entries expose a name and line, but no column. Several
+    # lambdas/comprehensions on one line therefore cannot be paired by position.
+    # Give only those expressions separate lines in a metadata-only source copy.
+    # Parentheses preserve scope and evaluation order; AST equality checks that
+    # formatting really left the program unchanged before using its symbol table.
+    # This avoids guessing CPython's child order (a lambda default, for example,
+    # creates its scope before the enclosing lambda enters its own scope).
+    original = symtable.symtable(source, '<source>', 'exec')
+    pending, collisions = [original], set()
+    while pending:
+        children = pending.pop().get_children()
+        counts = collections.Counter((child.get_name(), child.get_lineno()) for child in children)
+        collisions.update(key for key, count in counts.items() if count > 1)
+        pending.extend(children)
+    if not collisions:
+        return original, {}
+    kinds = {ast.Lambda: 'lambda', ast.ListComp: 'listcomp', ast.SetComp: 'setcomp',
+             ast.DictComp: 'dictcomp', ast.GeneratorExp: 'genexpr'}
+    data = source.replace('\r\n', '\n').replace('\r', '\n').encode('utf-8')
+    offsets, offset = [], 0
+    for line in data.split(b'\n'):
+        offsets.append(offset)
+        offset += len(line) + 1
+    openings, closings = collections.Counter(), collections.Counter()
+    for node in ast.walk(tree):
+        if (kinds.get(type(node)), getattr(node, 'lineno', None)) in collisions:
+            openings[offsets[node.lineno - 1] + node.col_offset] += 1
+            closings[offsets[node.end_lineno - 1] + node.end_col_offset] += 1
+    pieces, previous = [], 0
+    for position in sorted(openings.keys() | closings.keys()):
+        pieces.extend((data[previous:position], b'\n)' * closings[position],
+                       b'(\n' * openings[position]))
+        previous = position
+    pieces.append(data[previous:])
+    formatted = b''.join(pieces).decode('utf-8')
+    try:
+        parsed = ast.parse(formatted)
+    except SyntaxError:
+        # A pre-3.12 f-string can forbid newlines inside its expression. Preserve
+        # the original table and its conservative ambiguity refusal in that case.
+        return original, {}
+    if ast.dump(tree, include_attributes=False) != ast.dump(parsed, include_attributes=False):
+        raise ValueError('scope formatting changed the Python AST')
+    lines = {id(before): after.lineno
+             for before, after in zip(ast.walk(tree), ast.walk(parsed))
+             if hasattr(before, 'lineno')}
+    return symtable.symtable(formatted, '<scope-metadata>', 'exec'), lines
+
+symbols, scope_lines = lexical_scopes(source, tree)
 exceptions = {name: value for name, value in vars(builtins).items()
               if isinstance(value, type) and issubclass(value, BaseException)}
 # These are Stdlib.excNames, the exception constructors represented by Core. Keep
@@ -491,7 +540,7 @@ def dotted_name(node):
 
 def inner_scope(node, name, scopes):
     children = [s for s in scopes[-1].get_children()
-                if s.get_name() == name and s.get_lineno() == node.lineno]
+                if s.get_name() == name and s.get_lineno() == scope_lines.get(id(node), node.lineno)]
     if len(children) != 1:
         raise ValueError('ambiguous Python lexical scope')
     return scopes + children
@@ -1664,11 +1713,26 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   var charLiteralIsNumeric = false
   // The source file of the method being translated. `import` is resolved relative to it.
   var currentFile     = ""
+  val pythonLineCache = collection.mutable.Map.empty[String, Option[Array[String]]]
+  /** pysrc2cpg columns count UTF-16 code units; Python AST columns count UTF-8 bytes.
+    * Convert the original source prefix, including astral characters, without trying
+    * alternative keys that could borrow a neighbouring expression's metadata. */
+  def pythonSourceKey(file: String, line: Int, column: Int): Option[String] = for {
+    lines <- pythonLineCache.getOrElseUpdate(file, fileText(file).map(_.split("\\r\\n|\\n|\\r", -1)))
+    text <- lines.lift(line - 1)
+    offset = column - 1
+    if offset >= 0 && offset <= text.length
+    if !(offset > 0 && offset < text.length &&
+         Character.isHighSurrogate(text.charAt(offset - 1)) && Character.isLowSurrogate(text.charAt(offset)))
+    bytes = text.substring(0, offset).getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+  } yield s"$line:${bytes + 1}"
+
   def pythonSourceInfo(node: AstNode, table: String): Option[ujson.Value] = for {
     info <- pythonHandlers(currentFile)
     line <- node.lineNumber
     column <- node.columnNumber
-    value <- info(table).obj.get(s"$line:$column")
+    key <- pythonSourceKey(currentFile, line, column)
+    value <- info(table).obj.get(key)
   } yield value
 
   // Defaults require function-object state which Core does not yet represent.
@@ -1679,7 +1743,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     source <- pythonHandlers(m.filename)
     line <- m.lineNumber
     column <- m.columnNumber
-    signature <- source("signatures").obj.get(s"$line:$column")
+    key <- pythonSourceKey(m.filename, line, column)
+    signature <- source("signatures").obj.get(key)
     if signature("name").str == (if (m.name.startsWith("<lambda>")) "lambda" else m.name)
   } yield signature
 
@@ -10470,7 +10535,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             info <- pythonHandlers(currentFile)
             line <- cs.lineNumber
             column <- cs.columnNumber
-            meta <- info("tries").obj.get(s"$line:$column")
+            key <- pythonSourceKey(currentFile, line, column)
+            meta <- info("tries").obj.get(key)
           } yield (info, meta)
           recovered match {
             case None => holeS("control:TRY-source-metadata")

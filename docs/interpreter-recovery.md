@@ -115,6 +115,20 @@ Implicit protocol calls use reserved names so source bindings of `iter`/`next` c
 replace them. Source and kernel regressions live in
 `tests/test_source_generator_expressions.py`.
 
+Source metadata also distinguishes lambdas and comprehensions that share a line.
+When Python's public symbol table lacks a distinguishing column, the decoder gives
+those expressions separate lines in a temporary source copy and checks that its parsed
+AST is identical before using its scope positions. The CPG and translated program still
+use the original source. Metadata lookup converts Joern's UTF-16 columns to Python AST
+UTF-8 byte columns, including supplementary Unicode characters. The source regressions
+are `examples/python_control/scope_collisions.py` and `tests/test_python_scope_metadata.py`.
+Ambiguity that cannot be removed without changing the AST remains a refusal; in
+particular, older Python parsers restrict newlines inside f-string expressions.
+This extension passed the opt-in Joern/CPython comparison and kernel proofs, the
+signature/handler regressions, and the full Python suite. Metadata remained identical
+for the earlier example files and the sampled largest files from the four existing
+Python corpus checkouts. These metadata comparisons do not replace corpus re-landing.
+
 Frame methods reside in `Program.auxiliaryFuncs`, outside the source-function coverage
 denominator. The original operations and explicit translation refusals remain in the
 owning function's `analysisBody`; the interpreter executes `body`. Contract substitution
