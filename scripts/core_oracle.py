@@ -46,6 +46,8 @@ import deep_json
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIFFERENTIAL = os.path.join(REPO, "scripts", "differential.py")
+sys.path.insert(0, os.path.join(REPO, "cartographer"))
+from generator_lowering import lower_generators
 
 random.seed(20260819)          # deterministic: a moving oracle is not an oracle
 
@@ -204,11 +206,14 @@ def walk(n, out=None):
 
 
 def count_ast_holes(funcs):
-    """Total `hole` nodes in the AST bodies — a body-derived fingerprint that any
-    transpiler change moves, unlike the function-name set."""
+    """Count the same source coverage bodies that the renderer supplies to Core.
+
+    Frame compilation can introduce explicit refusals (delegation, captured cells),
+    so raw suspension markers are not yet the interpreter's hole inventory.
+    """
     n = 0
-    for f in funcs:
-        for node in walk(f.get("body")):
+    for f in lower_generators(funcs):
+        for node in walk(f.get("analysisBody", f.get("body"))):
             # Two node kinds carry holes: `hole` in expression position and `holeS` in
             # statement position. Counting only `hole` undercounted V8Base by 324 and
             # made a matching AST look stale — a fingerprint that cries wolf gets

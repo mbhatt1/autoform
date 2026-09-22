@@ -798,6 +798,9 @@ structure Func where
   that an omitted parameter has a default. Newly exported Python definitions
   always supply this field or contain an explicit metadata hole. -/
   pythonSignature : Option PythonSignature := none
+  /-- Source control flow for static coverage when execution uses a compiled frame.
+  This is analysis data only; the interpreter always executes `body`. -/
+  analysisBody : Option Stmt := none
   deriving Repr, Inhabited
 
 /-- Whether this `Func` is a method. Source metadata distinguishes nested functions
@@ -815,6 +818,10 @@ def Func.isMethod (fn : Func) : Bool :=
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where
   funcs   : List Func
+  /-- Compiler-generated frame methods. Available for execution and resolution, but
+  not additional source functions in the coverage denominator. Their source operations
+  are represented in the owning function's `analysisBody`. -/
+  auxiliaryFuncs : List Func := []
   dialect : Dialect := .python
   /-- Classes whose (single) base is a builtin type, by the **short** class name that
   `Expr.alloc` uses. Empty by default, so a program translated before the exporter
@@ -998,10 +1005,12 @@ def size : Stmt → Nat
 end Stmt
 
 namespace Func
+/-- The source-level body used for coverage and dependency analysis. -/
+def analyzedBody (f : Func) : Stmt := f.analysisBody.getD f.body
 /-- Holes in a function. -/
-def holes (f : Func) : List String := f.body.holes
+def holes (f : Func) : List String := f.analyzedBody.holes
 /-- Node count of a function. -/
-def size (f : Func) : Nat := f.body.size
+def size (f : Func) : Nat := f.analyzedBody.size
 /-- A function is *fully translated* when it contains no holes. Only these are
 candidates for unconditional verification. -/
 def total (f : Func) : Bool := f.holes.isEmpty

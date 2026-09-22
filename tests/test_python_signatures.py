@@ -35,7 +35,7 @@ mapper = lambda a=2: a
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
         staticMethod=False, property=False, classMethod=False, decoratorNames=[],
-        overloadStub=False, receiverThenCollectors=False,
+        overloadStub=False, receiverThenCollectors=False, generator=None,
         nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])
     # `defaults` means "carries a default this pipeline cannot model", which is what

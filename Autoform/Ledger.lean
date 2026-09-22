@@ -205,7 +205,7 @@ end Analysis
 take: `true` for a method call (`mcall`, resolved by `Ctx.resolveMethod`), `false` for a
 free call (`call`, resolved by `Ctx.resolve`). The tag is the whole point — the two paths
 have *different* resolution rules, and a flat `List String` cannot say which applies. -/
-def Func.calls (f : Func) : List (Bool × String) := Analysis.sCalls f.body
+def Func.calls (f : Func) : List (Bool × String) := Analysis.sCalls f.analyzedBody
 
 namespace Analysis
 
@@ -294,10 +294,10 @@ def sCallees : Stmt → List (Bool × String × String)
 end Analysis
 
 /-- Call sites with their contract keys. -/
-def Func.callees (f : Func) : List (Bool × String × String) := Analysis.sCallees f.body
+def Func.callees (f : Func) : List (Bool × String × String) := Analysis.sCallees f.analyzedBody
 
 /-- How many constructs in this function could hole at runtime. -/
-def Func.risk (f : Func) : Nat := Analysis.sRisk f.body
+def Func.risk (f : Func) : Nat := Analysis.sRisk f.analyzedBody
 
 /-- Can the interpreter resolve this callee, on the path it will actually take?
 

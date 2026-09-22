@@ -185,11 +185,13 @@ def substS (σ : Impl) : Stmt → Stmt
 
 /-- Apply an implementation to a function. Name and parameters are untouched, so name
 resolution in the instantiated program is the same as in the original. -/
-def Impl.onFunc (σ : Impl) (f : Func) : Func := { f with body := substS σ f.body }
+def Impl.onFunc (σ : Impl) (f : Func) : Func :=
+  { f with body := substS σ f.body, analysisBody := f.analysisBody.map (substS σ) }
 
 /-- Apply an implementation to a whole program. -/
 def Impl.onProgram (σ : Impl) (p : Program) : Program :=
-  { p with funcs := p.funcs.map σ.onFunc }
+  { p with funcs := p.funcs.map σ.onFunc,
+           auxiliaryFuncs := p.auxiliaryFuncs.map σ.onFunc }
 
 /-! ### The empty implementation changes nothing
 
@@ -262,7 +264,7 @@ theorem substS_nil : ∀ s : Stmt, substS [] s = s
   | .setGlobal x e   => by rw [substS, substE_nil e]
 
 @[simp] theorem onFunc_nil (f : Func) : Impl.onFunc [] f = f := by
-  simp [Impl.onFunc, substS_nil]
+  simp [Impl.onFunc, show substS [] = id from funext substS_nil]
 
 @[simp] theorem onProgram_nil (p : Program) : Impl.onProgram [] p = p := by
   simp [Impl.onProgram, List.map_id'']
@@ -866,7 +868,8 @@ theorem methodkey_refinesUnder_raise (payload : Val) :
   simp only [raisesContract] at hpost
   simp only [ctxOf, Impl.onProgram, Impl.onFunc, keysProgramHoled, keysProgramWith, methodkeyWith, substS, substE, substEL,
     he, f_cachetools_keys_py__module__hashkey,
-    f_cachetools_keys_py__module__methodkey, List.map, Program.table] at hpost
+    f_cachetools_keys_py__module__methodkey, List.map, Program.table, List.append_nil,
+    Option.map_none] at hpost
   have hplain : e.plainArg = true := hc.2.2 _ _ he
   intro args hargs
   obtain ⟨self, rest, rfl⟩ := List.exists_cons_of_ne_nil hargs

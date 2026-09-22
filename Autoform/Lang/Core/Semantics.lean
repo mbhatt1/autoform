@@ -868,7 +868,8 @@ structure Ctx where
   excClasses : List String := []
 
 /-- Build a function table from a program. -/
-def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
+def Program.table (p : Program) : FuncTable :=
+  (p.funcs ++ p.auxiliaryFuncs).map (fun f => (f.name, f))
 
 /-! ### Name matching the kernel can compute
 
@@ -1097,7 +1098,7 @@ needed for the same reason — a proof about a literal `Func` cannot fire a hypo
 lemma without first deciding which `fn` it is about. -/
 @[simp] theorem posRejected_mk (name : String) (params : List String) (body : Stmt)
     (vs : List Val) :
-    posRejected ⟨name, params, body, none, none, none⟩ vs
+    posRejected { name := name, params := params, body := body } vs
       = decide (params.length < vs.length) := by
   have : (List.filter (fun p => none != some p) params) = params := by
     simp [List.filter_eq_self]
@@ -1142,7 +1143,8 @@ def signatureRejected (fn : Func) (vs : List Val) (kws : List (String × Val)) :
 
 @[simp] theorem signatureRejected_legacy (name : String) (params : List String)
     (body : Stmt) (vararg kwarg : Option String) (vs : List Val) (kws : List (String × Val)) :
-    signatureRejected ⟨name, params, body, vararg, kwarg, none⟩ vs kws = false := rfl
+    signatureRejected { name := name, params := params, body := body,
+                        vararg := vararg, kwarg := kwarg } vs kws = false := rfl
 
 /-- A function with no variadic parameters, called with no keyword arguments, binds
 exactly what `applyFunc` bound before the calling convention existed. This is the
@@ -1162,7 +1164,7 @@ hypothesis form of `bindParams_plain` cannot fire on a literal without first dec
 which `fn` it is about. -/
 @[simp] theorem bindParams_mk (name : String) (params : List String) (body : Stmt)
     (base : Env) (vs : List Val) :
-    bindParams ⟨name, params, body, none, none, none⟩ base vs [] =
+    bindParams { name := name, params := params, body := body } base vs [] =
       (params.zip vs).foldl (fun (e : Env) (x, v) => Env.set e x v) base :=
   bindParams_plain base vs rfl rfl rfl
 

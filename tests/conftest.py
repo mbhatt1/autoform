@@ -130,8 +130,8 @@ def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None,
     os.makedirs(os.path.join(d, "Autoform", "Generated"), exist_ok=True)
     for s in ("check_render.py", "check_docs.py", "deep_json.py"):
         shutil.copy(os.path.join(SCRIPTS, s), os.path.join(d, "scripts", s))
-    shutil.copy(os.path.join(CARTO, "render_lean.py"),
-                os.path.join(d, "cartographer", "render_lean.py"))
+    for script in ("render_lean.py", "generator_lowering.py"):
+        shutil.copy(os.path.join(CARTO, script), os.path.join(d, "cartographer", script))
     funcs = funcs if funcs is not None else [fn()]
     ast = os.path.join(d, "ast-%s.json" % module)
     write_ast(ast, funcs)

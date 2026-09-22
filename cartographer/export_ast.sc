@@ -495,6 +495,25 @@ def inner_scope(node, name, scopes):
         raise ValueError('ambiguous Python lexical scope')
     return scopes + children
 
+def generator_metadata(node, scopes):
+    pending = [node.body] if isinstance(node, ast.Lambda) else list(node.body)
+    found = False
+    while pending:
+        child = pending.pop()
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            continue
+        if isinstance(child, (ast.Yield, ast.YieldFrom)):
+            found = True
+        pending.extend(ast.iter_child_nodes(child))
+    if not found:
+        return None
+    scope = inner_scope(node, 'lambda' if isinstance(node, ast.Lambda) else node.name, scopes)[-1]
+    symbols = scope.get_symbols()
+    return {'locals': sorted(s.get_name() for s in symbols if s.is_local() or s.is_free()),
+            'captures': sorted(s.get_name() for s in symbols if s.is_free()),
+            'parameters': sorted(s.get_name() for s in symbols if s.is_parameter()),
+            'async': isinstance(node, ast.AsyncFunctionDef)}
+
 def visit(node, scopes):
     if isinstance(node, ast.ClassDef):
         for st in node.body:
@@ -594,6 +613,7 @@ def visit(node, scopes):
             'property': sole_property,
             'classMethod': class_method,
             'decoratorNames': decorator_names,
+            'generator': generator_metadata(node, scopes),
             'overloadStub': overload_stub,
             # An instance method whose only parameters after `self` are collectors:
             # `def f(self, *args, **kwargs)`. Informational -- the exporter binds it
@@ -9471,6 +9491,15 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   }
 
   def exprV(n: AstNode): (List[ujson.Obj], ujson.Obj) = unwrapMacro(n) match {
+    // pysrc2cpg uses RETURN for both `return` and `yield`, including an assignment
+    // RHS (`sent = yield value`). Keep suspension explicit for the generator pass;
+    // treating this node as a return executes the body too early and loses the frame.
+    case r: Return if pyFile && (r.code.trim == "yield" || r.code.trim.startsWith("yield ")) =>
+      val (prelude, value) = kidsOf(r).headOption.map(exprV).getOrElse((Nil, ujson.Obj("k" -> "unit")))
+      val target = freshExprVTemp()
+      val kind = if (r.code.trim.startsWith("yield from ")) "yieldFromS" else "yieldS"
+      (prelude :+ ujson.Obj("k" -> kind, "e" -> value, "target" -> target),
+       ujson.Obj("k" -> "name", "v" -> target))
     case c: Call if callName(c) == "<operator>.assignment" =>
       kidsOf(c) match {
         case lhs :: rhs :: Nil => assignAsValue(lhs, rhs, None, "op:assignment")
@@ -10019,6 +10048,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     // ANY(1)`), checked BEFORE any other Call case so the synthetic expansion
     // Block is never even looked at.
     case c: Call if c.name == "UNUSED_PARAMETER" || c.name == "UNUSED_PARAMETER2" => skip
+    case r: Return if pyFile && (r.code.trim == "yield" || r.code.trim.startsWith("yield ")) =>
+      val (prelude, _) = exprV(r)
+      seqOf(prelude)
     case r: Return =>
       kidsOf(r).headOption match {
         case Some(e) =>
@@ -11859,6 +11891,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       "params" -> ujson.Arr.from(ps.map(_.name).filterNot(x => (cppFile || jsLikeFile) && x == "this")),
       "body"   -> body
     )
+    if (pyFile && !isModule) pythonSignatureInfo(m).foreach { signature =>
+      signature.obj.get("generator").filter(_ != ujson.Null).foreach { meta =>
+        obj("generator") = meta
+      }
+    }
     // Builtin bases ride on the module *initializer* entry — the function that runs the
     // file's `class` statements — rather than on the methods, so that a builtin-based
     // class with no methods at all is still recorded. The key is optional and absent when

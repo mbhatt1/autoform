@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render the language-neutral JSON AST as a Lean 4 `Autoform.Core.Program`.
 
-Deterministic printer. The only judgement it makes is name sanitisation; everything
-else is a direct structural mapping, so the output is diffable and reviewable.
+Deterministic translation. Ordinary nodes map structurally to Core; suspended
+generator bodies are compiled to explicit heap frames by generator_lowering.py.
 
 Two invariants this file exists to protect:
 
@@ -19,6 +19,8 @@ import json
 import threading, sys, re, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 import deep_json
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from generator_lowering import lower_generators
 
 # Break a term across lines once its flat form would push past this column. Purely
 # cosmetic: the layout below is whitespace-insensitive because every term is
@@ -635,6 +637,8 @@ def render_func(f, nm) -> list:
     # variadic parameters renders byte-identically to the way it did before the calling
     # convention existed. Both fields default to `none` in `Core.Func`.
     variadic = []
+    if 'analysisBody' in f:
+        variadic.append("  , analysisBody := some " + render(f['analysisBody'], 's', 10))
     if f.get("vararg") is not None:
         variadic.append(f"  , vararg := some {lean_str(f['vararg'])}")
     if f.get("kwarg") is not None:
@@ -724,7 +728,8 @@ def render_func(f, nm) -> list:
 def _run_main():
     src, dst = sys.argv[1], sys.argv[2]
     module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
-    funcs = deep_json.load(src)
+    funcs = lower_generators(deep_json.load(src))
+    auxiliary = [helper for function in funcs for helper in function.get('generatorHelpers', [])]
     dialect = infer_dialect(funcs)
 
     out = [
@@ -782,7 +787,7 @@ def _run_main():
     ]
     names = []
     seen = set()
-    for f in funcs:
+    for f in funcs + auxiliary:
         nm = ident(f["name"])
         while nm in seen:
             nm += "'"
@@ -830,6 +835,8 @@ def _run_main():
     excs = program_exc_classes(funcs)
 
     extra = ""
+    if auxiliary:
+        extra += ", auxiliaryFuncs := [" + ", ".join(names[len(funcs):]) + "]"
     notes = []
     if bb:
         extra += ", builtinBases := [" + bb + "]"
@@ -851,7 +858,7 @@ def _run_main():
     else:
         out.append(f"/-- Source dialect: `{dialect}` (integer division/modulo convention). -/")
     out.append("def program : Program := { dialect := " + dialect + extra + ", funcs := [")
-    out.append(",\n".join("  " + n for n in names))
+    out.append(",\n".join("  " + n for n in names[:len(funcs)]))
     out.append("] }")
     out.append("")
     out.append(f"end Autoform.Generated.{module}")
