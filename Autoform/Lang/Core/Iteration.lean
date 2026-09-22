@@ -28,11 +28,34 @@ def isNext (name : String) : Bool := name == "next" || name == "<python-next>"
 def consumes (name : String) : Bool :=
   name == "list" || name == "tuple" || name == "sum" || name == "any" || name == "all"
 
-def plainLengthHint (cls : String) : Bool :=
-  cls == "<generator>" || cls == dataClass || cls == callableClass
+def truthConsumer (name : String) : Bool := name == "any" || name == "all"
 
 def iteratorClass (cls : String) : Bool :=
   cls == dataClass || cls == sequenceClass || cls == callableClass
+
+/-- Only values whose truth can be answered without executing a user slot. Ordinary
+objects and builtin subclasses need interpreter dispatch; unknown ancestry is a gap.
+Container references must be unboxed before testing whether their payload is empty. -/
+def pureTruth (h : Heap) (value : Val) : Option Bool :=
+  match value with
+  | .ref r => match h.get r with
+      | some object =>
+          if iteratorClass object.cls || object.cls == "<generator>" then some true
+          else if object.cls == "list" || object.cls == "tuple" || object.cls == "dict" then
+            object.payload.toVal.map Val.truthy
+          else none
+      | none => none
+  | .bobj _ _ | .clsClos _ _ | .iref _ _ => none
+  | .fn name => if name.endsWith "<meta>" then none else some true
+  | value => some value.truthy
+
+def truthValue (h : Heap) (value : Val) : EResult :=
+  match pureTruth h value with
+  | some value => .val (.bool value)
+  | none => .hole "truth:unresolved-protocol"
+
+def plainLengthHint (cls : String) : Bool :=
+  cls == "<generator>" || cls == dataClass || cls == callableClass
 
 /-- Missing method declarations do not establish absent inherited/metaclass slots.
 Plain builtin values are known not to be iterators; ordinary objects require more
@@ -98,7 +121,8 @@ def dataNext (h : Heap) (r : Ref) : Heap × EResult :=
 /-- Stateful builtins are kept separate from `Stdlib.builtin`'s heap-preserving models. -/
 def freeNames : List String :=
   ["iter", "next", "<python-iter>", "<python-next>", "<iterator-next>", "<sequence-iter>",
-   "<iterator-identical>", "<iterator-tuple>", "<iterator-sum-add>", "<iterator-length-hint>"]
+   "<iterator-identical>", "<iterator-tuple>", "<iterator-sum-add>", "<iterator-length-hint>",
+   "any", "all", "<python-bool>"]
 
 def knowsFree (d : Dialect) (name : String) : Bool :=
   d == .python && freeNames.contains name
@@ -127,6 +151,12 @@ def builtin (d : Dialect) (h : Heap) (name : String) (args : List Val) :
     | _ => some (h, .exn (.str "TypeError"))
   | "<sequence-iter>", [source] => some (allocate h sequenceClass source)
   | "<iterator-identical>", [a, b] => some (h, sentinelIdentity a b)
+  | "<python-bool>", [value] => some (h, truthValue h value)
+  | "any", [source] | "all", [source] =>
+      -- Valid inputs dispatch to the Core consumer before reaching this fallback.
+      match source with
+      | .int _ | .bool _ | .float _ | .unit => some (h, .exn (.str "TypeError"))
+      | _ => some (h, .hole "iterator:truth-consumer")
   | "<iterator-tuple>", [source] =>
       match source.unbox h with
       | .list items => some (h, .val (.tuple items))
@@ -194,7 +224,7 @@ def callableNextBody : Stmt :=
       -- before rich equality; a callback can also exhaust this iterator reentrantly.
       (.ifte (field "<closed>") (raiseName "StopIteration")
         (.ifte (.call "<iterator-identical>" [field "<sentinel>", .name "<value>"]) stopBody
-          (.ifte (.call "bool" [.binop "==" (field "<sentinel>") (.name "<value>")]) stopBody
+          (.ifte (.call "<python-bool>" [.binop "==" (field "<sentinel>") (.name "<value>")]) stopBody
             (.ret (.name "<value>"))))))
 
 /-- Consumers resume one item at a time, so truth tests and accumulation interleave
@@ -216,10 +246,12 @@ def consumerBody (name : String) : Option Stmt :=
         (.ret (.name "<total>"))))
   else if name == "any" then
     some (.seq (.forIn "<item>" self
-      (.ifte (.name "<item>") (.ret (.lit (.bool true))) .skip)) (.ret (.lit (.bool false))))
+      (.ifte (.call "<python-bool>" [.name "<item>"]) (.ret (.lit (.bool true))) .skip))
+      (.ret (.lit (.bool false))))
   else if name == "all" then
     some (.seq (.forIn "<item>" self
-      (.ifte (.name "<item>") .skip (.ret (.lit (.bool false))))) (.ret (.lit (.bool true))))
+      (.ifte (.call "<python-bool>" [.name "<item>"]) .skip (.ret (.lit (.bool false)))))
+      (.ret (.lit (.bool true))))
   else if name == "<length-error>" then some (raiseName "TypeError")
   else none
 
@@ -281,6 +313,11 @@ theorem newData_excSafe (h : Heap) (source : Val) {h' : Heap} {v : Val} :
     | (cases result; exact Stdlib.excSafe_str (by decide))
     | cases result
 
+private theorem truthValue_ne_exn (h : Heap) (value v : Val) :
+    truthValue h value ≠ .exn v := by
+  unfold truthValue
+  split <;> intro impossible <;> cases impossible
+
 theorem builtin_excSafe (d : Dialect) (h : Heap) (name : String) (args : List Val)
     {h' : Heap} {v : Val} :
     builtin d h name args = some (h', .exn v) → Stdlib.ExcSafe v := by
@@ -289,6 +326,7 @@ theorem builtin_excSafe (d : Dialect) (h : Heap) (name : String) (args : List Va
   repeat' split at result
   all_goals first
     | exact newData_excSafe _ _ result
+    | exact (truthValue_ne_exn _ _ _ (congrArg Prod.snd (Option.some.inj result))).elim
     | exact (sentinelIdentity_ne_exn (congrArg Prod.snd (Option.some.inj result))).elim
     | exact dataNext_excSafe _ _ (congrArg Prod.snd (Option.some.inj result))
     | exact (allocate_ne_exn (congrArg Prod.snd (Option.some.inj result))).elim

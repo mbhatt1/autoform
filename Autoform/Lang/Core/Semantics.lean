@@ -1453,20 +1453,28 @@ Only the LEFT operand dispatches; CPython's reflected `__gt__`-for-`<` fallback 
 instance dispatches to that instance's class. `bool` falls back to `__len__` as CPython
 does; everything else names exactly one method. -/
 @[simp] def builtinDunderTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val) :
-    Option (Ref × String × String) :=
+    Option (Val × String × String) :=
   if ctx.dialect != .python then none else
   match vs with
   | [.ref r] =>
     match h.get r with
     | some o =>
-      if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none else
-      let pick (m : String) : Option (Ref × String × String) :=
-        if ctx.classDefines o.cls m then some (r, o.cls, m) else none
+      let pick (m : String) : Option (Val × String × String) :=
+        if ctx.classDefines o.cls m then some (.ref r, o.cls, m) else none
+      if f == "bool" || f == "<python-bool>" then
+        match pick "__bool__" with
+        | some target => some target
+        | none => pick "__len__"
+      else if Iteration.truthConsumer f && o.payload.toVal.isSome &&
+          (o.cls == "list" || o.cls == "tuple" || o.cls == "dict") &&
+          !ctx.classDefines o.cls "__iter__" then
+        some (.ref r, Iteration.consumerClass, f)
+      else if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none else
       if Iteration.consumes f &&
           (ctx.classDefines o.cls "__iter__" || ctx.classDefines o.cls "__getitem__") then
-        some (r, Iteration.consumerClass, f)
+        some (.ref r, Iteration.consumerClass, f)
       else if f == "len" && (Iteration.iteratorClass o.cls || o.cls == "<generator>") then
-        some (r, Iteration.consumerClass, "<length-error>")
+        some (.ref r, Iteration.consumerClass, "<length-error>")
       else
       match f with
       | "len"  => pick "__len__"
@@ -1478,9 +1486,6 @@ does; everything else names exactly one method. -/
                   | some t => some t
                   | none   => pick "__repr__"
       | "repr" => pick "__repr__"
-      | "bool" => match pick "__bool__" with
-                  | some t => some t
-                  | none   => pick "__len__"
       -- `iter(object)`: "the single argument must be a collection object which supports
       -- the iterable protocol (the `__iter__()` method)" -- library/functions.html#iter.
       -- The sequence-protocol fallback (`__getitem__` from 0) allocates an iterator
@@ -1491,11 +1496,17 @@ does; everything else names exactly one method. -/
       | "iter" | "<python-iter>" => match pick "__iter__" with
                   | some target => some target
                   | none => if ctx.classDefines o.cls "__getitem__" then
-                              some (r, Iteration.factoryClass, "__iter__")
+                              some (.ref r, Iteration.factoryClass, "__iter__")
                             else none
       | "next" | "<python-next>" => pick "__next__"
       | _      => none
     | none => none
+  | [value] =>
+      if Iteration.truthConsumer f then
+        match value with
+        | .list _ | .tuple _ | .dict _ | .str _ => some (value, Iteration.consumerClass, f)
+        | _ => none
+      else none
   | _ => none
 
 /-- `next(iterator, default)`: "If default is given, it is returned if the iterator is
@@ -1585,8 +1596,12 @@ return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
   | "str",  _       => .exn (.str "TypeError")
   | "repr", .str _  => .val v
   | "repr", _       => .exn (.str "TypeError")
-  | "bool", .bool _ => if m == "__len__" then .exn (.str "TypeError") else .val v
-  | "bool", .int i  => if m == "__len__" then .val (.bool (i != 0)) else .exn (.str "TypeError")
+  | "bool", .bool _ => .val v
+  | "bool", .int i  => if m == "__len__" then
+                        if i < 0 then .exn (.str "ValueError")
+                        else if i > 2147483647 then .hole "truth:length-platform"
+                        else .val (.bool (i != 0))
+                      else .exn (.str "TypeError")
   | "bool", _       => .exn (.str "TypeError")
   | _, _            => .val v
 
@@ -1596,7 +1611,7 @@ def checkedBuiltinDunderResult (ctx : Ctx) (h : Heap) (f m : String) (v : Val) :
     if (ctx.dunderOn h v "__next__").isSome then .val v
     else if Iteration.unknownResultProtocol h v then .hole "iterator:result-protocol"
     else .exn (.str "TypeError")
-  else builtinDunderResult f m v
+  else builtinDunderResult (if f == "<python-bool>" then "bool" else f) m v
 
 mutual
 
@@ -2079,7 +2094,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
               if kws.isEmpty then
                 match ctx.resolveMethod cls m with
                 | some fn =>
-                  match applyFunc ctx n h₁ fn (some (.ref r)) [] [] with
+                  match applyFunc ctx n h₁ fn (some r) [] [] with
                   | (h₂, .val v) => (h₂, checkedBuiltinDunderResult ctx h₂ f m v)
                   | (h₂, e)      => (h₂, e)
                 | none => (h₁, .hole s!"call:{f}:dunder-unresolved")

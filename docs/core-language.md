@@ -24,7 +24,7 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `bool : Bool → Val` | A boolean. |
 | `float : Fl → Val` | A floating-point bit pattern and format, interpreted by the kernel-reducible model in `Float.lean`. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
-| `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
+| `list : List Val → Val` | An immutable list value. Python list literals allocate a `ref` to an object with a mutable list payload; `Stmt.setIndex` updates that payload. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
 | `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. |
@@ -37,10 +37,15 @@ Three derived functions:
 
 * `Val.truthy` — the permissive truthiness shared by most dynamic languages (empty
   containers, `0`, `""` and `unit` are false; references and callables are true).
-* `Val.iterable` — what a value iterates over, if anything. `none` for everything that is
-  not a list, tuple or dict (or a `bobj` over one); `forIn` over anything else is a hole.
+* `Val.iterable` — the elements of a list, tuple, dictionary or string (or a `bobj`
+  over one). It returns `none` for other values; `forIn` additionally dispatches Python
+  iterator and sequence protocols for heap objects.
 * `Val.unbuiltin` — strips one layer of builtin-base wrapping. Non-recursive, so the
   functions that use it stay plain matchers that reduce by `rfl`.
+
+Python `any`/`all` use a Core consumer that dispatches declared truth methods and reads
+boxed container contents. `Val.truthy` itself does not execute those methods; its use
+elsewhere does not establish complete Python truth-protocol coverage.
 
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring

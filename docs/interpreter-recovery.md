@@ -111,9 +111,24 @@ truth tests for `any`/`all` and exact integer accumulation for `sum`. A custom l
 retains `iterator:length-hint`; non-integer sums retain `iterator:sum-type`. Shared
 free-variable cells retain `genexpr:free-variable-cells`, and async expressions retain
 `genexpr:async`. Historical ASTs must be re-exported to remove eager lowering.
+The truth consumers now run declared `__bool__`/`__len__` methods between resumptions,
+including their mutations, exceptions and short-circuit behavior. The same consumer
+handles plain lists, tuples, dictionaries and strings. Internal truth calls cannot be
+replaced by a source binding named `bool`. Unknown truth protocols retain
+`truth:unresolved-protocol`; lengths above the portable signed 32-bit bound retain
+`truth:length-platform` until the target's `Py_ssize_t` width is represented. These
+consumer changes do not establish protocol-correct truth testing for every other Core
+condition or operator. Source regressions live in `tests/test_source_truth_consumers.py`.
 Implicit protocol calls use reserved names so source bindings of `iter`/`next` cannot
 replace them. Source and kernel regressions live in
 `tests/test_source_generator_expressions.py`.
+
+Validation of the truth-consumer correction passed the full Lean build (478 jobs),
+the full Python suite (801 passed, 53 skipped, one expected failure), and all 12 existing
+generator/iterator source regressions. The new source comparison checked 14 CPython
+observations and their kernel proofs, plus two named-gap proofs. The strict
+`Autoform.Runtime` audit passed with stable artifacts and fresh replay. This scoped
+audit does not establish a full audit of the correction.
 
 Source metadata also distinguishes lambdas and comprehensions that share a line.
 When Python's public symbol table lacks a distinguishing column, the decoder gives
@@ -145,9 +160,11 @@ source comparison. The strict `Autoform.Runtime` audit passed with fresh replay 
 stable artifacts. The final expression test proves a sufficient smaller fuel budget in
 the kernel and transports that result to the native run's fuel using the proved
 monotonicity theorem; no native observation is accepted as a proof. Reporting regressions
-also check suspended-body calls, lowering refusals and deeply nested ASTs. A separate
-full strict audit of this checkpoint is still required; the passing iterator audit above
-does not cover this extension.
+also check suspended-body calls, lowering refusals and deeply nested ASTs. The separate full strict audit of commit `24bf6d0` passed on a stable, independent
+snapshot, including fresh kernel replay of the complete `Autoform` import closure.
+Its report is recorded in
+[`generator-expression-audit.json`](../artifacts/interpreter-recovery/generator-expression-audit.json).
+That result does not cover later scope metadata or truth-protocol changes.
 
 Validation of this generator slice on 2026-09-22 passed the source comparison and kernel
 proofs, the long-body lowering regression, `lake build`, the full Python test suite,

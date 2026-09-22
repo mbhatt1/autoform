@@ -668,7 +668,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                              | some fn =>
                                  rw [hrm] at hy
                                  dsimp only at hy ⊢
-                                 rcases hF : applyFunc ctx k h₁ fn (some (.ref r)) [] []
+                                 rcases hF : applyFunc ctx k h₁ fn (some r) [] []
                                    with ⟨h₂, r₂⟩
                                  rw [hF] at hy
                                  cases r₂ <;> first

@@ -648,8 +648,8 @@ class TestValueDunders:
         assert '.val (if neg then .bool (!v.truthy) else v)' in self.SEMANTICS
 
     def test_bool_falls_back_to_len_and_the_answers_are_type_checked(self):
-        assert '| "bool" => match pick "__bool__" with' in self.SEMANTICS
-        assert '| none   => pick "__len__"' in self.SEMANTICS
+        assert 'if f == "bool" || f == "<python-bool>" then' in self.SEMANTICS
+        assert '| none => pick "__len__"' in self.SEMANTICS
         # CPython: __len__ must be a non-negative int, __str__ a str, __bool__ a bool.
         assert '| "len",  .int i  => if i < 0 then .exn (.str "ValueError") else .val v' in self.SEMANTICS
         assert '| "str",  _       => .exn (.str "TypeError")' in self.SEMANTICS
@@ -904,7 +904,7 @@ class TestIterationProtocol:
 
     def test_iter_and_next_builtins_and_the_default_form(self):
         assert '| "iter" | "<python-iter>" => match pick "__iter__" with' in self.SEMANTICS
-        assert 'some (r, Iteration.factoryClass, "__iter__")' in self.SEMANTICS
+        assert 'some (.ref r, Iteration.factoryClass, "__iter__")' in self.SEMANTICS
         assert '| "next" | "<python-next>" => pick "__next__"' in self.SEMANTICS
         assert 'def nextDefaultTarget (ctx : Ctx) (h : Heap) (f : String) (vs : List Val)' in self.SEMANTICS
         assert '| (h₂, .exn (.str "StopIteration")) => (h₂, .val d)' in self.SEMANTICS
