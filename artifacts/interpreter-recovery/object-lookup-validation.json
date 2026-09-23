@@ -88,6 +88,13 @@
       "status": "FAIL",
       "summary": "4 stale exporter pins; 13 unattributed baselined artifacts; no provenance pins updated"
     },
+    "main_workspace_build": {
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 lake build",
+      "log": "/tmp/autoform-object-lookup-main-build.log",
+      "log_sha256": "aacb3761a2a9474e63593027d26c234d3664fab5b8aebe97a4ac4a5543b7e327",
+      "status": "PASS",
+      "summary": "478 jobs; source bytes and input hashes checked against the validated isolated workspace"
+    },
     "runtime_audit": {
       "status": "PASS",
       "module": "Autoform.Runtime",
@@ -167,14 +174,14 @@
     },
     "pipeline": {
       "status": "completed_with_gaps",
-      "report": "/private/tmp/autoform-object-lookup-pipeline-attempt2/run.json",
-      "report_sha256": "2dcfaa2663bab92931a9623ff97518240f72dad320bed8a34e00fbd86ac2e90c",
+      "report": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/run.json",
+      "report_sha256": "b2be002eae95b1ba8dd2d5559e0ed36320c8125a5f5573da56a9dc933b2f055c",
       "run": {
         "module": "ObjectLookupRecovery",
         "source": "/private/tmp/autoform-object-lookup-source",
         "execution_status": "completed_with_gaps",
         "security_requested": false,
-        "stage_timeout_seconds": 900.0,
+        "stage_timeout_seconds": 1800.0,
         "property_selection": {
           "mode": "none"
         },
@@ -188,10 +195,10 @@
               "ObjectLookupRecovery"
             ],
             "log": "source.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
             "exit_code": 0,
-            "seconds": 489.43
+            "seconds": 148.63
           },
           "core-oracle": {
             "status": "completed",
@@ -211,13 +218,13 @@
               "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/core-oracle.json"
             ],
             "log": "core-oracle.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
             "exit_code": 0,
-            "seconds": 12.64
+            "seconds": 12.43
           },
           "mutation": {
-            "status": "timed_out",
+            "status": "failed",
             "command": [
               "/Users/mbhatt/autoform/.venv/bin/python",
               "scripts/mutate.py",
@@ -235,11 +242,10 @@
               "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/mutation.json"
             ],
             "log": "mutation.log",
-            "timeout_seconds": 900.0,
-            "timed_out": true,
-            "exit_code": 124,
-            "seconds": 900.33,
-            "error": "stage exceeded its 900-second deadline"
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 2,
+            "seconds": 945.2
           },
           "restore-build": {
             "status": "completed",
@@ -250,13 +256,13 @@
               "Autoform.Contracts"
             ],
             "log": "restore-build.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
             "exit_code": 0,
-            "seconds": 109.2
+            "seconds": 0.72
           },
           "audit": {
-            "status": "failed",
+            "status": "completed",
             "command": [
               "/Users/mbhatt/autoform/.venv/bin/python",
               "scripts/audit_all.py",
@@ -283,10 +289,10 @@
               "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/selection.json"
             ],
             "log": "audit.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
-            "exit_code": 1,
-            "seconds": 0.67
+            "exit_code": 0,
+            "seconds": 213.38
           },
           "contracts": {
             "status": "completed",
@@ -298,7 +304,7 @@
               "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/contracts-ObjectLookupRecovery.json"
             ],
             "log": "contracts.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
             "exit_code": 0,
             "seconds": 0.04
@@ -317,17 +323,16 @@
               "--quiet"
             ],
             "log": "assurance.log",
-            "timeout_seconds": 900.0,
+            "timeout_seconds": 1800.0,
             "timed_out": false,
             "exit_code": 1,
-            "seconds": 0.08
+            "seconds": 1.08
           }
         },
-        "updated_at": "2026-09-23T14:54:00.466930+00:00",
+        "updated_at": "2026-09-23T15:30:06.666503+00:00",
         "verification_complete": false,
         "issues": [
           "mutation",
-          "audit",
           "assurance",
           "repository-coverage",
           "guarantee"
@@ -343,7 +348,7 @@
           "stage": "complete",
           "exit_code": 0,
           "status": "passed",
-          "finished_at": "2026-09-23T14:36:57.452673+00:00"
+          "finished_at": "2026-09-23T15:10:33.731173+00:00"
         },
         "context": {
           "kind": "source",
@@ -376,7 +381,7 @@
           "ref": null,
           "subdir": ".",
           "status": "ready",
-          "started_at": "2026-09-23T14:28:47.952159+00:00",
+          "started_at": "2026-09-23T15:08:05.050422+00:00",
           "kind": "local",
           "checkout": "/private/tmp/autoform-object-lookup-source",
           "source": "/private/tmp/autoform-object-lookup-source"
@@ -411,42 +416,38 @@
         },
         "guarantee_status": "unverified"
       },
-      "summary": "115 native agreements, zero divergences/inconclusives; 22 generated theorems built. Mutation exceeded the 900-second stage deadline; original source restored and rebuilt, dependent audit refused missing mutation.json.",
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH PYTHONPATH=src LEAN_NUM_THREADS=2 JOERN_HOME=/Users/mbhatt/joern AUTOFORM_CASES=5 AUTOFORM_MUTANTS=8 .venv/bin/python -u -m autoform --workspace /private/tmp/autoform-object-lookup-validation assure /private/tmp/autoform-object-lookup-source ObjectLookupRecovery --stage-timeout 1800",
       "artifacts": {
         "conformance.json": {
-          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/conformance.json",
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/conformance.json",
           "sha256": "c2a765e7812fff1ea32d68732b10574fa63b1f11e70c413cfd41a5159bede28a"
         },
         "specs.json": {
-          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/specs.json",
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/specs.json",
           "sha256": "3c2d19d583b538ce551b7aa2c9d7823e44bef0d1e0f7cae867969610873dd0e2"
         },
         "ledger.json": {
-          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/ledger.json",
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/ledger.json",
           "sha256": "e64394f049394790da1689f66fe59bf7ca8b98cf0a0219c98d6837bed3c8e883"
         },
         "core-oracle.json": {
-          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/core-oracle.json",
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/core-oracle.json",
           "sha256": "b34706bca88187642cd4e6960fcc90b755aa96808611ec5d53800c3fc8ade09d"
         },
+        "mutation.json": {
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/mutation.json",
+          "sha256": "7179cecc99d0a0076aa4f90ed0fe25c9441a129297cd3735c5126759b75f1c1b"
+        },
         "audit.json": {
-          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/audit.json",
-          "sha256": "6a2566a8898f9610a311e967d0984bd993f3aaeb0290ae8173abc057f9c9c08f"
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/audit.json",
+          "sha256": "666b1dee7fe9da0bbcef6deb3a962e14cd45ddaf3a03cfff5a66e9fb1cfb335c"
+        },
+        "summary.md": {
+          "path": "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/summary.md",
+          "sha256": "57bea60ef5caba961ea9a68130c1c0b871117a0b9aebbbd6601b070f2a7ebace"
         }
-      }
-    },
-    "pipeline_rerun": {
-      "status": "RUNNING",
-      "log": "/tmp/autoform-object-lookup-pipeline3.log",
-      "stage_timeout_seconds": 1800,
-      "summary": "Same source and eight-mutant sample; rerun to allow the mutation report to finish. No passing outcome claimed yet."
-    },
-    "main_workspace_build": {
-      "status": "PASS",
-      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 lake build",
-      "log": "/tmp/autoform-object-lookup-main-build.log",
-      "log_sha256": "aacb3761a2a9474e63593027d26c234d3664fab5b8aebe97a4ac4a5543b7e327",
-      "summary": "478 jobs; copied source bytes and input hashes checked against the validated isolated workspace"
+      },
+      "summary": "115 native agreements, zero divergences/inconclusives; 22 generated theorems built. Mutation finished with survivors/untested subjects (exit 2); restored build and strict scoped kernel audit passed. Overall completed_with_gaps."
     }
   },
   "failed_attempts": [
@@ -469,6 +470,11 @@
       "log": "/tmp/autoform-object-lookup-pipeline.log",
       "reason": "Sandbox DNS prevented pinned Lean dependency fetch; rerun with approved network access.",
       "log_sha256": "dc1d5ec9b79a0b515216765a5e126a7b11be2b44ca55821495b596f1c975770d"
+    },
+    {
+      "log": "/tmp/autoform-object-lookup-pipeline2.log",
+      "reason": "Source, conformance, generated proofs and core oracle passed. The mutation stage exceeded 900 seconds and left mutation.json absent, so its dependent audit refused replay. Original model restored and rebuilt. Full reports preserved at /private/tmp/autoform-object-lookup-pipeline-attempt2.",
+      "log_sha256": "69273db7b49aaa88fd90449397d1d10bb99d300ec27f9c166b9a8abc1f5fe89b"
     }
   ],
   "remaining": [

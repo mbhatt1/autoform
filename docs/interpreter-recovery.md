@@ -300,6 +300,12 @@ status are recorded in
 and [`object-lookup-audit.json`](../artifacts/interpreter-recovery/object-lookup-audit.json).
 The existing corpus render and provenance gates still fail; this checkpoint does not
 claim a completed re-land or completion of the arbitrary-codebase goal.
+The packaged `ObjectLookupRecovery` pipeline completed its native comparison,
+generated proofs, core oracle, restored build and strict scoped kernel audit. Its
+mutation run found survivors and untested subjects, including field writes that
+return-value-only observations do not distinguish, so the final status remains
+`completed_with_gaps`. The earlier mutation timeout and its completed rerun are
+both recorded in the validation artifact.
 
 Current integrity checks must continue to distinguish stale and missing evidence.
 `check_provenance.py` rejects the four tracked Python corpora whose exporter pin is
