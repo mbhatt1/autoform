@@ -1,0 +1,487 @@
+{
+  "base_revision": "75ef554e377efbe95a9f223c0cf5a4fdbde4489b",
+  "workspace": "/private/tmp/autoform-object-lookup-work",
+  "scope": "Python callable attribute lookup, property precedence, local-class method captures, and proof adaptations. This is not a completed corpus re-land.",
+  "input_sha256": {
+    "Autoform/Lang/Core/Semantics.lean": "e6d197d55e5e6fb1be842f33dc86789c4fd2d4edd2fc2accff41f5dfd203d0c9",
+    "Autoform/Lang/Core/Syntax.lean": "5980021cf289c03586d3f6f03a2a8c9bbf91388d00b33778cee9b71f6ebee9ad",
+    "Autoform/Lang/Core/ExcSafe.lean": "df5b3ab1354aa1ab6bb5b0b5ff829dc98e44b91cb3248f7c86071c43c3755192",
+    "Autoform/FuelMono.lean": "14d03fd0679de3db3ae9b64e65b26b6c9871189f830f59e044c97bed499cccaa",
+    "Autoform/Refine.lean": "1450006fdb1727e1d8e95f2dfb676f2176d1996519aaaba99a23ea829f4a0c8a",
+    "Autoform/SpecsGen/Basis.lean": "11c2006d80382d0276c0ec78bcbcd9714f6f8410d42268258855940c7252392e",
+    "Autoform/Specs/CachetoolsSpec.lean": "9c21e4027620675d73a8084f4468566fc8fd07a3b35ee8e0647867506b7c995f",
+    "cartographer/export_ast.sc": "3d650e6ab3985471a30fc55dbe4e1d63ccf9b03e3cf22bf6de247e2a0678a859",
+    "cartographer/render_lean.py": "4b2326e2512bca41d569310c21b53c7cf601cf00ff195f2e0ef9662bbf4cffa2",
+    "tests/test_production_gaps.py": "d406b4cfff0b3544f53d9bfb44eb202f97d01d1bfdef0eefb28aad8a3943e632",
+    "tests/test_source_numeric.py": "d0196d1e26446ddf52dc00126ade7a4c8f3f795238c08d61d5a6acc4f0547b77",
+    "tests/test_source_object_lookup.py": "fcbc7352c76591575bc79329cc6e29debe06978a7f2139ef374abc5d85e00b1b",
+    "examples/python_control/object_lookup.py": "f4c1eda9094c5b88763c7152243aaf31d248f741d1163dcdc0f382216edffb58"
+  },
+  "checks": {
+    "python": {
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/ -q",
+      "log": "/tmp/autoform-object-lookup-full-pytest2.log",
+      "log_sha256": "2096b8d3c385f36e0f269401e408149b57f315b6509519c0e288f9fb575badf7",
+      "status": "PASS",
+      "summary": "808 passed, 56 skipped, 1 xfailed in 315.83s"
+    },
+    "source_lookup": {
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH AUTOFORM_TEST_JOERN=1 JOERN_HOME=/Users/mbhatt/joern LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/test_source_object_lookup.py -q",
+      "log": "/tmp/autoform-object-lookup-source4.log",
+      "log_sha256": "2b7b3350486d21281a823b71cbde2051040fe0226a0ce1934c55812567dd334b",
+      "status": "PASS",
+      "summary": "3 passed in 97.92s; 13 CPython/native comparisons, 13 source kernel observations, 4 heap result/poststate kernel observations"
+    },
+    "thread_fixture": {
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/test_source_object_lookup.py -q -k kernel",
+      "log": "/tmp/autoform-object-lookup-thread-fixture.log",
+      "log_sha256": "5d39539a8168de85693b9ea3c61f01be317f3ad55390153ba9887a4cbb332d5f",
+      "status": "PASS",
+      "summary": "2 passed, 1 deselected in 4.37s after preserving LEAN_NUM_THREADS in numeric_env"
+    },
+    "lean_build": {
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 lake build",
+      "log": "/tmp/autoform-object-lookup-full-build2.log",
+      "log_sha256": "d8a713890cddddbf2be428066c28c351144c0657b541a89c2d5fb36fb8477e93",
+      "status": "PASS",
+      "summary": "478 jobs completed successfully"
+    },
+    "source_regressions_first_attempt": {
+      "command": "AUTOFORM_TEST_JOERN=1 JOERN_HOME=/Users/mbhatt/joern LEAN_NUM_THREADS=2 .venv/bin/python -m pytest -q tests/test_source_generators.py tests/test_source_iterators.py tests/test_source_generator_expressions.py tests/test_source_truth_consumers.py tests/test_source_truth_conditions.py tests/test_python_scope_metadata.py",
+      "log": "/tmp/autoform-object-lookup-protocol-regressions1.log",
+      "log_sha256": "cfd95471ddf636c2eee7135482f40302e499709ce2b42648bcd9543efc499070",
+      "status": "FAILED_SETUP",
+      "summary": "16 passed; 3 source tests failed with FileNotFoundError for /Users/mbhatt/joern/joern-parse; all three rerun below"
+    },
+    "source_regressions_rerun": {
+      "command": "AUTOFORM_TEST_JOERN=1 JOERN_HOME=/Users/mbhatt/joern/joern-cli LEAN_NUM_THREADS=2 .venv/bin/python -m pytest -q tests/test_source_generators.py::test_suspended_generators_source tests/test_source_iterators.py::test_iterators_source tests/test_source_generator_expressions.py::test_generator_expressions_source",
+      "log": "/tmp/autoform-object-lookup-protocol-regressions2.log",
+      "log_sha256": "70aa0de174048c56e0224320ef3bab015f11be507db62042d54132613ed26aee",
+      "status": "PASS",
+      "summary": "3 passed in 1271.51s"
+    },
+    "docs": {
+      "command": ".venv/bin/python scripts/check_docs.py",
+      "log": "/tmp/autoform-object-lookup-check-docs2.log",
+      "log_sha256": "0be735e7831d86b58691d974e247a54caeaaa8cb914f1e291663a55e1e6e3779",
+      "status": "PASS",
+      "summary": "8 documented figures match the existing ledger; local ignored ledger-Cachetools.json copied unchanged from main, sha256 e875e4baba22df66712d7874995eabd9bb993ced4e7ca0b0057ad19af607f4d8"
+    },
+    "spec_freshness": {
+      "command": ".venv/bin/python scripts/check_specs_fresh.py",
+      "log": "/tmp/autoform-object-lookup-check-specs.log",
+      "log_sha256": "872ce9bda2475a1f18ef278c92d79a793d0cd85511cfc4d1dfa85d7a508f2885",
+      "status": "PASS",
+      "summary": "8 spec modules match their recorded corpus inputs; does not establish source conformance"
+    },
+    "render": {
+      "command": ".venv/bin/python scripts/check_render.py",
+      "log": "/tmp/autoform-object-lookup-check-render.log",
+      "log_sha256": "23deebe6fb085d6d1be1faea42ec7bf49974f977a4b52cec991b2d3ae2661ffb",
+      "status": "FAIL",
+      "summary": "13 verified, 4 mismatched, 3 unverifiable; corpus regeneration remains outstanding"
+    },
+    "provenance": {
+      "command": ".venv/bin/python scripts/check_provenance.py --strict",
+      "log": "/tmp/autoform-object-lookup-check-provenance.log",
+      "log_sha256": "d497e3b07ff30bfa524c7781f670accc95a0adedd63dfc150915768bc5dfd45e",
+      "status": "FAIL",
+      "summary": "4 stale exporter pins; 13 unattributed baselined artifacts; no provenance pins updated"
+    },
+    "runtime_audit": {
+      "status": "PASS",
+      "module": "Autoform.Runtime",
+      "report": "/tmp/autoform-object-lookup-runtime-audit.json",
+      "report_sha256": "606e14be88d8fb708752d1021f6214d911962ccd8963456a9533a7436de5d1ef",
+      "artifact_snapshot_status": "STABLE",
+      "axiom_sweep": {
+        "status": "CLEAN",
+        "declarations": 4194,
+        "leaks": [],
+        "declared_axioms": [],
+        "nonstandard_axioms": [],
+        "axiom_histogram": {
+          "propext": 1537,
+          "Quot.sound": 795,
+          "Classical.choice": 728
+        },
+        "error": null,
+        "root_theorems": 0,
+        "root_theorem_names": [],
+        "root_axioms": []
+      },
+      "lean4checker": {
+        "status": "VERIFIED",
+        "available": true,
+        "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+        "mode": "fresh",
+        "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform.Runtime",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "detail": "the kernel replayed every constant reachable from `Autoform.Runtime` into a fresh environment and accepted them all"
+      },
+      "verdict": {
+        "failures": [],
+        "pass": true
+      }
+    },
+    "full_audit": {
+      "status": "PASS",
+      "module": "Autoform",
+      "report": "/tmp/autoform-object-lookup-audit.json",
+      "report_sha256": "458f21eace1a6334d91b3604f026c351123ccc3784d7028cf42b004bfe5df58a",
+      "artifact_snapshot_status": "STABLE",
+      "axiom_sweep": {
+        "status": "CLEAN",
+        "declarations": 7153,
+        "leaks": [],
+        "declared_axioms": [],
+        "nonstandard_axioms": [],
+        "axiom_histogram": {
+          "propext": 2243,
+          "Quot.sound": 1307,
+          "Classical.choice": 1239
+        },
+        "error": null,
+        "root_theorems": 0,
+        "root_theorem_names": [],
+        "root_axioms": []
+      },
+      "lean4checker": {
+        "status": "VERIFIED",
+        "available": true,
+        "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+        "mode": "fresh",
+        "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "detail": "the kernel replayed every constant reachable from `Autoform` into a fresh environment and accepted them all"
+      },
+      "verdict": {
+        "failures": [],
+        "pass": true
+      },
+      "committed_report": "artifacts/interpreter-recovery/object-lookup-audit.json"
+    },
+    "pipeline": {
+      "status": "completed_with_gaps",
+      "report": "/private/tmp/autoform-object-lookup-pipeline-attempt2/run.json",
+      "report_sha256": "2dcfaa2663bab92931a9623ff97518240f72dad320bed8a34e00fbd86ac2e90c",
+      "run": {
+        "module": "ObjectLookupRecovery",
+        "source": "/private/tmp/autoform-object-lookup-source",
+        "execution_status": "completed_with_gaps",
+        "security_requested": false,
+        "stage_timeout_seconds": 900.0,
+        "property_selection": {
+          "mode": "none"
+        },
+        "stages": {
+          "source": {
+            "status": "completed",
+            "command": [
+              "bash",
+              "/private/tmp/autoform-object-lookup-validation/autoform.sh",
+              "/private/tmp/autoform-object-lookup-source",
+              "ObjectLookupRecovery"
+            ],
+            "log": "source.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 489.43
+          },
+          "core-oracle": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/core_oracle.py",
+              "ast-ObjectLookupRecovery.json",
+              "ObjectLookupRecovery",
+              "/private/tmp/autoform-object-lookup-source",
+              "--conformance",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/conformance.json",
+              "--inputs",
+              "0",
+              "--scratch",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery",
+              "--out",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/core-oracle.json"
+            ],
+            "log": "core-oracle.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 12.64
+          },
+          "mutation": {
+            "status": "timed_out",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/mutate.py",
+              "Autoform/Generated/ObjectLookupRecovery.lean",
+              "Autoform.Generated.ObjectLookupRecovery",
+              "--spec-file",
+              "Autoform/SpecsGen/ObjectLookupRecovery.lean",
+              "--spec-module",
+              "Autoform.SpecsGen.ObjectLookupRecovery",
+              "--spec-report",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/specs.json",
+              "--max-mutants",
+              "8",
+              "--json",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/mutation.json"
+            ],
+            "log": "mutation.log",
+            "timeout_seconds": 900.0,
+            "timed_out": true,
+            "exit_code": 124,
+            "seconds": 900.33,
+            "error": "stage exceeded its 900-second deadline"
+          },
+          "restore-build": {
+            "status": "completed",
+            "command": [
+              "lake",
+              "build",
+              "Autoform.SpecsGen.ObjectLookupRecovery",
+              "Autoform.Contracts"
+            ],
+            "log": "restore-build.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 109.2
+          },
+          "audit": {
+            "status": "failed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/audit_all.py",
+              "--strict",
+              "--module",
+              "Autoform.SpecsGen.ObjectLookupRecovery",
+              "--output",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/audit.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/specs.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/conformance.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/mutation.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/core-oracle.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/context.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/ast-ObjectLookupRecovery.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/inventory.json",
+              "--evidence",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/selection.json"
+            ],
+            "log": "audit.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 1,
+            "seconds": 0.67
+          },
+          "contracts": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/emit_contracts.py",
+              "ObjectLookupRecovery",
+              "--out",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/contracts-ObjectLookupRecovery.json"
+            ],
+            "log": "contracts.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 0.04
+          },
+          "assurance": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/sacm.py",
+              "--module",
+              "ObjectLookupRecovery",
+              "--root",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery",
+              "--markdown",
+              "/private/tmp/autoform-object-lookup-validation/artifacts/pipeline/ObjectLookupRecovery/assurance.md",
+              "--quiet"
+            ],
+            "log": "assurance.log",
+            "timeout_seconds": 900.0,
+            "timed_out": false,
+            "exit_code": 1,
+            "seconds": 0.08
+          }
+        },
+        "updated_at": "2026-09-23T14:54:00.466930+00:00",
+        "verification_complete": false,
+        "issues": [
+          "mutation",
+          "audit",
+          "assurance",
+          "repository-coverage",
+          "guarantee"
+        ],
+        "comparisons": 115,
+        "divergences": 0,
+        "proofs": 22,
+        "open_obligations": 0,
+        "holes": 0,
+        "source_pipeline": {
+          "module": "ObjectLookupRecovery",
+          "source": "/private/tmp/autoform-object-lookup-source",
+          "stage": "complete",
+          "exit_code": 0,
+          "status": "passed",
+          "finished_at": "2026-09-23T14:36:57.452673+00:00"
+        },
+        "context": {
+          "kind": "source",
+          "source": "/private/tmp/autoform-object-lookup-source",
+          "kernel_root": null,
+          "data_model": "lp64",
+          "compilation_database": null,
+          "defines": [],
+          "frontend_args": [],
+          "native_model_matches_host": true,
+          "configuration": "default",
+          "limitations": [],
+          "language": "python",
+          "frontend": "PYTHONSRC"
+        },
+        "proof_counts_scope": "conformance",
+        "proof_summary": {
+          "conformance": {
+            "proofs": 22,
+            "open_obligations": 0
+          },
+          "security": {
+            "requested": false,
+            "proofs": null,
+            "open_obligations": null
+          }
+        },
+        "repository": {
+          "input": "/private/tmp/autoform-object-lookup-source",
+          "ref": null,
+          "subdir": ".",
+          "status": "ready",
+          "started_at": "2026-09-23T14:28:47.952159+00:00",
+          "kind": "local",
+          "checkout": "/private/tmp/autoform-object-lookup-source",
+          "source": "/private/tmp/autoform-object-lookup-source"
+        },
+        "source_coverage": {
+          "schema_version": 1,
+          "language": "python",
+          "inventory_fingerprint": "9bc60f7f29170d5540327d38e062a5dd78b55c80a1413ba5d397927204bfc6c0",
+          "files": [
+            {
+              "path": "object_lookup.py",
+              "language": "python",
+              "status": "represented"
+            }
+          ],
+          "counts": {
+            "represented": 1,
+            "unrepresented": 0,
+            "unsupported": 0,
+            "unclassified": 0,
+            "auxiliary": 0,
+            "outside_partition": 0
+          },
+          "source_changes": [],
+          "source_stable": true,
+          "scan_complete": true,
+          "source_census_complete": false,
+          "truncated_by_method_limit": false,
+          "frontend_census_complete": false,
+          "unexpected_ast_files": [],
+          "note": "Represented means at least one exported AST entry names the file. It does not establish complete parsing, translation or proof coverage."
+        },
+        "guarantee_status": "unverified"
+      },
+      "summary": "115 native agreements, zero divergences/inconclusives; 22 generated theorems built. Mutation exceeded the 900-second stage deadline; original source restored and rebuilt, dependent audit refused missing mutation.json.",
+      "artifacts": {
+        "conformance.json": {
+          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/conformance.json",
+          "sha256": "c2a765e7812fff1ea32d68732b10574fa63b1f11e70c413cfd41a5159bede28a"
+        },
+        "specs.json": {
+          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/specs.json",
+          "sha256": "3c2d19d583b538ce551b7aa2c9d7823e44bef0d1e0f7cae867969610873dd0e2"
+        },
+        "ledger.json": {
+          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/ledger.json",
+          "sha256": "e64394f049394790da1689f66fe59bf7ca8b98cf0a0219c98d6837bed3c8e883"
+        },
+        "core-oracle.json": {
+          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/core-oracle.json",
+          "sha256": "b34706bca88187642cd4e6960fcc90b755aa96808611ec5d53800c3fc8ade09d"
+        },
+        "audit.json": {
+          "path": "/private/tmp/autoform-object-lookup-pipeline-attempt2/audit.json",
+          "sha256": "6a2566a8898f9610a311e967d0984bd993f3aaeb0290ae8173abc057f9c9c08f"
+        }
+      }
+    },
+    "pipeline_rerun": {
+      "status": "RUNNING",
+      "log": "/tmp/autoform-object-lookup-pipeline3.log",
+      "stage_timeout_seconds": 1800,
+      "summary": "Same source and eight-mutant sample; rerun to allow the mutation report to finish. No passing outcome claimed yet."
+    },
+    "main_workspace_build": {
+      "status": "PASS",
+      "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=2 lake build",
+      "log": "/tmp/autoform-object-lookup-main-build.log",
+      "log_sha256": "aacb3761a2a9474e63593027d26c234d3664fab5b8aebe97a4ac4a5543b7e327",
+      "summary": "478 jobs; copied source bytes and input hashes checked against the validated isolated workspace"
+    }
+  },
+  "failed_attempts": [
+    {
+      "log": "/tmp/autoform-object-lookup-full-pytest1.log",
+      "reason": "One stale implementation-text assertion; corrected and the full suite passed.",
+      "log_sha256": "d6f15aacd0fe415c2a3717e121d1f3f720428150c31fa68b0865b08c244cfbdb"
+    },
+    {
+      "log": "/tmp/autoform-object-lookup-full-build1.log",
+      "reason": "CachetoolsSpec needed property-side conditions. Fixed without changing its theorem statements; all 478 jobs passed on rerun.",
+      "log_sha256": "7db9ba83632c90d16b60f62a8e04e2a0d9746f69adb2176d8a472f725327d6e6"
+    },
+    {
+      "log": "/tmp/autoform-object-lookup-check-docs.log",
+      "reason": "Isolated clone lacked ignored ledger-Cachetools.json. Copied the unchanged published ledger, then check_docs passed.",
+      "log_sha256": "ac32fda7a353b5e10c6e701484ce7284aac1fc928641c58d0bc1e7bbf6728649"
+    },
+    {
+      "log": "/tmp/autoform-object-lookup-pipeline.log",
+      "reason": "Sandbox DNS prevented pinned Lean dependency fetch; rerun with approved network access.",
+      "log_sha256": "dc1d5ec9b79a0b515216765a5e126a7b11be2b44ca55821495b596f1c975770d"
+    }
+  ],
+  "remaining": [
+    "Inherited methods/MRO and qualified class identity",
+    "Custom attribute hooks, general descriptors, and class metadata",
+    "Callable lookup before compiler-lifted argument statement preludes",
+    "Four Python corpus re-lands and faithful native global/callback inputs",
+    "The arbitrary-codebase goal remains active; repository-wide integrity gates are not all green"
+  ],
+  "notes": [
+    "The source lookup and full Python runs preceded the test fixture change that preserves LEAN_NUM_THREADS; the two kernel probes were rerun with the final fixture.",
+    "The three same-named local classes in the source probe share method bodies; these probes establish capture retention, not qualified class identity.",
+    "Only the stated import closure is covered by each kernel audit.",
+    "Peak observed total RSS during this batch was 91.36 GiB; obsolete failed proof attempts were stopped before 100 GiB."
+  ]
+}

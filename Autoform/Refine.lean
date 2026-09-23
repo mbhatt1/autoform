@@ -824,9 +824,11 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a : Expr} {h₁ : Heap} {r : Ref} {o : Obj} {f : String} {v : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
     (ho : h₁.get r = some o)
-    (hf : o.fields.find? (·.1 == f) = some (f, v)) :
+    (hf : o.fields.find? (·.1 == f) = some (f, v))
+    (hp : (ctx.dialect == .python &&
+      ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = false := by rfl) :
     evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
-  simp [evalExpr, ha, ho, hf]
+  simp [evalExpr, ha, ho, hf, hp]
 
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
@@ -851,9 +853,10 @@ theorem evalExpr_mcall_container (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
     (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
     (has : evalList ctx k h₁ ρ args = (h₂, .inr (vs, kws)))
-    (hm : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = some result) :
+    (hm : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = some result)
+    (hat : ctx.usesAttributeCall h₁ r m = false) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args) = result := by
-  simp [evalExpr, hr, has, hm]
+  simp [evalExpr, hr, has, hm, hat]
 
 theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {recv : Expr} {h₁ h₂ : Heap} {r : Ref} {o : Obj} {fn : Func}
@@ -870,10 +873,34 @@ theorem evalExpr_mcall_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (hcm : fn.isClassMethod = false := by rfl)
     -- The corresponding source-method equation applies when the built-in container
     -- protocol did not handle the call. Concrete non-__iter__ methods reduce this.
-    (hiter : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = none := by rfl) :
+    (hiter : Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws = none := by rfl)
+    (hat : ctx.usesAttributeCall h₁ r m = false := by rfl) :
     evalExpr ctx (k+1) h ρ (.mcall recv m args)
       = applyFunc ctx k h₂ fn (some (.ref r)) vs kws := by
-  simp [evalExpr, hr, has, hiter, ho, hm, hcap, hcm]
+  simp [evalExpr, hr, has, hiter, ho, hm, hcap, hcm, hat]
+
+/-- Python saves the callable attribute before evaluating arguments. This equation
+also permits getter effects: argument evaluation starts from the lookup's heap. -/
+theorem evalExpr_mcall_attribute (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
+    {recv : Expr} {h₁ hc h₂ : Heap} {r : Ref} {fn : Func} {cap : Env}
+    {m : String} {args : List Expr} {vs : List Val} {kws : List (String × Val)}
+    (hr : evalExpr ctx k h ρ recv = (h₁, .val (.ref r)))
+    (hat : ctx.usesAttributeCall h₁ r m = true)
+    (hlookup : evalExpr ctx k h₁ (("<mcall:receiver>", .ref r) :: ρ)
+      (.field (.name "<mcall:receiver>") m) = (hc, .val (.clos fn.name cap)))
+    (has : evalList ctx k hc ρ args = (h₂, .inr (vs, kws)))
+    (hm : ctx.resolve fn.name = some fn) :
+    evalExpr ctx (k+1) h ρ (.mcall recv m args) =
+      applyClosure ctx k h₂ fn cap vs kws := by
+  rw [evalExpr, hr]
+  simp only [hat, if_true, hlookup, has, hm]
+
+/-- Binding only `self` is the ordinary method calling convention. -/
+theorem applyClosure_self (ctx : Ctx) (k : Nat) (h : Heap) (fn : Func)
+    (self : Val) (vs : List Val) (kws : List (String × Val)) :
+    applyClosure ctx k h fn [("self", self)] vs kws =
+      applyFunc ctx k h fn (some self) vs kws := by
+  cases k <;> rfl
 
 theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
@@ -1830,35 +1857,56 @@ abbrev ctxT : Ctx := ctxOf CounterProgram
 
 def counterRep : HeapRep Int :=
   { cls := "Counter"
-  , abs := fun o => if o.captured = [] then
+  , abs := fun o => if o.captured = [] ∧ o.payload.toVal.isNone = true ∧
+                      o.fields.all (fun p => p.1 == "n") = true then
                       (match o.fields.find? (·.1 == "n") with
                        | some (_, .int i) => some i
                        | _                => none)
                     else none }
 
+/-- Counter owns only its numeric field. In particular, an instance cannot shadow
+`bump`, and it cannot masquerade as a boxed builtin container. -/
+theorem counter_layout {h : Heap} {r : Ref} {a : Int}
+    (hR : Represents counterRep h r a) {o : Obj} (ho : h.get r = some o) :
+    o.captured = [] ∧ o.payload = .none ∧ o.fields.all (fun p => p.1 == "n") = true := by
+  obtain ⟨o', ho', _, ha⟩ := hR
+  rw [ho] at ho'; cases ho'
+  simp only [counterRep] at ha
+  split at ha
+  · rename_i hl
+    refine ⟨hl.1, ?_, hl.2.2⟩
+    cases hp : o.payload <;> simp_all [Payload.toVal]
+  · simp at ha
+
 theorem counter_getField {h : Heap} {r : Ref} {a : Int}
     (hR : Represents counterRep h r a) : h.getField r "n" = .int a := by
-  obtain ⟨o, ho, _, ha⟩ := hR
-  simp only [counterRep] at ha
+  obtain ⟨o, ho, hc, ha⟩ := hR
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  simp only [counterRep, hl.1, hl.2.1, Payload.toVal, Option.isNone_none, hl.2.2, and_self, if_true] at ha
   simp only [Heap.getField, ho]
-  by_cases hcap : o.captured = [] <;> simp only [hcap, if_true, if_false, if_neg, reduceIte] at ha
-  · cases hf : o.fields.find? (·.1 == "n") with
-    | none => rw [hf] at ha; simp at ha
-    | some p =>
+  cases hf : o.fields.find? (·.1 == "n") with
+  | none => rw [hf] at ha; simp at ha
+  | some p =>
       obtain ⟨kk, w⟩ := p
       rw [hf] at ha
       cases w <;> simp at ha
       subst ha; rfl
-  · simp at ha
 
 theorem counter_set {h : Heap} {r : Ref} {a b : Int} (hR : Represents counterRep h r a) :
     Represents counterRep (h.setField r "n" (.int b)) r b := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hcap])
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  exact Represents.update ⟨o, ho, hc, ha⟩ ho (by simp [counterRep, hl.1, hl.2.1, Payload.toVal, hl.2.2])
+
+theorem counter_missing_field {h : Heap} {r : Ref} {a : Int} {o : Obj}
+    (hR : Represents counterRep h r a) (ho : h.get r = some o)
+    {name : String} (hn : name ≠ "n") : o.fields.find? (·.1 == name) = none := by
+  have hl := (counter_layout hR ho).2.2
+  apply List.find?_eq_none.mpr
+  intro p hp
+  have hk := List.all_eq_true.mp hl p hp
+  simp only [beq_iff_eq] at hk
+  simp [hk, Ne.symm hn]
 
 /-- Suffix facts, needed because `String.endsWith` does not reduce definitionally. -/
 theorem ew1 : "cnt.py:<module>.Counter.__init__".endsWith ".Counter.bump" = false := by simp [String.endsWith]; decide
@@ -1887,11 +1935,9 @@ theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep 
     ∃ o, h.get r = some o ∧ o.cls = "Counter" ∧
       o.fields.find? (·.1 == "n") = some ("n", .int a) ∧ o.captured = [] := by
   obtain ⟨o, ho, hc, ha⟩ := hR
-  have hcap : o.captured = [] := by
-    by_cases hcap : o.captured = []
-    · exact hcap
-    · simp only [counterRep, if_neg hcap] at ha; simp at ha
-  simp only [counterRep, if_pos hcap] at ha
+  have hl := counter_layout (⟨o, ho, hc, ha⟩ : Represents counterRep h r a) ho
+  have hcap := hl.1
+  simp only [counterRep, hl.1, hl.2.1, Payload.toVal, Option.isNone_none, hl.2.2, and_self, if_true] at ha
   refine ⟨o, ho, hc, ?_, hcap⟩
   cases hf : o.fields.find? (·.1 == "n") with
   | none => rw [hf] at ha; simp at ha
@@ -1908,7 +1954,9 @@ theorem counter_find {h : Heap} {r : Ref} {a : Int} (hR : Represents counterRep 
 theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     (hR : Represents counterRep h r acc)
     (hc : ρ.find? (·.1 == "c") = some ("c", .ref r))
-    (hx : ρ.find? (·.1 == "x") = some ("x", .int iv)) :
+    (hx : ρ.find? (·.1 == "x") = some ("x", .int iv))
+    (hglobal : (h.get ctxT.globals).bind
+      (fun o => o.fields.find? (·.1 == classAttrKey "Counter" "bump")) = none) :
     execStmt ctxT (j+8) h ρ (.expr (.mcall (.name "c") "bump" [(.name "x")]))
       = (h.setField r "n" (.int (acc + iv)), .normal ρ) := by
   obtain ⟨o, ho, hcls, hfind, hcap⟩ := counter_find hR
@@ -1955,11 +2003,31 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
     rw [hbody]
   have hmc : evalExpr ctxT (j+7) h ρ (.mcall (.name "c") "bump" [(.name "x")])
       = (h.setField r "n" (.int (acc + iv)), .val (.int (acc + iv))) := by
-    rw [evalExpr_mcall_obj ctxT (j+6) h ρ
-      (evalExpr_name ctxT (j+5) h ρ "c" hc)
+    have hmiss := counter_missing_field hR ho (name := "bump") (by decide)
+    have hpay := (counter_layout hR ho).2.1
+    have hat : ctxT.usesAttributeCall h r "bump" = true := by
+      have hi : Iteration.resolveMethod "Counter" "bump" = none := rfl
+      simp [Ctx.usesAttributeCall, ho, hcls, hpay, hi, Payload.toVal,
+        ctxT, ctxOf, CounterProgram]
+    have hlookup : evalExpr ctxT (j+6) h (("<mcall:receiver>", .ref r) :: ρ)
+        (.field (.name "<mcall:receiver>") "bump") =
+          (h, .val (.clos f_counter_bump.name [("self", .ref r)])) := by
+      rw [evalExpr, evalExpr_name ctxT (j+4) h _ "<mcall:receiver>" (v := .ref r) (by simp)]
+      have hd : ctxT.dialect = .python := rfl
+      have hp : ctxT.properties = [] := rfl
+      have hcd : ctxT.classDefines "Counter" "bump" = true := rfl
+      have hfn : f_counter_bump.isMethod = true := rfl
+      have hcm : f_counter_bump.isClassMethod = false := rfl
+      have hrt : f_counter_bump.name.startsWith "<runtime>." = false := by
+        rw [← strStartsWith_eq_startsWith]; rfl
+      simp only [classAttrKey, String.reduceAppend] at hglobal
+      simp [ho, hcls, hmiss, hcap, hpay, hglobal, hd, hp, Payload.toVal,
+        hcd, resolve_bump, hfn, hcm, hrt]
+    rw [evalExpr_mcall_attribute ctxT (j+6) h ρ
+      (evalExpr_name ctxT (j+5) h ρ "c" hc) hat hlookup
       (evalList_cons_val ctxT (j+5) h ρ rfl (evalExpr_name ctxT (j+4) h ρ "x" hx)
         (evalList_nil ctxT (j+4) h ρ))
-      ho hcap (by rw [hcls]; exact resolve_bump)]
+      (by rfl), applyClosure_self]
     exact happ
   exact execStmt_expr_val ctxT (j+7) h ρ hmc
 
@@ -1989,7 +2057,12 @@ theorem total_for_step (S : Int) :
     have hx' : (ρ.set "x" (Val.int y)).find? (·.1 == "x") = some ("x", .int y) := by
       simp [Env.set]
     refine ⟨h.setField 0 "n" (.int (acc + y)), ρ.set "x" (Val.int y),
-      bump_step j hR hc' hx', ys', acc + y, rfl, ?_, counter_set hR, hc'⟩
+      bump_step j hR hc' hx' (by
+        obtain ⟨o, ho, hc, ha⟩ := hR
+        change (h.get 0).bind _ = none
+        rw [ho]
+        exact counter_missing_field ⟨o, ho, hc, ha⟩ ho (by decide)),
+      ys', acc + y, rfl, ?_, counter_set hR, hc'⟩
     simp only [isum] at hsum
     omega
 
@@ -2049,7 +2122,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
   have hR0 : Represents counterRep
       [{ cls := "Counter", fields := [("n", Val.int 0)], captured := [] }] 0 0 := by
     refine ⟨_, rfl, rfl, ?_⟩
-    simp [counterRep]
+    simp [counterRep, Payload.toVal]
   have hcc : ([("c", Val.ref 0), ("xs", Val.list (ys.map Val.int))] : Env).find? (·.1 == "c")
       = some ("c", .ref 0) := by simp
   obtain ⟨h', ρ', hfor, hpost⟩ :=

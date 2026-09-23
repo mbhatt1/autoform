@@ -356,14 +356,16 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
     -- `.field`), so "an accessor returns the field it names" is a claim about receivers
     -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
-    -- answers there. A hit is found before the `@property` and class-attribute arms, which
-    -- is why this ONE premise replaced the `hprop`/`hcls` pair. Python-only, like `hbox`,
-    -- so the default discharges it for every `.cLike` corpus; a Python spec carries it as
-    -- a domain conjunct (`synth_specs.py` emits it).
+    -- answers there. A property takes precedence even on a hit; `hprop` below excludes
+    -- that case. Python specs carry the field-presence condition as a domain conjunct
+    -- (`synth_specs.py` emits it).
     (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
         (o.fields.find? (·.1 == fld)).isSome = true ∨
         (o.captured.find? (·.1 == fld)).isSome = true := by
-      intro hc; exact absurd hc (by decide)) :
+      intro hc; exact absurd hc (by decide))
+    -- Accessor synthesis uses this lemma only when the accessed name is absent from
+    -- the program's property table. A same-named property would run arbitrary code.
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
@@ -374,6 +376,19 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
+    have hpr : (ctx.dialect == .python &&
+        ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld)) = false := by
+      have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
+        apply List.any_eq_false.mpr
+        intro p hmem
+        have hn := List.all_eq_true.mp hprop p hmem
+        simp_all
+      simp [hp]
+    have hnop : (o.cls, fld) ∉ ctx.properties := by
+      intro hmem
+      have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
+      simp at hp
+    simp only [hgr, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
@@ -387,8 +402,8 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
             -- the JS property path (`jsContainerField`) is not taken.
             have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
             simp [hgr, hf, hc, hm, hd, hbx, hjs]
-      · simp [hgr, hf, hc, hm]
-    · simp [hgr, hf]
+      · simp [hgr, hf, hc, hm, hnop]
+    · simp [hgr, hf, hnop]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
 
@@ -419,14 +434,16 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
     -- `.field`), so "an accessor returns the field it names" is a claim about receivers
     -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
-    -- answers there. A hit is found before the `@property` and class-attribute arms, which
-    -- is why this ONE premise replaced the `hprop`/`hcls` pair. Python-only, like `hbox`,
-    -- so the default discharges it for every `.cLike` corpus; a Python spec carries it as
-    -- a domain conjunct (`synth_specs.py` emits it).
+    -- answers there. A property takes precedence even on a hit; `hprop` below excludes
+    -- that case. Python specs carry the field-presence condition as a domain conjunct
+    -- (`synth_specs.py` emits it).
     (hfld : ctx.dialect = .python → ∀ o, h.get r = some o →
         (o.fields.find? (·.1 == fld)).isSome = true ∨
         (o.captured.find? (·.1 == fld)).isSome = true := by
-      intro hc; exact absurd hc (by decide)) :
+      intro hc; exact absurd hc (by decide))
+    -- Accessor synthesis uses this lemma only when the accessed name is absent from
+    -- the program's property table. A same-named property would run arbitrary code.
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
@@ -437,6 +454,19 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
+    have hpr : (ctx.dialect == .python &&
+        ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld)) = false := by
+      have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
+        apply List.any_eq_false.mpr
+        intro p hmem
+        have hn := List.all_eq_true.mp hprop p hmem
+        simp_all
+      simp [hp]
+    have hnop : (o.cls, fld) ∉ ctx.properties := by
+      intro hmem
+      have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
+      simp at hp
+    simp only [hgr, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
     · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
@@ -450,8 +480,8 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
             -- the JS property path (`jsContainerField`) is not taken.
             have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
             simp [hgr, hf, hc, hm, hd, hbx, hjs]
-      · simp [hgr, hf, hc, hm]
-    · simp [hgr, hf]
+      · simp [hgr, hf, hc, hm, hnop]
+    · simp [hgr, hf, hnop]
 
 /-! ## 3b. Fuel independence
 

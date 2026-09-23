@@ -955,7 +955,21 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     case _ => n
   }
 
-  def kidsOf(n: AstNode): List[AstNode] = n.astChildren.collect { case a: AstNode => a }.map(unwrapMacro).l
+  def kidsOf(n: AstNode): List[AstNode] = {
+    val kids = n.astChildren.collect { case a: AstNode => a }.map(unwrapMacro).l
+    // Python type recovery adds METHOD_REF annotations at order -1 beside the
+    // original attribute expression. They are inferred targets, not executable
+    // operands: taking one as a return value bypasses descriptor lookup and self.
+    kids.filterNot {
+      case m: MethodRef if m.order < 0 && m.method.filename.toLowerCase.endsWith(".py") =>
+        kids.exists {
+          case c: Call => callName(c) == "<operator>.fieldAccess" &&
+            c.code == m.code && c.lineNumber == m.lineNumber && c.columnNumber == m.columnNumber
+          case _ => false
+        }
+      case _ => false
+    }
+  }
 
   /** A block's source text with its braces and any comments stripped, leaving only
     * what would actually execute. Distinguishes a genuinely empty `{}` body (or a
@@ -1074,7 +1088,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   def resolvedRef(n: AstNode): Option[AstNode] = n match {
     case c: Call if fieldOps.contains(callName(c)) =>
       kidsOf(c) match {
-        case (m: MethodRef) :: _ :: _ :: Nil => Some(m)
+        // Python's inferred METHOD_REF is not proof of a static class access.
+        // An instance attribute can be a descriptor or shadow the inferred method.
+        case (m: MethodRef) :: (_: TypeRef) :: _ :: Nil => Some(m)
+        case (m: MethodRef) :: _ :: _ :: Nil if !c.method.filename.toLowerCase.endsWith(".py") => Some(m)
         case (t: TypeRef) :: _ :: _ :: Nil   => Some(t)
         case _                               => None
       }

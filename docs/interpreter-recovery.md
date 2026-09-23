@@ -264,6 +264,43 @@ These attempts are not completed re-lands. Native module state, callback encodin
 class attributes still need investigation before the remaining mismatches can be
 classified as interpreter defects or mismatched inputs.
 
+Python attribute calls now look up and save an ordinary callable attribute before
+executing its arguments. Instance fields can shadow ordinary methods, properties run
+before instance-field reads, and bound methods and getters retain the lexical captures
+of local classes. Missing Python methods no longer resolve to unrelated functions or
+constructors with the same suffix. Container methods keep their dedicated path; a
+user-defined method on a represented container subclass uses attribute lookup.
+
+The exporter preserves the source attribute expression when Joern adds a synthetic
+`METHOD_REF` beside it. Such an annotation previously replaced a property read with
+an inferred function value. Attribute lookup and legacy method-name classification use
+structural character-list helpers so the new paths reduce in kernel proofs.
+
+The Counter representation now excludes extra instance fields and container payloads.
+Its method-call rule also requires that the globals frame does not override the class
+method. These conditions prevent field shadowing from invalidating the proof; the
+end-to-end `total` result and its fuel bound are unchanged. Generic accessor rules
+require the accessed name to be absent from the program's property table, since a
+property can run arbitrary code even when an instance field exists.
+
+`tests/test_source_object_lookup.py` checks source execution against CPython and proves
+those observations in the kernel. Separate heap probes cover an instance dictionary
+entry shadowed by a property and a represented container subclass method. This work
+does not establish inheritance/MRO, qualified class identity, dynamic descriptors,
+custom attribute hooks, or general class metadata. Calls with arguments lifted into
+compiler statement preludes still need a separate lookup-order review.
+
+
+The object-lookup checkpoint passed the full Python suite, the source and kernel
+probes, the protocol regressions, and the 478-job Lean build. A strict fresh-kernel
+replay of the complete `Autoform` import closure accepted 7,153 declarations with
+stable inputs. Commands, input hashes, failed attempts, and the end-to-end pipeline
+status are recorded in
+[`object-lookup-validation.json`](../artifacts/interpreter-recovery/object-lookup-validation.json)
+and [`object-lookup-audit.json`](../artifacts/interpreter-recovery/object-lookup-audit.json).
+The existing corpus render and provenance gates still fail; this checkpoint does not
+claim a completed re-land or completion of the arbitrary-codebase goal.
+
 Current integrity checks must continue to distinguish stale and missing evidence.
 `check_provenance.py` rejects the four tracked Python corpora whose exporter pin is
 stale; regenerate their complete evidence with `scripts/reland_corpus.sh`. Do not

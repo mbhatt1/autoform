@@ -803,6 +803,14 @@ structure Func where
   analysisBody : Option Stmt := none
   deriving Repr, Inhabited
 
+/-- Tail after the first Python scope marker. Structural recursion keeps legacy
+method classification reducible in kernel-checked execution. -/
+def pythonScopeTail : List Char → Option (List Char)
+  | [] => none
+  | c :: cs =>
+      if "<module>.".toList.isPrefixOf (c :: cs) then some ((c :: cs).drop 9)
+      else pythonScopeTail cs
+
 /-- Whether this `Func` is a method. Source metadata distinguishes nested functions
 from class methods; a dotted qualified name cannot establish that distinction.
 Legacy models retain the naming heuristic. Used for Python's unbound-method rule,
@@ -811,9 +819,9 @@ def Func.isMethod (fn : Func) : Bool :=
   match fn.pythonSignature.bind (·.isMethod) with
   | some method => method
   | none =>
-    match fn.name.splitOn "<module>." with
-    | [_, rest] => rest.any (· == '.')
-    | _         => false
+    match pythonScopeTail fn.name.toList with
+    | some rest => (pythonScopeTail rest).isNone && rest.any (· == '.')
+    | none => false
 
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where
@@ -837,9 +845,9 @@ structure Program where
 
   Python reaches a property getter by attribute ACCESS, not by a call: `c.currsize` runs
   `Cache.currsize`. Core has no descriptor protocol, and this list is the whole of one --
-  consulted by `evalExpr`'s `.field` case only after an ordinary field lookup has missed,
-  which is Python's own order. Empty by default, so a corpus rendered before the exporter
-  recorded properties reads its attributes exactly as it did.
+  consulted before instance fields because a property is a data descriptor, including
+  a read-only property. Empty by default; other descriptor kinds still need their own
+  explicit model.
 
   A list on `Program`/`Ctx` rather than a marker name in the function table, because the
   accessor theorems in `SpecsGen/Basis.lean` must be able to say "this field is not a

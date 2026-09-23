@@ -874,16 +874,19 @@ def Program.table (p : Program) : FuncTable :=
 
 /-! ### Name matching the kernel can compute
 
-Every name lookup below used `String.endsWith`/`String.splitOn`. Those are well-founded
-recursions over byte positions, and the kernel does not unfold well-founded recursion, so
-any proof *by computation* (`decide`, `rfl`, `cbv`) that reached a resolve MISS -- the
-suffix scan -- or a class-value's short name did not terminate. Three cachetools
-constructors had to be excluded from the generated conformance module for exactly this
-reason, and `BuiltinBase.lean` had to state its resolution facts as `#guard`s. The helpers
-here do the same work on `List Char`, by structural recursion only: `String.toList` reduces
-on a literal, `List.reverse`/`List.isPrefixOf`/`List.take` reduce structurally, so a
-concrete lookup now reduces in the kernel. `strEndsWith_eq_endsWith` is the proof that
-nothing else changed. -/
+Name matching runs during kernel-checked execution as well as native execution.
+These helpers use character lists and structural recursion to keep concrete lookups
+cheap to reduce. The agreement lemmas connect them to the library's string operations.
+This is a reduction-cost choice, not a restriction on what the Lean kernel can prove. -/
+
+/-- Structural prefix matching for executable proofs of attribute lookup. -/
+def strStartsWith (s pre : String) : Bool := pre.toList.isPrefixOf s.toList
+
+@[simp] theorem strStartsWith_eq_startsWith (s pre : String) :
+    strStartsWith s pre = s.startsWith pre := by
+  unfold strStartsWith String.startsWith
+  rw [Bool.eq_iff_iff, List.isPrefixOf_iff_prefix, String.Slice.startsWith_string_iff,
+      String.copy_toSlice]
 
 /-- `suffix` is a suffix of `s`, decided on the character lists. -/
 def strEndsWith (s suffix : String) : Bool := suffix.toList.isSuffixOf s.toList
@@ -1216,20 +1219,35 @@ def stripSig (k : String) : String :=
 #guard stripSig "a.py:<module>.C.f" == "a.py:<module>.C.f"
 #guard stripSig "plain" == "plain"
 
-/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
+/-- Resolve a class method. Python never falls back to an unrelated free function;
+other dialects retain their legacy suffix fallback. -/
 def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   match if ctx.dialect == .python then Iteration.resolveMethod cls meth else none with
   | some fn => some fn
   | none =>
   match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
-  | []          => ctx.resolve meth
+  | []          => if ctx.dialect == .python then none else ctx.resolve meth
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
   (ctx.dialect == .python && (Iteration.resolveMethod cls meth).isSome) ||
   ctx.table.any (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth))
+
+/-- Python resolves an ordinary callable attribute before evaluating its arguments.
+Builtin container methods and the interpreter's iterator methods keep their dedicated
+execution paths. User fields, properties and methods on container subclasses still
+use attribute lookup, including any getter effects. -/
+def Ctx.usesAttributeCall (ctx : Ctx) (h : Heap) (r : Ref) (name : String) : Bool :=
+  ctx.dialect == .python &&
+    match h.get r with
+    | none => false
+    | some object =>
+        !(Iteration.resolveMethod object.cls name).isSome && object.cls != "<generator>" &&
+        (object.payload.toVal.isNone || object.fields.any (·.1 == name) ||
+          ctx.classDefines object.cls name ||
+          ctx.properties.any (fun p => p.1 == object.cls && p.2 == name))
 
 /-- The constructor a class instance creation runs. Python spells it `__init__`; Java
 spells it `<init>` (JLS §15.9.4: "the selected constructor is invoked" -- and the
@@ -1437,7 +1455,7 @@ Only the LEFT operand dispatches; CPython's reflected `__gt__`-for-`<` fallback 
   | .ref r =>
     match h.get r with
     | some o =>
-      if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none
+      if o.payload.toVal.isSome || strStartsWith o.cls "<module>" then none
       else if op == "!=" then
         if ctx.classDefines o.cls "__ne__" then some (r, o.cls, "__ne__", false)
         else if ctx.classDefines o.cls "__eq__" then some (r, o.cls, "__eq__", true)
@@ -1469,7 +1487,7 @@ does; everything else names exactly one method. -/
           (o.cls == "list" || o.cls == "tuple" || o.cls == "dict") &&
           !ctx.classDefines o.cls "__iter__" then
         some (.ref r, Iteration.consumerClass, f)
-      else if o.payload.toVal.isSome || o.cls.startsWith "<module>" then none else
+      else if o.payload.toVal.isSome || strStartsWith o.cls "<module>" then none else
       if Iteration.consumes f &&
           (ctx.classDefines o.cls "__iter__" || ctx.classDefines o.cls "__getitem__") then
         some (.ref r, Iteration.consumerClass, f)
@@ -1956,6 +1974,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.ref r)) =>
         match h₁.get r with
         | some o =>
+          -- Properties are data descriptors: the getter wins over a same-named
+          -- instance field. A local class's getter retains its lexical captures.
+          if ctx.dialect == .python &&
+              ctx.properties.any (fun p => p.1 == o.cls && p.2 == f) then
+            match ctx.resolveMethod o.cls f with
+            | some fn =>
+                if o.captured.isEmpty then applyFunc ctx n h₁ fn (some (.ref r)) [] []
+                else applyClosure ctx n h₁ fn (("self", .ref r) :: o.captured) [] []
+            | none => (h₁, .hole s!"property:{f}:unresolved")
+          else
           match o.fields.find? (·.1 == f) with
           | some (_, v) => (h₁, .val v)
           | none        => match o.captured.find? (·.1 == f) with
@@ -1977,7 +2005,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            -- objects fall through to the arms below: `AttributeError`
                            -- under `.python` (Language Reference §3.2.11), `unit` elsewhere.
                            | none        =>
-                             if o.cls.startsWith "<module>" then
+                             if strStartsWith o.cls "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
                              -- A boxed container has no `__dict__` to miss into:
                              -- `{'a': 1}.a` is an AttributeError in Python and was a hole
@@ -1992,21 +2020,6 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                              -- anything else. `jsContainerField` is the whole table.
                              else if ctx.dialect == .javascript && o.payload.toVal.isSome then
                                (h₁, jsContainerField o.payload f)
-                             else if ctx.dialect.boxesContainers && o.payload.toVal.isSome then
-                               (h₁, .hole s!"field:{f}:on-container")
-                             -- A `@property`: the attribute read IS a call, so run the
-                             -- getter on the receiver. Keyed by `(o.cls, f)` against
-                             -- `ctx.properties`, and consulted only after the ordinary
-                             -- field and capture lookups have missed -- Python's own
-                             -- order, so an instance attribute shadowing a property is
-                             -- not this case. Python only: a property is a Python
-                             -- construct, and the gate is what keeps every `.cLike`
-                             -- corpus, and every accessor theorem about one, untouched.
-                             else if ctx.dialect == .python &&
-                                     ctx.properties.any (fun p => p.1 == o.cls && p.2 == f) then
-                               match ctx.resolveMethod o.cls f with
-                               | some fn => applyFunc ctx n h₁ fn (some (.ref r)) [] []
-                               | none    => (h₁, .hole s!"property:{f}:unresolved")
                              -- A CLASS attribute read through an instance: `self.__marker`
                              -- where `__marker = object()` was bound in the class body.
                              -- Python's lookup falls from the instance to its class, and
@@ -2039,12 +2052,16 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                    if ctx.classDefines o.cls f then
                                      match ctx.resolveMethod o.cls f with
                                      | some fn =>
-                                         if fn.name.startsWith "<runtime>." then
+                                         if strStartsWith fn.name "<runtime>." then
                                            (h₁, .hole "field:runtime-method")
                                          else if fn.isMethod && !fn.isClassMethod then
-                                           (h₁, .val (.clos fn.name [("self", .ref r)]))
+                                           (h₁, .val (.clos fn.name (("self", .ref r) :: o.captured)))
+                                         else if !fn.isClassMethod && !o.captured.isEmpty then
+                                           (h₁, .val (.clos fn.name o.captured))
                                          else (h₁, .val (.fn fn.name))
                                      | none => (h₁, .hole "field:method-unresolved")
+                                   else if o.payload.toVal.isSome then
+                                     (h₁, .hole s!"field:{f}:on-container")
                                    else (h₁, .exn (.str "AttributeError"))
                              -- Every other dialect keeps `unit`: in JavaScript a missing
                              -- property IS `undefined` (ECMA-262 §10.1.8.1
@@ -2238,76 +2255,110 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | n+1, h, ρ, .mcall recv m args =>
       match evalExpr ctx n h ρ recv with
       | (h₁, .val (.ref r)) =>
-        match evalList ctx n h₁ ρ args with
-        | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr (vs, kws)) =>
-          match Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws with
-          | some result => result
-          | none =>
-          match h₂.get r with
-          | none   => (h₂, .hole "mcall:dangling-ref")
-          | some o =>
-            match ctx.resolveMethod o.cls m with
-            | none    =>
-              -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). The user class
-              -- has already been consulted and lost, so a container payload gets the
-              -- builtin behaviour -- on the payload, writing any mutation back through
-              -- `setPayload` so aliases observe it. Inert until something constructs a
-              -- payload; `Payload.toVal` is `none` for every object Core builds today.
-              match o.payload.toVal with
-              | some pay =>
-                  if kws.isEmpty then
-                    match Stdlib.method ctx.dialect h₂ pay m vs with
-                    | some (h₃, .pure res) => (h₃, res)
-                    | some (h₃, .mutating res nv) =>
-                        match Payload.ofVal nv with
-                        | some np => (h₃.setPayload r np, res)
-                        -- A mutating builtin whose new receiver is not a container.
-                        -- Writing it back would change what the object IS.
-                        | Option.none => (h₃, .hole s!"mcall:{m}:payload-kind-changed")
-                    | Option.none => (h₂, .hole s!"mcall:{o.cls}.{m}")
-                  -- Same refusal the unboxed path makes: `Stdlib.method` has no keyword
-                  -- calling convention, and dropping keywords silently is the bug the
-                  -- varargs work fixed.
-                  else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
-              | Option.none =>
-              -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
-              -- `resolveMethod` finds nothing; what it has is a *field* holding a
-              -- function value, and a module-level function takes no receiver. Calling
-              -- it with `self` bound would shift every argument by one, so the receiver
-              -- is dropped — which is exactly what CPython does for an attribute that is
-              -- a plain function rather than a class attribute.
-              --
-              -- The same rule holds for an ORDINARY instance whose attribute holds a
-              -- function or closure: `self.cb(x)` does not pass `self` in CPython
-              -- either. It was kept module-only "until measured on its own"; the
-              -- differential oracle measured it on click 8.2.1 (`FuncParamType.convert`,
-              -- `self.func(value)`: three divergences, docs/languages.md §10.9), so the
-              -- lookup now runs for every object and only the hole LABELS still tell a
-              -- module object from an instance.
-              match o.fields.find? (·.1 == m) with
-              | some (_, .fn g)      =>
-                  match ctx.resolve g with
-                  | some fn => applyFunc ctx n h₂ fn none vs kws
-                  | none    => (h₂, .hole s!"call:{g}")
-              | some (_, .clos g cap) =>
-                  match ctx.resolve g with
-                  | some fn => applyClosure ctx n h₂ fn cap vs kws
-                  | none    => (h₂, .hole s!"call:{g}")
-              | some _  =>
-                  if o.cls.startsWith "<module>" then (h₂, .hole s!"module-call:{m}:not-a-function")
-                  else (h₂, .hole s!"mcall:{o.cls}.{m}:field-not-callable")
+        if ctx.usesAttributeCall h₁ r m then
+          -- These private bindings cannot be source-level Python identifiers.
+          -- Save the attribute itself: arguments may replace the receiver's field.
+          match evalExpr ctx n h₁ (("<mcall:receiver>", .ref r) :: ρ)
+              (.field (.name "<mcall:receiver>") m) with
+          | (hc, .val callee) =>
+            match evalList ctx n hc ρ args with
+            | (h₂, .inl result) => (h₂, result)
+            | (h₂, .inr (vs, kws)) =>
+              match callee with
+              | .fn g      => match ctx.resolve g with
+                              | some fn =>
+                                if fn.isClassMethod then
+                                  applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                                else if fn.isMethod && fn.vararg.isNone
+                                   && vs.length == fn.params.length + 1 then
+                                  applyFunc ctx n h₂ fn (some (vs.headD .unit)) vs.tail kws
+                                else applyFunc ctx n h₂ fn none vs kws
+                              | none    => (h₂, .hole s!"call:{g}")
+              | .clos g cap => match ctx.resolve g with
+                              | some fn => applyClosure ctx n h₂ fn cap vs kws
+                              | none    => (h₂, .hole s!"call:{g}")
+              | .ref addr  =>
+                match unboxFn h₂ addr with
+                | some (.fn g)      => match ctx.resolve g with
+                                       | some fn => applyFunc ctx n h₂ fn none vs kws
+                                       | none    => (h₂, .hole s!"call:{g}")
+                | some (.clos g cap) => match ctx.resolve g with
+                                        | some fn => applyClosure ctx n h₂ fn cap vs kws
+                                        | none    => (h₂, .hole s!"call:{g}")
+                | _ => (h₂, .hole "call:value:not-callable")
+              | _ => (h₂, .hole "call:value:not-callable")
+          | result => result
+        else
+          match evalList ctx n h₁ ρ args with
+          | (h₂, .inl e)  => (h₂, e)
+          | (h₂, .inr (vs, kws)) =>
+            match Iteration.containerMethod ctx.dialect h₂ (.ref r) m vs kws with
+            | some result => result
+            | none =>
+            match h₂.get r with
+            | none   => (h₂, .hole "mcall:dangling-ref")
+            | some o =>
+              match ctx.resolveMethod o.cls m with
               | none    =>
-                  if o.cls.startsWith "<module>" then (h₂, .hole s!"module-attr:{m}")
-                  else (h₂, .hole s!"mcall:{o.cls}.{m}")
-            | some fn =>
-              -- `c.make(3)` on a `@classmethod`: Python passes the CLASS, not `c`, and
-              -- passes it as the first positional (the exporter kept `cls` in `params`),
-              -- so there is no receiver to inject under `self`.
-              if fn.isClassMethod then
-                applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
-              else if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
-              else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
+                -- Boxed containers, step 3 (`docs/boxed-containers.md` §2). The user class
+                -- has already been consulted and lost, so a container payload gets the
+                -- builtin behaviour -- on the payload, writing any mutation back through
+                -- `setPayload` so aliases observe it. Inert until something constructs a
+                -- payload; `Payload.toVal` is `none` for every object Core builds today.
+                match o.payload.toVal with
+                | some pay =>
+                    if kws.isEmpty then
+                      match Stdlib.method ctx.dialect h₂ pay m vs with
+                      | some (h₃, .pure res) => (h₃, res)
+                      | some (h₃, .mutating res nv) =>
+                          match Payload.ofVal nv with
+                          | some np => (h₃.setPayload r np, res)
+                          -- A mutating builtin whose new receiver is not a container.
+                          -- Writing it back would change what the object IS.
+                          | Option.none => (h₃, .hole s!"mcall:{m}:payload-kind-changed")
+                      | Option.none => (h₂, .hole s!"mcall:{o.cls}.{m}")
+                    -- Same refusal the unboxed path makes: `Stdlib.method` has no keyword
+                    -- calling convention, and dropping keywords silently is the bug the
+                    -- varargs work fixed.
+                    else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
+                | Option.none =>
+                -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
+                -- `resolveMethod` finds nothing; what it has is a *field* holding a
+                -- function value, and a module-level function takes no receiver. Calling
+                -- it with `self` bound would shift every argument by one, so the receiver
+                -- is dropped — which is exactly what CPython does for an attribute that is
+                -- a plain function rather than a class attribute.
+                --
+                -- The same rule holds for an ORDINARY instance whose attribute holds a
+                -- function or closure: `self.cb(x)` does not pass `self` in CPython
+                -- either. It was kept module-only "until measured on its own"; the
+                -- differential oracle measured it on click 8.2.1 (`FuncParamType.convert`,
+                -- `self.func(value)`: three divergences, docs/languages.md §10.9), so the
+                -- lookup now runs for every object and only the hole LABELS still tell a
+                -- module object from an instance.
+                match o.fields.find? (·.1 == m) with
+                | some (_, .fn g)      =>
+                    match ctx.resolve g with
+                    | some fn => applyFunc ctx n h₂ fn none vs kws
+                    | none    => (h₂, .hole s!"call:{g}")
+                | some (_, .clos g cap) =>
+                    match ctx.resolve g with
+                    | some fn => applyClosure ctx n h₂ fn cap vs kws
+                    | none    => (h₂, .hole s!"call:{g}")
+                | some _  =>
+                    if strStartsWith o.cls "<module>" then (h₂, .hole s!"module-call:{m}:not-a-function")
+                    else (h₂, .hole s!"mcall:{o.cls}.{m}:field-not-callable")
+                | none    =>
+                    if strStartsWith o.cls "<module>" then (h₂, .hole s!"module-attr:{m}")
+                    else (h₂, .hole s!"mcall:{o.cls}.{m}")
+              | some fn =>
+                -- `c.make(3)` on a `@classmethod`: Python passes the CLASS, not `c`, and
+                -- passes it as the first positional (the exporter kept `cls` in `params`),
+                -- so there is no receiver to inject under `self`.
+                if fn.isClassMethod then
+                  applyFunc ctx n h₂ fn none (fn.ownerClassValue :: vs) kws
+                else if o.captured.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+                else applyClosure ctx n h₂ fn (("self", .ref r) :: o.captured) vs kws
       | (h₁, .val (.fn g)) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
@@ -3974,9 +4025,9 @@ private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × ERes
        | .val (.int 1) => true | _ => false
 #guard (mcallOn (.name "d") "get" [.lit (.str "a")]).1[1]!.version == 0
 
--- An ordinary instance has no payload, so nothing changed for it.
+-- An ordinary Python instance with no such attribute raises before argument evaluation.
 #guard match (mcallOn (.name "o") "append" [.lit (.int 3)]).2 with
-       | .hole "mcall:Plain.append" => true | _ => false
+       | .exn (.str "AttributeError") => true | _ => false
 
 -- §4, live iteration. `for v in xs: del xs[0]` on [1,2].
 -- CPython sees one element and ends with [2]; a SNAPSHOT loop would see two. This is the

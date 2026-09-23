@@ -28,7 +28,7 @@ def run(args, cwd, env, timeout=240):
 
 @pytest.fixture(scope="module")
 def numeric_env():
-    env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "JAVA_HOME")
+    env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "JAVA_HOME", "LEAN_NUM_THREADS")
            if k in os.environ}
     env["PATH"] = str(Path.home() / ".elan/bin") + os.pathsep + env.get("PATH", "")
     if not shutil.which("lake", path=env["PATH"]):

@@ -640,7 +640,7 @@ class TestValueDunders:
             assert 'ctx.classDefines' in body, helper
             assert 'resolveMethod' not in body, helper
             # ordinary instances only: no container payload, not a module frame
-            assert 'o.payload.toVal.isSome || o.cls.startsWith "<module>"' in body, helper
+            assert 'o.payload.toVal.isSome || strStartsWith o.cls "<module>"' in body, helper
             assert 'ctx.dialect != .python then none' in body, helper
 
     def test_not_equal_falls_back_to_the_negation_of_eq(self):

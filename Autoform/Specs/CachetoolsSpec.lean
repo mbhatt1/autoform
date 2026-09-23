@@ -117,6 +117,30 @@ quietly adapts. -/
 unfold `program` itself (a 233-entry list literal). -/
 theorem P_dialect : P.dialect = Dialect.python := rfl
 
+/-- Attribute reads must discharge the descriptor check before unfolding getter
+applications. These facts use the imported property table and preserve all receiver
+domains and postconditions below. -/
+@[simp] private theorem stored__Cache__maxsize_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__maxsize") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Cache__currsize_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__currsize") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Cache__data_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Cache__data") = false := by
+  simp [program]
+
+@[simp] private theorem stored_expires_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "expires") = false := by
+  simp [program]
+
+@[simp] private theorem stored__Timer__nesting_not_property (cls : String) :
+    program.properties.any (fun p => p.1 == cls && p.2 == "_Timer__nesting") = false := by
+  simp [program]
+
+
 /-- Field lookup as a *shallow* function: own fields first, then the bindings captured by
 the class the object came from, then `unit`.
 
@@ -312,13 +336,17 @@ theorem Cache_size_fields_distinct (fuel : Nat) (hf : 10 ≤ fuel) :
         = .val (.int 3)
   ∧ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
       ≠ (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_maxsize rfl,
-      runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache_currsize rfl]
-  refine ⟨?_, ?_, ?_⟩ <;>
-    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, sampleCache, Heap.get,
-          f_cachetools___init___py__module__Cache_maxsize,
-          f_cachetools___init___py__module__Cache_currsize]
+  have hmax := Cache_maxsize_mrefines sampleCache (.ref 0) []
+    ⟨0, .int 128, rfl, by exact ⟨_, rfl, rfl⟩⟩ fuel hf
+  have hcur := Cache_currsize_mrefines sampleCache (.ref 0) []
+    ⟨0, .int 3, rfl, by exact ⟨_, rfl, rfl⟩⟩ fuel hf
+  have hm : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.maxsize" (.ref 0) []).2
+      = .val (.int 128) := by
+    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hmax
+  have hc : (runMethod fuel sampleCache "cachetools/__init__.py:<module>.Cache.currsize" (.ref 0) []).2
+      = .val (.int 3) := by
+    simpa [readField, sampleCache, Heap.get, Outcome.toEResult] using congrArg Prod.snd hcur
+  exact ⟨hm, hc, by rw [hm, hc]; intro he; cases he⟩
 
 /-! ### `Cache.__contains__` — membership, and the *polarity* of `in`
 
@@ -355,11 +383,15 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 1]).2 = .val (.bool true)
   ∧ (runMethod fuel [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
         "cachetools/__init__.py:<module>.Cache.__contains__" (.ref 0) [.int 2]).2 = .val (.bool false) := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  refine ⟨?_, ?_⟩ <;>
-    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
-    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
-          Ctx.dunderOn, Val.unbox, f_cachetools___init___py__module__Cache___contains__]
+  have present := Cache_contains_mrefines
+    [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+    (.ref 0) [.int 1] ⟨0, .int 1, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl⟩⟩ fuel hf
+  have absent := Cache_contains_mrefines
+    [{ cls := "Cache", fields := [("_Cache__data", .dict [(.int 1, .int 9)])] }]
+    (.ref 0) [.int 2] ⟨0, .int 2, [(.int 1, .int 9)], rfl, rfl, ⟨_, rfl, rfl⟩⟩ fuel hf
+  constructor
+  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd present
+  · simpa [readField, Heap.get, Val.beq, Outcome.toEResult] using congrArg Prod.snd absent
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
 
@@ -393,10 +425,9 @@ theorem TLRUItem_lt_irrefl (fuel : Nat) (hf : 12 ≤ fuel) :
     (runMethod fuel [{ cls := "_Item", fields := [("expires", .int 7)] }]
         "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__" (.ref 0) [.ref 0]).2
       = .val (.bool false) := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TLRUCache__Item___lt__ rfl]
-  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, applyBinop_int_lt, Heap.get,
-        f_cachetools___init___py__module__TLRUCache__Item___lt__]
+  have hr := TLRUItem_lt_mrefines [{ cls := "_Item", fields := [("expires", .int 7)] }]
+    (.ref 0) [.ref 0] ⟨0, 0, 7, 7, rfl, rfl, ⟨_, rfl, rfl⟩, ⟨_, rfl, rfl⟩⟩ fuel hf
+  simpa [readField, Heap.get, Outcome.toEResult] using congrArg Prod.snd hr
 
 /-! ### `_TimedCache._Timer.__exit__` — a heap effect, specified exactly
 
@@ -429,10 +460,10 @@ theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
     readField ((runMethod fuel [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" (.ref 0) [.unit]).1) 0
         "_Timer__nesting" = .int 0 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
-  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
-        f_cachetools___init___py__module___TimedCache__Timer___exit__]
+  have hr := Timer_exit_mrefines [{ cls := "_Timer", fields := [("_Timer__nesting", .int 1)] }]
+    (.ref 0) [.unit] ⟨0, 1, .unit, rfl, rfl, ⟨_, rfl, rfl⟩⟩ fuel hf
+  rw [hr]
+  rfl
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
 
@@ -465,11 +496,10 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   ∧ readField (runMethod fuel [{ cls := "_Timer", fields := [] }]
         "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" (.ref 0) [.int 99]).1
       0 "_Timer__nesting" = .int 0 := by
-  obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
-  refine ⟨?_, ?_⟩ <;>
-    rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
-    simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, posRejected, signatureRejected, Func.keywordParams, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
-          f_cachetools___init___py__module___TimedCache__Timer___init__]
+  have hr := Timer_init_mrefines [{ cls := "_Timer", fields := [] }]
+    (.ref 0) [.int 99] ⟨0, .int 99, rfl, rfl⟩ fuel hf
+  rw [hr]
+  exact ⟨rfl, rfl⟩
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
 
