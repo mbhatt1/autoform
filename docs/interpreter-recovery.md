@@ -338,3 +338,20 @@ existing `Cache.__init__` conformance theorem. Its class-value read of
 also reports inherited-attribute divergences; this has not completed a corpus
 re-land. The [diagnostic report](../artifacts/interpreter-recovery/cachetools-object-lookup-diagnostic.json)
 preserves the failing theorem, sample size, per-function divergences and input hashes.
+
+Minimal [inherited-lookup probes](../artifacts/interpreter-recovery/inherited-lookup-diagnostic.json)
+confirm two missing behaviors on the fresh Cachetools model: the base classes
+resolve `getsizeof` and `timer`, while `FIFOCache` and `TTLCache` incorrectly raise
+`AttributeError` for the corresponding inherited reads. Correcting this requires
+class identity, ordered base metadata and descriptor lookup together; a global
+method-name fallback would bind unrelated functions. These probes do not claim
+to explain every divergent corpus call.
+
+Python method calls with compiler-lifted argument statements now save the callable
+attribute before those statements. Saved methods on modeled builtin containers and
+runtime iterators retain their receiver. The
+[bound-call validation](../artifacts/interpreter-recovery/bound-call-validation.json)
+records source comparisons, kernel observations, a full Lean build and a fresh full
+kernel audit. Its packaged pipeline completes with mutation and assurance gaps;
+constructor post-state and untested theorem subjects remain limitations. Inherited
+builtin descriptors on user subclasses and general attribute hooks remain open.

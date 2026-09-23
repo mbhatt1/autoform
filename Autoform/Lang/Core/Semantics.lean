@@ -923,6 +923,41 @@ def dropLastDotSegment (cs : List Char) : List Char :=
 #guard strEndsWith "x" "" == true
 #guard strEndsWith "" ".x" == false
 
+/-- A private adapter for methods on builtin containers and runtime iterators.
+The captured receiver retains its identity; argument collectors preserve the normal
+method-call convention. Only reserved names can resolve to this adapter. -/
+def boundMethodAdapter (name : String) : Func :=
+  { name := "<bound-method>." ++ name,
+    params := ["<bound:args>", "<bound:kwargs>"],
+    vararg := some "<bound:args>", kwarg := some "<bound:kwargs>",
+    body := .ret (.mcall (.name "<bound:self>") name
+      [.starred (.name "<bound:args>"), .dstarred (.name "<bound:kwargs>")]) }
+
+/-- Resolve the reserved adapter name, without making its short name a source callable. -/
+def resolveBoundMethod (name : String) : Option Func :=
+  if strStartsWith name "<bound-method>." then
+    let method := String.ofList (name.toList.drop 15)
+    if Stdlib.knowsMethod .python method || method == "__iter__" || method == "__next__" then
+      some (boundMethodAdapter method)
+    else none
+  else none
+
+/-- Binding a builtin method is supported only for the exact represented builtin
+class. An inherited builtin on a user subclass still needs an explicit model that
+freezes the descriptor independently of later instance writes. -/
+def builtinMethodValue (object : Obj) (receiver : Ref) (name : String) : Option Val :=
+  let supported :=
+    match object.cls, object.payload with
+    | "list", .list _ =>
+        ["append", "insert", "extend", "clear", "remove", "pop", "copy", "count", "index", "__iter__"].contains name
+    | "dict", .dict _ =>
+        ["get", "keys", "values", "items", "copy", "pop", "popitem", "setdefault", "update", "clear", "__iter__"].contains name
+    | "tuple", .tuple _ => ["count", "index", "__iter__"].contains name
+    | _, _ => (Iteration.resolveMethod object.cls name).isSome
+  if supported then
+    some (.clos (boundMethodAdapter name).name [("<bound:self>", .ref receiver)])
+  else none
+
 /-- Resolve a callable by exact name, else by suffix.
 
 Joern emits fully-qualified names like `pkg/mod.py:<module>.Cls.meth`, while call sites
@@ -932,6 +967,7 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
   match ctx.table.find? (·.1 == n) with
   | some (_, f) => some f
   | none        =>
+    if strStartsWith n "<bound-method>." then resolveBoundMethod n else
     -- Scan for a *unique* suffix match, stopping as soon as a second one is seen.
     -- The previous form built the full match list with `filter`, so every miss
     -- allocated across the whole table — on Django's 10,623 functions that made the
@@ -2053,7 +2089,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                      match ctx.resolveMethod o.cls f with
                                      | some fn =>
                                          if strStartsWith fn.name "<runtime>." then
-                                           (h₁, .hole "field:runtime-method")
+                                           match builtinMethodValue o r f with
+                                           | some callable => (h₁, .val callable)
+                                           | none => (h₁, .hole "field:runtime-method")
                                          else if fn.isMethod && !fn.isClassMethod then
                                            (h₁, .val (.clos fn.name (("self", .ref r) :: o.captured)))
                                          else if !fn.isClassMethod && !o.captured.isEmpty then
@@ -2061,7 +2099,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                          else (h₁, .val (.fn fn.name))
                                      | none => (h₁, .hole "field:method-unresolved")
                                    else if o.payload.toVal.isSome then
-                                     (h₁, .hole s!"field:{f}:on-container")
+                                     match builtinMethodValue o r f with
+                                     | some callable => (h₁, .val callable)
+                                     | none => (h₁, .hole s!"field:{f}:on-container")
                                    else (h₁, .exn (.str "AttributeError"))
                              -- Every other dialect keeps `unit`: in JavaScript a missing
                              -- property IS `undefined` (ECMA-262 §10.1.8.1

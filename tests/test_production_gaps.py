@@ -1257,7 +1257,8 @@ class TestPreludesEverywhere:
         # callee/receiver first, then positionals, then keywords -- §6.3.4's order
         assert '// operands in evaluation order: callee/receiver, positionals, keywords' in self.SRC
         assert 'calleeV.foreach(f => out("f") = f)' in self.SRC
-        assert 'recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) }' in self.SRC
+        assert 'if (pyFile && kind == "mcall") ujson.Obj("k" -> "callV")' in self.SRC
+        assert '"field", "a" -> re, "f" -> baseline("m")' in self.SRC
         assert 'case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value' in self.SRC
         assert 'case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value' in self.SRC
 

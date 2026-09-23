@@ -1885,9 +1885,14 @@ theorem tfFree_of_table {ctx : Ctx}
       have hmem := List.mem_of_find?_eq_some hfind
       have : f = fn := by simpa using hr
       exact this ▸ hT (a, f) hmem
-    · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
-      · exact hq2 ▸ hT q hq
-      · simp at hacc
+    · split at hr
+      · unfold resolveBoundMethod at hr
+        dsimp only at hr
+        repeat' split at hr
+        all_goals cases hr <;> rfl
+      · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
+        · exact hq2 ▸ hT q hq
+        · simp at hacc
   refine ⟨hres, ?_⟩
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr

@@ -9807,7 +9807,14 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // operands in evaluation order: callee/receiver, positionals, keywords
         val recur: List[(List[ujson.Obj], ujson.Value, Option[String])] =
           valueCalleeNode.toList.map { f => val (pf, fe) = exprV(f); (pf, fe: ujson.Value, Some("<callee>")) } ++
-          recvNode.toList.map { r => val (pr, re) = exprV(r); (pr, re: ujson.Value, Some("<recv>")) } ++
+          recvNode.toList.map { r =>
+            val (pr, re) = exprV(r)
+            // Python evaluates the callable attribute, including descriptor effects,
+            // before any argument. Saving only the receiver postpones lookup until
+            // after lifted argument statements have already run.
+            if (pyFile) (pr, ujson.Obj("k" -> "field", "a" -> re, "f" -> baseline("m")): ujson.Value, Some("<callee>"))
+            else (pr, re: ujson.Value, Some("<recv>"))
+          } ++
           posArgs.map {
             case sc: Call if callName(sc) == "<operator>.starredUnpack" =>
               (List.empty[ujson.Obj], argExpr(sc), None)
@@ -9849,7 +9856,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
             case (v, Some("<keyword_dict>")) => ujson.Obj("k" -> "dstarred", "a" -> v): ujson.Value
             case (v, Some(k))                => ujson.Obj("k" -> "kwargE", "n" -> k, "a" -> v): ujson.Value
           }
-          val out = ujson.Obj.from(baseline.value.toSeq)
+          val out =
+            if (pyFile && kind == "mcall") ujson.Obj("k" -> "callV")
+            else ujson.Obj.from(baseline.value.toSeq)
           out("args") = ujson.Arr.from(argVals)
           recvV.foreach(r => out("recv") = r)
           calleeV.foreach(f => out("f") = f)
