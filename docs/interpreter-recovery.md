@@ -320,3 +320,14 @@ Regression checks live in `tests/test_reland_scope.py`.
 Local scratch ASTs without manifest entries are reported
 as unverifiable by `check_render.py`. The docs/spec freshness checks do not establish
 that the current interpreter agrees with every source corpus.
+
+The native sampler now runs on the main thread, where its signal deadlines can
+interrupt synthesized calls. The old large-stack worker was obsolete after AST
+decoding and traversal became iterative. Random free-function sampling now uses
+the same deadline as constructed calls; a timeout or unavailable deadline is a
+recorded skip, never a source exception. Reports identify the changed sample as
+`python-deadlines-v4`. These signal deadlines do not replace the pipeline's external
+process timeout. `tests/test_native_deadlines.py` checks a blocking native call
+through the CLI while reading an AST deeper than Python's recursion limit. The
+[validation report](../artifacts/interpreter-recovery/native-deadline-validation.json)
+records the focused checks and full Python suite.

@@ -836,20 +836,37 @@ def find_class(rel, clsname):
 
 
 class Timeout(Exception):
-    pass
+    """A harness deadline, never an exception observed from the source program."""
+
+
+class DeadlineUnavailable(Timeout):
+    """The platform/thread cannot install a native-call deadline."""
 
 
 @contextlib.contextmanager
 def time_limit(seconds):
-    """Guard against a synthesized call that blocks (locks, sleeps, IO)."""
+    """Interrupt synthesized calls on the main thread, or refuse the call.
+
+    This is a Python signal deadline, not process isolation. Corpus code that masks
+    signals or catches the harness exception still needs an external process limit.
+    """
     import signal
+    import threading
+    if (threading.current_thread() is not threading.main_thread()
+            or not all(hasattr(signal, name) for name in
+                       ('SIGALRM', 'ITIMER_REAL', 'setitimer', 'getitimer'))):
+        raise DeadlineUnavailable('native-call deadline unavailable on this thread/platform')
+    if seconds <= 0:
+        raise ValueError('deadline must be positive')
+    if signal.getitimer(signal.ITIMER_REAL)[0] != 0:
+        raise DeadlineUnavailable('native-call deadline conflicts with an active timer')
+
+    def handler(sig, frm):
+        raise Timeout('native call exceeded its deadline')
+
+    old = signal.signal(signal.SIGALRM, handler)
     try:
-        def handler(sig, frm): raise Timeout()
-        old = signal.signal(signal.SIGALRM, handler)
         signal.setitimer(signal.ITIMER_REAL, seconds)
-    except (ValueError, AttributeError):
-        yield; return            # not the main thread, or no SIGALRM: run unguarded
-    try:
         yield
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
@@ -1114,8 +1131,8 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                 with time_limit(2.0):
                     got = raw(inst, *argv)
                 outcome = ("val", enc.enc_result(got))
-            except Timeout:
-                why[qual] = "call did not terminate within 2s"; break
+            except Timeout as exc:
+                why[qual] = str(exc) or "call did not terminate within 2s"; break
             except Unencodable as e:
                 why[qual] = "unencodable result: %s" % (e.args[0],); break
             except Exception as e:                       # noqa: BLE001
@@ -1758,12 +1775,16 @@ def main():
                   "a different measurement and must not be compared." % "v2")
 
     if lang == "python":
-        BASIS = "python-exception-guards-v3"
+        BASIS = "python-deadlines-v4"
         BASIS_NOTE = ("Varargs remain attempted. Functions whose only static holes are "
                       "unsupported exception-representation fallbacks are also sampled; "
                       "cases reaching a hole remain inconclusive. Static hole counts "
                       "are unchanged. Coverage and rates differ from the earlier "
-                      "hole-free-only sampling population.")
+                      "hole-free-only sampling population. Synthesized native calls now "
+                      "use main-thread signal deadlines, including random free-function "
+                      "calls; timed-out calls are skipped, never recorded as source "
+                      "exceptions. Python's normal recursion limit is preserved. These "
+                      "bounds may change the sample relative to python-exception-guards-v3.")
 
     # Each non-Python runtime backend samples its own domain and calls its own surface;
     # naming that basis per runtime is what stops a Node rate being read as if it were
@@ -2058,8 +2079,16 @@ def main():
                 enc = Encoder()
                 enc.freeze()
                 try:
-                    got = fn(*args)
+                    with time_limit(2.0):
+                        got = fn(*args)
                     out = ("val", enc.enc_result(got))
+                except Timeout as exc:
+                    reason = ('skip_native_deadline_unavailable' if isinstance(exc, DeadlineUnavailable)
+                              else 'skip_native_timeout')
+                    stats[reason] = stats.get(reason, 0) + 1
+                    stats.setdefault('native_deadline_detail', []).append(
+                        {'function': f['name'], 'reason': str(exc), 'origin': 'random'})
+                    break
                 except Unencodable:
                     stats["skip_unencodable_ret"] += 1; continue
                 except Exception as e:                      # noqa: BLE001
@@ -2122,6 +2151,10 @@ def main():
               "cases": len(cases), "agree": 0, "total": 0, "divergences": 0,
               "inconclusive": 0, "rate": "n/a", "by_origin": {},
               "skipped": {k: v for k, v in stats.items() if k.startswith("skip")},
+              "native_deadline_detail": stats.get("native_deadline_detail", []),
+              "native_call_deadline": ({"mode": "SIGALRM", "seconds": 2.0,
+                                         "unsupported": "skip", "recursion_limit": sys.getrecursionlimit()}
+                                        if lang == "python" else None),
               "skipped_note": "call-event counts, not function counts: a function whose "
                               "case quota is already full still logs skips for every "
                               "further call. Bound coverage with `coverage`, never with "
@@ -2607,46 +2640,6 @@ def main():
     return 1 if diverge else (2 if not total or not result["build_stable"] else 0)
 
 
-def _run_on_a_big_stack(fn):
-    """Run `fn` on a thread with a large stack and a raised recursion limit.
-
-    `json.load` is recursive, and the neutral AST nests as deeply as the source does.
-    Ansible's AST blew Python's 1000-frame default *while decoding*, so conformance could
-    not run on the largest Python corpus at all -- and the traceback pointed at the JSON
-    decoder, which reads as "the file is corrupt" rather than "this program is deeply
-    nested".
-
-    This is the third instance of the same defect in this repository: `render_lean.py`
-    never set a limit and died at 247 consecutive statements, `has_hole` was recursive and
-    raised before any backend ran, and now the decoder itself. Raising the limit alone is
-    not enough -- the limit guards the C stack, so lifting it without a bigger stack turns
-    a clean exception into a segfault.
-    """
-    import threading
-    sys.setrecursionlimit(300_000)
-    try:
-        threading.stack_size(512 * 1024 * 1024)
-    except (ValueError, RuntimeError):
-        try:
-            threading.stack_size(64 * 1024 * 1024)
-        except (ValueError, RuntimeError):
-            pass
-    box = {}
-
-    def go():
-        try:
-            box["rc"] = fn()
-        except BaseException as e:          # noqa: BLE001 - re-raised on the caller
-            box["exc"] = e
-
-    t = threading.Thread(target=go)
-    t.start()
-    t.join()
-    if "exc" in box:
-        raise box["exc"]
-    return box.get("rc", 0)
-
-
 if __name__ == "__main__":
     # The oracle is headless. A corpus function that reads the terminal (`click.prompt`,
     # `getpass`) must see EOF, not this process's stdin: a prompt that blocks would hang
@@ -2655,4 +2648,7 @@ if __name__ == "__main__":
         sys.stdin = open(os.devnull)
     except OSError:
         pass
-    sys.exit(_run_on_a_big_stack(main))
+    # AST decoding and traversal use explicit stacks. Keep native execution on the
+    # main thread so signal deadlines work and source recursion retains Python's
+    # normal limit, instead of changing it process-wide to 300,000.
+    sys.exit(main())

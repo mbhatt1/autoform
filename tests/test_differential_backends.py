@@ -197,5 +197,5 @@ def test_every_runtime_has_its_own_measurement_basis(differential):
     in CPython's words."""
     src = (ROOT / "scripts/differential.py").read_text()
     for basis in ("node-numeric-pool-v1", "jvm-primitive-static-v1", "go-package-func-v1",
-                  "python-exception-guards-v3", "c-native-zero-boundary-v3"):
+                  "python-exception-guards-v3", "python-deadlines-v4", "c-native-zero-boundary-v3"):
         assert basis in src, basis
