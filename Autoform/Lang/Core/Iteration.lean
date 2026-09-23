@@ -313,7 +313,7 @@ theorem newData_excSafe (h : Heap) (source : Val) {h' : Heap} {v : Val} :
     | (cases result; exact Stdlib.excSafe_str (by decide))
     | cases result
 
-private theorem truthValue_ne_exn (h : Heap) (value v : Val) :
+theorem truthValue_ne_exn (h : Heap) (value v : Val) :
     truthValue h value ≠ .exn v := by
   unfold truthValue
   split <;> intro impossible <;> cases impossible

@@ -123,12 +123,38 @@ Implicit protocol calls use reserved names so source bindings of `iter`/`next` c
 replace them. Source and kernel regressions live in
 `tests/test_source_generator_expressions.py`.
 
+The subsequent condition extension routes `if`, `while`, conditional expressions,
+negation, Boolean operators, `__contains__` results, and the `__eq__` fallback for `!=`
+through effectful truth testing. Refinement rules include its resulting heap, and the
+fuel-monotonicity and exception-safety proofs cover the additional calls. The renderer
+uses separate value and branch forms, following CPython's
+[`codegen_jump_if`](https://github.com/python/cpython/blob/3.14/Python/codegen.c).
+A cached short-circuit answer survives temporary assignments and generator suspension;
+a later independent test of the materialized value calls the protocol again.
+The auxiliary helper functions retain source operations in `analysisBody` and do not
+increase the source-function denominator. Source regressions are in
+`tests/test_source_truth_conditions.py`.
+
+The condition extension passed the full Lean build (478 jobs), the full Python suite
+(804 passed, 54 skipped, one expected failure), and all 18 generator, iterator, truth
+consumer and scope source regressions. Its new source test compared 31 CPython results
+and proved each in the kernel, together with two named-gap results. The strict
+`Autoform.Runtime` audit passed with stable artifacts and fresh replay. Input hashes
+and validation commands are recorded in
+[`truth-conditions-validation.json`](../artifacts/interpreter-recovery/truth-conditions-validation.json).
+A full audit of this extension and complete regeneration of the four affected Python
+corpora remain separate gates; their older renders now differ from the current renderer.
+
 Validation of the truth-consumer correction passed the full Lean build (478 jobs),
 the full Python suite (801 passed, 53 skipped, one expected failure), and all 12 existing
 generator/iterator source regressions. The new source comparison checked 14 CPython
 observations and their kernel proofs, plus two named-gap proofs. The strict
 `Autoform.Runtime` audit passed with stable artifacts and fresh replay. This scoped
-audit does not establish a full audit of the correction.
+audit does not establish a full audit of the correction. A subsequent full strict
+audit of commit `2a431df` passed on an independent, stable snapshot, including fresh
+kernel replay of `Autoform`; see
+[`truth-consumer-audit.json`](../artifacts/interpreter-recovery/truth-consumer-audit.json).
+That result excludes the later condition extension.
 
 Source metadata also distinguishes lambdas and comprehensions that share a line.
 When Python's public symbol table lacks a distinguishing column, the decoder gives

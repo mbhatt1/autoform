@@ -272,9 +272,9 @@ theorem evalExpr_hole (l : String) :
 
 /-- Value-passing form for `unop`: the shape actually used when discharging obligations. -/
 theorem evalExpr_unop_val {a : Expr} {h₁ : Heap} {v : Val} (op : String)
-    (ha : evalExpr ctx k h ρ a = (h₁, .val v)) :
+    (ha : evalExpr ctx k h ρ a = (h₁, .val v)) (hop : op ≠ "!" := by decide) :
     evalExpr ctx (k+1) h ρ (.unop op a) = (h₁, applyUnop ctx.dialect op v) := by
-  simp [evalExpr, ha]
+  simp [evalExpr, ha, hop]
 
 /-- Value-passing form for `binop` at a **strict** operator. Note the heap threads
 left-to-right; this lemma is where that evaluation order is pinned.
@@ -293,19 +293,23 @@ theorem evalExpr_binop_val {a b : Expr} {h₁ h₂ : Heap} {x y : Val} (op : Str
 /-- `&&` does not evaluate its right operand once the left is falsy, and yields the
 **left operand itself** under Python value semantics (`0 and 5` is `0`, not `False`).
 Only C-like dialects collapse it to a boolean. -/
-theorem evalExpr_and_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = false) :
+theorem evalExpr_and_short {a b : Expr} {h₁ ht : Heap} {x : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x))
+    (hx : evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
     evalExpr ctx (k+1) h ρ (.binop "&&" a b)
-      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
+      = (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool false)) := by
+  simp [evalExpr, ha, hx, Val.truthy]
 
 /-- `||` does not evaluate its right operand once the left is truthy, and yields the
 **left operand itself** under Python value semantics (`5 or 0` is `5`, not `True`). -/
-theorem evalExpr_or_short {a b : Expr} {h₁ : Heap} {x : Val}
-    (ha : evalExpr ctx k h ρ a = (h₁, .val x)) (hx : x.truthy = true) :
+theorem evalExpr_or_short {a b : Expr} {h₁ ht : Heap} {x : Val}
+    (ha : evalExpr ctx k h ρ a = (h₁, .val x))
+    (hx : evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
     evalExpr ctx (k+1) h ρ (.binop "||" a b)
-      = (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
-  cases hd : ctx.dialect <;> simp [evalExpr, ha, hx, hd, Dialect.boolOpsAreValues]
+      = (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool true)) := by
+  simp [evalExpr, ha, hx, Val.truthy]
 
 /-- A non-value in the left operand short-circuits and is propagated unchanged. This is
 what stops a hole in one operand from being silently absorbed. -/
@@ -314,15 +318,21 @@ theorem evalExpr_binop_stuck {a b : Expr} {h₁ : Heap} {r : EResult} (op : Stri
     evalExpr ctx (k+1) h ρ (.binop op a b) = (h₁, r) := by
   cases r <;> simp [evalExpr, ha] <;> exact absurd rfl (hr _)
 
-theorem evalExpr_cond_true {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
-    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ t := by
-  simp [evalExpr, hc, hv]
+theorem evalExpr_cond_true {c t e : Expr} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
+    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k ht ρ t := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
 
-theorem evalExpr_cond_false {c t e : Expr} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k h₁ ρ e := by
-  simp [evalExpr, hc, hv]
+
+theorem evalExpr_cond_false {c t e : Expr} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    evalExpr ctx (k+1) h ρ (.cond c t e) = evalExpr ctx k ht ρ e := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
 
 theorem evalList_nil :
     evalList ctx (k+1) h ρ [] = (h, .inr ([], [])) := rfl
@@ -391,33 +401,44 @@ theorem execStmt_seq_ret {a b : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
     (ha : execStmt ctx k h ρ a = (h₁, .ret v ρ')) :
     execStmt ctx (k+1) h ρ (.seq a b) = (h₁, .ret v ρ') := by simp [execStmt, ha]
 
-theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true) :
-    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ t := by
-  simp [execStmt, hc, hv]
+theorem execStmt_ifte_true {c : Expr} {t e : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true))) :
+    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k ht ρ t := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
 
-theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k h₁ ρ e := by
-  simp [execStmt, hc, hv]
+
+theorem execStmt_ifte_false {c : Expr} {t e : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    execStmt ctx (k+1) h ρ (.ifte c t e) = execStmt ctx k ht ρ e := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
 
 theorem execStmt_tryCatch_exn {b : Stmt} {x : String} {hd : Stmt} {h₁ : Heap} {v : Val} {ρ' : Env}
     (hb : execStmt ctx k h ρ b = (h₁, .exn v ρ')) :
     execStmt ctx (k+1) h ρ (.tryCatch b x hd) = execStmt ctx k h₁ (ρ'.set x v) hd := by
   simp [execStmt, hb]
 
-theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ : Heap} {v : Val}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = false) :
-    execStmt ctx (k+1) h ρ (.loop c body) = (h₁, .normal ρ) := by
-  simp [execStmt, hc, hv]
+theorem execStmt_loop_false {c : Expr} {body : Stmt} {h₁ ht : Heap} {v : Val}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool false))) :
+    execStmt ctx (k+1) h ρ (.loop c body) = (ht, .normal ρ) := by
+  simp [evalExpr, execStmt, hc, hv, Val.truthy]
+
 
 /-- One turn of the loop, when the body finishes normally. Unrolling a loop by hand is
 exactly this lemma applied `n` times. -/
-theorem execStmt_loop_step {c : Expr} {body : Stmt} {h₁ h₂ : Heap} {v : Val} {ρ' : Env}
-    (hc : evalExpr ctx k h ρ c = (h₁, .val v)) (hv : v.truthy = true)
-    (hb : execStmt ctx k h₁ ρ body = (h₂, .normal ρ')) :
+theorem execStmt_loop_step {c : Expr} {body : Stmt} {h₁ ht h₂ : Heap} {v : Val} {ρ' : Env}
+    (hc : evalExpr ctx k h ρ c = (h₁, .val v))
+    (hv : evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] [])
+      = (ht, .val (.bool true)))
+    (hb : execStmt ctx k ht ρ body = (h₂, .normal ρ')) :
     execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
-  simp [execStmt, hc, hv, hb]
+  simp [execStmt, hc, hv, hb, Val.truthy]
 
 theorem execFor_nil (x : String) (body : Stmt) :
     execFor ctx (k+1) h ρ x [] body = (h, .normal ρ) := rfl
@@ -517,17 +538,20 @@ obligation at the end of this file. -/
 
 A COMPARISON is not in it. `==`, `!=` and the order operators dispatch to `__eq__`/`__lt__`/…
 when the left operand is a Python instance whose class defines them (`cmpDunderTarget`),
-and that is a call — it can touch the heap and it can run out of fuel. `isCmpOp op = false`
+and that is a call — it can touch the heap and it can run out of fuel. Truth tests
+(`!`, `&&`, `||`, and conditionals) can also call Python slots; arbitrary variables may
+hold such objects, so those forms are excluded from this syntactic fragment.
+`isCmpOp op = false`
 is the syntactic side condition that keeps `binop` call-free; a comparison on operands known
 to be scalars is handled by `evalExpr_binop_val` with its `binopNeedsHeap` premise instead. -/
 inductive PureE : Expr → Prop where
   | lit   (l : Lit)      : PureE (.lit l)
   | name  (x : String)   : PureE (.name x)
   | fnref (f : String)   : PureE (.fnref f)
-  | unop  {a} (op : String) : PureE a → PureE (.unop op a)
-  | binop {a b} (op : String) (hop : isCmpOp op = false) :
+  | unop  {a} (op : String) (hop : op ≠ "!") : PureE a → PureE (.unop op a)
+  | binop {a b} (op : String) (hop : isCmpOp op = false)
+      (hand : op ≠ "&&") (hor : op ≠ "||") :
       PureE a → PureE b → PureE (.binop op a b)
-  | cond  {c t e} : PureE c → PureE t → PureE e → PureE (.cond c t e)
 
 /-- Evaluation depth: the fuel needed to evaluate a pure expression. -/
 def edepth : Expr → Nat
@@ -564,33 +588,23 @@ theorem evalExpr_pure_fuel_indep (ctx : Ctx) :
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by simp [edepth] at h₁; omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by simp [edepth] at h₂; omega⟩
       rfl
-  | unop op _ ih =>
+  | unop op hop _ ih =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, ih (k₁ := m₁) (k₂ := m₂) (h := h) (ρ := ρ) (by omega) (by omega)]
-  | binop op hop _ _ iha ihb =>
+      simp only [evalExpr, show (op == "!") = false from beq_eq_false_iff_ne.mpr hop, Bool.false_eq_true, if_false, ih (k₁ := m₁) (k₂ := m₂) (h := h) (ρ := ρ) (by omega) (by omega)]
+  | binop op hop hand hor _ _ iha ihb =>
       intro k₁ k₂ h ρ h₁ h₂
       simp only [edepth] at h₁ h₂
       obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
       obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, iha (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
+      simp only [evalExpr, show (op == "&&") = false from beq_eq_false_iff_ne.mpr hand, show (op == "||") = false from beq_eq_false_iff_ne.mpr hor, Bool.false_or, Bool.false_eq_true, if_false, iha (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
       rcases hA : evalExpr ctx m₂ h ρ _ with ⟨hA', rA⟩
       -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
       cases rA <;>
         simp only [ihb (h := hA') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega),
                    binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true, if_false]
-  | cond _ _ _ ihc iht ihe =>
-      intro k₁ k₂ h ρ h₁ h₂
-      simp only [edepth] at h₁ h₂
-      obtain ⟨m₁, rfl⟩ : ∃ m, k₁ = m + 1 := ⟨k₁ - 1, by omega⟩
-      obtain ⟨m₂, rfl⟩ : ∃ m, k₂ = m + 1 := ⟨k₂ - 1, by omega⟩
-      simp only [evalExpr, ihc (h := h) (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
-      rcases hC : evalExpr ctx m₂ h ρ _ with ⟨hC', rC⟩
-      cases rC <;>
-        simp only [iht (h := hC') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega),
-                   ihe (h := hC') (ρ := ρ) (k₁ := m₁) (k₂ := m₂) (by omega) (by omega)]
 
 /-- Monotonicity on the pure fragment, the form usually wanted. -/
 theorem evalExpr_pure_fuel_mono (ctx : Ctx) {e : Expr} (pe : PureE e) {k₁ k₂ : Nat}
@@ -617,7 +631,7 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           simp only [evalExpr]
           repeat' (first | rfl | split)
   | fnref f => intro k h ρ; cases k <;> rfl
-  | unop op _ ih =>
+  | unop op hop _ ih =>
       intro k h ρ; cases k with
       | zero => rfl
       | succ m =>
@@ -625,8 +639,8 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
         rcases hA : evalExpr ctx m h ρ _ with ⟨hA', rA⟩
         rw [hA] at ha; simp only at ha; subst ha
         simp only [evalExpr, hA]
-        cases rA <;> rfl
-  | binop op hop _ _ iha ihb =>
+        cases rA <;> simp [hop]
+  | binop op hop hand hor _ _ iha ihb =>
       intro k h ρ; cases k with
       | zero => rfl
       | succ m =>
@@ -639,38 +653,12 @@ theorem evalExpr_pure_heap_inert (ctx : Ctx) :
           rcases hB : evalExpr ctx m hA' ρ _ with ⟨hB', rB⟩
           rw [hB] at hb; simp only at hb; subst hb
           -- `hop` rules the heap path (and the dunder call inside it) out syntactically.
-          simp only [evalExpr, hA, hB, binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true,
-                     if_false]
-          -- three cases: the two short-circuit exits (heap untouched by construction)
-          -- and the strict path (heap untouched by both induction hypotheses).
-          by_cases hs1 : (op == "&&" && !x.truthy) = true
-          · simp [hs1]
-          · by_cases hs2 : (op == "||" && x.truthy) = true
-            · simp [hs1, hs2]
-            · simp only [hs1, hs2, Bool.false_eq_true, if_false]
-              -- `==`/`!=` on a ref now branches through `Val.eqPy`. BOTH branches leave the
-              -- heap alone, so heap-inertness still holds; the branch just has to be taken.
-              -- `==`/`!=` on a ref branches through `Val.eqPy`. Both branches leave the
-              -- heap alone, so inertness still holds -- but `split` introduces the heap as
-              -- a fresh variable equated to `hB'` by a pair equation, so the branch has to
-              -- be taken AND that equation consumed.
-              cases rB <;> ((repeat' split) <;> (first | rfl | simp_all))
+          simp only [evalExpr, hA, hB,
+            show (op == "&&") = false from beq_eq_false_iff_ne.mpr hand,
+            show (op == "||") = false from beq_eq_false_iff_ne.mpr hor,
+            Bool.false_or, binopNeedsHeap_arith _ _ _ hop, Bool.false_eq_true, if_false]
+          cases rB <;> rfl
         | _ => simp only [evalExpr, hA]
-  | cond _ _ _ ihc iht ihe =>
-      intro k h ρ; cases k with
-      | zero => rfl
-      | succ m =>
-        have hc := ihc (k := m) (h := h) (ρ := ρ)
-        rcases hC : evalExpr ctx m h ρ _ with ⟨hC', rC⟩
-        rw [hC] at hc; simp only at hc; subst hc
-        simp only [evalExpr, hC]
-        cases rC with
-        | val v =>
-          by_cases hv : v.truthy
-          · simpa [hv] using iht (k := m) (h := hC') (ρ := ρ)
-          · simp only [hv, Bool.false_eq_true, if_false]
-            exact ihe (k := m) (h := hC') (ρ := ρ)
-        | _ => rfl
 
 /-! ## 3b. A loop rule, and a heap representation predicate
 
@@ -709,10 +697,11 @@ postcondition must hold. -/
 theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
     (I : Nat → Heap → Env → Prop) (Q : Heap → Env → Prop)
     (hstep : ∀ m h ρ k, B ≤ k → I m h ρ →
-      ∃ h₁ v, evalExpr ctx k h ρ c = (h₁, .val v) ∧
-        (v.truthy = true →
-          ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k h₁ ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
-        (v.truthy = false → Q h₁ ρ)) :
+      ∃ h₁ v ht b, evalExpr ctx k h ρ c = (h₁, .val v) ∧
+        evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true →
+          ∃ m' h₂ ρ', m' < m ∧ execStmt ctx k ht ρ body = (h₂, .normal ρ') ∧ I m' h₂ ρ') ∧
+        (b = false → Q ht ρ)) :
     ∀ k m h ρ, I m h ρ → B + m + 1 ≤ k →
       ∃ h' ρ', execStmt ctx k h ρ (.loop c body) = (h', .normal ρ') ∧ Q h' ρ' := by
   intro k
@@ -720,15 +709,15 @@ theorem execStmt_loop_rule (ctx : Ctx) (c : Expr) (body : Stmt) (B : Nat)
   | zero => intro m h ρ _ hk; omega
   | succ k ih =>
     intro m h ρ hI hk
-    obtain ⟨h₁, v, hc, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
-    cases hv : v.truthy with
+    obtain ⟨h₁, v, ht, b, hc, htruth, htrue, hfalse⟩ := hstep m h ρ k (by omega) hI
+    cases hv : b with
     | false =>
-      refine ⟨h₁, ρ, ?_, hfalse hv⟩
-      simp [execStmt, hc, hv]
+      refine ⟨ht, ρ, ?_, hfalse hv⟩
+      simp [execStmt, hc, htruth, Val.truthy, hv]
     | true =>
       obtain ⟨m', h₂, ρ', hm', hb, hI'⟩ := htrue hv
       have hstep' : execStmt ctx (k+1) h ρ (.loop c body) = execStmt ctx k h₂ ρ' (.loop c body) := by
-        simp [execStmt, hc, hv, hb]
+        simp [execStmt, hc, htruth, Val.truthy, hv, hb]
       rw [hstep']
       exact ih m' h₂ ρ' hI' (by omega)
 
@@ -1517,13 +1506,14 @@ abbrev ctxC : Ctx := ctxOf CMathProgram
 theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     (hfitN : Fits32 (triN (n.toNat + 1))) :
     ∀ m h ρ k, 4 ≤ k → sumtoInv n m h ρ →
-      ∃ h₁ v, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
-          execStmt ctxC k h₁ ρ
+      ∃ h₁ v ht b, evalExpr ctxC k h ρ (.binop "<=" (.name "i") (.name "n")) = (h₁, .val v) ∧
+        evalTruthWith ctxC h₁ v (fun fn self => applyFunc ctxC k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxC k ht ρ
             (.seq (.assign "acc" (.binop "+" (.name "acc") (.name "i")))
                   (.assign "i" (.binop "+" (.name "i") (.lit (.int 1)))))
             = (h₂, .normal ρ') ∧ sumtoInv n m' h₂ ρ') ∧
-        (v.truthy = false → sumtoPost n h₁ ρ) := by
+        (b = false → sumtoPost n ht ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, d, hdm, hnv, hiv, haccv, hga, hgi⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 4 := ⟨k - 4, by omega⟩
@@ -1532,7 +1522,7 @@ theorem sumto_step (n : Int) (hn : 0 ≤ n) (hb : n ≤ 65535)
     rw [evalExpr_binop_val ctxC (k1+3) [] ρ "<=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxC (k1+2) [] ρ "i" hiv) (evalExpr_name ctxC (k1+2) [] ρ "n" hnv)]
     rfl
-  refine ⟨[], .bool (decide ((d:Int) ≤ n)), hcond, ?_, ?_⟩
+  refine ⟨[], .bool (decide ((d:Int) ≤ n)), [], decide ((d:Int) ≤ n), hcond, by simp, ?_, ?_⟩
   · intro hv
     have hdn : (d:Int) ≤ n := by
       simpa [Val.truthy] using hv
@@ -1673,14 +1663,15 @@ def gcdPost (g : Nat) (h : Heap) (ρ : Env) : Prop :=
 
 theorem gcdish_step (g : Nat) :
     ∀ m h ρ k, 5 ≤ k → gcdInv g m h ρ →
-      ∃ h₁ v, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
-        (v.truthy = true → ∃ m' h₂ ρ', m' < m ∧
-          execStmt ctxS k h₁ ρ
+      ∃ h₁ v ht b, evalExpr ctxS k h ρ (.binop "!=" (.name "b") (.lit (.int 0))) = (h₁, .val v) ∧
+        evalTruthWith ctxS h₁ v (fun fn self => applyFunc ctxS k h₁ fn (some self) [] []) = (ht, .val (.bool b)) ∧
+        (b = true → ∃ m' h₂ ρ', m' < m ∧
+          execStmt ctxS k ht ρ
             (.seq (.assign "t" (.name "b"))
               (.seq (.assign "b" (.binop "%" (.name "a") (.name "b")))
                     (.assign "a" (.name "t"))))
             = (h₂, .normal ρ') ∧ gcdInv g m' h₂ ρ') ∧
-        (v.truthy = false → gcdPost g h₁ ρ) := by
+        (b = false → gcdPost g ht ρ) := by
   intro m h ρ k hk hI
   obtain ⟨rfl, x, y, hx, hy, hym, hgcd, hav, hbv, hga, hgb, hgt⟩ := hI
   obtain ⟨k1, rfl⟩ : ∃ q, k = q + 5 := ⟨k - 5, by omega⟩
@@ -1689,7 +1680,7 @@ theorem gcdish_step (g : Nat) :
     rw [evalExpr_binop_val ctxS (k1+4) [] ρ "!=" (by decide) (by decide) (by simp [binopNeedsHeap, Val.kind])
           (evalExpr_name ctxS (k1+3) [] ρ "b" hbv) (evalExpr_lit_int ctxS (k1+3) [] ρ 0)]
     rfl
-  refine ⟨[], .bool (!(y == 0)), hcond, ?_, ?_⟩
+  refine ⟨[], .bool (!(y == 0)), [], !(y == 0), hcond, by simp, ?_, ?_⟩
   · intro hv
     have hy0 : y ≠ 0 := by
       simp [Val.truthy] at hv; omega

@@ -43,9 +43,26 @@ Three derived functions:
 * `Val.unbuiltin` — strips one layer of builtin-base wrapping. Non-recursive, so the
   functions that use it stay plain matchers that reduce by `rfl`.
 
-Python `any`/`all` use a Core consumer that dispatches declared truth methods and reads
-boxed container contents. `Val.truthy` itself does not execute those methods; its use
-elsewhere does not establish complete Python truth-protocol coverage.
+Python conditions, negation, Boolean operators, and truth conversion of comparison
+results use `evalTruthWith`. It reads native container payloads and runs declared
+`__bool__`/`__len__` methods through the ordinary fuel-bounded interpreter, carrying
+heap changes and exceptions into the continuation. `any`/`all` use the same private
+truth protocol. Unknown object protocols remain `truth:unresolved-protocol`; a length
+requiring an unrepresented `__index__` protocol is `length:index-protocol`, and a
+length above the portable signed 32-bit bound is `truth:length-platform`.
+
+The Python renderer distinguishes a branch's truth test from a materialized Boolean
+expression. It preserves a previously computed answer within one short-circuit
+expression, including across lifted statement preludes and suspended frames. An
+independent later test runs the protocol again. Auxiliary truth helpers are excluded
+from the source-function population, and source operations remain in `analysisBody`.
+Compiler-created temporary expressions can carry `pythonTruthCache`, an expression
+that reads an internal state: `0` is untested, `1` is false, and `2` is true. The
+exporter assigns it on every selected branch; generator lowering moves its binding
+into the frame alongside other locals. The renderer consumes it only within the
+original Boolean expression. Source-level variable reads do not inherit the cache.
+The pure-expression refinement fragment excludes operations that may invoke a truth
+method; branch and loop rules carry the truth test's resulting heap explicitly.
 
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring

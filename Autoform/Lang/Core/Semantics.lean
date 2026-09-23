@@ -1588,7 +1588,12 @@ return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
 `__bool__` a `bool`; and `bool()` through `__len__` is the length's truthiness. -/
 @[simp] def builtinDunderResult (f m : String) (v : Val) : EResult :=
   match f, v with
-  | "len",  .int i  => if i < 0 then .exn (.str "ValueError") else .val v
+  | "len",  .int i  => if i < 0 then .exn (.str "ValueError")
+                       else if i > 2147483647 then .hole "truth:length-platform"
+                       else .val v
+  | "len", .bool b => .val (.int (if b then 1 else 0))
+  | "len", .ref _ | "len", .bobj _ _ | "len", .clsClos _ _ =>
+      .hole "length:index-protocol"
   | "len",  _       => .exn (.str "TypeError")
   | "hash", .int _  => .val v
   | "hash", _       => .exn (.str "TypeError")
@@ -1602,6 +1607,8 @@ return a non-negative `int`, `__hash__` an `int`, `__str__`/`__repr__` a `str`,
                         else if i > 2147483647 then .hole "truth:length-platform"
                         else .val (.bool (i != 0))
                       else .exn (.str "TypeError")
+  | "bool", .ref _ | "bool", .bobj _ _ | "bool", .clsClos _ _ =>
+      if m == "__len__" then .hole "length:index-protocol" else .exn (.str "TypeError")
   | "bool", _       => .exn (.str "TypeError")
   | _, _            => .val v
 
@@ -1612,6 +1619,68 @@ def checkedBuiltinDunderResult (ctx : Ctx) (h : Heap) (f m : String) (v : Val) :
     else if Iteration.unknownResultProtocol h v then .hole "iterator:result-protocol"
     else .exn (.str "TypeError")
   else builtinDunderResult (if f == "<python-bool>" then "bool" else f) m v
+
+/-- Truth testing can run Python code. The caller supplies a smaller-fuel function
+application, so this helper preserves structural recursion and threads every effect.
+The private builtin name cannot be shadowed by a source-level `bool` binding. -/
+def evalTruthWith (ctx : Ctx) (h : Heap) (value : Val)
+    (apply : Func → Val → Heap × EResult) : Heap × EResult :=
+  if ctx.dialect == .python then
+    match builtinDunderTarget ctx h "<python-bool>" [value] with
+    | some (receiver, cls, method) =>
+        match ctx.resolveMethod cls method with
+        | some fn =>
+            match apply fn receiver with
+            | (h', .val v) => (h', builtinDunderResult "bool" method v)
+            | result => result
+        | none => (h, .hole "truth:dunder-unresolved")
+    | none => (h, Iteration.truthValue h value)
+  else (h, .val (.bool value.truthy))
+
+@[simp] theorem evalTruthWith_bool (ctx : Ctx) (h : Heap) (b : Bool) (apply) :
+    evalTruthWith ctx h (.bool b) apply = (h, .val (.bool b)) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer, Val.truthy]
+
+@[simp] theorem evalTruthWith_int (ctx : Ctx) (h : Heap) (i : Int) (apply) :
+    evalTruthWith ctx h (.int i) apply = (h, .val (.bool ((.int i : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_str (ctx : Ctx) (h : Heap) (s : String) (apply) :
+    evalTruthWith ctx h (.str s) apply = (h, .val (.bool ((.str s : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_list (ctx : Ctx) (h : Heap) (xs : List Val) (apply) :
+    evalTruthWith ctx h (.list xs) apply = (h, .val (.bool ((.list xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_tuple (ctx : Ctx) (h : Heap) (xs : List Val) (apply) :
+    evalTruthWith ctx h (.tuple xs) apply = (h, .val (.bool ((.tuple xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_dict (ctx : Ctx) (h : Heap) (xs : List (Val × Val)) (apply) :
+    evalTruthWith ctx h (.dict xs) apply = (h, .val (.bool ((.dict xs : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_float (ctx : Ctx) (h : Heap) (f : Fl) (apply) :
+    evalTruthWith ctx h (.float f) apply = (h, .val (.bool ((.float f : Val).truthy))) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer]
+
+@[simp] theorem evalTruthWith_unit (ctx : Ctx) (h : Heap) (apply) :
+    evalTruthWith ctx h .unit apply = (h, .val (.bool false)) := by
+  simp [evalTruthWith, builtinDunderTarget, Iteration.truthValue, Iteration.pureTruth,
+    Iteration.truthConsumer, Val.truthy]
+
+@[simp] theorem evalTruthWith_not_python (ctx : Ctx) (h : Heap) (v : Val) (apply)
+    (hd : ctx.dialect ≠ .python) :
+    evalTruthWith ctx h v apply = (h, .val (.bool v.truthy)) := by
+  simp [evalTruthWith, hd]
 
 mutual
 
@@ -1652,26 +1721,26 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   | _+1, h, _, .dstarred _    => (h, .hole "op:starred-outside-call")
   | n+1, h, ρ, .unop op a =>
       match evalExpr ctx n h ρ a with
-      | (h₁, .val v) => (h₁, applyUnop ctx.dialect op v)
+      | (h₁, .val v) =>
+          if op == "!" then
+            match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+            | (h₂, .val b) => (h₂, .val (.bool (!b.truthy)))
+            | result => result
+          else (h₁, applyUnop ctx.dialect op v)
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .binop op a b =>
       match evalExpr ctx n h ρ a with
       | (h₁, .val x) =>
-        -- `&&` and `||` must NOT evaluate their right operand when the left already
-        -- decides the answer. Eager evaluation was a genuine soundness bug, not a
-        -- conservative approximation: `scripts/differential.py` caught
-        -- `safemod(-11, 0)` returning 0 in CPython while Core raised ZeroDivisionError,
-        -- because `b != 0 and a % b == 0` evaluated the division anyway.
-        -- `and`/`or` are VALUE operators in Python and JavaScript: `a and b` is `a`
-        -- when `a` is falsy and `b` otherwise, so `pick(0, 5)` is `5`, not `True`.
-        -- Returning a bool was wrong for every Python program that uses them in
-        -- value position; it survived because cachetools only uses them in
-        -- conditions, where truthiness makes the two indistinguishable.
-        -- C is the opposite: `&&`/`||` genuinely yield 0/1.
-        if op == "&&" && !x.truthy then
-          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool false))
-        else if op == "||" && x.truthy then
-          (h₁, .val (if ctx.dialect.boolOpsAreValues then x else .bool true))
+        if op == "&&" || op == "||" then
+          match evalTruthWith ctx h₁ x (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) =>
+              if (op == "&&" && !test.truthy) || (op == "||" && test.truthy) then
+                (ht, .val (if ctx.dialect.boolOpsAreValues then x else .bool test.truthy))
+              else
+                match evalExpr ctx n ht ρ b with
+                | (h₂, .val y) => (h₂, applyBinop ctx.dialect op x y)
+                | result => result
+          | result => result
         else
           match evalExpr ctx n h₁ ρ b with
           | (h₂, .val y) =>
@@ -1689,7 +1758,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                 match ctx.resolveMethod cls m with
                 | some fn =>
                   match applyFunc ctx n h₂ fn (some (.ref r)) [y] [] with
-                  | (h₃, .val v) => (h₃, .val (if neg then .bool (!v.truthy) else v))
+                  | (h₃, .val v) =>
+                      if neg then
+                        match evalTruthWith ctx h₃ v (fun fn self => applyFunc ctx n h₃ fn (some self) [] []) with
+                        | (h₄, .val test) => (h₄, .val (.bool (!test.truthy)))
+                        | result => result
+                      else (h₃, .val v)
                   | (h₃, e)      => (h₃, e)
                 | none => (h₂, .hole s!"binop:{op}:dunder-unresolved")
               | none =>
@@ -1703,7 +1777,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, r) => (h₁, r)
   | n+1, h, ρ, .cond c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v) => if v.truthy then evalExpr ctx n h₁ ρ t else evalExpr ctx n h₁ ρ e
+      | (h₁, .val v) =>
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) => if test.truthy then evalExpr ctx n ht ρ t else evalExpr ctx n ht ρ e
+          | result => result
       | (h₁, r)      => (h₁, r)
   | n+1, h, ρ, .isOp neg a b =>
       match evalExpr ctx n h ρ a with
@@ -1732,7 +1809,10 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             match ctx.dunderOn h₂ c "__contains__" with
             | some (r, fn) =>
                 match applyFunc ctx n h₂ fn (some (.ref r)) [x] [] with
-                | (h₃, .val rv) => (h₃, .val (.bool (if neg then !rv.truthy else rv.truthy)))
+                | (h₃, .val rv) =>
+                    match evalTruthWith ctx h₃ rv (fun fn self => applyFunc ctx n h₃ fn (some self) [] []) with
+                    | (h₄, .val test) => (h₄, .val (.bool (if neg then !test.truthy else test.truthy)))
+                    | result => result
                 | (h₃, res)     => (h₃, res)
             | none =>
             match valIn x (c.unbox h₂) with
@@ -2805,10 +2885,14 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
       | (h₁, r)          => (h₁, r)
   | n+1, h, ρ, .ifte c t e =>
       match evalExpr ctx n h ρ c with
-      | (h₁, .val v)     => if v.truthy then execStmt ctx n h₁ ρ t
-                            else execStmt ctx n h₁ ρ e
-      | (h₁, .exn v)     => (h₁, .exn v ρ)
-      | (h₁, .hole l)    => (h₁, .hole l)
+      | (h₁, .val v) =>
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) => if test.truthy then execStmt ctx n ht ρ t else execStmt ctx n ht ρ e
+          | (ht, .exn ex) => (ht, .exn ex ρ)
+          | (ht, .hole l) => (ht, .hole l)
+          | (ht, .outOfFuel) => (ht, .outOfFuel)
+      | (h₁, .exn v) => (h₁, .exn v ρ)
+      | (h₁, .hole l) => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)
   | n+1, h, ρ, .tryFinally body fin =>
       match execStmt ctx n h ρ body with
@@ -2830,13 +2914,18 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
   | n+1, h, ρ, .loop c body =>
       match evalExpr ctx n h ρ c with
       | (h₁, .val v) =>
-          if v.truthy then
-            match execStmt ctx n h₁ ρ body with
-            | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
-            | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
-            | (h₂, .brk ρ')    => (h₂, .normal ρ')
-            | (h₂, r)          => (h₂, r)
-          else (h₁, .normal ρ)
+          match evalTruthWith ctx h₁ v (fun fn self => applyFunc ctx n h₁ fn (some self) [] []) with
+          | (ht, .val test) =>
+              if test.truthy then
+                match execStmt ctx n ht ρ body with
+                | (h₂, .normal ρ') => execStmt ctx n h₂ ρ' (.loop c body)
+                | (h₂, .cont ρ')   => execStmt ctx n h₂ ρ' (.loop c body)
+                | (h₂, .brk ρ')    => (h₂, .normal ρ')
+                | (h₂, r)          => (h₂, r)
+              else (ht, .normal ρ)
+          | (ht, .exn ex) => (ht, .exn ex ρ)
+          | (ht, .hole l) => (ht, .hole l)
+          | (ht, .outOfFuel) => (ht, .outOfFuel)
       | (h₁, .exn v)     => (h₁, .exn v ρ)
       | (h₁, .hole l)    => (h₁, .hole l)
       | (h₁, .outOfFuel) => (h₁, .outOfFuel)

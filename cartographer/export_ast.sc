@@ -9533,9 +9533,33 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   // Preserve operand values across a later operand's lifted effects. Merely
   // concatenating preludes makes `a + (a = b)` read the new a twice in JS.
   // Logical operators also have to keep the RHS prelude on its selected path.
+  def pythonLogicalValues(op: String, lhs: (List[ujson.Obj], ujson.Obj),
+                          rhs: (List[ujson.Obj], ujson.Obj)): (List[ujson.Obj], ujson.Obj) = {
+    val (pa, ae) = lhs; val (pb, be) = rhs
+    val saved = freshExprVTemp(); val result = freshExprVTemp(); val state = freshExprVTemp()
+    val left = ujson.Obj("k" -> "name", "v" -> saved)
+    val prefix = pa :+ ujson.Obj("k" -> "assign", "x" -> saved, "e" -> ae)
+    def assign(e: ujson.Obj) = ujson.Obj("k" -> "assign", "x" -> result, "e" -> e)
+    def setState(e: ujson.Value) = ujson.Obj("k" -> "assign", "x" -> state, "e" -> e)
+    // 0 = untested, 1 = false, 2 = true. A short circuit reuses the answer
+    // already computed for that operand, even if __bool__ mutated the object.
+    val evaluated = seqOf(pb ++ List(assign(be), setState(
+      be.obj.getOrElse("pythonTruthCache", ujson.Obj("k" -> "int", "v" -> 0)))))
+    val skipped = seqOf(List(assign(left), setState(
+      ujson.Obj("k" -> "int", "v" -> (if (op == "&&") 1 else 2)))))
+    val condition = ujson.Obj("k" -> "name", "v" -> saved)
+    ae.obj.get("pythonTruthCache").foreach(v => condition("pythonTruthCache") = v)
+    val branch = ujson.Obj("k" -> "ifte", "c" -> condition,
+      "t" -> (if (op == "&&") evaluated else skipped),
+      "e" -> (if (op == "&&") skipped else evaluated))
+    (prefix :+ branch, ujson.Obj("k" -> "name", "v" -> result,
+      "pythonTruthCache" -> ujson.Obj("k" -> "name", "v" -> state)))
+  }
+
   def binopValue(op: String, a: AstNode, b: AstNode): (List[ujson.Obj], ujson.Obj) = {
     val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
-    if (pb.isEmpty) (pa, typedBinop(op, a, b, ae, be))
+    if (pyFile && (op == "&&" || op == "||")) pythonLogicalValues(op, (pa, ae), (pb, be))
+    else if (pb.isEmpty) (pa, typedBinop(op, a, b, ae, be))
     else {
       val saved = freshExprVTemp()
       val left = ujson.Obj("k" -> "name", "v" -> saved)
@@ -9543,9 +9567,6 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       if (op == "&&" || op == "||") {
         val result = freshExprVTemp()
         def assign(e: ujson.Obj) = ujson.Obj("k" -> "assign", "x" -> result, "e" -> e)
-        // Core already owns boolean-vs-operand return semantics for each dialect.
-        // A known boolean on the evaluated path avoids testing the old operand's
-        // truthiness again after RHS effects might have changed its object.
         val evaluated = seqOf(pb :+ assign(typedBinop(op, a, b,
           ujson.Obj("k" -> "bool", "v" -> (op == "&&")), be)))
         val skipped = assign(typedBinop(op, a, b, left, ujson.Obj("k" -> "unit")))
@@ -9653,6 +9674,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           binopValue(op, a, b)
         case None => (Nil, hole("op:shiftRight:unknown-signedness"))
       }
+    case c: Call if pyFile && Set("<operator>.logicalAnd", "<operator>.logicalOr").contains(callName(c)) &&
+                    kidsOf(c).size >= 2 =>
+      kidsOf(c).map(exprV).reduceRight((lhs, rhs) => pythonLogicalValues(binops(callName(c)), lhs, rhs))
     case c: Call if binops.contains(callName(c)) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(callName(c))) =>
       val List(a, b) = kidsOf(c)
@@ -9868,10 +9892,22 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         (condPrelude, conditionalValue(c, ujson.Obj("k" -> "cond", "c" -> condE, "t" -> tE, "e" -> eE)))
       else {
         val tmp = freshExprVTemp()
-        val ifStmt = ujson.Obj("k" -> "ifte", "c" -> condE,
-          "t" -> seqOf(tPrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> tE)),
-          "e" -> seqOf(ePrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> eE)))
-        (condPrelude :+ ifStmt, conditionalValue(c, ujson.Obj("k" -> "name", "v" -> tmp)))
+        if (pyFile) {
+          val state = freshExprVTemp()
+          def branch(prelude: List[ujson.Obj], value: ujson.Obj) = seqOf(prelude ++ List(
+            ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> value),
+            ujson.Obj("k" -> "assign", "x" -> state, "e" -> value.obj.getOrElse(
+              "pythonTruthCache", ujson.Obj("k" -> "int", "v" -> 0)))))
+          val ifStmt = ujson.Obj("k" -> "ifte", "c" -> condE,
+            "t" -> branch(tPrelude, tE), "e" -> branch(ePrelude, eE))
+          (condPrelude :+ ifStmt, conditionalValue(c, ujson.Obj("k" -> "name", "v" -> tmp,
+            "pythonTruthCache" -> ujson.Obj("k" -> "name", "v" -> state))))
+        } else {
+          val ifStmt = ujson.Obj("k" -> "ifte", "c" -> condE,
+            "t" -> seqOf(tPrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> tE)),
+            "e" -> seqOf(ePrelude :+ ujson.Obj("k" -> "assign", "x" -> tmp, "e" -> eE)))
+          (condPrelude :+ ifStmt, conditionalValue(c, ujson.Obj("k" -> "name", "v" -> tmp)))
+        }
       }
     // `009-reduce-remaining-holes-4`: `(void)e`, `e` IMPURE -- `callExpr`'s own
     // cast-to-void handling keeps `e`'s effects by emitting `expr(e)` directly

@@ -121,7 +121,10 @@ class FrameCompiler:
     def expression(self, value):
         def rewrite(item):
             if item.get("k") == "name" and item["v"] in self.locals:
-                return node("mcall", recv=name("self"), m="__read_local__", args=[string(item["v"])])
+                result = node("mcall", recv=name("self"), m="__read_local__", args=[string(item["v"])])
+                if "pythonTruthCache" in item:
+                    result["pythonTruthCache"] = item["pythonTruthCache"]
+                return result
             if item.get("k") == "call" and item["f"] in self.locals:
                 return node("callV", f=self.expression(name(item["f"])), args=item["args"])
             if item.get("k") in ("yieldS", "yieldFromS"):

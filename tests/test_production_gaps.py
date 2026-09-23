@@ -597,7 +597,8 @@ class TestDunderDispatch:
         assert 'match ctx.dunderOn h₂ (.ref r) "__delitem__" with' in self.SEM
 
     def test_not_in_negates_the_methods_truthiness(self):
-        assert '(if neg then !rv.truthy else rv.truthy)' in self.SEM
+        assert 'evalTruthWith ctx h₃ rv' in self.SEM
+        assert '(if neg then !test.truthy else test.truthy)' in self.SEM
 
     def test_a_class_without_the_method_keeps_its_hole(self):
         """The fallbacks are the labels that existed before; nothing became a guess."""
@@ -645,13 +646,16 @@ class TestValueDunders:
     def test_not_equal_falls_back_to_the_negation_of_eq(self):
         assert 'if ctx.classDefines o.cls "__ne__" then some (r, o.cls, "__ne__", false)' in self.SEMANTICS
         assert 'else if ctx.classDefines o.cls "__eq__" then some (r, o.cls, "__eq__", true)' in self.SEMANTICS
-        assert '.val (if neg then .bool (!v.truthy) else v)' in self.SEMANTICS
+        assert 'evalTruthWith ctx h₃ v' in self.SEMANTICS
+        assert '.val (.bool (!test.truthy))' in self.SEMANTICS
 
     def test_bool_falls_back_to_len_and_the_answers_are_type_checked(self):
         assert 'if f == "bool" || f == "<python-bool>" then' in self.SEMANTICS
         assert '| none => pick "__len__"' in self.SEMANTICS
         # CPython: __len__ must be a non-negative int, __str__ a str, __bool__ a bool.
-        assert '| "len",  .int i  => if i < 0 then .exn (.str "ValueError") else .val v' in self.SEMANTICS
+        assert '| "len",  .int i  => if i < 0 then .exn (.str "ValueError")' in self.SEMANTICS
+        assert 'else if i > 2147483647 then .hole "truth:length-platform"' in self.SEMANTICS
+        assert '.hole "length:index-protocol"' in self.SEMANTICS
         assert '| "str",  _       => .exn (.str "TypeError")' in self.SEMANTICS
 
     def test_every_protocol_has_a_cpython_guard(self):

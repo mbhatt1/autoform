@@ -375,6 +375,19 @@ theorem allocBuiltin_ne_exn (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : L
   repeat' split at h
   all_goals cases h
 
+/-- Python truth testing propagates only represented exceptions from its slot call. -/
+theorem evalTruthWith_excSafe {ctx : Ctx} {h h' : Heap} {value ex : Val}
+    {apply : Func → Val → Heap × EResult}
+    (safe : ∀ fn self h₂ v, apply fn self = (h₂, .exn v) → ExcSafeIn ctx.excClasses v)
+    (hy : evalTruthWith ctx h value apply = (h', .exn ex)) : ExcSafeIn ctx.excClasses ex := by
+  unfold evalTruthWith at hy
+  repeat' split at hy
+  all_goals first
+    | (cases hy; done)
+    | exact (builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
+    | exact (Iteration.truthValue_ne_exn _ _ _ (Prod.mk.inj hy).2).elim
+    | exact safe _ _ _ _ hy
+
 /-! ## The simultaneous induction
 
 Mirrors `FuelMono.lean`'s `FuelStep`: one clause per interpreter function, all at fuel
@@ -428,6 +441,8 @@ set_option hygiene false in
 macro "exc_close" : tactic => `(tactic| first
   | (cases hy; done)
   | (cases hy; exact (excSafe_str (by decide)).weaken)
+  | exact evalTruthWith_excSafe (fun fn self h₂ ex he => ihF _ hd he) hy
+  | (cases hy; exact evalTruthWith_excSafe (fun fn self h₂ ex he => ihF _ hd he) (by assumption))
   | exact ihE _ hd hy
   | exact ihF _ hd hy
   | exact ihC _ hd hy

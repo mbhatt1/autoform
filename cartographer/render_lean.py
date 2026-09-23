@@ -21,6 +21,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import deep_json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from generator_lowering import lower_generators
+from python_truth_lowering import lower_truth_conditions
+from python_truth_values import lower_truth_values
 
 # Break a term across lines once its flat form would push past this column. Purely
 # cosmetic: the layout below is whitespace-insensitive because every term is
@@ -729,8 +731,11 @@ def _run_main():
     src, dst = sys.argv[1], sys.argv[2]
     module = sys.argv[3] if len(sys.argv) > 3 else "Translated"
     funcs = lower_generators(deep_json.load(src))
-    auxiliary = [helper for function in funcs for helper in function.get('generatorHelpers', [])]
     dialect = infer_dialect(funcs)
+    if dialect == '.python':
+        funcs = lower_truth_values(lower_truth_conditions(funcs))
+    auxiliary = [helper for function in funcs for kind in ('generatorHelpers', 'truthHelpers')
+                 for helper in function.get(kind, [])]
 
     out = [
         "import Autoform.Lang.Core.Semantics",
