@@ -331,3 +331,10 @@ process timeout. `tests/test_native_deadlines.py` checks a blocking native call
 through the CLI while reading an AST deeper than Python's recursion limit. The
 [validation report](../artifacts/interpreter-recovery/native-deadline-validation.json)
 records the focused checks and full Python suite.
+
+A fresh Cachetools export under the first object-lookup change still fails its
+existing `Cache.__init__` conformance theorem. Its class-value read of
+`Cache.getsizeof` reaches an unmodeled field branch. A separate diagnostic sample
+also reports inherited-attribute divergences; this has not completed a corpus
+re-land. The [diagnostic report](../artifacts/interpreter-recovery/cachetools-object-lookup-diagnostic.json)
+preserves the failing theorem, sample size, per-function divergences and input hashes.
