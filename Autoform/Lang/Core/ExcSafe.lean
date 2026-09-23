@@ -368,6 +368,15 @@ theorem jsContainerField_ne_exn (p : Payload) (f : String) {v : Val} :
   repeat' split at h
   all_goals cases h
 
+/-- Reading a modeled class callable either returns its value or names a gap. -/
+theorem readClassAttribute_ne_exn (ctx : Ctx) (owner : String)
+    (captured : List (String × Val)) (attr : String) {v : Val} :
+    ctx.readClassAttribute owner captured attr = .exn v → False := by
+  intro h
+  unfold Ctx.readClassAttribute at h
+  repeat' (first | split at h | dsimp only at h)
+  all_goals cases h
+
 theorem allocBuiltin_ne_exn (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val)
     {v : Val} : allocBuiltin ctx cls b vs = .exn v → False := by
   intro h
@@ -470,6 +479,7 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
+  | exact (readClassAttribute_ne_exn _ _ _ _ (Prod.mk.inj hy).2).elim
   | (cases hy; exact (listSetSlice_excSafe (by assumption)).weaken)
   | exact (builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
   | exact (checkedBuiltinDunderResult_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken

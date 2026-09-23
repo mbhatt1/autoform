@@ -355,3 +355,14 @@ records source comparisons, kernel observations, a full Lean build and a fresh f
 kernel audit. Its packaged pipeline completes with mutation and assurance gaps;
 constructor post-state and untested theorem subjects remain limitations. Inherited
 builtin descriptors on user subclasses and general attribute hooks remain open.
+
+Class values now expose their own translated callable attributes through exact
+qualified owners. Saved static methods, unbound methods, classmethods and captured
+local static methods pass the source and kernel probes. The
+[class-attribute validation](../artifacts/interpreter-recovery/class-attribute-validation.json)
+records the full Python suite, full Lean build, fresh full kernel audit, and main
+checkout verification. The unchanged stored `Cache.__init__` observations also
+replay and prove with this reader; the earlier failed corpus re-land has not been
+promoted. The packaged class-attribute pipeline still has mutation and assurance
+gaps. Inheritance, descriptor objects and captured unbound methods remain outside
+this validated change.

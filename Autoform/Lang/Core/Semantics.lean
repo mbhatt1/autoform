@@ -1237,6 +1237,31 @@ on `.` is safe here because the file part's dots are never the LAST segment. -/
 def Func.ownerClassValue (fn : Func) : Val :=
   .fn (String.mk (dropLastDotSegment fn.name.toList) ++ "<meta>")
 
+/-- Read an attribute through a Python class value, without binding an instance.
+
+The class marker retains the qualified owner, so method lookup is exact: a method
+on another class with the same short name cannot answer this read. A property read
+on the class returns its descriptor in Python, not the getter's result. Descriptor
+objects, stored class attributes and inherited attributes remain explicit holes;
+the legacy short-name namespace cannot identify arbitrary class values faithfully. -/
+def Ctx.readClassAttribute (ctx : Ctx) (owner : String)
+    (captured : List (String × Val)) (attr : String) : EResult :=
+  if ctx.dialect != .python || !strEndsWith owner "<meta>" then
+    .hole s!"field:{attr}:non-object"
+  else
+    let cls := classNameOfValue owner
+    if ctx.properties.any (fun p => p.1 == cls && p.2 == attr) then
+      .hole s!"class-attribute:{attr}:property-descriptor"
+    else
+      let qualified := String.mk (owner.toList.reverse.drop 6).reverse ++ "." ++ attr
+      match ctx.table.find? (·.1 == qualified) with
+      | some (_, fn) =>
+          if captured.isEmpty then .val (.fn fn.name)
+          else if fn.isMethod || fn.isClassMethod then
+            .hole s!"class-attribute:{attr}:captured-unbound-method"
+          else .val (.clos fn.name captured)
+      | none => .hole s!"class-attribute:{attr}:unresolved"
+
 /-- A Java method's qualified name carries its erased signature --
 `pkg.Cls.<init>:void(java.util.Map,boolean)` -- because the JVM overloads on it
 (JLS §8.4.9 overloading, §8.8 constructors). Core has no overloads and matches methods by
@@ -2124,6 +2149,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.str s)) =>
           if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.jsLength))
           else (h₁, .hole s!"field:{f}:non-object")
+      | (h₁, .val (.fn owner)) => (h₁, ctx.readClassAttribute owner [] f)
+      | (h₁, .val (.clsClos owner captured)) =>
+          (h₁, ctx.readClassAttribute owner captured f)
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form

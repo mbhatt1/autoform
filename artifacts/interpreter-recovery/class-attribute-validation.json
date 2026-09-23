@@ -1,0 +1,455 @@
+{
+  "base_revision": "6989cbf",
+  "workspace": "/private/tmp/autoform-class-attribute-work",
+  "scope": "Own-class callable attribute reads through qualified class values, including captured local static methods. Stacked on the independently validated bound-call implementation.",
+  "input_sha256": {
+    "Autoform/Lang/Core/Semantics.lean": "40beae86ae91209203f781d72fd6ca9887746ffbe0549d213228dff8452aec1e",
+    "Autoform/FuelMono.lean": "6152e03d535b74da2d8ac8676fe72f0b91615593e578b7ff833ba0dde8c753f3",
+    "cartographer/export_ast.sc": "7b82393e6e81d73826aca774a89107f06679158be668a5bc95d889880fb2c354",
+    "scripts/differential.py": "8b2ddbc28801dd6367e462bdf4ea4cddfac3b7f663c43b4e1b3141e2b1114951",
+    "examples/python_control/class_attributes.py": "d6d2b25c8c2458bbd0e2d0e7d1c46921dac32cb02ba645647de61978c0190d78",
+    "tests/test_source_class_attributes.py": "c635fda2b46fd81dff21f963802a56db002b8d6fc1627c91f93c8141e5cd7d00",
+    "Autoform/Lang/Core/ExcSafe.lean": "119dd8d5279151d2b93534aef037a42cef816012c8fc7218c563c76881ebe820"
+  },
+  "checks": {
+    "runtime_build": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-build2.log",
+      "summary": "386 jobs",
+      "log_sha256": "28084e785947d7991d6515d5326f03401075c27d2c7ff710437aadc4d5836b72"
+    },
+    "source": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-source3.log",
+      "summary": "2 passed; five source comparisons and kernel observations, four kernel boundary checks",
+      "log_sha256": "ca6233f1cd70c9fc0b37d1ae5809a7433095b6e58e010a35c538303b439042ef"
+    },
+    "cachetools_constructor_replay": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-cachetools-replay.log",
+      "summary": "Five existing native observations return unit at fuel 16",
+      "log_sha256": "df5be764fdac308b3a95f73ef9f32defb382e2420d9a14946db1d2b306293fad"
+    },
+    "cachetools_constructor_proof": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-cachetools-proof2.log",
+      "proof": "/private/tmp/autoform-class-attribute-cachetools-proof.lean",
+      "proof_sha256": "2db2df04bc2f0d5aac8cf36ac79ea06d881aff0593e5710453ca7a422d9d9c8a",
+      "summary": "The unchanged five-observation domain satisfies its existing lawConform statement at fuel 16 by kernel checking",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "python": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-full-pytest1.log",
+      "summary": "812 passed, 58 skipped, 1 xfailed in 320.99s",
+      "log_sha256": "e53f2a3cb7b831f976417810aedec9fcea976959ac160276b61138432b33e134"
+    },
+    "full_build": {
+      "status": "PASS",
+      "log": "/tmp/autoform-class-attribute-full-build4.log",
+      "log_sha256": "0c366045b7176cbaf741102d9f5c513f63eb8fb143fcf5b2b2912d9c41a2539b",
+      "summary": "478 jobs, including the adapted exception-safety induction"
+    },
+    "runtime_audit": {
+      "status": "PASS",
+      "report": "/tmp/autoform-class-attribute-runtime-audit.json",
+      "report_sha256": "fc69939fbe92948d456b45582310ba9514e678d2e3995808900047a6f9addaa3",
+      "artifact_snapshot_status": "STABLE",
+      "axiom_sweep": {
+        "status": "CLEAN",
+        "declarations": 4199,
+        "leaks": [],
+        "declared_axioms": [],
+        "nonstandard_axioms": [],
+        "axiom_histogram": {
+          "propext": 1542,
+          "Quot.sound": 797,
+          "Classical.choice": 730
+        },
+        "error": null,
+        "root_theorems": 0,
+        "root_theorem_names": [],
+        "root_axioms": []
+      },
+      "lean4checker": {
+        "status": "VERIFIED",
+        "available": true,
+        "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+        "mode": "fresh",
+        "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform.Runtime",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "detail": "the kernel replayed every constant reachable from `Autoform.Runtime` into a fresh environment and accepted them all"
+      },
+      "verdict": {
+        "failures": [],
+        "pass": true
+      }
+    },
+    "full_audit": {
+      "status": "PASS",
+      "report": "artifacts/interpreter-recovery/class-attribute-audit.json",
+      "report_sha256": "bb1587fe5f9c8364f65abd2028b11754017cf75d18f7e4d4adf7c635863411dd",
+      "artifact_snapshot_status": "STABLE",
+      "axiom_sweep": {
+        "status": "CLEAN",
+        "declarations": 7159,
+        "leaks": [],
+        "declared_axioms": [],
+        "nonstandard_axioms": [],
+        "axiom_histogram": {
+          "propext": 2249,
+          "Quot.sound": 1310,
+          "Classical.choice": 1242
+        },
+        "error": null,
+        "root_theorems": 0,
+        "root_theorem_names": [],
+        "root_axioms": []
+      },
+      "lean4checker": {
+        "status": "VERIFIED",
+        "available": true,
+        "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+        "mode": "fresh",
+        "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "detail": "the kernel replayed every constant reachable from `Autoform` into a fresh environment and accepted them all"
+      },
+      "verdict": {
+        "failures": [],
+        "pass": true
+      }
+    },
+    "pipeline": {
+      "status": "completed_with_gaps",
+      "report": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/run.json",
+      "report_sha256": "15b6984d5b08cc61d8c32c1624d22cd9a3a8aa10c4fa7f6d9453271071c75360",
+      "run": {
+        "module": "ClassAttributesRecovery",
+        "source": "/private/tmp/autoform-class-attribute-source",
+        "execution_status": "completed_with_gaps",
+        "security_requested": false,
+        "stage_timeout_seconds": 1800.0,
+        "property_selection": {
+          "mode": "none"
+        },
+        "stages": {
+          "source": {
+            "status": "completed",
+            "command": [
+              "bash",
+              "/private/tmp/autoform-class-attribute-validation/autoform.sh",
+              "/private/tmp/autoform-class-attribute-source",
+              "ClassAttributesRecovery"
+            ],
+            "log": "source.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 74.54
+          },
+          "core-oracle": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/core_oracle.py",
+              "ast-ClassAttributesRecovery.json",
+              "ClassAttributesRecovery",
+              "/private/tmp/autoform-class-attribute-source",
+              "--conformance",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/conformance.json",
+              "--inputs",
+              "0",
+              "--scratch",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery",
+              "--out",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/core-oracle.json"
+            ],
+            "log": "core-oracle.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 5.59
+          },
+          "mutation": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/mutate.py",
+              "Autoform/Generated/ClassAttributesRecovery.lean",
+              "Autoform.Generated.ClassAttributesRecovery",
+              "--spec-file",
+              "Autoform/SpecsGen/ClassAttributesRecovery.lean",
+              "--spec-module",
+              "Autoform.SpecsGen.ClassAttributesRecovery",
+              "--spec-report",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/specs.json",
+              "--max-mutants",
+              "8",
+              "--json",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/mutation.json"
+            ],
+            "log": "mutation.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 159.43
+          },
+          "restore-build": {
+            "status": "completed",
+            "command": [
+              "lake",
+              "build",
+              "Autoform.SpecsGen.ClassAttributesRecovery",
+              "Autoform.Contracts"
+            ],
+            "log": "restore-build.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 0.68
+          },
+          "audit": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/audit_all.py",
+              "--strict",
+              "--module",
+              "Autoform.SpecsGen.ClassAttributesRecovery",
+              "--output",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/audit.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/specs.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/conformance.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/mutation.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/core-oracle.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/context.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/ast-ClassAttributesRecovery.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/inventory.json",
+              "--evidence",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/selection.json"
+            ],
+            "log": "audit.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 123.19
+          },
+          "contracts": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/emit_contracts.py",
+              "ClassAttributesRecovery",
+              "--out",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/contracts-ClassAttributesRecovery.json"
+            ],
+            "log": "contracts.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 0,
+            "seconds": 0.04
+          },
+          "assurance": {
+            "status": "completed",
+            "command": [
+              "/Users/mbhatt/autoform/.venv/bin/python",
+              "scripts/sacm.py",
+              "--module",
+              "ClassAttributesRecovery",
+              "--root",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery",
+              "--markdown",
+              "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/assurance.md",
+              "--quiet"
+            ],
+            "log": "assurance.log",
+            "timeout_seconds": 1800.0,
+            "timed_out": false,
+            "exit_code": 1,
+            "seconds": 1.09
+          }
+        },
+        "updated_at": "2026-09-23T17:06:03.836032+00:00",
+        "verification_complete": false,
+        "issues": [
+          "assurance",
+          "repository-coverage"
+        ],
+        "comparisons": 35,
+        "divergences": 0,
+        "proofs": 7,
+        "open_obligations": 0,
+        "holes": 0,
+        "source_pipeline": {
+          "module": "ClassAttributesRecovery",
+          "source": "/private/tmp/autoform-class-attribute-source",
+          "stage": "complete",
+          "exit_code": 0,
+          "status": "passed",
+          "finished_at": "2026-09-23T17:01:13.762017+00:00"
+        },
+        "context": {
+          "kind": "source",
+          "source": "/private/tmp/autoform-class-attribute-source",
+          "kernel_root": null,
+          "data_model": "lp64",
+          "compilation_database": null,
+          "defines": [],
+          "frontend_args": [],
+          "native_model_matches_host": true,
+          "configuration": "default",
+          "limitations": [],
+          "language": "python",
+          "frontend": "PYTHONSRC"
+        },
+        "proof_counts_scope": "conformance",
+        "proof_summary": {
+          "conformance": {
+            "proofs": 7,
+            "open_obligations": 0
+          },
+          "security": {
+            "requested": false,
+            "proofs": null,
+            "open_obligations": null
+          }
+        },
+        "repository": {
+          "input": "/private/tmp/autoform-class-attribute-source",
+          "ref": null,
+          "subdir": ".",
+          "status": "ready",
+          "started_at": "2026-09-23T16:59:59.132507+00:00",
+          "kind": "local",
+          "checkout": "/private/tmp/autoform-class-attribute-source",
+          "source": "/private/tmp/autoform-class-attribute-source"
+        },
+        "source_coverage": {
+          "schema_version": 1,
+          "language": "python",
+          "inventory_fingerprint": "6c0309b6b83d8d43255117aa3a8ea173ac50311bf0013e3bebccf590143802dc",
+          "files": [
+            {
+              "path": "class_attributes.py",
+              "language": "python",
+              "status": "represented"
+            }
+          ],
+          "counts": {
+            "represented": 1,
+            "unrepresented": 0,
+            "unsupported": 0,
+            "unclassified": 0,
+            "auxiliary": 0,
+            "outside_partition": 0
+          },
+          "source_changes": [],
+          "source_stable": true,
+          "scan_complete": true,
+          "source_census_complete": false,
+          "truncated_by_method_limit": false,
+          "frontend_census_complete": false,
+          "unexpected_ast_files": [],
+          "note": "Represented means at least one exported AST entry names the file. It does not establish complete parsing, translation or proof coverage."
+        },
+        "guarantee_status": "verified_scoped"
+      },
+      "artifacts": {
+        "conformance.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/conformance.json",
+          "sha256": "d6b8a4749df4d36894461b0d429dfb740311bb45a6f601f2ba202d6d0003dd63"
+        },
+        "specs.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/specs.json",
+          "sha256": "d41022bf3c519031116d2310c3ae21f5551ebcce3b98c0e799b98a243d2604d8"
+        },
+        "ledger.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/ledger.json",
+          "sha256": "7a111e65a3b750899f107c0af2f3d495f60df828ccf74ad46096bb2daabfdc7d"
+        },
+        "core-oracle.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/core-oracle.json",
+          "sha256": "5fb4b675fdd7e5dada0bb50b7020189165c38900a00ad985b881d31dc696fa1d"
+        },
+        "mutation.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/mutation.json",
+          "sha256": "47af7023bca6f85808a6aac948df3e9473f7d0f35189216f830a501db10a8cc3"
+        },
+        "audit.json": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/audit.json",
+          "sha256": "15af38ba368056e9f2fc21de6035801f07caf0f9002018ea3a56d89812d8e633"
+        },
+        "summary.md": {
+          "path": "/private/tmp/autoform-class-attribute-validation/artifacts/pipeline/ClassAttributesRecovery/summary.md",
+          "sha256": "98bff2e753a3c7a6c836319b2c8cbbeac7183c3a588690604eb95b10ca3fbba7"
+        }
+      }
+    }
+  },
+  "failed_attempts": [
+    {
+      "log": "/tmp/autoform-class-attribute-source1.log",
+      "reason": "Source test used runFunc without module initialization; boundary tests used Lit.fn instead of Expr.fnref and invalid record indentation."
+    },
+    {
+      "log": "/tmp/autoform-class-attribute-source2.log",
+      "reason": "The local static class probe exposed the missing clsClos branch; added it and reran both tests."
+    },
+    {
+      "log": "/tmp/autoform-class-attribute-full-build1.log",
+      "reason": "Isolated git clone lacked ignored V8Base build input; missing local generated files copied unchanged from validated bound-call workspace."
+    },
+    {
+      "log": "/tmp/autoform-class-attribute-full-build2.log",
+      "reason": "The full root imports ExcSafe, which Runtime does not. Its induction needed a non-exception lemma for readClassAttribute; added without weakening the theorem."
+    },
+    {
+      "log": "/tmp/autoform-class-attribute-full-build3.log",
+      "reason": "Interrupted build had no completion marker; process inventory after continuation confirmed no lake or Lean process remained."
+    }
+  ],
+  "remaining": [
+    "Inherited attributes and C3 MRO",
+    "Qualified identity for object instances and stored class namespaces",
+    "Property descriptor objects and custom attribute hooks",
+    "Captured unbound instance/class methods",
+    "General unbound receiver binding with default, variadic and keyword arguments",
+    "Full corpus re-land remains outstanding"
+  ],
+  "references": [
+    "https://docs.python.org/3/reference/datamodel.html#invoking-descriptors",
+    "https://docs.python.org/3/library/functions.html#classmethod",
+    "https://docs.python.org/3/howto/mro.html"
+  ],
+  "notes": [
+    "The pipeline and Python suite preceded the ExcSafe proof adaptation; executable semantics and exporter bytes did not change. The subsequent full root build includes that proof, while Runtime does not import ExcSafe."
+  ],
+  "promotion": {
+    "workspace": "/Users/mbhatt/autoform",
+    "source_hashes_verified": true,
+    "main_build": {
+      "status": "PASS",
+      "summary": "478 jobs",
+      "log": ".autoform-work/class-attribute-main-build.log",
+      "sha256": "93a14e81709a10cdcafb01c845e37ba9086d9f03d24c929c1f9b3f1e66a08840"
+    },
+    "focused_tests": {
+      "status": "PASS",
+      "summary": "3 passed, 3 skipped in 9.72s; expensive source probes already passed in the frozen checkout",
+      "log": ".autoform-work/class-attribute-main-tests.log",
+      "sha256": "c1886a70b51c1e23d7570fed006400529ed8072963958305dc94c7dacd9f04c5"
+    }
+  }
+}
