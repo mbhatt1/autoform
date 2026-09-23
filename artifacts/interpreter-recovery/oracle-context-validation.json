@@ -1,0 +1,34 @@
+{
+  "base_revision": "4bc664a3eb35cd0c2425a9aaa9cc8686e1def14a",
+  "scope": "Preserve property and exception metadata in three oracle contexts; import files containing only classes before method sampling.",
+  "input_sha256": {
+    "scripts/differential.py": "3cc2c2b75e64ea29ee206cd6e7d0ea0d2422a705103ec7809daf52da76651e05",
+    "scripts/core_oracle.py": "826c0950cac4f77f01cde0c0cdef8da01fb5f9e75aaff29a5f45d89152fb4896",
+    "scripts/synth_specs.py": "5a07b0b69d3dcc694a17e433c4ed878a261132f8e77c24d962304d59f03752f0",
+    "tests/test_oracle_context_metadata.py": "1ef6980c5fd6c557f79ae881fbdcd9c6ab39e86fa0cbcbb0be5f59354ec34e05"
+  },
+  "checks": [
+    {
+      "command": "AUTOFORM_TEST_ORACLES=1 LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/test_oracle_context_metadata.py -q --basetemp=/tmp/autoform-oracle-context-tests3",
+      "log": "/tmp/autoform-oracle-context-tests3.log",
+      "log_sha256": "930e005cefde9d9f0d45d222e900bb999339a837ba4dc4a850f073ae5c4d5a2b",
+      "status": "PASS",
+      "summary": "3 passed; four kernel-checked observations and native comparison through the differential driver"
+    },
+    {
+      "command": "LEAN_NUM_THREADS=2 .venv/bin/python -m pytest tests/ -q",
+      "log": "/tmp/autoform-oracle-context-full-pytest.log",
+      "log_sha256": "8e803d08c813d76c31c6f1e61c2d02ac8bde14736463b48d912e9a4d7803dc84",
+      "status": "PASS",
+      "summary": "806 passed, 55 skipped, 1 xfailed"
+    },
+    {
+      "command": "LEAN_NUM_THREADS=2 lake build",
+      "log": "/tmp/autoform-oracle-context-build.log",
+      "log_sha256": "8e0487640e1ac295c9b1ce69126369e3f2bb6eaebd75c170febb00f090fde077",
+      "status": "PASS",
+      "summary": "478 jobs completed successfully"
+    }
+  ],
+  "remaining": "Corpus comparisons still fail; diagnostics are recorded separately. No complete corpus re-land is claimed."
+}

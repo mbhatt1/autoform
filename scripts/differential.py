@@ -2070,6 +2070,10 @@ def main():
 
         # (3) methods the suite never called: reuse an instance it built for a
         # sibling method, or build one, and synthesize arguments from observed values
+        # A file containing only classes was never imported by the free-function
+        # loop above. Its methods still need their defining module loaded.
+        for rel in sorted({rel for _, rel, _ in methods}):
+            load_module(os.path.join(src_root, rel), src_root)
         reached = set(c["name"] for c in cases)
         built = constructed_cases(methods, reached, live, pool, stats, ncases)
         cases += built
@@ -2243,7 +2247,8 @@ def main():
               # because the harness dropped the field on the way in.
               "private def dctx : Ctx := "
               "{ dialect := program.dialect, table := program.table, globals := gref, "
-              "builtinBases := program.builtinBases }",
+              "builtinBases := program.builtinBases, properties := program.properties, "
+              "excClasses := program.excClasses }",
               "",
               "private structure DCase where",
               "  idx  : Nat",

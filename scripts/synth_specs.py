@@ -857,7 +857,8 @@ def h0 : Heap := %s
 def gref : Ref := %s
 def base : Nat := h0.length
 def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref,
-                 builtinBases := P.builtinBases }
+                 builtinBases := P.builtinBases, properties := P.properties,
+                 excClasses := P.excClasses }
 def FUEL : Nat := %d
 open Autoform.Generated.%s
 

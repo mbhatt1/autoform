@@ -1,0 +1,6104 @@
+{
+  "status": "INCOMPLETE_RELANDS",
+  "base_revision": "4bc664a3eb35cd0c2425a9aaa9cc8686e1def14a",
+  "scope": "Diagnostic attempts only. No conformance success or corpus re-land is claimed. Original attempts omitted properties and exception classes in their replay contexts; some mismatches therefore concern the harness. All runs reached the existing 600-case cap.",
+  "attempts": [
+    {
+      "name": "cachetools_initial",
+      "command": "JOERN_HOME=/Users/mbhatt/joern AUTOFORM_CASES=20 scripts/reland_corpus.sh /private/tmp/ct-v717 Cachetools",
+      "context": "original replay context",
+      "report": "/private/tmp/autoform-cachetools-reland-attempt1/report/conformance.json",
+      "report_sha256": "c337f5e269bc93e47810bd1ae582e59f7e2ddf952da17d04079aca695a64cf0f",
+      "measurement": {
+        "measurement_basis": "python-exception-guards-v3",
+        "runtime_version": "Python 3.11.13",
+        "functions_total": 209,
+        "functions_hole_free": 209,
+        "cases": 600,
+        "agree": 250,
+        "divergences": 65,
+        "inconclusive": 285,
+        "total": 315,
+        "build_stable": true
+      },
+      "input_provenance": {
+        "ast_sha256": "94bf7eb1e35e43b8a140d644b80b59465e7fa65e36bba7958bb627cdbf3719f0",
+        "generated_sha256": "986e00c96e2dc6e2a655df27c25e689c1a8ea24fc38d67e671b9608d29823aac",
+        "source_sha256": {
+          "cachetools/__init__.py": "bdc70bd5dec0be9fb69241dad5badd53482a92d9bffbc86770c0aadac5e528d4",
+          "cachetools/_cached.py": "3f301c0cfbf6a108ca2ffca574568198164f9599439b595c859f6450a4da795b",
+          "cachetools/_cachedmethod.py": "ad2e75ebb6d3131225f36ce63c6f281700e675aff79ce2d447f8e97132b4ecb4",
+          "cachetools/func.py": "87724e4fc82303fd5172cc9fd03c7aaf6a767c6c477f3cb74a245fc45ebf7816",
+          "cachetools/keys.py": "9550bd6914744c2fc6fd211dfb83cdae2d6206b1a1bfcf052d017cb23b39b49e"
+        },
+        "semantics_sha256": {
+          "Autoform/Lang/Core/ExcSafe.lean": "df5b3ab1354aa1ab6bb5b0b5ff829dc98e44b91cb3248f7c86071c43c3755192",
+          "Autoform/Lang/Core/Float.lean": "ec4dc8083b78c4269b2596f62dcbbdbb6fbaafc52871da5b0dd1eb3e165b2d9e",
+          "Autoform/Lang/Core/Iteration.lean": "470c8616225925994b6d7fb928b21a7140159b8f00f9493f4251079fa5b78279",
+          "Autoform/Lang/Core/Numeric.lean": "75ed826611bfdf5e0dcac49852641bd1fc7ed63769833aa0362b8c60f57db693",
+          "Autoform/Lang/Core/Semantics.lean": "4cbf9379d10ee8c544bae98016a380a94a802a78efd96cdf6e3449132929173b",
+          "Autoform/Lang/Core/Stdlib.lean": "2ae37715614516e6901f7beb24eb0ce214081304d7c4009701c34b15d56f0b55",
+          "Autoform/Lang/Core/Syntax.lean": "6cf7345659ea8486d44f93bdd9cc1f2ae8451501ecff52b1d1872f45730d8507",
+          "Autoform/Lang/Core/TypedNumeric.lean": "7238da9a1f6fe3c0e59c063e91f41aa5d168ee56c141cb459d400481ac95e6b3"
+        }
+      },
+      "divergence_detail": [
+        {
+          "function": "cachetools/func.py:<module>.lru_cache",
+          "args": "(int 14, int 10)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                14
+              ],
+              [
+                "int",
+                10
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int 2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                2
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int -10, int -9, int 19)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -10
+              ],
+              [
+                "int",
+                -9
+              ],
+              [
+                "int",
+                19
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int -19, int -12)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -19
+              ],
+              [
+                "int",
+                -12
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int -4, int -7, int 4)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                -7
+              ],
+              [
+                "int",
+                4
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int -3, int -2, int 11, int 8)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                -2
+              ],
+              [
+                "int",
+                11
+              ],
+              [
+                "int",
+                8
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int -19, int -16, int -6, int 4)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -19
+              ],
+              [
+                "int",
+                -16
+              ],
+              [
+                "int",
+                -6
+              ],
+              [
+                "int",
+                4
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int -6, int -3, int 5)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -6
+              ],
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                5
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int -6)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -6
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int -4, int -8, int -2, int 18)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                -8
+              ],
+              [
+                "int",
+                -2
+              ],
+              [
+                "int",
+                18
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__delitem__",
+          "args": "(int 1, int 2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                1
+              ],
+              [
+                "int",
+                2
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int -4, int -4, int -6)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                -6
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lfu_cache",
+          "args": "(int -9, int -11)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -9
+              ],
+              [
+                "int",
+                -11
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lru_cache",
+          "args": "(int 10, int 8)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                10
+              ],
+              [
+                "int",
+                8
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int 13, int -7, int 16, int 12)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                13
+              ],
+              [
+                "int",
+                -7
+              ],
+              [
+                "int",
+                16
+              ],
+              [
+                "int",
+                12
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int 6, int 4, int 6)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                4
+              ],
+              [
+                "int",
+                6
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lfu_cache",
+          "args": "(int -13, int 19)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -13
+              ],
+              [
+                "int",
+                19
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int 17, int -11, int 12)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                17
+              ],
+              [
+                "int",
+                -11
+              ],
+              [
+                "int",
+                12
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int -5, int -2, int -12, int -10)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -5
+              ],
+              [
+                "int",
+                -2
+              ],
+              [
+                "int",
+                -12
+              ],
+              [
+                "int",
+                -10
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int 1)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                1
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int -1, int -1, int -2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -1
+              ],
+              [
+                "int",
+                -1
+              ],
+              [
+                "int",
+                -2
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int 3, int 5, int 16)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                3
+              ],
+              [
+                "int",
+                5
+              ],
+              [
+                "int",
+                16
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int 7, int -7, int 7)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                7
+              ],
+              [
+                "int",
+                -7
+              ],
+              [
+                "int",
+                7
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int -17, int -20)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -17
+              ],
+              [
+                "int",
+                -20
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int 6, int 5, int -3)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                5
+              ],
+              [
+                "int",
+                -3
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lru_cache",
+          "args": "(int 16, int -4)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                16
+              ],
+              [
+                "int",
+                -4
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int -12, int 11)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -12
+              ],
+              [
+                "int",
+                11
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int 4, int -8, int -2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                4
+              ],
+              [
+                "int",
+                -8
+              ],
+              [
+                "int",
+                -2
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int 6, int -4, int -6)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                -6
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int 3, int -9, int -2)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                3
+              ],
+              [
+                "int",
+                -9
+              ],
+              [
+                "int",
+                -2
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__delitem__",
+          "args": "(int 6, int -1)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                -1
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int -2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -2
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int -13, int 19)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -13
+              ],
+              [
+                "int",
+                19
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lfu_cache",
+          "args": "(int -3, int -15)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                -15
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int 5, int 4, int -7)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                5
+              ],
+              [
+                "int",
+                4
+              ],
+              [
+                "int",
+                -7
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lru_cache",
+          "args": "(int -9, int 15)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -9
+              ],
+              [
+                "int",
+                15
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.lfu_cache",
+          "args": "(int -10, int 7)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -10
+              ],
+              [
+                "int",
+                7
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int 0, int -1, int -1)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                0
+              ],
+              [
+                "int",
+                -1
+              ],
+              [
+                "int",
+                -1
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int 3, int 8, int -17)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                3
+              ],
+              [
+                "int",
+                8
+              ],
+              [
+                "int",
+                -17
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__delitem__",
+          "args": "(int 2, int -5)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                2
+              ],
+              [
+                "int",
+                -5
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int -3, int 1)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                1
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int 0)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                0
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int -4, int 2, int -6)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -4
+              ],
+              [
+                "int",
+                2
+              ],
+              [
+                "int",
+                -6
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.__setitem__",
+          "args": "(int -3, int 3, int 5)",
+          "detail": "cpython=unit, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                3
+              ],
+              [
+                "int",
+                5
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int 6, int 4, int -13)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                4
+              ],
+              [
+                "int",
+                -13
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int 5, int -6, int 2)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                5
+              ],
+              [
+                "int",
+                -6
+              ],
+              [
+                "int",
+                2
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setitem__",
+          "args": "(int -3, int 0, int 0)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -3
+              ],
+              [
+                "int",
+                0
+              ],
+              [
+                "int",
+                0
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int -7)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -7
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.__setstate__",
+          "args": "(int -4)",
+          "detail": "cpython raised TypeError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -4
+              ]
+            ],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.ttl_cache",
+          "args": "(int 13, int -16, int 8, int -19)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                13
+              ],
+              [
+                "int",
+                -16
+              ],
+              [
+                "int",
+                8
+              ],
+              [
+                "int",
+                -19
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int 13, int 12)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                13
+              ],
+              [
+                "int",
+                12
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.expire",
+          "args": "(int -1)",
+          "detail": "cpython=list[], lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -1
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.fifo_cache",
+          "args": "(int 12, int 15)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                12
+              ],
+              [
+                "int",
+                15
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TTLCache.popitem",
+          "args": "()",
+          "detail": "cpython raised KeyError, lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "TTLCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TTLCache__root",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "_TTLCache__links",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TTLCache__ttl",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Timer__time",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Link",
+                [
+                  [
+                    "expires",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "key",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "next",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ],
+                  [
+                    "prev",
+                    [
+                      "ref",
+                      2
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/__init__.py:<module>.TLRUCache.expire",
+          "args": "(int -8)",
+          "detail": "cpython=list[], lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                -8
+              ]
+            ],
+            "heap": [
+              [
+                "TLRUCache",
+                [
+                  [
+                    "getsizeof",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Cache__size",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__data",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_Cache__currsize",
+                    [
+                      "int",
+                      0
+                    ]
+                  ],
+                  [
+                    "_Cache__maxsize",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TimedCache__timer",
+                    [
+                      "ref",
+                      1
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__items",
+                    [
+                      "dict",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__order",
+                    [
+                      "list",
+                      []
+                    ]
+                  ],
+                  [
+                    "_TLRUCache__ttu",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "_Timer",
+                [
+                  [
+                    "_Timer__timer",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ],
+                  [
+                    "_Timer__nesting",
+                    [
+                      "int",
+                      0
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "cachetools/func.py:<module>.rr_cache",
+          "args": "(int -18, int 19, int 5)",
+          "detail": "cpython=fn '_cache.<locals>.decorator', lean raised AttributeError",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                -18
+              ],
+              [
+                "int",
+                19
+              ],
+              [
+                "int",
+                5
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        }
+      ]
+    },
+    {
+      "name": "click_initial",
+      "command": "JOERN_HOME=/Users/mbhatt/joern AUTOFORM_CASES=20 scripts/reland_corpus.sh /private/tmp/corp_click Click",
+      "context": "original replay context",
+      "report": "/private/tmp/autoform-click-reland-attempt1/report/conformance.json",
+      "report_sha256": "bff91679e07cfc5b6c45350fc027ff422bf1e60d92ed107461c611d8b3411f0d",
+      "measurement": {
+        "measurement_basis": "python-exception-guards-v3",
+        "runtime_version": "Python 3.11.13",
+        "functions_total": 549,
+        "functions_hole_free": 488,
+        "cases": 600,
+        "agree": 189,
+        "divergences": 5,
+        "inconclusive": 406,
+        "total": 194,
+        "build_stable": true
+      },
+      "input_provenance": {
+        "ast_sha256": "977cbb69b29da1f5ad609350b5c82f47fac5b6fbf2cebadc5ad0fa0ec8850ccb",
+        "generated_sha256": "8d13d1b80c352205d58d38d28a188add3308a95e525256100184eb97b61f2988",
+        "source_sha256": {
+          "click/__init__.py": "e98c92d5a7b29276742d8c1e5a8ccd672d00f6767fd75c2660886fddc6d0ad8a",
+          "click/_compat.py": "bf7c4166415bbc0d415cf46415f04973afa92303c8ef7e399be910127a5502ce",
+          "click/_termui_impl.py": "0125e12e2f4840873426cf4a4124bedfe48b65c3deb7756acac05ff5681b6e92",
+          "click/_textwrap.py": "04e69ed1143abe0dc590d8122723a81b31b599e18cc49fee9165592b1feffb4a",
+          "click/_winconsole.py": "fefc54b946b1c01868474bd458236e1d8f1551e7e231d088c94d925cfaa817e0",
+          "click/core.py": "814869352f5c14119d1175dd8ac1951be791bc67f8f514f215a831ba5ab0745c",
+          "click/decorators.py": "e4feda6e126d010629fca1e08d4be132fe3ae044703b3aefd9e9cd9279701f24",
+          "click/exceptions.py": "d6b76d5e01c9d5bdce8c690df94a5707db7f1c2062849be1fc3b6998b9b09fdb",
+          "click/formatting.py": "061ab1e105dd290f56e162a49c8c23e4a3ca166b5db863ae1aad72c3f4c72d9f",
+          "click/globals.py": "80cf8d87a0383341c1fd2824685e4ce2770618c0c773f7e51d7bbdfe88781845",
+          "click/parser.py": "9d4d40876a75d6adbdba5d6f35d53db303e8fcf52e2abc54e985d3a22ef5ab57",
+          "click/shell_completion.py": "09048676382e9f83916ce66b5cfd0256112d3f1e249ecb9f3a446c0e22bae1c3",
+          "click/termui.py": "bc062b282d9aedffcd7c42210138445587dafff89be5741b4d2086b499400510",
+          "click/testing.py": "d9e2dd01a0890864e83f94f0f9737c263ac36f7c1b2487c047183777472b5b93",
+          "click/types.py": "2814d1c4ddbc711d5567999bf62257f7c3104b0fe9f521b3963a9f108f33e53c",
+          "click/utils.py": "6f5326faeb040c11ed13070f96d3c89f7cd22b89f0d8a4e9e460bbfe849394ba"
+        },
+        "semantics_sha256": {
+          "Autoform/Lang/Core/ExcSafe.lean": "df5b3ab1354aa1ab6bb5b0b5ff829dc98e44b91cb3248f7c86071c43c3755192",
+          "Autoform/Lang/Core/Float.lean": "ec4dc8083b78c4269b2596f62dcbbdbb6fbaafc52871da5b0dd1eb3e165b2d9e",
+          "Autoform/Lang/Core/Iteration.lean": "470c8616225925994b6d7fb928b21a7140159b8f00f9493f4251079fa5b78279",
+          "Autoform/Lang/Core/Numeric.lean": "75ed826611bfdf5e0dcac49852641bd1fc7ed63769833aa0362b8c60f57db693",
+          "Autoform/Lang/Core/Semantics.lean": "4cbf9379d10ee8c544bae98016a380a94a802a78efd96cdf6e3449132929173b",
+          "Autoform/Lang/Core/Stdlib.lean": "2ae37715614516e6901f7beb24eb0ce214081304d7c4009701c34b15d56f0b55",
+          "Autoform/Lang/Core/Syntax.lean": "6cf7345659ea8486d44f93bdd9cc1f2ae8451501ecff52b1d1872f45730d8507",
+          "Autoform/Lang/Core/TypedNumeric.lean": "7238da9a1f6fe3c0e59c063e91f41aa5d168ee56c141cb459d400481ac95e6b3"
+        }
+      },
+      "divergence_detail": [
+        {
+          "function": "click/core.py:<module>.Command.__repr__",
+          "args": "()",
+          "detail": "cpython=str '<Command 1>', lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "Command",
+                [
+                  [
+                    "name",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "context_settings",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "callback",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "params",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "epilog",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "options_metavar",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "short_help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "add_help_option",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_help_option",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "no_args_is_help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "hidden",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "deprecated",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "click/types.py:<module>.FuncParamType.convert",
+          "args": "(int 6, int -5, int 5)",
+          "detail": "cpython=unit, lean raised TypeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                -5
+              ],
+              [
+                "int",
+                5
+              ]
+            ],
+            "heap": [
+              [
+                "FuncParamType",
+                [
+                  [
+                    "name",
+                    [
+                      "str",
+                      "<lambda>"
+                    ]
+                  ],
+                  [
+                    "func",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"TypeError\")"
+        },
+        {
+          "function": "click/shell_completion.py:<module>.ShellComplete.source_vars",
+          "args": "()",
+          "detail": "cpython raised AttributeError, lean returned ref 20",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "ShellComplete",
+                [
+                  [
+                    "cli",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "ctx_args",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "prog_name",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "complete_var",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.ref 20)"
+        },
+        {
+          "function": "click/shell_completion.py:<module>.get_completion_class",
+          "args": "(int 7)",
+          "detail": "cpython=int 13 lean=unit",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                7
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.unit)"
+        },
+        {
+          "function": "click/shell_completion.py:<module>.ShellComplete.source_vars",
+          "args": "()",
+          "detail": "cpython raised AttributeError, lean returned ref 20",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "ShellComplete",
+                [
+                  [
+                    "cli",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "ctx_args",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "prog_name",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "complete_var",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.ref 20)"
+        }
+      ]
+    },
+    {
+      "name": "click_context_corrected",
+      "command": "scripts/differential.py /private/tmp/autoform-reland-click/ast-Click.json /private/tmp/corp_click Click 20",
+      "context": "properties and exception classes preserved; files containing only classes imported before method sampling",
+      "report": "/private/tmp/autoform-click-context-probe/conformance.json",
+      "report_sha256": "2f993cf810ca6ecc106b598ab3b2c53a124cc41a6efb228d6395f079014328fb",
+      "measurement": {
+        "measurement_basis": "python-exception-guards-v3",
+        "runtime_version": "Python 3.11.13",
+        "functions_total": 549,
+        "functions_hole_free": 488,
+        "cases": 600,
+        "agree": 189,
+        "divergences": 3,
+        "inconclusive": 408,
+        "total": 192,
+        "build_stable": true
+      },
+      "input_provenance": {
+        "ast_sha256": "977cbb69b29da1f5ad609350b5c82f47fac5b6fbf2cebadc5ad0fa0ec8850ccb",
+        "generated_sha256": "8d13d1b80c352205d58d38d28a188add3308a95e525256100184eb97b61f2988",
+        "source_sha256": {
+          "click/__init__.py": "e98c92d5a7b29276742d8c1e5a8ccd672d00f6767fd75c2660886fddc6d0ad8a",
+          "click/_compat.py": "bf7c4166415bbc0d415cf46415f04973afa92303c8ef7e399be910127a5502ce",
+          "click/_termui_impl.py": "0125e12e2f4840873426cf4a4124bedfe48b65c3deb7756acac05ff5681b6e92",
+          "click/_textwrap.py": "04e69ed1143abe0dc590d8122723a81b31b599e18cc49fee9165592b1feffb4a",
+          "click/_winconsole.py": "fefc54b946b1c01868474bd458236e1d8f1551e7e231d088c94d925cfaa817e0",
+          "click/core.py": "814869352f5c14119d1175dd8ac1951be791bc67f8f514f215a831ba5ab0745c",
+          "click/decorators.py": "e4feda6e126d010629fca1e08d4be132fe3ae044703b3aefd9e9cd9279701f24",
+          "click/exceptions.py": "d6b76d5e01c9d5bdce8c690df94a5707db7f1c2062849be1fc3b6998b9b09fdb",
+          "click/formatting.py": "061ab1e105dd290f56e162a49c8c23e4a3ca166b5db863ae1aad72c3f4c72d9f",
+          "click/globals.py": "80cf8d87a0383341c1fd2824685e4ce2770618c0c773f7e51d7bbdfe88781845",
+          "click/parser.py": "9d4d40876a75d6adbdba5d6f35d53db303e8fcf52e2abc54e985d3a22ef5ab57",
+          "click/shell_completion.py": "09048676382e9f83916ce66b5cfd0256112d3f1e249ecb9f3a446c0e22bae1c3",
+          "click/termui.py": "bc062b282d9aedffcd7c42210138445587dafff89be5741b4d2086b499400510",
+          "click/testing.py": "d9e2dd01a0890864e83f94f0f9737c263ac36f7c1b2487c047183777472b5b93",
+          "click/types.py": "2814d1c4ddbc711d5567999bf62257f7c3104b0fe9f521b3963a9f108f33e53c",
+          "click/utils.py": "6f5326faeb040c11ed13070f96d3c89f7cd22b89f0d8a4e9e460bbfe849394ba"
+        },
+        "semantics_sha256": {
+          "Autoform/Lang/Core/ExcSafe.lean": "df5b3ab1354aa1ab6bb5b0b5ff829dc98e44b91cb3248f7c86071c43c3755192",
+          "Autoform/Lang/Core/Float.lean": "ec4dc8083b78c4269b2596f62dcbbdbb6fbaafc52871da5b0dd1eb3e165b2d9e",
+          "Autoform/Lang/Core/Iteration.lean": "470c8616225925994b6d7fb928b21a7140159b8f00f9493f4251079fa5b78279",
+          "Autoform/Lang/Core/Numeric.lean": "75ed826611bfdf5e0dcac49852641bd1fc7ed63769833aa0362b8c60f57db693",
+          "Autoform/Lang/Core/Semantics.lean": "4cbf9379d10ee8c544bae98016a380a94a802a78efd96cdf6e3449132929173b",
+          "Autoform/Lang/Core/Stdlib.lean": "2ae37715614516e6901f7beb24eb0ce214081304d7c4009701c34b15d56f0b55",
+          "Autoform/Lang/Core/Syntax.lean": "6cf7345659ea8486d44f93bdd9cc1f2ae8451501ecff52b1d1872f45730d8507",
+          "Autoform/Lang/Core/TypedNumeric.lean": "7238da9a1f6fe3c0e59c063e91f41aa5d168ee56c141cb459d400481ac95e6b3"
+        }
+      },
+      "divergence_detail": [
+        {
+          "function": "click/core.py:<module>.Command.__repr__",
+          "args": "()",
+          "detail": "cpython=str '<Command 1>', lean raised AttributeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [],
+            "heap": [
+              [
+                "Command",
+                [
+                  [
+                    "name",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "context_settings",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "callback",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "params",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "epilog",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "options_metavar",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "short_help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "add_help_option",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "_help_option",
+                    [
+                      "unit"
+                    ]
+                  ],
+                  [
+                    "no_args_is_help",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "hidden",
+                    [
+                      "int",
+                      1
+                    ]
+                  ],
+                  [
+                    "deprecated",
+                    [
+                      "int",
+                      1
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"AttributeError\")"
+        },
+        {
+          "function": "click/types.py:<module>.FuncParamType.convert",
+          "args": "(int 6, int -5, int 5)",
+          "detail": "cpython=unit, lean raised TypeError",
+          "origin": "constructed",
+          "case": {
+            "self": [
+              "ref",
+              0
+            ],
+            "args": [
+              [
+                "int",
+                6
+              ],
+              [
+                "int",
+                -5
+              ],
+              [
+                "int",
+                5
+              ]
+            ],
+            "heap": [
+              [
+                "FuncParamType",
+                [
+                  [
+                    "name",
+                    [
+                      "str",
+                      "<lambda>"
+                    ]
+                  ],
+                  [
+                    "func",
+                    [
+                      "fn",
+                      "_ctor_fallback.<locals>.<lambda>"
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          },
+          "lean_repr": "Autoform.Core.EResult.exn (Autoform.Core.Val.str \"TypeError\")"
+        },
+        {
+          "function": "click/shell_completion.py:<module>.get_completion_class",
+          "args": "(int 7)",
+          "detail": "cpython=int 13 lean=unit",
+          "origin": "random",
+          "case": {
+            "self": null,
+            "args": [
+              [
+                "int",
+                7
+              ]
+            ],
+            "heap": []
+          },
+          "lean_repr": "Autoform.Core.EResult.val (Autoform.Core.Val.unit)"
+        }
+      ]
+    }
+  ],
+  "next_checks": [
+    "Preserve native module pre-state or isolate synthesized calls; get_completion_class observed a registry changed by earlier calls.",
+    "Reject or model callback values whose implementation is absent from the translated program; the constructor fallback lambda is not source code.",
+    "Implement and validate Python class metadata and inherited attribute lookup; Command.__repr__ reads self.__class__.__name__.",
+    "Correct property precedence: data descriptors precede instance fields.",
+    "Make the case cap configurable and provide at least 500 compared calls per required corpus.",
+    "Repair ineffective native timeouts: differential runs in a helper thread, where SIGALRM setup is skipped; random free-function calls are also unguarded.",
+    "Add each newly generated specification module to the full audit import closure.",
+    "Complete the entire re-land cascade after corrections; do not repin only AST or spec hashes."
+  ]
+}

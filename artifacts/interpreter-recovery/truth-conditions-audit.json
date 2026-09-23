@@ -1,0 +1,44 @@
+{
+  "revision": "4bc664a3eb35cd0c2425a9aaa9cc8686e1def14a",
+  "scope": "Full Autoform import closure at the general truth-condition checkpoint. Corpus re-landing and subsequent oracle context corrections are outside this checkpoint.",
+  "command": "PATH=/Users/mbhatt/.elan/bin:$PATH LEAN_NUM_THREADS=4 .venv/bin/python scripts/audit_all.py --strict",
+  "snapshot": "/private/tmp/autoform-audit-4bc664a",
+  "copy": "independent APFS clone; source and build artifacts have distinct inodes from the working tree",
+  "full_report": "/private/tmp/autoform-audit-4bc664a/audit.json",
+  "full_report_sha256": "6e4c980488344193a236c6ea26e4972cf542817a9930e36d84cc2640ea3f8c63",
+  "artifact_snapshot_status": "STABLE",
+  "source_files_scanned": 185,
+  "trusted_core_findings": [],
+  "generated_findings": [],
+  "axiom_sweep": {
+    "status": "CLEAN",
+    "declarations": 7142,
+    "leaks": [],
+    "declared_axioms": [],
+    "nonstandard_axioms": [],
+    "axiom_histogram": {
+      "propext": 2235,
+      "Quot.sound": 1296,
+      "Classical.choice": 1232
+    },
+    "error": null,
+    "root_theorems": 0,
+    "root_theorem_names": [],
+    "root_axioms": []
+  },
+  "lean4checker": {
+    "status": "VERIFIED",
+    "available": true,
+    "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+    "mode": "fresh",
+    "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "",
+    "detail": "the kernel replayed every constant reachable from `Autoform` into a fresh environment and accepted them all"
+  },
+  "verdict": {
+    "failures": [],
+    "pass": true
+  }
+}

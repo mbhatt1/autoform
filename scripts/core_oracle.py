@@ -343,7 +343,8 @@ private def gref : Ref := gp.2
 private def base : Nat := h0.length
 private def octx : Ctx :=
   {{ dialect := program.dialect, table := program.table, globals := gref,
-     builtinBases := program.builtinBases }}
+     builtinBases := program.builtinBases, properties := program.properties,
+     excClasses := program.excClasses }}
 
 private structure OCase where
   idx  : Nat

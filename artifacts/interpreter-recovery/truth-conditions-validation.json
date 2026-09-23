@@ -103,10 +103,14 @@
       "log": "/tmp/autoform-condition-protocol-regressions.log",
       "log_sha256": "c305e1c0358c02929443f8b4b00beb54295871b88d378cbee20ebbbfa9d2ac5e",
       "summary": "18 passed in 1888.07s (0:31:28)"
+    },
+    "full_audit": {
+      "status": "PASS",
+      "revision": "4bc664a3eb35cd0c2425a9aaa9cc8686e1def14a",
+      "summary": "artifacts/interpreter-recovery/truth-conditions-audit.json"
     }
   },
   "pending": [
-    "full strict audit of a committed snapshot",
     "complete regeneration of four Python corpora"
   ]
 }

@@ -142,8 +142,11 @@ and proved each in the kernel, together with two named-gap results. The strict
 `Autoform.Runtime` audit passed with stable artifacts and fresh replay. Input hashes
 and validation commands are recorded in
 [`truth-conditions-validation.json`](../artifacts/interpreter-recovery/truth-conditions-validation.json).
-A full audit of this extension and complete regeneration of the four affected Python
-corpora remain separate gates; their older renders now differ from the current renderer.
+The full strict audit of commit `4bc664a` subsequently passed on a stable independent
+snapshot, including fresh replay of the complete `Autoform` import closure; see
+[`truth-conditions-audit.json`](../artifacts/interpreter-recovery/truth-conditions-audit.json).
+Complete regeneration of the four affected Python corpora remains a separate gate;
+their older renders differ from the current renderer.
 
 Validation of the truth-consumer correction passed the full Lean build (478 jobs),
 the full Python suite (801 passed, 53 skipped, one expected failure), and all 12 existing
@@ -240,6 +243,26 @@ stages. It still reports `completed_with_gaps`: some functions are unexercised a
 sampled agreement is not a proof of transpiler faithfulness. Its reproducible source
 is `/tmp/autoform-valuecall-source/valuecall.py`; use the same CLI command above with
 workspace `/tmp/autoform-valuecall-validation` and module `ValueCallRecovery`.
+
+The differential driver, core oracle and generated specification context must carry
+`Program.properties` and `Program.excClasses`, as well as the dialect, functions,
+builtin bases and globals address. Omitting those fields caused the oracle to bypass
+property getters and reject represented user exceptions. The generated-driver tests in
+`tests/test_oracle_context_metadata.py` execute property reads and custom exceptions,
+including kernel proofs of both results. The native sampler also loads files containing
+only classes before attempting their methods; those files need no free function or test
+suite to become visible to the sampler.
+The correction passed the three generated-driver tests, the full Python suite
+(806 passed, 55 skipped, one expected failure), and the 478-job Lean build. Commands
+and input hashes are recorded in
+[`oracle-context-validation.json`](../artifacts/interpreter-recovery/oracle-context-validation.json).
+The first regenerated Cachetools and Click comparisons failed and stopped before
+specification regeneration. Their diagnostic reports and the Click comparison with the
+corrected contexts are indexed in
+[`corpus-reland-diagnostics.json`](../artifacts/interpreter-recovery/corpus-reland-diagnostics.json).
+These attempts are not completed re-lands. Native module state, callback encoding and
+class attributes still need investigation before the remaining mismatches can be
+classified as interpreter defects or mismatched inputs.
 
 Current integrity checks must continue to distinguish stale and missing evidence.
 `check_provenance.py` rejects the four tracked Python corpora whose exporter pin is
