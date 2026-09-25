@@ -48,6 +48,35 @@ every callee to resolve inside the program, and is the verifiable core;
 Static hole-freedom does not imply the interpreter never holes — an untranslated callee
 is invisible in the AST.
 
+## Scale: SQLite (C, full source tree)
+
+Exporter-level hole census on the full `sqlite/sqlite` tree (7,772 functions, Joern
+4.0.606, `--define SQLITE_OS_UNIX --define SQLITE_TEST`). Hole-free here is the static
+upper bound (see above); these runs did not re-check call-closure or conformance, and no
+Lean was built for them.
+
+| Exporter | Hole-free | Holes |
+|---|---|---|
+| before spec 011 (`77542bb`) | 4,602 (59.2%) | 13,291 |
+| after spec 011 (pointer, address-of, indirection, casts/sizeof, control flow) | **5,054 (65.0%)** | 11,759 |
+
+Per function: 551 became hole-free and 99 lost it. Every loss is a translation that
+was wrong and now refuses. 69 are `sizeof` values that disagreed with gcc; the struct
+layout now matches gcc on 97 types and 1,536 sites. 15 are boxed-local initializers
+that used to be dropped. The rest are type-punning casts and pointer cursors that were
+tracked two ways. Along the way this fixed several hole-free-but-wrong translations:
+`&&`/`||` ran the right operand's side effects unconditionally, `do`/`while` swapped
+its body and condition, `0` and `NULL` compared unequal in null tests, `char**` was read
+as a byte cursor, and `int n; f(&n)` holed at run time.
+
+What remains is mostly the missing address model: `cstr:address-compare` (1,244 of
+1,478 are in one function, `sqlite3__wasm_enum_json`), `&buf[i]` into memory of unknown
+provenance, pointer↔integer casts, and `sqlite3VdbeExec`'s `goto`s. Most of the
+remaining cast/`sizeof` holes come from the checkout having no generated `sqlite3.h`.
+Generating it and defining SQLite's linkage macros (`--define "SQLITE_API= "`; the
+trailing space matters, because `c2cpg` crashes on an empty `NAME=`) raises the casts
+branch alone to 65.1%.
+
 ## The oracle
 
 Each item below was found by the tooling, not designed in. On its first run the
