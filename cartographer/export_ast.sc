@@ -1242,6 +1242,21 @@ import scala.annotation.tailrec
     * simply fall through to the existing hole, exactly as before this feature. */
   var strCursorBase = Map.empty[String, String]
 
+  /** Pointer-arith family: the `strCursorBase` roots whose BINDING cannot change
+    * while the method runs, so that every cursor seeded from one was seeded from
+    * the same VALUE: a parameter that is never rebound, or a local rebound exactly
+    * once, outside any loop. (A byte cursor's own `++`/`op=` moves only its `$off`,
+    * so for a cursor only a plain `=` counts as rebinding.)
+    *
+    * Two cursors with the same root are compared/subtracted by their `$off`s
+    * alone (`callExpr`'s cursor-pair case), which silently assumes both offsets
+    * are measured from the same address. A root rebound in between breaks that:
+    * `p = X + 10; X = X + 5; q = X + 7; p < q` compares `10 < 7` where C compares
+    * `X0+10 < X0+12`. (That shape was masked while `X = X + 5` on a `char*` was
+    * itself a hole; it no longer is.) So the cursor-pair case requires its root to
+    * be in this set, for every operator. */
+  var stableCursorRoots = Set.empty[String]
+
   /** `(owning type, member name) -> member type`, for the whole program.
     *
     * `007-reduce-remaining-holes-2`: Joern's C frontend emits multiple `TypeDecl`
@@ -4171,11 +4186,9 @@ import scala.annotation.tailrec
     *
     * A pair (`fn`, `i`, `j`) is CLOSED when every call site of `fn`, across the
     * whole analyzed program, passes at positions `i`/`j` EITHER:
-    *   - a syntactically self-evident same-buffer shape (`sameBufferAtCallSite`:
-    *     the identical expression twice, or one argument spelled as the other
-    *     PLUS/MINUS some offset expression -- C's own `zEnd = zStart + n`
-    *     idiom, checked purely structurally, no interprocedural reasoning
-    *     needed for this case at all), or
+    *   - a syntactically self-evident same-POSITION shape (`sameBufferAtCallSite`:
+    *     the identical pure expression twice -- the `zStart, zStart + n` spelling
+    *     this also used to accept was unsound, see that def), or
     *   - a FORWARDED pair -- both arguments are bare references to two
     *     parameters of the CALLING function, and THAT pair is itself already
     *     known closed (the same `Fwd` bootstrapping `closedOutParamsTransitive`
@@ -4220,29 +4233,45 @@ import scala.annotation.tailrec
 
     def normCode(n: AstNode): String = n.code.replaceAll("\\s+", "")
 
-    // `zEnd = zStart + n` (or `n + zStart`, or the `-` spelling) -- one
-    // argument IS the other, textually, plus some offset expression. Checked
-    // BEFORE the `Fwd` case: a call site can satisfy both (a forwarded
-    // parameter that ALSO happens to be shifted, `foo(zStart, zStart+k)`
-    // where `zStart` is itself a parameter) and the syntactic case needs no
-    // recursion to trust, so it is strictly the cheaper, more direct proof.
+    // The same argument expression at both positions. Checked BEFORE the `Fwd`
+    // case, since it needs no recursion to trust. (It used to also accept one
+    // argument spelled as the other plus/minus an offset -- see the comment
+    // inside for why that was unsound.)
     def sameBufferAtCallSite(a: AstNode, b: AstNode): Boolean = {
-      def isShiftedFrom(base: AstNode, whole: AstNode): Boolean = whole match {
-        case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
-          kidsOf(c) match {
-            case List(l, _) => normCode(l) == normCode(base)
-            case _ => false
-          }
-        case _ => false
-      }
-      normCode(a) == normCode(b) || isShiftedFrom(a, b) || isShiftedFrom(b, a)
+      // Pointer-arith family: ONLY the identical-expression case is sound, and
+      // only for a pure one. The consumer (`emit`) unifies the two parameters onto
+      // one `strCursorBase`, after which `zEnd - zStart` / `zEnd == zStart`
+      // compare their `$off`s -- and a parameter's `$off` starts at 0 in the
+      // callee's prologue, whatever the caller passed. So unification asserts
+      // that the two arguments are the SAME position, not merely the same
+      // buffer. `f(z, z + n)` passes two DIFFERENT positions (in Core, `z` and
+      // `strFrom z n`, both then offset 0), and the unified translation of
+      // `zEnd - zStart` answered `0` for C's `n` -- hole-free and wrong. The
+      // shifted case (one argument spelled as the other `+`/`-` an offset,
+      // previously accepted here) is therefore no longer accepted; a positional
+      // relationship across a call boundary is not representable by a shared
+      // base with per-parameter offsets that restart at 0, and needs the callee
+      // to receive the caller's offset (a Core pointer VALUE, not this
+      // per-function offset encoding) to be translated.
+      normCode(a) == normCode(b) && pureNode(a)
     }
 
     // A bare reference to a parameter of `n`'s OWN enclosing method (the call
     // site's caller) -- `(callerFullName, paramIndex)`, or `None` if `n` is not
     // such a reference at all (an expression, a local, a literal, ...).
+    //
+    // Pointer-arith family: only a parameter NEVER WRITTEN in its own method
+    // (no `=`, `op=`, `++`/`--` with it as the target) is a sound `Fwd` link --
+    // a closed pair means "the two arrived at the SAME position", and a cursor
+    // parameter that advanced before being forwarded (`zStart++; f(zStart,
+    // zEnd)`) no longer is at the position it arrived at.
+    def neverWritten(m: Method, name: String): Boolean =
+      !m.ast.isCall.exists(c =>
+        (c.methodFullName == "<operator>.assignment" || augOps.contains(c.methodFullName) ||
+         incrOps.contains(c.methodFullName)) &&
+        (kidsOf(c).headOption match { case Some(t: Identifier) => t.name == name; case _ => false }))
     def paramRefOf(n: AstNode): Option[(String, Int)] = n match {
-      case i: Identifier =>
+      case i: Identifier if neverWritten(i.method, i.name) =>
         i.method.parameter.l.find(_.name == i.name).map(p => (p.method.fullName, p.index))
       case p: MethodParameterIn => Some((p.method.fullName, p.index))
       case _ => None
@@ -5911,6 +5940,100 @@ import scala.annotation.tailrec
     case _ => false
   }
 
+  /** Pointer-arith family: `isIrefExpr`, plus a bare boxed-array name read as a
+    * value. `expr()`'s own `Identifier` case already renders such a name as
+    * `irefIndex a 0` -- C's array-to-pointer decay (see that case's comment) -- so
+    * its VALUE is a `Val.iref` exactly as surely as a tracked name's is, and its
+    * element type is the array's own declared element type. Kept local to the
+    * pointer-arithmetic/comparison sites in `callExpr` rather than folded into
+    * `isIrefExpr` itself, whose other consumers (dereference, write-through,
+    * cross-function tracking) are not this family's to widen. */
+  def isIrefOperand(n: AstNode): Boolean = isIrefExpr(n) || (n match {
+    case i: Identifier => boxedArrays.contains(localName(i.name))
+    case _ => false
+  })
+
+  /** Pointer-arith family: a C null-pointer constant -- a null literal
+    * (`isNullLiteral`: `NULL`, `nullptr`, a bare `0`), or one cast to a pointer type
+    * (`(void*)0`, what `NULL` expands to, and `(T*)0`). */
+  def isNullPointerConst(n: AstNode): Boolean = isNullLiteral(n) || (n match {
+    case c: Call if c.methodFullName == "<operator>.cast" =>
+      kidsOf(c) match {
+        case List(tref, operand) => isNullLiteral(operand) && castTargetIsPointer(tref, staticTypeOf(tref))
+        case _ => false
+      }
+    case _ => false
+  })
+
+  /** A bare integer-zero literal (`0`, `0x0`, `0L`) -- the one null spelling that is
+    * ALSO an ordinary integer, and so needs pointer evidence from the other side. */
+  def isZeroLiteralNode(n: AstNode): Boolean = n match {
+    case l: Literal => isZeroLiteral(l.code.trim)
+    case _ => false
+  }
+
+  /** Pointer-arith family: `char*`/`unsigned char*`/`char[N]` -- ONE level of
+    * indirection to a byte, unlike `isCString`, whose pattern also admits `char**`. */
+  def isSingleCharPointerType(ty: String): Boolean =
+    bareType(ty).matches("""(signed|unsigned)?char(\*|\[\d*\])""")
+  def isSingleCharPointer(n: AstNode): Boolean = isSingleCharPointerType(staticTypeOf(n))
+
+  /** Pointer-arith family: static evidence that `n` is a POINTER (so that a `0`
+    * compared against it is the null-pointer constant, not the integer zero). */
+  def hasPointerEvidence(n: AstNode): Boolean =
+    isPointerType(staticTypeOf(n)) || isCString(n) || isIrefOperand(n)
+
+  /** Pointer-arith family: the null test `v == NULL`, as ONE Core expression that is
+    * right for every representation a null pointer has in this exporter's output.
+    *
+    * There are two. `NULL`/`nullptr`/`(T*)0` render as `Val.unit` (the literal and
+    * cast cases in `expr`), but a bare `0` renders as `Val.int 0` (`intLit`), and C
+    * code writes both: `p = 0; ... if (p == NULL)`, `return 0;` from a pointer-returning
+    * function, `if (p == 0)` on a pointer that came from `(T*)0`. A plain
+    * `binop "==" v null` answers `Val.beq`, which is `false` for `.unit` vs `.int 0`
+    * -- so `p == 0` on a `NULL`-valued `p`, and `p != NULL` (which is also how the
+    * CPG spells a bare `if (p)`) on a `0`-valued one, were both silently wrong.
+    *
+    * `v in (unit, 0)` (`Expr.inOp` over a two-element `tupleE`) evaluates `v` ONCE
+    * and answers `Val.beq v .unit || Val.beq v (.int 0)` (`valIn`'s tuple case): true
+    * for either null spelling, false for every non-null pointer value Core has --
+    * `.ref`, `.iref`, `.fn`, and any `.str` INCLUDING `""` (a pointer to an empty
+    * string is not null; `Val.truthy ""` is false, which is why truthiness cannot be
+    * used here). A pointer never holds any other `.int`: integer-to-pointer casts are
+    * holes (`op:cast:pointer:int-to-pointer`). `neg` gives `!=`. */
+  /** Pointer-arith family: `c` is a null test on a pointer -- `p == NULL`,
+    * `p != 0`, `(T*)0 == p`, and the `p != NULL` the CPG writes for a bare `if (p)`
+    * -- returning the non-null operand and whether it is `!=`. A bare `0` needs
+    * pointer evidence from the other side (so `n == 0` on an integer is never
+    * touched); `NULL`/`nullptr`/`(T*)0` are their own evidence. Shared by `callExpr`
+    * and `exprV`, which translate `==`/`!=` independently and must agree. */
+  def pointerNullTest(c: Call): Option[(AstNode, Boolean)] = {
+    val kids = kidsOf(c)
+    val mfn  = c.methodFullName
+    if (!cLikeFile || kids.size != 2 ||
+        !(mfn == "<operator>.equals" || mfn == "<operator>.notEquals") ||
+        kids.count(isNullPointerConst) != 1) None
+    else {
+      val (nul, other) = if (isNullPointerConst(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+      if (hasPointerEvidence(other) || !isZeroLiteralNode(nul)) Some((other, mfn == "<operator>.notEquals"))
+      else None
+    }
+  }
+
+  /** Pointer-arith family: `!p`, `p` with pointer evidence. C defines `!E` as
+    * `(0 == E)` (C11 6.5.3.3p5), so on a pointer it is a null test -- and the generic
+    * `unop "!"` is wrong for one: it answers from `Val.truthy`, under which a
+    * `Val.str ""` (a non-null pointer to an empty string) is falsy, so `!p` came out
+    * `true`. It also inherits the `.unit`/`.int 0` split `nullTestExpr` handles. */
+  def isPointerNot(c: Call): Boolean =
+    cLikeFile && c.methodFullName == "<operator>.logicalNot" && kidsOf(c).size == 1 &&
+    hasPointerEvidence(kidsOf(c).head)
+
+  def nullTestExpr(v: ujson.Obj, neg: Boolean): ujson.Obj =
+    ujson.Obj("k" -> "inOp", "neg" -> neg, "a" -> v,
+              "b" -> ujson.Obj("k" -> "tupleE",
+                               "items" -> ujson.Arr(ujson.Obj("k" -> "unit"), intLit(0))))
+
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
     val mfn  = c.methodFullName
@@ -5936,7 +6059,20 @@ import scala.annotation.tailrec
     // mechanism). Checked BEFORE the general `cStringUnsafe` guard just below,
     // which would otherwise hole this unconditionally (both operands' types
     // still look like "a char* plus an int" to that check).
-    if (cLikeFile && (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
+    //
+    // Pointer-arith family: checked FIRST, a null test on a pointer --
+    // `p == NULL`/`p != 0`/`(T*)0 == p`, and the `p != NULL` the CPG writes for a
+    // bare `if (p)` -- becomes `nullTestExpr`, which is right for both of the
+    // null representations this exporter produces (see its doc comment); a plain
+    // `==` was wrong whenever the two sides used different ones. Needs pointer
+    // evidence for a bare `0` (so `n == 0` on an integer is untouched); a
+    // `NULL`/`nullptr`/`(T*)0` operand is its own evidence. Only the non-null
+    // side is evaluated, once, so no purity condition is needed.
+    if (pointerNullTest(c).isDefined) {
+      val (other, neg) = pointerNullTest(c).get
+      nullTestExpr(expr(other), neg)
+    }
+    else if (cLikeFile && (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
              kids.size == 2 &&
              rawLocalOrParamName(kids(0)).map(localName).exists(strCursorParams.contains) &&
              !isCString(kids(1))) {
@@ -5985,7 +6121,10 @@ import scala.annotation.tailrec
              Set("<operator>.subtraction", "<operator>.lessThan", "<operator>.lessEqualsThan",
                  "<operator>.greaterThan", "<operator>.greaterEqualsThan",
                  "<operator>.equals", "<operator>.notEquals").contains(mfn) &&
-             isIrefExpr(kids(0)) && isIrefExpr(kids(1)))
+             // Pointer-arith family: `isIrefOperand`, so a decayed boxed-array
+             // name (`p - buf`, `p == buf`, `p < aBuf`) counts too -- `expr()`
+             // renders it as `irefIndex buf 0`, a `Val.iref` like any other.
+             isIrefOperand(kids(0)) && isIrefOperand(kids(1)))
       ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     // `010-reach-90pct-hole-free` US4: `p < end` / `p == q` / ... -- TWO tracked
     // byte cursors, compared. Sound exactly when both provably measure offsets
@@ -6004,7 +6143,11 @@ import scala.annotation.tailrec
                val nmA = rawLocalOrParamName(kids(0)).map(localName).get
                val nmB = rawLocalOrParamName(kids(1)).map(localName).get
                (strCursorBase.get(nmA), strCursorBase.get(nmB)) match {
-                 case (Some(baseA), Some(baseB)) => baseA == baseB
+                 // Pointer-arith family: the shared root must also be one whose
+                 // binding cannot change between the two cursors' seedings --
+                 // see `stableCursorRoots`.
+                 case (Some(baseA), Some(baseB)) =>
+                   baseA == baseB && stableCursorRoots.contains(baseA)
                  case _ => false
                }
              }) {
@@ -6013,6 +6156,62 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "binop", "op" -> binops(mfn),
                 "a" -> ujson.Obj("k" -> "name", "v" -> (nmA + "$off")),
                 "b" -> ujson.Obj("k" -> "name", "v" -> (nmB + "$off")))
+    }
+    // Pointer-arith family: `p + n` / `n + p` / `p - n` on a `char*`, the pointer
+    // operand `isIrefExpr` (PROVABLY a `Val.iref` -- a tracked name, an interior
+    // address-of, or arithmetic/ternary/cast over one) and the other operand NOT
+    // pointer-shaped. `isIrefExpr` itself already classifies exactly this
+    // expression as an interior pointer (its `<operator>.addition`/`.subtraction`
+    // cases), and `incrStmt` already emits `p = p + 1` for the same names; only
+    // the `char*` spelling of the inline form was still refused, by the guard
+    // just below, which predates `Val.iref` and exists because a `char*` used to
+    // be a `Val.str` whose `+` concatenates. Here the left value is a `Val.iref`,
+    // whose `applyBinop` arm is element-indexed (a `char` element is one byte,
+    // so no `sizeof` scaling is being skipped), and the right one an integer:
+    // `.iref + .int` is the only arm that can answer, `.fld` selectors answer
+    // `iref:arith-on-field`, and anything unexpected (`.str + .int`) has no arm
+    // and is a dynamic hole -- never a concatenation, never a guess. `n - p` is
+    // not pointer arithmetic in C and is not admitted.
+    else if (cLikeFile && kids.size == 2 &&
+             (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
+             ((isIrefExpr(kids(0)) && !isPointerType(staticTypeOf(kids(1))) && !isCString(kids(1))) ||
+              (mfn == "<operator>.addition" && isIrefExpr(kids(1)) &&
+               !isPointerType(staticTypeOf(kids(0))) && !isCString(kids(0)))))
+      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+    // Pointer-arith family: `p + n` / `n + p` on a single-level `char*` (or `char[]`)
+    // that is NEITHER a tracked byte cursor (handled above, via `$off`) NOR an
+    // interior pointer (handled just above, via `Val.iref` arithmetic): `Expr.strFrom
+    // (expr p) n`, the string from `n` bytes past `p` onward.
+    //
+    // Faithful because of what a `Val.str` in a `char*` position already MEANS in this
+    // exporter's output: the bytes at that address up to the terminator. That is the
+    // convention every string literal, every `char[]` global, and every tracked
+    // cursor's bare read (`strFrom z z$off`, `expr`'s `Identifier` case) already
+    // relies on, and `p + n` names exactly the bytes from `n` further on -- the
+    // cursor mechanism's own `z + n` translation, minus the `$off` a non-cursor does
+    // not have (its value IS its position). Every way the result can be used is either
+    // content-only (a callee reading it, `strByte`), or identity-sensitive and then
+    // already a dynamic hole under `.cLike` (`.str`/`.str` `==`, `<`, `-`:
+    // `str:pointer-*-not-modelled`, `binop:-`), or a null test, where a `Val.str` --
+    // `""` included -- is correctly non-null (`nullTestExpr`). A `Val.str` is
+    // immutable, so a stale snapshot cannot be observed either: nothing in Core can
+    // write into one (`setIndex`/`setDerefIref` on a `.str` are holes).
+    //
+    // If `p` is NOT a `Val.str` at run time (an untracked `Val.iref` buffer, `.unit`
+    // for NULL), `strFrom` answers `strFrom:non-string-receiver` -- a hole, never a
+    // guess. A start past the end is `""` (`strFrom`'s documented clamp): for the
+    // one-past-the-end pointer that is exactly right, and anything further is
+    // undefined behaviour in C. Subtraction (`p - n`) is NOT admitted: a `Val.str`
+    // has no bytes before its own start, so it keeps its static hole rather than
+    // becoming a guaranteed dynamic one. Restricted to a SINGLE-level `char` pointee
+    // (`char**` + n is an array-of-pointers step, not a byte step).
+    else if (cLikeFile && kids.size == 2 && mfn == "<operator>.addition" && {
+               val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+               isSingleCharPointer(p) && !isIrefOperand(p) &&
+               !isPointerType(staticTypeOf(n)) && !isCString(n)
+             }) {
+      val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+      ujson.Obj("k" -> "strFrom", "a" -> expr(p), "b" -> expr(n))
     }
     else if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
         cStringUnsafe.contains(mfn) && !isNullCheck)
@@ -6025,6 +6224,9 @@ import scala.annotation.tailrec
                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
         case None     => hole("op:shiftRight:unknown-signedness")
       }
+    // Pointer-arith family: `!p` on a pointer -- see `isPointerNot`.
+    else if (isPointerNot(c))
+      nullTestExpr(expr(kids(0)), neg = false)
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
     // `009-reduce-remaining-holes-4`: `z[i]`, `z` a tracked byte cursor
@@ -7289,6 +7491,44 @@ import scala.annotation.tailrec
         ujson.Obj("k" -> "assign", "x" -> offNm,
                   "e" -> ujson.Obj("k" -> "binop", "op" -> aug.get,
                                    "a" -> ujson.Obj("k" -> "name", "v" -> offNm), "b" -> rhsE))
+      // Pointer-arith family: `p += n`/`p -= n`, `p` a `char*` PROVABLY holding an
+      // interior pointer for its whole lifetime (`ptrIrefNames`) and `n` not
+      // itself pointer-shaped. This is `incrStmt`'s own `ptrIrefNames` case (`p++`
+      // -> `p = p + 1`, already emitted for exactly these names) with a step of `n`
+      // instead of `1`: `applyBinop`'s `Val.iref`/`Val.int` arm is element-indexed,
+      // so no `sizeof` scaling is needed, and a `char*`'s element IS a byte. The
+      // `cStringUnsafe` guard just below exists because a `char*` used to be a
+      // `Val.str`, whose `+` would concatenate -- a `ptrIrefNames` name never holds
+      // a `Val.str` (every one of its assignments is an interior-pointer shape;
+      // `ptrIrefNames`' own doc comment), and even if it did, `.str + .int` has no
+      // `applyBinop` case and is a dynamic hole, never a concatenation. A `.fld`
+      // (struct-field) interior pointer likewise answers `iref:arith-on-field`,
+      // a hole, not a guess. Checked BEFORE that guard for the same reason the
+      // `strCursorParams` case above is.
+      case i: Identifier if cLikeFile && (aug.contains("+") || aug.contains("-")) &&
+                             ptrIrefNames.contains(localName(i.name)) &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ujson.Obj("k" -> "binop", "op" -> aug.get,
+                                   "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
+      // Pointer-arith family: `p += n` on an UNTRACKED single-level `char*` local
+      // (neither a byte cursor nor an interior pointer -- both handled above):
+      // `p = strFrom p n`, `callExpr`'s untracked `p + n` translation (see its
+      // comment for the faithfulness argument) written back to `p`. `-=` is not
+      // admitted, for the reason `p - n` is not there.
+      case i: Identifier if cLikeFile && aug.contains("+") && isSingleCharPointer(i) &&
+                             !ptrIrefNames.contains(localName(i.name)) &&
+                             !strCursorParams.contains(localName(i.name)) &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !boxedArrays.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
       // `s += n` on a `char*` advances a pointer; see `cStringUnsafe`. The augmented form
       // never reaches `callExpr`, so it is guarded here too.
       case _ if cLikeFile && aug.isDefined && (isCString(lhs) || isCString(rhs)) =>
@@ -7580,6 +7820,19 @@ import scala.annotation.tailrec
       val offNm = rawLocalOrParamName(tgt).map(localName).get + "$off"
       ujson.Obj("k" -> "assign", "x" -> offNm, "e" -> bump(ujson.Obj("k" -> "name", "v" -> offNm)))
     }
+    // Pointer-arith family: `p++`/`++p` on an UNTRACKED single-level `char*` local --
+    // `p = strFrom p 1`, `assignTo`'s untracked `p += 1` (see `callExpr`'s `p + n`
+    // case for why this is faithful). `--` stays a hole: a `Val.str` has no byte
+    // before its own start.
+    else if (cLikeFile && op == "+" && (tgt match { case _: Identifier => true; case _ => false }) &&
+             isSingleCharPointer(tgt) &&
+             rawLocalOrParamName(tgt).map(localName).exists(nm =>
+               !boxedLocals.contains(nm) && !boxedArrays.contains(nm))) {
+      val nm = rawLocalOrParamName(tgt).map(localName).get
+      val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+      ujson.Obj("k" -> k, "x" -> nm,
+                "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> one))
+    }
     else if (isPointerType(staticTypeOf(tgt)) || isCString(tgt)) holeS("op:" + opName + ":pointer")
     else tgt match {
       // `003-box-address-taken-locals`: `x++`/`x--` on a boxed local, same rewrite as
@@ -7844,11 +8097,22 @@ import scala.annotation.tailrec
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
         case None => (Nil, hole("op:shiftRight:unknown-signedness"))
       }
+    // Pointer-arith family: a pointer null test, prelude-aware -- the same
+    // translation `callExpr` gives it (`pointerNullTest`/`nullTestExpr`), with the
+    // one evaluated operand's prelude threaded as every other operand's is here.
+    case c: Call if pointerNullTest(c).isDefined =>
+      val (other, neg) = pointerNullTest(c).get
+      val (po, oe) = exprV(other)
+      (po, nullTestExpr(oe, neg))
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
       val List(a, b) = kidsOf(c)
       val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
       (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> binops(c.methodFullName), "a" -> ae, "b" -> be))
+    // Pointer-arith family: `!p` on a pointer is `p == 0` (see `callExpr`).
+    case c: Call if isPointerNot(c) =>
+      val (pa, ae) = exprV(kidsOf(c).head)
+      (pa, nullTestExpr(ae, neg = false))
     case c: Call if unops.contains(c.methodFullName) && kidsOf(c).size == 1 =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, ujson.Obj("k" -> "unop", "op" -> unops(c.methodFullName), "a" -> ae))
@@ -9381,8 +9645,31 @@ import scala.annotation.tailrec
     // byte-cursor tracking -- see `strCursorParams`'s own doc comment. Restricted to
     // an actual `char*`/`char[]`-typed parameter (`isCString`) so this can never fire
     // on an ordinary pointer already served by `ptrIrefNames`/`closedOutParams` above.
+    //
+    // Pointer-arith family: a name ALREADY in `ptrIrefNames` is excluded from
+    // byte-cursor tracking outright (here, and in the local-candidate rounds
+    // below). The two representations are mutually exclusive by construction --
+    // a cursor keeps its ORIGINAL value in `z` and its position in `z$off`,
+    // while an interior pointer carries its position INSIDE its own
+    // `Val.iref` value -- but nothing previously stopped one name from
+    // entering both sets, and then the two halves of the translation
+    // disagreed: its defining assignment was rendered by the cursor seed
+    // (`zEnd = z; zEnd$off = 0 + n`, `assignTo`'s cursor case), while its
+    // reads went through the `isIrefExpr` comparison/subtraction branch in
+    // `callExpr`, which reads the bare `zEnd` binding -- silently dropping
+    // the `+ n`. Reproduced on `char *z = sqlite3_malloc(n); char *zEnd = z
+    // + n; while (z < zEnd) ...`: the loop test compared `z` against the
+    // UNADVANCED base and was false on entry -- a hole-free, wrong
+    // translation. The interior-pointer reading is the one that is right for
+    // every occurrence (its arithmetic lives in the value), so it wins.
+    //
+    // Also restricted to a SINGLE-level `char` pointer (`isSingleCharPointer`,
+    // here and for locals below) rather than `isCString`, whose pattern admits
+    // `char**`: a byte cursor models a pointer to BYTES, and `argv[i]` on a
+    // `char **argv` was being read as `strByte argv (argv$off + i)` -- one byte
+    // of a string, where C reads the i-th POINTER.
     strCursorParams = (if (moduleScope) Nil else m.parameter.l)
-      .filter(p => isCString(p) && strCursorEligible(m, p.name))
+      .filter(p => isSingleCharPointer(p) && !ptrIrefNames.contains(localName(p.name)) && strCursorEligible(m, p.name))
       .map(p => localName(p.name)).toSet
     // `009-reduce-remaining-holes-4`: LOCAL variables, generalizing the mechanism
     // above beyond parameters -- SQLite's own extremely common `char *zTail = zStr +
@@ -9457,7 +9744,7 @@ import scala.annotation.tailrec
     // couple of hops deep, and a candidate that still doesn't resolve after
     // the round bound simply stays excluded, never guessed into membership.
     val localCandidates = (if (moduleScope) Nil else m.local.l)
-      .filter(l => isCStringType(l.typeFullName) && strCursorEligible(m, l.name, allowDefiningAssign = true))
+      .filter(l => isSingleCharPointerType(l.typeFullName) && strCursorEligible(m, l.name, allowDefiningAssign = true))
       .filter { l =>
         m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
           .count(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == l.name; case _ => false }) == 1
@@ -9470,7 +9757,8 @@ import scala.annotation.tailrec
     }.toMap
     for (_ <- 1 to 4) {
       val newlyQualified = candidateRhs.collect {
-        case (nm, rhs) if !strCursorParams.contains(nm) && cursorBaseAndOffset(rhs).isDefined => nm
+        case (nm, rhs) if !strCursorParams.contains(nm) && !ptrIrefNames.contains(nm) &&
+                          cursorBaseAndOffset(rhs).isDefined => nm
       }.toSet
       strCursorParams = strCursorParams ++ newlyQualified
     }
@@ -9567,6 +9855,28 @@ import scala.annotation.tailrec
       } {
         strCursorBase = strCursorBase + (nameI -> nameI) + (nameJ -> nameI)
       }
+    }
+    // Pointer-arith family: `stableCursorRoots` -- see its declaration.
+    stableCursorRoots = if (moduleScope) Set.empty else {
+      // Every write to a bare name: `(name, isPlainAssign, the write node)`. A
+      // cursor's `++`/`op=` moves only its `$off`, never its binding, so for a
+      // cursor only plain `=` counts as rebinding it.
+      val writes: List[(String, Boolean, Call)] = m.ast.isCall.filter(c =>
+          c.methodFullName == "<operator>.assignment" || augOps.contains(c.methodFullName) ||
+          incrOps.contains(c.methodFullName)).l
+        .flatMap(c => kidsOf(c).headOption.collect {
+          case t: Identifier => (localName(t.name), c.methodFullName == "<operator>.assignment", c)
+        })
+      def rebinds(nm: String): List[Call] =
+        writes.collect { case (n, plain, c) if n == nm && (plain || !strCursorParams.contains(nm)) => c }
+      def inLoop(c: Call): Boolean =
+        c.inAstMinusLeaf.collectAll[ControlStructure]
+          .exists(cs => Set("WHILE", "FOR", "DO").contains(cs.controlStructureType))
+      val params = m.parameter.l.map(p => localName(p.name)).toSet
+      val locals = m.local.l.map(l => localName(l.name)).toSet -- params
+      (params.filter(nm => rebinds(nm).isEmpty) ++
+       locals.filter(nm => rebinds(nm) match { case List(c) => !inLoop(c); case _ => false }))
+        .filter(nm => !boxedLocals.contains(nm))
     }
     val body0 = methodBody(m)
     // `003-box-address-taken-locals`: allocate every boxed local's/parameter's cell
@@ -9680,6 +9990,7 @@ import scala.annotation.tailrec
     ptrIrefAllocNames = Map.empty
     strCursorParams = Set.empty
     strCursorBase = Map.empty
+    stableCursorRoots = Set.empty
     // `self` is stripped ONLY for a method of a class, where `applyFunc` binds the
     // receiver itself. A MODULE-LEVEL function whose first parameter happens to be named
     // `self` is not a method and its `self` is an ordinary positional: cachetools defines
