@@ -335,6 +335,54 @@ import scala.annotation.tailrec
     braceless.replaceAll("/\\*(?s:.*?)\\*/", "").replaceAll("//[^\n]*", "").trim
   }
 
+  /** `011-control-flow-holes`: every name that survives in the CPG as a call or a
+    * method -- i.e. every name the parse ever saw as something other than an empty
+    * macro expansion. See `onlyEmptiedMacroCalls`. */
+  lazy val survivingCallNames: Set[String] = cpg.call.name.toSet ++ cpg.method.name.toSet
+
+  /** `011-control-flow-holes`: is `code` (a childless block's source text) nothing
+    * but `NAME(...);` statements, each naming a function-like macro that expanded to
+    * nothing? Parsed conservatively: comments stripped, then repeatedly one
+    * identifier, a balanced parenthesised argument list (string/char literals
+    * respected), and a `;`; any other text -- an assignment, a keyword, a
+    * preprocessor line, a bare identifier -- fails. Each name must also be absent
+    * from `survivingCallNames` and not a compiler builtin, so a real function whose
+    * call was dropped by a parse failure can never qualify. */
+  def onlyEmptiedMacroCalls(code: String): Boolean = {
+    val s = stripBlockCode(code)
+    val keywords = Set("if", "while", "for", "switch", "return", "sizeof", "do", "else",
+      "case", "goto", "break", "continue", "default", "typedef", "struct", "union", "enum",
+      "_Static_assert", "static_assert", "__attribute__", "asm", "__asm__", "_Alignof",
+      "alignof", "_Generic", "va_arg", "va_start", "va_end", "va_copy")
+    var i = 0; var names = List.empty[String]; var ok = s.nonEmpty
+    def ws(): Unit = while (i < s.length && s.charAt(i).isWhitespace) i += 1
+    while (ok && { ws(); i < s.length }) {
+      val st = i
+      while (i < s.length && (s.charAt(i).isLetterOrDigit || s.charAt(i) == '_')) i += 1
+      val nm = s.substring(st, i)
+      ws()
+      if (nm.isEmpty || nm.head.isDigit || i >= s.length || s.charAt(i) != '(') ok = false
+      else {
+        var depth = 0; var inStr: Char = 0; var closed = false
+        while (ok && !closed && i < s.length) {
+          val ch = s.charAt(i)
+          if (inStr != 0) {
+            if (ch == '\\') i += 1 else if (ch == inStr) inStr = 0
+          } else if (ch == '"' || ch == '\'') inStr = ch
+          else if (ch == '(') depth += 1
+          else if (ch == ')') { depth -= 1; if (depth == 0) closed = true }
+          i += 1
+        }
+        ws()
+        if (!closed || i >= s.length || s.charAt(i) != ';') ok = false
+        else { i += 1; names = nm :: names }
+      }
+    }
+    ok && names.nonEmpty && names.forall { nm =>
+      !keywords.contains(nm) && !nm.startsWith("__builtin") && !survivingCallNames.contains(nm)
+    }
+  }
+
   /** Joern's ARGUMENT index: -1 = the callee/receiver expression, 0 = the implicit
     * `self`/`this` the Python frontend threads through, >=1 = the real arguments. */
   def aidx(n: AstNode): Int = n match {
@@ -953,6 +1001,27 @@ import scala.annotation.tailrec
     * cleanup" pattern this whole feature targets), since no label there is
     * ever mid-expansion when reached again. */
   var expandingGotoLabels: Set[String] = Set.empty
+  /** `011-control-flow-holes`: labels in `gotoTailStmts` whose resolved tail ends by
+    * FALLING OFF THE END of the function body rather than at a `return` -- the
+    * spliced copy then gets an explicit `return` (of `unit`) appended. See
+    * `methodBody`'s `resolvedTailStmts`. */
+  var gotoTailFallsOff: Set[String] = Set.empty
+  /** `011-control-flow-holes`: the label a `goto` may be translated as `continue`
+    * for -- a BACKWARD jump to a top-level "restart" label, the rest of the function
+    * from that label wrapped in `while (true) { ...; break }`. Cleared inside every
+    * loop/switch exactly like `gotoAsBreak` (a `continue` there would bind to the
+    * inner loop); see `methodBody`. */
+  var gotoAsRestart: Option[String] = None
+  /** `011-control-flow-holes`: labels that are a direct child of a loop/switch body,
+    * every `goto` to which has that loop/switch as its innermost enclosing one --
+    * label -> (rest of that body after the label, `"cont"` or `"brk"`). The jump is
+    * that tail followed by the exit. Deliberately NOT cleared by `outsideLoopScope`:
+    * the proof is per-`goto`-site (innermost enclosing construct), made once in
+    * `methodBody` (`blockExitLabels`), not a property of the current scope. */
+  var gotoAsBlockExit: Map[String, (List[AstNode], String)] = Map.empty
+  /** `011-control-flow-holes`: AST nodes the `gotoAsBlockExit` splice may still copy
+    * in the current function (reset per function in `methodBody`). */
+  var blockExitSpliceBudget: Int = 0
 
   /** C and C++ specifically, as opposed to the whole `cLike` *dialect* family (which
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
@@ -6637,6 +6706,20 @@ import scala.annotation.tailrec
       nullTestExpr(expr(kids(0)), neg = false)
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
+    // `011-control-flow-holes`: unary `+e` (`<operator>.plus`, one child) is `e`.
+    // C11 6.5.3.3p1/p2: the operand must have ARITHMETIC type (never a pointer), and
+    // the result is "the value of its (promoted) operand" -- integer promotion is
+    // value-preserving by definition (6.3.1.1p2), and a floating operand is not
+    // promoted at all, so `+0.0` is `0.0` and `+(-0.0)` stays `-0.0`. Nothing is
+    // evaluated beyond `e` itself, exactly once, so `expr(e)` is the translation, not
+    // an approximation. Measured on the amalgamation: every one of the sites is a
+    // literal sign spelling (`return +1;`, `r<0 ? -0.5 : +0.5`), which is why this
+    // used to be an `op:plus` hole for a value with no semantics of its own. Gated to
+    // C/C++ files (`cppFile`): Python/JS unary `+` performs a numeric CONVERSION
+    // (`+"3"` is 3), which is not the identity and keeps the generic hole. (In C++ an
+    // overloaded `operator+` is a named call, never `<operator>.plus`.)
+    else if (mfn == "<operator>.plus" && kids.size == 1 && cppFile)
+      expr(kids(0))
     // `009-reduce-remaining-holes-4`: `z[i]`, `z` a tracked byte cursor
     // (`strCursorParams`) -- C's own `z[i]` is exactly `*(z+i)`, so this reads the
     // byte at `z`'s CURRENT offset plus `i`, not literal position `i` from the
@@ -7558,9 +7641,12 @@ import scala.annotation.tailrec
     * itself evaluating `true`. */
   def outsideLoopScope[A](f: => A): A = {
     val savedBreak = gotoAsBreak
+    val savedRestart = gotoAsRestart
     gotoAsBreak    = None
+    gotoAsRestart  = None
     val r = f
     gotoAsBreak   = savedBreak
+    gotoAsRestart = savedRestart
     r
   }
 
@@ -7623,30 +7709,139 @@ import scala.annotation.tailrec
     if (n.isEmpty || n.contains("<") || n.contains("(")) "unnamed-operator" else n
   }
 
-  def pushDoTest(v: ujson.Value, cond: ujson.Value): ujson.Value = v match {
+  def pushDoTest(v: ujson.Value, cond: ujson.Value,
+                 prelude: List[ujson.Obj] = Nil): ujson.Value = v match {
     case o: ujson.Obj =>
       o.value.get("k").map(_.str) match {
         case Some("cont") =>
-          ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
-                    "e" -> ujson.Obj("k" -> "brk"))
+          seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
+                                     "e" -> ujson.Obj("k" -> "brk")))
         case Some("loop") | Some("forIn") => o
         case _ =>
-          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond)) })
+          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond, prelude)) })
       }
-    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond)))
+    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond, prelude)))
     case other        => other
   }
 
   def forStmt(cs: ControlStructure): ujson.Obj = {
     val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
-    if (ks.size != 4) holeS("control:FOR:elided-clause")
-    else outsideLoopScope {
-      val step = stmt(ks(2))
-      val body = pushStep(stmt(ks(3)), step)
-      seqOf(List(stmt(ks(0)),
-                 ujson.Obj("k" -> "loop", "c" -> expr(ks(1)),
-                           "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
+    val clauses: Option[(Option[AstNode], Option[AstNode], Option[AstNode], AstNode)] =
+      if (ks.size == 4) Some((Some(ks(0)).filterNot(forInitIsBlankBlock(cs, _)), Some(ks(1)), Some(ks(2)), ks(3)))
+      else forClausesByOrder(cs, ks)
+    clauses match {
+      case None => holeS("control:FOR:elided-clause")
+      case Some((initN, condN, stepN, bodyN)) => outsideLoopScope {
+        val step = stepN.map(stmt).getOrElse(skip)
+        val body = pushStep(stmt(bodyN), step)
+        val loopBody = ujson.Obj("k" -> "seq", "a" -> body, "b" -> step)
+        // `011-control-flow-holes`: a controlling expression with a prelude
+        // (`for (; (c = *z) != 0; z++)`) -- same shape and the same argument as
+        // `while`'s own case in `stmt`: `P; if (v) skip else break` at the top of the
+        // body, re-run on every iteration. `continue` is `step; continue` (via
+        // `pushStep`, unchanged), and `Stmt.loop` then re-enters at the top, i.e.
+        // `P` and the test run after the step -- C's order (6.8.5.3). An omitted
+        // condition is "replaced by a nonzero constant" (6.8.5.3p2): `true`.
+        val (pc, cv) = condN match {
+          case None => (Nil, ujson.Obj("k" -> "bool", "v" -> true))
+          case Some(cn) => exprV(cn) match {
+            case (Nil, _) => (Nil, expr(cn))   // no prelude: plain `expr`, byte-identical to before
+            case other    => other
+          }
+        }
+        val theLoop =
+          if (pc.isEmpty) ujson.Obj("k" -> "loop", "c" -> cv, "body" -> loopBody)
+          else ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                         "body" -> seqOf(pc ++ List(
+                           ujson.Obj("k" -> "ifte", "c" -> cv, "t" -> skip, "e" -> ujson.Obj("k" -> "brk")),
+                           loopBody)))
+        seqOf(List(initN.map(stmt).getOrElse(skip), theLoop))
+      }
     }
+  }
+
+  /** `011-control-flow-holes`: a `for` with fewer than four (non-`LOCAL`) children,
+    * resolved clause-by-clause instead of holed as ambiguous.
+    *
+    * The ambiguity `forStmt`'s doc comment names is real for a POSITIONAL reading --
+    * three children could be any three of four clauses -- but the C frontend does not
+    * lose the information: it builds each clause with its fixed ORDER (init 1,
+    * condition 2, step 3, body 4) and simply emits nothing for an omitted one, so the
+    * surviving children's `order` says which clauses they are. (An omitted INIT
+    * shows up as an empty BLOCK at order 1, so in practice only the condition and the
+    * step go missing -- `for (;;)`, `for (j = i+1; ; j++)`.) Two independent
+    * confirmations are required before trusting it:
+    *
+    *  - the orders must be distinct, drawn from 1..4, and include the body (4);
+    *  - the header text itself (`cs.code`, which carries `for (A;B;C)`) must split
+    *    into exactly three top-level `;`-separated clauses whose EMPTINESS matches
+    *    the missing orders one for one -- so a clause that went missing for any
+    *    reason other than being blank in the source (a parse failure) is not
+    *    silently read as omitted.
+    *
+    * Anything else stays `control:FOR:elided-clause`. */
+  def forClausesByOrder(cs: ControlStructure, ks: List[AstNode])
+      : Option[(Option[AstNode], Option[AstNode], Option[AstNode], AstNode)] = {
+    val orders = ks.map(_.order)
+    val byOrder = ks.map(k => k.order -> k).toMap
+    val ordersOk = orders.distinct.size == orders.size && orders.forall(o => o >= 1 && o <= 4) &&
+                   byOrder.contains(4)
+    val headerOk = ordersOk && forHeaderClauses(cs.code).exists { parts =>
+      (1 to 3).forall { k =>
+        val blank = parts(k - 1).isEmpty
+        blank == !byOrder.contains(k) ||
+          // an omitted init that the frontend still materialised as an empty BLOCK
+          (k == 1 && blank && byOrder.get(1).exists {
+            case b: Block => kidsOf(b).isEmpty
+            case _        => false
+          })
+      }
+    }
+    if (!headerOk) None
+    else Some((byOrder.get(1).filterNot(forInitIsBlankBlock(cs, _)), byOrder.get(2), byOrder.get(3), byOrder(4)))
+  }
+
+  /** `011-control-flow-holes`: the three `;`-separated clauses of a `for` header's
+    * source text (`for (A;B;C)` -> `A`,`B`,`C`, comments removed), or `None` if the
+    * text does not parse as exactly that. Tracks nesting and string/char literals so a
+    * `;` inside either is not a separator. */
+  def forHeaderClauses(code: String): Option[List[String]] = {
+    val open = code.indexOf('(')
+    if (!code.trim.startsWith("for") || open < 0) None
+    else {
+      var depth = 0; var i = open; val parts = scala.collection.mutable.ListBuffer.empty[String]
+      val cur = new StringBuilder; var inStr: Char = 0; var done = false
+      while (i < code.length && !done) {
+        val ch = code.charAt(i)
+        if (inStr != 0) {
+          cur.append(ch)
+          if (ch == '\\' && i + 1 < code.length) { cur.append(code.charAt(i + 1)); i += 1 }
+          else if (ch == inStr) inStr = 0
+        } else ch match {
+          case '"' | '\'' => inStr = ch; cur.append(ch)
+          case '(' | '[' | '{' =>
+            depth += 1; if (depth > 1) cur.append(ch)
+          case ')' | ']' | '}' =>
+            depth -= 1
+            if (depth == 0) { parts += cur.toString; done = true } else cur.append(ch)
+          case ';' if depth == 1 => parts += cur.toString; cur.clear()
+          case _ => cur.append(ch)
+        }
+        i += 1
+      }
+      if (done && parts.size == 3) Some(parts.toList.map(_.replaceAll("/\\*(?s:.*?)\\*/", "").trim))
+      else None
+    }
+  }
+
+  /** `011-control-flow-holes`: is `n` the empty BLOCK the C frontend materialises
+    * for an OMITTED `for` init (`for (; c; s)`)? It carries the separator as its code,
+    * which `stmt`'s empty-block check would otherwise report as dropped content
+    * (`stmt:empty-ast-children`). Requires both no children and a blank first clause
+    * in the header text, so a genuinely unparsed init is still a hole. */
+  def forInitIsBlankBlock(cs: ControlStructure, n: AstNode): Boolean = n match {
+    case b: Block => kidsOf(b).isEmpty && forHeaderClauses(cs.code).exists(_.head.isEmpty)
+    case _        => false
   }
 
   /** Assignment, including the augmented forms, to any of the three target shapes. */
@@ -8685,6 +8880,36 @@ import scala.annotation.tailrec
     * bump statement (`Env.set` binds any name; no prior declaration is needed). */
   def freshExprVTemp(): String = { val n = "$exprV$" + exprVTempCounter; exprVTempCounter += 1; n }
 
+  /** `011-control-flow-holes`: the operands of a C comma expression delivered as a
+    * BLOCK in expression position (see `exprV`'s own case for the semantics), or
+    * `None` if this block is not that shape. C/C++ files only (`pysrc2cpg`'s own
+    * expression BLOCKs are temp-binding lowerings with a different meaning, handled by
+    * `blockExpr`). Every item must itself be an expression node -- a call/operator,
+    * a name or a literal, or a nested comma block -- so a declaration (`LOCAL`, whose
+    * block scope Core's flat environment cannot express) or any statement shape keeps
+    * the existing hole. */
+  def commaItems(b: Block): Option[List[AstNode]] = {
+    val items = kidsOf(b)
+    def isExprItem(n: AstNode): Boolean = n match {
+      case _: Call | _: Identifier | _: Literal => true
+      case nb: Block                            => commaItems(nb).isDefined
+      case _                                    => false
+    }
+    if (cppFile && items.size >= 2 && items.forall(isExprItem)) Some(items) else None
+  }
+
+  /** `011-control-flow-holes`: a function-like macro invocation (`dispatchType ==
+    * "INLINED"`) whose expansion BLOCK has MORE than one child -- the case
+    * `unwrapMacro` deliberately leaves alone -- returned as that expansion block when
+    * it is a pure comma expression (`commaItems`). The macro's own argument children
+    * are NOT evaluated: a preprocessor substitutes them textually into the expansion,
+    * which is exactly the block this returns, so reading the expansion is what the
+    * compiler itself sees. */
+  def macroCommaBlock(c: Call): Option[Block] =
+    if (c.dispatchType != "INLINED") None
+    else c.astChildren.collect { case b: Block => b }.headOption
+           .filter(b => b.astChildren.size > 1 && commaItems(b).isDefined)
+
   /** FR-005/FR-008: an assignment (plain or augmented) reached in expression
     * position. On a provably pure target, the write is `assignTo` verbatim and the
     * value is a fresh READ of the target after the write -- deliberately NOT a
@@ -8831,6 +9056,73 @@ import scala.annotation.tailrec
         val realArgs = kidsOf(c).filter(aidx(_) >= 1)
         pointerCallFieldDynamic(c, realArgs).getOrElse((Nil, baseline))
       }
+    // `011-control-flow-holes`: `a && b` / `a || b` -- a SOUNDNESS fix, not only a
+    // coverage one. These fell to the generic `binops` pass-through below, which
+    // concatenates `pa ++ pb` ahead of the value -- so `b`'s prelude (an assignment,
+    // `x++`, a hoisted pointer call, ...) ran UNCONDITIONALLY, before `a` was even
+    // evaluated. C's `&&`/`||` (6.5.13/6.5.14) evaluate `b` ONLY when `a` did not
+    // decide the result, with a sequence point between them. Confirmed live on a
+    // fixture: `if (a && (c = f(a)) != 0)` exported as `c = f(a); if (a && c != 0)`,
+    // calling `f` even when `a == 0` -- and SQLite spells exactly this all over
+    // (`pBt->pPage1==0 && SQLITE_OK==(rc = lockBtree(pBt))`).
+    //
+    // The faithful shape, when `b` needs a prelude:
+    //
+    //     pa;  L := a;  if (L) { pb; R := b }          (for `||`: `if (L) skip else ...`)
+    //     value:  L && R                                 (resp. `L || R`)
+    //
+    // `a` is evaluated exactly once, after its own prelude and before anything of
+    // `b`'s -- the sequence point. `pb`/`b` run exactly when Core's own `evalExpr`
+    // short-circuit (Semantics.lean, the `op == "&&" && !x.truthy` test) would have
+    // evaluated `b`: `ifte` branches on `.truthy` of the same value. The final
+    // `binop` re-reads only the two fresh temporaries (pure reads): when `L` decides
+    // the result `R` is never read (it may be unbound -- exactly as unevaluated as the
+    // original `b`), otherwise it applies the identical `applyBinop` to the identical
+    // two values, so the 0/1-vs-value dialect rule is untouched too. When `b` has NO
+    // prelude nothing changes at all (`pa` was already safe to hoist: `a` is always
+    // evaluated first).
+    case c: Call if (c.methodFullName == "<operator>.logicalAnd" ||
+                     c.methodFullName == "<operator>.logicalOr") && kidsOf(c).size == 2 =>
+      val List(a, b) = kidsOf(c)
+      val op = binops(c.methodFullName)
+      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+      if (pb.isEmpty) (pa, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+      else {
+        val lt = freshExprVTemp(); val rt = freshExprVTemp()
+        val runRight = seqOf(pb :+ ujson.Obj("k" -> "assign", "x" -> rt, "e" -> be))
+        val guard =
+          if (op == "&&") ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> lt),
+                                    "t" -> runRight, "e" -> skip)
+          else ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> lt),
+                         "t" -> skip, "e" -> runRight)
+        (pa ++ List(ujson.Obj("k" -> "assign", "x" -> lt, "e" -> ae), guard),
+         ujson.Obj("k" -> "binop", "op" -> op, "a" -> ujson.Obj("k" -> "name", "v" -> lt),
+                   "b" -> ujson.Obj("k" -> "name", "v" -> rt)))
+      }
+    // `011-control-flow-holes`: unary `+e` -- see `callExpr`'s own matching case for
+    // why it is exactly `e`; threaded here so `+(x = v)` keeps `e`'s prelude.
+    case c: Call if c.methodFullName == "<operator>.plus" && kidsOf(c).size == 1 && cppFile =>
+      exprV(kidsOf(c).head)
+    // `011-control-flow-holes`: a C comma expression `(e1, e2, ..., en)`, which the
+    // C frontend delivers as a BLOCK in expression position -- either written
+    // directly or as the expansion of a function-like macro whose body is one
+    // (`UNUSED_PARAMETER2(x,y)` -> `(void)(x),(void)(y)`; SQLite's `putVarint32`
+    // -> `(v<0x80) ? (*(p)=(u8)(v)), 1 : f(p,v)`). C11 6.5.17p2: the left operand
+    // is evaluated as a void expression, then a sequence point, then the right
+    // operand, whose value is the result. So `e1..e(n-1)` become statements run in
+    // order (`stmt`, which evaluates an expression for its effects and discards the
+    // value -- the same translation the same node would get as a statement of its
+    // own), and `en` is the value, its own prelude threaded after theirs: exactly the
+    // source order. Only the pure comma shape qualifies (`commaItems`: every item an
+    // expression node -- no declaration, which could shadow an outer name in Core's
+    // flat environment, and no statement, which a GNU statement-expression could
+    // carry); anything else keeps `blockExpr`'s own `expr:BLOCK-*` hole.
+    case b: Block if commaItems(b).isDefined =>
+      val items = commaItems(b).get
+      val (pl, v) = exprV(items.last)
+      (items.init.map(stmt) ++ pl, v)
+    case c: Call if macroCommaBlock(c).isDefined =>
+      exprV(macroCommaBlock(c).get)
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
@@ -8871,6 +9163,29 @@ import scala.annotation.tailrec
     // doc comment for the full bug report and reasoning) for the identical
     // `exprV`-never-routes-through-`callExpr` reason the `boxedArrays` case just
     // below already documents for itself.
+    // `011-control-flow-holes`: `z[i]`, `z` a tracked byte cursor -- `callExpr`'s
+    // own matching case (`strByte z (z$off + i)`), which this function lacked: the
+    // generic `index` case below read position `i` from the ORIGINAL string start,
+    // silently wrong once `z` has advanced. Found by diffing loop conditions after
+    // they started going through `exprV` (`sqlite3StrIHash`'s `while (z[0])`); the
+    // same gap affected `if` conditions, which have used `exprV` since
+    // `006-reduce-remaining-holes`. Checked first, exactly as in `callExpr`.
+    // Deliberately NARROWER than `callExpr`'s case: only a receiver whose static type
+    // is a single-level `char *` (one `*`, no array). `isCStringType` also accepts
+    // `char **` (`argv`, `azResult`), for which `strByte` would read a BYTE where C
+    // reads a `char *` element -- `callExpr` has that problem today (reported, not
+    // fixed here: it belongs to the pointer-arithmetic family); this case must not
+    // spread it into positions that currently read the element with `index`.
+    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
+                    rawLocalOrParamName(kidsOf(c)(0)).map(localName).exists(strCursorParams.contains) &&
+                    { val t = staticTypeOf(kidsOf(c)(0)).replace(" ", "")
+                      t.count(_ == '*') == 1 && !t.contains("[") && isCStringType(t) } =>
+      val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
+      val (pb, be) = exprV(kidsOf(c)(1))
+      (pb, ujson.Obj("k" -> "strByte", "a" -> ujson.Obj("k" -> "name", "v" -> nm),
+                     "b" -> ujson.Obj("k" -> "binop", "op" -> "+",
+                                      "a" -> ujson.Obj("k" -> "name", "v" -> (nm + "$off")),
+                                      "b" -> be)))
     case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     isIrefExpr(kidsOf(c)(0)) =>
       val List(a, b) = kidsOf(c)
@@ -9133,7 +9448,22 @@ import scala.annotation.tailrec
       // on the floor": on the SQLite CPG, 15%+ of core-file functions hit the
       // latter, each exporting as a hole-free `skip` that in fact translated
       // nothing of the function's real body.
-      if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
+      //
+      // `011-control-flow-holes`: one sub-shape of the ambiguity IS decidable -- a
+      // body whose entire source is invocations of function-like macros that the
+      // parse expanded to NOTHING (`{ testcase( page0!=0 ); }`, `{ VdbeComment((v,
+      // "...")); }`, `{ PAGERTRACE(("...")); }` -- SQLite's debug/coverage hooks,
+      // `#define testcase(X)` with an empty body in the configuration the CPG was
+      // built under). The preprocessor removed them, so the compiler sees `{ }` too
+      // and `skip` is exactly right. `onlyEmptiedMacroCalls` requires each invoked
+      // name to leave NO trace anywhere in the CPG (no CALL, no METHOD of that name
+      // -- any macro that ever expands to something is an `INLINED` call, and any real
+      // function is called or defined somewhere): measured on the amalgamation, every
+      // qualifying name (17 of them) is `#define`d empty in `sqlite3.c`, while the
+      // genuine parse-failure bodies (`{ width = va_arg(ap,int); }`,
+      // `#if`-guarded bodies) fail the shape test and keep this hole.
+      if (kids.isEmpty && stripBlockCode(b.code).nonEmpty && onlyEmptiedMacroCalls(b.code)) skip
+      else if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
       else forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case td: TypeDecl => skip   // a struct/union/typedef/class decl carries no behaviour either
@@ -9248,8 +9578,34 @@ import scala.annotation.tailrec
           // A `while` whose condition is the frontend's synthetic iterator probe only
           // makes sense inside the `for` shape above; on its own it is not a condition.
           if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
-          else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
-                         "body" -> outsideLoopScope(stmt(kids(1))))
+          else {
+            // `011-control-flow-holes`: the "real, separate increment" the comment
+            // above defers -- `while ((c = next()) != 0)`, `while (n-- > 0)`. With a
+            // prelude `P` and value `v`, the faithful shape is
+            //
+            //     while (true) { P; if (v) skip else break; B }
+            //
+            // which evaluates `P` then tests `v` before EVERY iteration, including
+            // the first, exactly once per test -- C's `while` (6.8.5.1). A `continue`
+            // in `B` needs no rewriting: `Stmt.loop` re-runs its body from the top,
+            // i.e. re-runs `P` and the test, which is exactly where C's `continue`
+            // goes. `break` leaves the loop either way. `P` itself never contains a
+            // `brk`/`cont` (it is built by `exprV` from expression nodes only), so the
+            // synthetic test's `break` is the only new jump, and it belongs to this
+            // loop. With no prelude, the unchanged shape.
+            // With no prelude the condition stays plain `expr` -- byte-identical to
+            // before (`exprV`'s value for a prelude-free node is not guaranteed to be
+            // `expr`'s own; see its `strCursorParams` index case).
+            val (pc, cv) = exprV(kids(0))
+            if (pc.isEmpty)
+              ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
+                        "body" -> outsideLoopScope(stmt(kids(1))))
+            else
+              ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                        "body" -> seqOf(pc ++ List(
+                          ujson.Obj("k" -> "ifte", "c" -> cv, "t" -> skip, "e" -> ujson.Obj("k" -> "brk")),
+                          outsideLoopScope(stmt(kids(1))))))
+          }
 
         // `do B while (C)` is NOT `while (C) B`, and translating it as one was a silent
         // mistranslation: a do-while runs its body at least once, so with `C` initially
@@ -9265,13 +9621,41 @@ import scala.annotation.tailrec
         // loops keep their own `continue` (`pushDoTest` stops at `loop`/`forIn`), and `C`
         // may be evaluated more than once per source iteration only on paths where the
         // original would have evaluated it too.
+        //
+        // `011-control-flow-holes`: WHICH child is the condition is read from the
+        // CPG's own CONDITION edge, not assumed to be `kids(0)`. The C frontend emits
+        // a do-while's children in SOURCE order -- body first (order 1), condition
+        // second (order 2), confirmed on all 83 do-whiles of the SQLite amalgamation
+        // -- so the positional reading translated the BODY as the condition and the
+        // CONDITION as the body: `do { ... } while ((p = p->pNext) != 0)` exported
+        // as `loop { p = p->pNext; (p != 0); if <hole: expr:BLOCK-prelude> ... }`,
+        // the whole real body gone. With a braced body that surfaced only as an
+        // `expr:BLOCK-prelude` hole; with a single-statement body (`do x = f(x);
+        // while (c);`) it was silently wrong. `kids(0)` stays the fallback only when
+        // the graph carries no single CONDITION edge (a frontend that does not
+        // record it), which is the old behaviour. The condition may also carry a
+        // prelude (`while ((p = p->pNext) != 0)`): both the trailing test and every
+        // `continue`'s test become `P; if (v) ...` -- `P` evaluated exactly where
+        // C evaluates the controlling expression (6.8.5.2: after each execution of
+        // the body, and a `continue` jumps to "the end of the loop body").
         case "DO" if kids.size >= 2 =>
-          if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
+          val rawKids = cs.astChildren.l
+          val condIdx = cs.condition.l match {
+            case List(cn) => rawKids.indexWhere(_ eq cn)
+            case _        => -1
+          }
+          val (condN, bodyN) =
+            if (kids.size == 2 && condIdx >= 0 && condIdx < 2) (kids(condIdx), kids(1 - condIdx))
+            else (kids(0), kids(1))
+          if (condN.isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
           else {
-            val cond = expr(kids(0))
-            val test = ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
-                                 "e" -> ujson.Obj("k" -> "brk"))
-            val body = pushDoTest(outsideLoopScope(stmt(kids(1))), cond)
+            val (pc, cond) = exprV(condN) match {
+              case (Nil, _) => (Nil, expr(condN))   // no prelude: plain `expr`, as `while`
+              case other    => other
+            }
+            val test = seqOf(pc :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
+                                             "e" -> ujson.Obj("k" -> "brk")))
+            val body = pushDoTest(outsideLoopScope(stmt(bodyN)), cond, pc)
             ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
                       "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> test))
           }
@@ -9293,7 +9677,47 @@ import scala.annotation.tailrec
                        !expandingGotoLabels.contains(kids.head.code.trim) =>
           val label = kids.head.code.trim
           expandingGotoLabels += label
-          val result = seqOf(stmts(gotoTailStmts(label)))
+          // `011-control-flow-holes`: a tail that ends by falling off the function's
+          // end gets that implicit exit made explicit -- see `resolvedTailStmts`.
+          val exitS = if (gotoTailFallsOff.contains(label))
+                        List(ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))) else Nil
+          val result = seqOf(stmts(gotoTailStmts(label)) ++ exitS)
+          expandingGotoLabels -= label
+          result
+        // `011-control-flow-holes`: `goto L`, `L` a top-level restart label this
+        // function's body from `L` onward is wrapped in a one-shot loop for (see
+        // `methodBody`), and this site is not inside any nested loop/switch
+        // (`outsideLoopScope` clears `gotoAsRestart`).
+        case "GOTO" if gotoAsRestart.isDefined && kids.map(_.code.trim) == List(gotoAsRestart.get) =>
+          ujson.Obj("k" -> "cont")
+        // `011-control-flow-holes`: `goto L`, `L` a direct child of the body of this
+        // site's innermost enclosing loop/switch -- the rest of that body from `L`,
+        // then `continue` (loop) / `break` (switch). See `methodBody`'s
+        // `blockExitLabels`; a re-entrant expansion keeps the hole.
+        //
+        // Bounded: a `goto` inside a large `switch` (SQLite's `sqlite3VdbeExec` opcode
+        // dispatch) would otherwise copy most of the switch body at every site, nested
+        // copies multiplying -- confirmed to exhaust the JVM heap, and even when it
+        // fits, every copy duplicates the tail's own unrelated holes into the ledger.
+        // So a tail is spliced only if it is small (<= 400 AST nodes), contains no
+        // `goto` of its own (no chained expansion), and fits the per-function
+        // `blockExitSpliceBudget`; otherwise the site keeps the `control:GOTO` hole --
+        // a size limit, never a different translation.
+        case "GOTO" if kids.size == 1 && gotoAsBlockExit.contains(kids.head.code.trim) &&
+                       !expandingGotoLabels.contains(kids.head.code.trim) && {
+                         val tl = gotoAsBlockExit(kids.head.code.trim)._1
+                         val sz = tl.map(_.ast.size).sum
+                         sz <= 400 && sz <= blockExitSpliceBudget &&
+                           !tl.exists(_.ast.exists {
+                             case g: ControlStructure => g.controlStructureType == "GOTO"
+                             case _                   => false
+                           })
+                       } =>
+          val label = kids.head.code.trim
+          val (tail, exit) = gotoAsBlockExit(label)
+          blockExitSpliceBudget -= tail.map(_.ast.size).sum
+          expandingGotoLabels += label
+          val result = seqOf(stmts(tail) :+ ujson.Obj("k" -> exit))
           expandingGotoLabels -= label
           result
         case "BREAK"    => ujson.Obj("k" -> "brk")
@@ -9495,10 +9919,10 @@ import scala.annotation.tailrec
   def methodBody(m: Method): ujson.Obj = {
     val body   = m.body
     val ks     = kidsOf(body)
-    val labels = body.ast.collect {
+    val allLabels = body.ast.collect {
       case j: JumpTarget if j.parserTypeName == "CASTLabelStatement" => j
     }.l
-    val jumps  = body.ast.collect {
+    val allJumps  = body.ast.collect {
       case c: ControlStructure if c.controlStructureType == "GOTO" => c
     }.l
     val idx = ks.indexWhere {
@@ -9524,6 +9948,88 @@ import scala.annotation.tailrec
       }
       ks.indexWhere(_ eq cur)
     }
+    /** `011-control-flow-holes`: labels in the body block (directly, or via plain `{}` blocks) of a
+      * loop or switch `S`, every `goto` to which has `S` itself as its innermost
+      * enclosing `for`/`while`/`do`/`switch`:
+      *
+      *     for (...) { ...; if (c) goto next; ...; next: T; }
+      *     switch (op) { case A: if (v) goto dflt; ...; default: dflt: T; }
+      *
+      * Such a jump means "run the rest of `S`'s body from the label, `T`, then leave
+      * the body the way reaching its end does" -- and each `S` has a Core statement
+      * for exactly that exit: the end of a LOOP body is `continue` (C11 6.8.6.2p2
+      * defines `continue` as a jump to just before the end of the body; `pushStep` /
+      * `pushDoTest` then give a `for` its step and a `do` its test, exactly as for a
+      * written `continue`), and the end of a SWITCH body is `break` (the switch is
+      * done; `Stmt.breakBlock` catches it). So the `goto` is replaced by a copy of `T`
+      * followed by that exit -- the same tail-splice `gotoTailStmts` uses at function
+      * level, with the loop/switch exit playing the role of its trailing `return`:
+      * the copy can never complete `.normal`, so nothing after the `goto` site runs.
+      * A `break`/`continue` inside `T` binds to `S` in the copy exactly as in the
+      * original (the copy sits inside `S` too, and the site has no nearer
+      * loop/switch). `case`/`default` markers inside `T` are dropped (falling past a
+      * case label is a no-op; the value node after a `case` marker is not a
+      * statement). A `goto` inside a nested loop/switch is rejected (the exit would
+      * bind to that inner construct). A `goto` from within `T` itself to the same
+      * label would re-expand forever; `expandingGotoLabels` turns that into the
+      * ordinary `control:GOTO` hole. These labels and their jumps are removed from
+      * what the function-level mechanisms below consider, since this one fully
+      * accounts for them. Values: (tail nodes, exit statement kind). */
+    val blockExitLabels: Map[String, (List[AstNode], String)] = {
+      def innermost(n: AstNode): Option[AstNode] = ancestorsTo(n).reverse.collectFirst {
+        case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) => cs
+      }
+      def dropCaseMarkers(ns: List[AstNode]): List[AstNode] = ns match {
+        case (j: JumpTarget) :: _ :: rest if j.parserTypeName == "CASTCaseStatement" => dropCaseMarkers(rest)
+        case (j: JumpTarget) :: rest if j.parserTypeName == "CASTDefaultStatement"   => dropCaseMarkers(rest)
+        case n :: rest => n :: dropCaseMarkers(rest)
+        case Nil       => Nil
+      }
+      // The label may also sit inside PLAIN nested blocks within that body
+      // (`default: { dflt: ...; }`, SQLite's `sqlite3ExprIfTrue`): a plain `{ }`
+      // block is not a control construct, so when it ends control simply continues
+      // with the statements after it in its own enclosing block. The tail is then
+      // the rest of the innermost block after the label, followed by the rest of each
+      // enclosing plain block after the block it contains, up to the loop/switch
+      // body -- exactly the statements C executes, in order. Only `Block`-in-`Block`
+      // nesting is walked; any other construct in between (an `if` branch, ...)
+      // disqualifies the label.
+      def climb(n: AstNode, acc: List[AstNode]): Option[(Block, List[AstNode], AstNode)] =
+        parentOf(n) match {
+          case Some(blk: Block) =>
+            val sibs = kidsOf(blk)
+            val at = sibs.indexWhere(_ eq n)
+            if (at < 0) None
+            else {
+              val acc2 = acc ++ sibs.drop(at + 1)
+              parentOf(blk) match {
+                case Some(outer: Block) => climb(blk, acc2)
+                case _                  => Some((blk, acc2, n))
+              }
+            }
+          case _ => None
+        }
+      allLabels.flatMap { l =>
+        val sameName = allLabels.count(_.name == l.name) == 1
+        climb(l, Nil) match {
+          case Some((blk, tailNodes, _)) if sameName =>
+            val ownerOpt = parentOf(blk).collect {
+              case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) &&
+                                           !cs.condition.l.exists(_ eq blk) &&
+                                           (cs.controlStructureType != "FOR" || blk.order == 4) => cs
+            }
+            val myJumps = allJumps.filter(g => kidsOf(g).map(_.code.trim) == List(l.name))
+            if (ownerOpt.isDefined && myJumps.nonEmpty &&
+                myJumps.forall(g => innermost(g).exists(_ eq ownerOpt.get))) {
+              val exit = if (ownerOpt.get.controlStructureType == "SWITCH") "brk" else "cont"
+              Some(l.name -> (dropCaseMarkers(tailNodes), exit))
+            } else None
+          case _ => None
+        }
+      }.toMap
+    }
+    val labels = allLabels.filterNot(l => blockExitLabels.contains(l.name))
+    val jumps  = allJumps.filterNot(g => kidsOf(g).size == 1 && blockExitLabels.contains(kidsOf(g).head.code.trim))
     /** `010-reach-90pct-hole-free` US6: generalizes `tailAlwaysExits` below from
       * "is `ks.last` a bare `Return`" to "does a forward scan from this label's
       * own position reach a bare `Return` (truncate there -- everything after is
@@ -9566,8 +10072,22 @@ import scala.annotation.tailrec
       * contains no unresolved `goto` to a label this same resolution pass
       * covers, and re-translating it via the ordinary `stmt()`/`gotoTailStmts`
       * dispatch can never recurse back into this computation. */
-    val resolvedTailCache = scala.collection.mutable.Map.empty[String, Option[List[AstNode]]]
-    def resolvedTailStmts(labelName: String, depth: Int): Option[List[AstNode]] =
+    //
+    // `011-control-flow-holes`: the second component says whether the resolved tail
+    // ends by FALLING OFF THE END of the function body (the scan ran out of `ks`
+    // without meeting a `return` or a `goto`) -- previously `None`, which left every
+    // `void` function's `goto cleanup;` whose cleanup simply ends at the closing
+    // brace (`attachFunc`, `sqlite3FinishTrigger`, `sqlite3AddGenerated`, ...) a
+    // `control:GOTO` hole. Falling off the end of a function body IS an exit: Core's
+    // `applyFunc` maps a body that finishes `.normal` to the value `unit`, and maps
+    // `.ret unit` to the identical `unit`. So the splice site appends an explicit
+    // `return` (of `unit`) after such a tail (`gotoTailFallsOff`), which (a) is
+    // observationally identical to reaching the end of the function, and (b) restores
+    // exactly the property the splice's soundness rests on -- the spliced copy never
+    // completes `.normal`, so nothing after the `goto` site can run. A tail reached
+    // through a chain of `goto`s inherits the flag of the tail it ends in.
+    val resolvedTailCache = scala.collection.mutable.Map.empty[String, Option[(List[AstNode], Boolean)]]
+    def resolvedTailStmts(labelName: String, depth: Int): Option[(List[AstNode], Boolean)] =
       if (depth > labels.size) None
       else resolvedTailCache.getOrElseUpdate(labelName + "@" + depth, {
         val labelIdx = ks.indexWhere { case j: JumpTarget => j.name == labelName; case _ => false }
@@ -9575,12 +10095,12 @@ import scala.annotation.tailrec
         else {
           val start = labelIdx + 1
           var i = start
-          var result: Option[List[AstNode]] = None
+          var result: Option[(List[AstNode], Boolean)] = None
           var done = false
           while (!done && i < ks.size) {
             ks(i) match {
               case _: Return =>
-                result = Some(ks.slice(start, i + 1))
+                result = Some((ks.slice(start, i + 1), false))
                 done = true
               case g: ControlStructure if g.controlStructureType == "GOTO" =>
                 kidsOf(g) match {
@@ -9588,7 +10108,8 @@ import scala.annotation.tailrec
                     val targetName = t.code.trim
                     val targetIdx = ks.indexWhere { case j: JumpTarget => j.name == targetName; case _ => false }
                     if (targetIdx >= 0)
-                      result = resolvedTailStmts(targetName, depth + 1).map(inner => ks.slice(start, i) ++ inner)
+                      result = resolvedTailStmts(targetName, depth + 1).map { case (inner, fo) =>
+                        (ks.slice(start, i) ++ inner, fo) }
                   case _ =>
                 }
                 done = true
@@ -9596,6 +10117,7 @@ import scala.annotation.tailrec
                 i += 1
             }
           }
+          if (!done) result = Some((ks.slice(start, ks.size), true))
           result
         }
       })
@@ -9731,26 +10253,73 @@ import scala.annotation.tailrec
         kidsOf(g).size == 1 && labels.exists(_.name == kidsOf(g).head.code.trim)
       }
 
-    if (singleLabelOk) {
-      val saved = gotoAsBreak
-      gotoAsBreak = Some(labels.head.name)
-      val prefix = seqOf(stmts(ks.take(idx)))
-      gotoAsBreak = saved
-      val suffix = seqOf(stmts(ks.drop(idx + 1)))
-      ujson.Obj("k" -> "seq",
-        "a" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
-                         "body" -> ujson.Obj("k" -> "seq", "a" -> prefix,
-                                             "b" -> ujson.Obj("k" -> "brk"))),
-        "b" -> suffix)
-    }
-    else if (multiLabelOk) {
-      val saved = gotoTailStmts
-      gotoTailStmts = labels.map(l => l.name -> resolvedTailStmts(l.name, 0).get).toMap
-      val result = stmt(body)
-      gotoTailStmts = saved
-      result
-    }
-    else stmt(body)
+    /** `011-control-flow-holes`: a BACKWARD jump to a "restart" label --
+      *
+      *     A;  again:  B;  if (e) goto again;  C;
+      *
+      * is exactly
+      *
+      *     A;  while (true) { B; if (e) continue; C; break }
+      *
+      * The one-shot loop runs `B..C` once; `continue` re-enters it at the top, i.e.
+      * at `again`, which is precisely where the `goto` lands; the trailing `break`
+      * leaves once the body completes normally, which is the function falling off its
+      * end after `C` exactly as before (nothing follows the loop). `return` passes
+      * straight through `Stmt.loop`. Conditions, each load-bearing in the same way as
+      * `singleLabelOk`'s: exactly one (remaining) label, a direct child of the body;
+      * every jump targets it, sits AFTER it (a backward jump -- a forward one would
+      * enter the loop body from outside) and is not inside any loop or switch (a
+      * `continue` there binds to that inner construct -- `outsideLoopScope` also
+      * clears `gotoAsRestart` as defence in depth). SQLite: `sqlite3ExprDeleteNN`'s
+      * `exprDeleteRestart`, `vdbeRecordCompareString`'s `vrcs_restart`. */
+    val restartOk =
+      jumps.nonEmpty && labels.size == 1 && idx >= 0 && (labels.head eq ks(idx)) &&
+      targets == List(labels.head.name) &&
+      jumps.forall(g => !insideLoop(g) && { val i = topIndex(g); i > idx })
+
+    val savedBlockExit = gotoAsBlockExit
+    val savedBudget = blockExitSpliceBudget
+    gotoAsBlockExit = blockExitLabels
+    blockExitSpliceBudget = 4000
+    val out =
+      if (singleLabelOk) {
+        val saved = gotoAsBreak
+        gotoAsBreak = Some(labels.head.name)
+        val prefix = seqOf(stmts(ks.take(idx)))
+        gotoAsBreak = saved
+        val suffix = seqOf(stmts(ks.drop(idx + 1)))
+        ujson.Obj("k" -> "seq",
+          "a" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                           "body" -> ujson.Obj("k" -> "seq", "a" -> prefix,
+                                               "b" -> ujson.Obj("k" -> "brk"))),
+          "b" -> suffix)
+      }
+      else if (restartOk) {
+        val prefix = seqOf(stmts(ks.take(idx)))
+        val saved = gotoAsRestart
+        gotoAsRestart = Some(labels.head.name)
+        val tail = seqOf(stmts(ks.drop(idx + 1)))
+        gotoAsRestart = saved
+        ujson.Obj("k" -> "seq", "a" -> prefix,
+          "b" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                           "body" -> ujson.Obj("k" -> "seq", "a" -> tail,
+                                               "b" -> ujson.Obj("k" -> "brk"))))
+      }
+      else if (multiLabelOk) {
+        val saved = gotoTailStmts
+        val savedFo = gotoTailFallsOff
+        val resolved = labels.map(l => l.name -> resolvedTailStmts(l.name, 0).get).toMap
+        gotoTailStmts = resolved.map { case (k, v) => k -> v._1 }
+        gotoTailFallsOff = resolved.collect { case (k, (_, true)) => k }.toSet
+        val result = stmt(body)
+        gotoTailStmts = saved
+        gotoTailFallsOff = savedFo
+        result
+      }
+      else stmt(body)
+    gotoAsBlockExit = savedBlockExit
+    blockExitSpliceBudget = savedBudget
+    out
   }
 
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
