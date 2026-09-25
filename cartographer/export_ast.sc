@@ -2472,6 +2472,65 @@ import scala.annotation.tailrec
     * OTHERWISE-safe parameter (and, via `Fwd`/`wideClosedIrefParam`'s own
     * forwarding, every caller that forwards it onward too) over a detail
     * with no bearing on the argument's actual runtime shape. */
+  /** Does the pointer cast `cast` (whose operand is `operand`) keep the POINTEE type,
+    * modulo cv-qualifiers and scalar typedef aliases (`resolveIntType`)? See
+    * `irefCastPreservesPointee` for why an interior pointer / out-parameter may only
+    * be seen through such a cast. Unrecoverable types answer `false`. */
+  def castPreservesPointee(cast: AstNode, operand: AstNode): Boolean = {
+    def pointee(ty: String): Option[String] = {
+      val b = bareType(ty)
+      if (b.endsWith("*")) Some(b.dropRight(1)) else None
+    }
+    // `&y`'s own type is often unrecovered by the frontend; its pointee is `y`'s type.
+    val operandPointee = operand match {
+      case a: Call if a.methodFullName == "<operator>.addressOf" && kidsOf(a).size == 1 &&
+                      pointee(staticTypeOf(operand)).isEmpty =>
+        Some(bareType(staticTypeOf(kidsOf(a).head))).filter(t => t.nonEmpty && t != "ANY")
+      case _ => pointee(staticTypeOf(operand))
+    }
+    // The cast node's own `typeFullName` is not reliable here (Joern reports `u64`
+    // for `(u64*)e`); the TYPE_REF child's source spelling is the target type.
+    val castPointee = kidsOf(cast) match {
+      case List(t, _) => pointee(t.code).orElse(pointee(staticTypeOf(cast)))
+      case _          => pointee(staticTypeOf(cast))
+    }
+    // Pointee types that are BOTH pointers (`(void**)&pData` for `u8 *pData`, the
+    // `sqlite3OsFetch` out-parameter idiom) are allowed: the stored element is a
+    // pointer value, which Core represents the same way whatever its pointee type
+    // (`Val.ref`/`Val.iref`/`Val.str` carry no C type), and on the flat-address
+    // targets this project models every object pointer has one representation. A
+    // scalar reinterpretation (`*(char*)&one`, `*(i64*)&u64Val`, `(u32*)&intVal`)
+    // is never allowed: reading the stored integer unchanged is the wrong answer.
+    (castPointee, operandPointee) match {
+      case (Some(a), Some(b)) =>
+        a == b || (resolveIntType(a).isDefined && resolveIntType(a) == resolveIntType(b)) ||
+        (a.endsWith("*") && b.endsWith("*"))
+      case _ => false
+    }
+  }
+
+  /** The out-parameter call-site classifiers' view of an argument: a null literal
+    * under any casts (`(T*)0` is still null), otherwise the argument with only
+    * POINTEE-PRESERVING cast layers removed. A type-punning cast
+    * (`f((u64*)&i64Local)`, `f((u32*)&aByte[i])`) stays in place, so the argument
+    * matches none of the trusted `&x` shapes and the pair stays open: the callee's
+    * `*p` would otherwise read/write the stored element unchanged under a different
+    * type -- a wrong answer, not a hole. (Previously every cast layer was stripped,
+    * which was already wrong for the box-model `closedOutParam`; it was merely
+    * masked for scalars by `&n` not yet being an interior pointer.) */
+  def outParamArg(rawArg: AstNode): AstNode = {
+    def strip(n: AstNode): AstNode = n match {
+      case c: Call if c.methodFullName == "<operator>.cast" =>
+        kidsOf(c) match {
+          case List(_, operand) if castPreservesPointee(c, operand) => strip(operand)
+          case _ => n
+        }
+      case _ => n
+    }
+    val all = unwrapCastLayers(rawArg)
+    if (isNullLiteral(all)) all else strip(rawArg)
+  }
+
   def unwrapCastLayers(n: AstNode): AstNode = n match {
     case c: Call if c.methodFullName == "<operator>.cast" =>
       kidsOf(c) match {
@@ -4005,7 +4064,7 @@ import scala.annotation.tailrec
     else {
       val callSites = allCalls.filter(_.methodFullName == fn.fullName)
       callSites.nonEmpty && callSites.forall { c =>
-        kidsOf(c).find(aidx(_) == paramIndex).map(unwrapCastLayers).exists {
+        kidsOf(c).find(aidx(_) == paramIndex).map(outParamArg).exists {
           case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
             kidsOf(addr) match {
               case List(n) if addrShape(n) == "local" =>
@@ -4132,7 +4191,7 @@ import scala.annotation.tailrec
     case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
@@ -4475,7 +4534,7 @@ import scala.annotation.tailrec
     * can reuse the IDENTICAL "is this argument expression, by itself, a proof
     * this parameter always receives a safe interior pointer" test without a
     * second, driftable copy. */
-  def irefCallArgStructurallyOk(c: Call, rawArg: AstNode): Boolean = unwrapCastLayers(rawArg) match {
+  def irefCallArgStructurallyOk(c: Call, rawArg: AstNode): Boolean = outParamArg(rawArg) match {
     case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
       kidsOf(addr) match {
         case List(x) =>
@@ -4632,7 +4691,7 @@ import scala.annotation.tailrec
     case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(x) =>
@@ -4949,7 +5008,7 @@ import scala.annotation.tailrec
     case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
@@ -5068,7 +5127,7 @@ import scala.annotation.tailrec
     case object Bad extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(c: Call, rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(c: Call, rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case i: Identifier =>
         i.method.parameter.l.find(_.name == i.name) match {
           case Some(p) => Fwd(p.method.fullName, p.index)
@@ -6084,11 +6143,23 @@ import scala.annotation.tailrec
       }
     case c: Call if c.methodFullName == "<operator>.cast" =>
       kidsOf(c) match {
-        case List(_, operand) => isIrefExpr(operand)
+        case List(_, operand) => isIrefExpr(operand) && irefCastPreservesPointee(c, operand)
         case _ => false
       }
     case _ => false
   }
+
+  /** A pointer cast is transparent for an interior pointer only if it does not change
+    * the pointee type (modulo cv-qualifiers and scalar typedef aliases): a `Val.iref`
+    * names ONE element/field, and `derefIref` reads that element's `Val` unchanged.
+    * `*(sqlite3_uint64*)&a` with `a` an `sqlite3_int64` (libcmpp.c/series.c `add64`,
+    * found on the full corpus once `&a` became an interior pointer) reinterprets the
+    * bits as unsigned, and `*(u32*)&aByte[i]` reads four elements, not one -- reading
+    * the stored value unchanged is a wrong answer for both, so such a cast is not an
+    * interior-pointer expression and its dereference keeps its hole. A cast whose types
+    * cannot be recovered is treated the same way. */
+  def irefCastPreservesPointee(cast: AstNode, operand: AstNode): Boolean =
+    castPreservesPointee(cast, operand)
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
