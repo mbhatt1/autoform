@@ -1244,9 +1244,10 @@ import scala.annotation.tailrec
 
   /** Pointer-arith family: the `strCursorBase` roots whose BINDING cannot change
     * while the method runs, so that every cursor seeded from one was seeded from
-    * the same VALUE: a parameter that is never rebound, or a local rebound exactly
-    * once, outside any loop. (A byte cursor's own `++`/`op=` moves only its `$off`,
-    * so for a cursor only a plain `=` counts as rebinding.)
+    * the same VALUE: one that is never rebound, or whose every rebinding is outside
+    * any loop and textually before every seeding of a cursor rooted at it. (A byte
+    * cursor's own `++`/`op=` moves only its `$off`, so for a cursor only a plain `=`
+    * counts as rebinding.)
     *
     * Two cursors with the same root are compared/subtracted by their `$off`s
     * alone (`callExpr`'s cursor-pair case), which silently assumes both offsets
@@ -9872,11 +9873,25 @@ import scala.annotation.tailrec
       def inLoop(c: Call): Boolean =
         c.inAstMinusLeaf.collectAll[ControlStructure]
           .exists(cs => Set("WHILE", "FOR", "DO").contains(cs.controlStructureType))
+      // The plain `=` that seed a cursor local rooted at `root`.
+      def seeds(root: String): List[Call] =
+        writes.collect { case (n, true, c) if n != root && strCursorParams.contains(n) && strCursorBase.get(n).contains(root) => c }
+      // Every rebind of the root is outside any loop, and textually precedes every
+      // seeding of a cursor rooted at it (`if (zIn == 0) zIn = ""; z = zIn; zEnd =
+      // &z[n];`) -- so, absent backward jumps (a backward `goto` is itself a hole),
+      // all seedings observe the root's one final binding.
+      def stable(root: String): Boolean = {
+        val rb = rebinds(root)
+        rb.isEmpty || (rb.forall(c => !inLoop(c)) && {
+          val rbLines = rb.map(_.lineNumber)
+          val sdLines = seeds(root).map(_.lineNumber)
+          (rbLines ++ sdLines).forall(_.isDefined) &&
+          sdLines.flatten.forall(s => rbLines.flatten.forall(r => r < s))
+        })
+      }
       val params = m.parameter.l.map(p => localName(p.name)).toSet
       val locals = m.local.l.map(l => localName(l.name)).toSet -- params
-      (params.filter(nm => rebinds(nm).isEmpty) ++
-       locals.filter(nm => rebinds(nm) match { case List(c) => !inLoop(c); case _ => false }))
-        .filter(nm => !boxedLocals.contains(nm))
+      (params ++ locals).filter(nm => !boxedLocals.contains(nm) && stable(nm))
     }
     val body0 = methodBody(m)
     // `003-box-address-taken-locals`: allocate every boxed local's/parameter's cell
