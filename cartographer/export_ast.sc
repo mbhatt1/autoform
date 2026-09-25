@@ -7418,24 +7418,79 @@ import scala.annotation.tailrec
     * members, translated member-wise, see its own case below) -- becomes the
     * statement hole `op:arrayDecl:boxed-initializer`: this commit turns a silent
     * wrong answer into an honest hole where it cannot yet give the right one. */
+  /** `011-address-of-local-arrays`: inclusive value range of a scalar INTEGER C
+    * type (`resolveIntType`'s width tag), or `None` when it is not one this can
+    * reason about. Bare `char` (signedness implementation-defined) is `0..127`,
+    * the range valid under either choice. */
+  def cIntRange(ty: String): Option[(BigInt, BigInt)] = {
+    val plain = ty.replace("const ", "").replace("volatile ", "").trim
+    if (plain == "char") Some((BigInt(0), BigInt(127)))
+    else resolveIntType(ty).flatMap { tag =>
+      scala.util.Try(tag.drop(1).toInt).toOption.map { w =>
+        if (tag.startsWith("u")) (BigInt(0), BigInt(2).pow(w) - 1)
+        else (-BigInt(2).pow(w - 1), BigInt(2).pow(w - 1) - 1)
+      }
+    }
+  }
+
+  /** `011-address-of-local-arrays`: `T a[N] = {v0, ..., vk-1};` / `T a[] = {v};` for a
+    * local array that is NOT boxed (so `a` is bound to the initializer's `Val.list`
+    * value, `arrayInit`/`classifyInitElements`, and read through `Expr.index`).
+    * Two gaps in that path, both about the array's SIZE, which the initializer
+    * alone does not carry:
+    *   - `T a[] = {v}` -- one positional element. `arrayInit` refuses a lone
+    *     non-Block child as ambiguous with an array DECLARATOR's size child
+    *     (`op:arrayDecl:size`); here it is the RIGHT-HAND SIDE of the
+    *     declaration's own assignment and the declared type has no size, so it
+    *     can only be the one-element initializer (C sizes the array from it).
+    *   - `T a[N] = {v0, ..., vk-1}` with `k < N` -- C zero-fills elements `k..N-1`
+    *     (6.7.9p21), but the `Val.list` held only `k` items, so `a[k]` raised
+    *     `IndexError` instead of reading `0`. For a scalar INTEGER element type
+    *     the list is now padded with `0` (at most `maxInitPad` of them, keeping the
+    *     rendered literal small); otherwise (pointer/aggregate/float element, or a
+    *     larger pad) it is the hole `op:arrayDecl:partial-initializer`.
+    * `None` leaves every other shape (full-length, designated, nested, a sized
+    * array whose size does not resolve) on the unchanged default path. */
+  def maxInitPad: Int = 64
+  def unboxedArrayInit(i: Identifier, rhs: AstNode): Option[ujson.Obj] = {
+    val ty = bareType(staticTypeOf(i))
+    val kids = kidsOf(rhs)
+    val plain = kids.nonEmpty && kids.forall {
+      case _: Block => false
+      case c: Call => c.methodFullName != "<operator>.arrayInitializer" &&
+                      c.methodFullName != "<operator>.assignment"
+      case _ => true
+    }
+    if (ty.endsWith("[]") && !ty.dropRight(2).contains("[")) {
+      if (plain && kids.size == 1) Some(classifyInitElements(kids)) else None
+    } else {
+      val sized: Option[(String, Int)] =
+        arrayShape.findFirstMatchIn(ty).map(mt => (mt.group(1).trim, mt.group(2).toInt))
+          .orElse(arrayShapeAny.findFirstMatchIn(ty).flatMap { mt =>
+            resolveMacroArraySize(mt.group(2), currentFile).map(mt.group(1).trim -> _)
+          })
+      sized match {
+        case Some((et, n)) if !et.contains("[") && kids.size < n =>
+          val padded =
+            if (plain && cIntRange(et).isDefined && n - kids.size <= maxInitPad)
+              Some(classifyInitElements(kids)).filter(_.value.get("k").exists(_.str == "listE")).map { l =>
+                ujson.Obj("k" -> "listE", "items" -> ujson.Arr.from(
+                  l("items").arr.toList ++ List.fill(n - kids.size)(intLit(0))))
+              }
+            else None
+          Some(padded.getOrElse(hole("op:arrayDecl:partial-initializer")))
+        case _ => None
+      }
+    }
+  }
+
   def boxedAggregateInit(nm: String, lhs: AstNode, rhs: AstNode): ujson.Obj = {
     val refuse = holeS("op:arrayDecl:boxed-initializer")
     def isAlloc(n: AstNode) = n match {
       case c: Call => c.methodFullName == "<operator>.alloc"
       case _ => false
     }
-    // Inclusive value range of an integer element type, or `None` when not a
-    // scalar integer this can reason about.
-    def intRange(ty: String): Option[(BigInt, BigInt)] = {
-      val plain = ty.replace("const ", "").replace("volatile ", "").trim
-      if (plain == "char") Some((BigInt(0), BigInt(127)))
-      else resolveIntType(ty).flatMap { tag =>
-        scala.util.Try(tag.drop(1).toInt).toOption.map { w =>
-          if (tag.startsWith("u")) (BigInt(0), BigInt(2).pow(w) - 1)
-          else (-BigInt(2).pow(w - 1), BigInt(2).pow(w - 1) - 1)
-        }
-      }
-    }
+    def intRange(ty: String): Option[(BigInt, BigInt)] = cIntRange(ty)
     def literalValue(v: AstNode): Option[BigInt] = v match {
       case l: Literal =>
         val t = l.code.trim
@@ -7773,6 +7828,19 @@ import scala.annotation.tailrec
                   "e" -> ujson.Obj("k" -> "irefIndex",
                                    "a" -> ujson.Obj("k" -> "boxArray", "n" -> lenE),
                                    "i" -> ujson.Obj("k" -> "int", "v" -> 0)))
+      // `011-address-of-local-arrays`: an UNBOXED local array's brace initializer --
+      // see `unboxedArrayInit`.
+      case i: Identifier if aug.isEmpty && cLikeFile && !moduleScope && !isGlobalWrite(i.name) &&
+                             (rhs match {
+                               case c: Call => c.methodFullName == "<operator>.arrayInitializer"
+                               case _ => false
+                             }) =>
+        unboxedArrayInit(i, rhs) match {
+          case Some(e) => ujson.Obj("k" -> "assign", "x" -> localName(i.name), "e" -> e)
+          // Unchanged default: exactly the generic `case i: Identifier` below.
+          case None    => ujson.Obj("k" -> "assign", "x" -> localName(i.name),
+                                    "e" -> combine(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+        }
       case i: Identifier =>
         // At module scope, for a name a `global` statement rebound, or (C-like
         // files) a name that's a recognized file-scope global and not a local/
