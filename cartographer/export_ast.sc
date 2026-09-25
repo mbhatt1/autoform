@@ -4025,6 +4025,27 @@ import scala.annotation.tailrec
     * on some OTHER parameter) nor uselessly strict (would have rejected all 45).
     * A parameter with zero dereferences at all is vacuously safe -- there is
     * nothing to guard. */
+  // NOTE (pointer-indirection family, measured with a fixture): as written this
+  // predicate is VACUOUS -- `fn.ast.isIdentifier.filter(_.name == paramName)` includes
+  // the `p` operand of the dereference itself, and Joern's CFG evaluates a call's
+  // operands before the call, so every `*p`/`p->f`/`p[i]` is dominated by its own
+  // `p`; an unguarded `void f(int *p){ *p = 1; }` called with `0` passes. (Dominance
+  // is also branch-insensitive: `if (p) {..} *p = 1;` would pass even without that.)
+  // A branch-sensitive rewrite was tried and REJECTED on measurement: it demotes
+  // callees whose null-safety rests on a correlated invariant rather than a local
+  // test (`sqlite3MatchEName`'s `pbRowid` is only dereferenced when
+  // `eEName==ENAME_ROWID`, which its callers only request with a non-null pointer;
+  // likewise `sqlite3PagerOpenWal`, `tableAndColumnIndex`, `wherePartIdxExpr`).
+  //
+  // Admitting a `NullLit` call site does not NEED this check for soundness: a null
+  // argument is a `Val.int 0`, and the only things a closed out-parameter is ever
+  // dereferenced with -- `derefIref`/`setDerefIref` (and, before `boxedScalarAddr`,
+  // `field`/`setField` on a box) -- all require a `Val.iref`/`Val.ref` and yield a
+  // DYNAMIC hole (`derefIref:non-iref`, `setDerefIref:non-iref`) on anything else. So
+  // a callee that really does dereference a null it was passed holes at run time on
+  // that path; it can never produce a value. What this predicate controls is only how
+  // many such paths are counted as statically hole-free, which is the ledger's
+  // documented "static hole-freedom is an upper bound" caveat, not a wrong answer.
   def calleeNullGuardsParam(fn: Method, paramName: String): Boolean = {
     val derefs: List[CfgNode] =
       (fn.ast.isCall.filter(_.methodFullName == "<operator>.indirection").l
@@ -4368,9 +4389,19 @@ import scala.annotation.tailrec
     * per-method var, for exactly this "whole-program check cannot trust
     * per-method state" reason). */
   def scalarAddressOfEligible(x: AstNode): Boolean = {
+    // A plain POINTER local (`Pager *pPager; f(&pPager);` -- the `T **ppOut`
+    // out-parameter idiom) qualifies exactly as a number does: `boxableName` boxes
+    // it into the same one-field cell, and `&pPager` is the same `boxedScalarAddr`
+    // interior pointer `Val.iref r (.fld "v")`, whose `derefIref`/`setDerefIref`
+    // read/write the stored pointer VALUE, never anything behind it. It used to be
+    // excluded, which left every callee whose call sites mix `&pLocal` with
+    // `&s->pField`/`&a[i]` (both already accepted here) unclosed -- `closedOutParam`
+    // takes only `&local`, this function only the other shapes. An ARRAY is still
+    // excluded (its `&arr` is not a box address), which is what the two
+    // `arrayShape` tests below are for; `isPointerType` alone would also match it.
     def isScalar(ty: String): Boolean = {
       val bt = bareType(ty)
-      !isClassType(ty) && !isPointerType(bt) &&
+      !isClassType(ty) && !(isPointerType(bt) && !bt.endsWith("*")) &&
       !arrayShape.findFirstMatchIn(bt).isDefined && !arrayShapeAny.findFirstMatchIn(bt).isDefined
     }
     x match {
@@ -4525,6 +4556,18 @@ import scala.annotation.tailrec
     sealed trait ArgShape
     case object Ok extends ArgShape
     case object Bad extends ArgShape
+    // A null-pointer literal argument (`f(..., 0)`, "caller does not want this
+    // output") -- the same shape, and the same admission rule, as
+    // `closedOutParamsTransitive`'s own `NullLit` (`calleeNullGuardsParam`). The
+    // soundness argument does not rest on that check (see the NOTE above it): a
+    // null argument is `Val.int 0`, and `derefIref`/`setDerefIref` on anything but a
+    // `Val.iref` is the dynamic hole `derefIref:non-iref`/`setDerefIref:non-iref`,
+    // never a value. A pair whose only non-forwarding sites are null literals is
+    // not admitted (`hasIndependentSite`).
+    // Now that `&n` of a boxed scalar is itself an interior pointer
+    // (`boxedScalarAddr`), this is the one base case the box-model fixed point had
+    // that this interior-pointer one lacked.
+    case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
     def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
@@ -4540,6 +4583,7 @@ import scala.annotation.tailrec
             if (ok) Ok else Bad
           case _ => Bad
         }
+      case n if isNullPointerLiteral(n) => NullLit
       // `009-reduce-remaining-holes-4`: a BARE array-decay pass, checked BEFORE the
       // generic `Identifier`/`MethodParameterIn` forwarding cases below -- see
       // `closedIrefOutParam`'s own matching case for the full reasoning (a C array
@@ -4569,6 +4613,15 @@ import scala.annotation.tailrec
         (fn, idx) -> sites.map(c => kidsOf(c).find(aidx(_) == idx).map(classify).getOrElse(Bad))
       }.toMap
 
+    // Computed once per pair, only for pairs that actually see a `NullLit` site.
+    val nullGuarded: Map[(String, Int), Boolean] =
+      shapesByPair.collect {
+        case ((fn, idx), shapes) if shapes.exists { case NullLit => true; case _ => false } =>
+          val guarded = methodByName.get(fn).flatMap(_.parameter.find(_.index == idx))
+            .exists(p => calleeNullGuardsParam(methodByName(fn), p.name))
+          (fn, idx) -> guarded
+      }
+
     var closed  = Set.empty[(String, Int)]
     var changed = true
     var round   = 0
@@ -4583,11 +4636,13 @@ import scala.annotation.tailrec
         // independent call site establishes the actual base case).
         val hasIndependentSite = shapes.exists {
           case Fwd(cfn, ci) => (cfn, ci) != key
+          case NullLit      => false
           case _            => true
         }
         val ok = hasIndependentSite && shapes.forall {
           case Ok                               => true
           case Bad                              => false
+          case NullLit                          => nullGuarded.getOrElse(key, false)
           case Fwd(cfn, ci) if (cfn, ci) == key => true
           case Fwd(cfn, ci)                     => closed.contains((cfn, ci))
         }
@@ -5010,6 +5065,50 @@ import scala.annotation.tailrec
   /** `Expr.field (Expr.name nm) "v"` -- a read of a boxed local/parameter's one
     * field, i.e. the value it stands for everywhere it is read as a plain name. */
   def boxField(nm: String): ujson.Obj = ujson.Obj("k" -> "field", "a" -> boxRef(nm), "f" -> "v")
+
+  /** `&n` for a boxed scalar local/parameter `n`: `Expr.irefField (Expr.name n) "v"`,
+    * i.e. `Val.iref r (.fld "v")` for `n`'s box `r`.
+    *
+    * This used to be `boxRef(n)` -- the box's bare `Val.ref`. That was correct only for
+    * a callee that dereferenced its parameter as `Expr.field p "v"` (`closedOutParams`),
+    * and WRONG-SHAPED for every callee that trusts its parameter as an interior pointer
+    * (`ptrIrefNames` via `closedIrefOutParam`, which has accepted `&n` for a scalar `n`
+    * since `scalarAddressOfEligible`): there `*p` is `derefIref p`, and `derefIref` on a
+    * bare `Val.ref` is the runtime hole `derefIref:non-iref`. So `int n; f(&n);` with
+    * `void f(int *p){ *p = 1; }` was statically hole-free and dynamically ALWAYS a hole.
+    *
+    * With `&n` an interior pointer, the two representations coincide: by
+    * `Semantics.lean`, `derefIref (irefField (name n) "v")` evaluates `n` to `.ref r` and
+    * returns `h.getField r "v"`, which is exactly `field (name n) "v"` (`boxField n`);
+    * `setDerefIref` likewise delegates to `h.setField r "v"`, exactly `setField (name n)
+    * "v"`. Every other place that reads/writes `n` itself (`boxField`, `setField` on
+    * `boxRef`) is unchanged, so the pointer and the name still alias the one heap cell.
+    * `==`/`!=` on two such pointers compare `(ref, selector)`, i.e. which box -- the C
+    * meaning of comparing two addresses of scalars; `+`/`-`/ordering on a `.fld` selector
+    * stay the dynamic hole `iref:arith-on-field` (C only defines `&n + 0`/`+ 1`, and the
+    * latter may not be dereferenced). Callee accesses through `closedOutParams` switch to
+    * `derefIref`/`setDerefIref` in the same change (`outParamRead`/`outParamWrite`). */
+  def boxedScalarAddr(nm: String): ujson.Obj =
+    ujson.Obj("k" -> "irefField", "a" -> boxRef(nm), "f" -> "v")
+
+  /** `*p` read for `p` in `closedOutParams` -- `p` holds whatever its (closed) callers
+    * passed, which is `&n` (`boxedScalarAddr`, an interior pointer) or a forwarded
+    * parameter carrying one; see `boxedScalarAddr`. */
+  def outParamRead(p: String): ujson.Obj =
+    ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "name", "v" -> p))
+
+  /** `*p` read for `p` a `ptrAliases` name (the only assignment to `p` is `p = &n`):
+    * read `n`'s box directly (unchanged); otherwise `p` must be a `closedOutParams`
+    * name and is read through the pointer it holds. */
+  def aliasOrOutParamRead(p: String): ujson.Obj =
+    ptrAliases.get(p).map(boxField).getOrElse(outParamRead(p))
+
+  /** The write counterpart of `aliasOrOutParamRead`. */
+  def aliasOrOutParamWrite(p: String, v: ujson.Obj): ujson.Obj =
+    ptrAliases.get(p) match {
+      case Some(target) => ujson.Obj("k" -> "setField", "r" -> boxRef(target), "f" -> "v", "v" -> v)
+      case None => ujson.Obj("k" -> "setDerefIref", "p" -> ujson.Obj("k" -> "name", "v" -> p), "v" -> v)
+    }
 
   /** `import p.q` / `from <prefix> import <name>`.
     *
@@ -5873,6 +5972,17 @@ import scala.annotation.tailrec
     *     identical "cast is a transparent pass-through" reasoning
     *     `castOperandIsPointerShaped`'s own doc comment already argues for,
     *     applied to THIS narrower question instead of the general one). */
+  /** Is `&operand` translated as `boxedScalarAddr` -- `operand` a bare boxed scalar
+    * local/parameter (`boxedLocals`, via the same `boxableName` predicate
+    * `callExpr`'s `<operator>.addressOf` case uses), and not a boxed array/struct
+    * (those have their own `irefIndex`/`irefField` shapes)? Such an `&n` evaluates to
+    * `Val.iref r (.fld "v")` -- an interior pointer -- so it is an `isIrefExpr` shape,
+    * and a pointer local assigned only such values (and other interior pointers) is
+    * `ptrIrefNames`-tracked. */
+  def isBoxedScalarAddrOperand(operand: AstNode): Boolean =
+    boxableName(operand).exists(nm => boxedLocals.contains(nm) &&
+                                      !boxedArrays.contains(nm) && !boxedStructs.contains(nm))
+
   def isIrefExpr(n: AstNode): Boolean = n match {
     case i: Identifier        => ptrIrefNames.contains(localName(i.name))
     case p: MethodParameterIn => ptrIrefNames.contains(localName(p.name))
@@ -5883,7 +5993,8 @@ import scala.annotation.tailrec
           boxedStructFieldOperand(operand).isDefined ||
           pointerStructFieldOperand(operand).isDefined ||
           boxedStructArrayIndexOperand(operand).isDefined ||
-          pointerStructArrayIndexOperand(operand).isDefined
+          pointerStructArrayIndexOperand(operand).isDefined ||
+          isBoxedScalarAddrOperand(operand)
         case _ => false
       }
     case c: Call if c.methodFullName == "<operator>.addition" =>
@@ -6394,7 +6505,12 @@ import scala.annotation.tailrec
         ujson.Obj("k" -> "irefField", "a" -> baseJson, "f" -> f)
       }
       else if (aggregate) expr(kids(0))
-      else if (boxed.isDefined) boxRef(boxed.get)
+      // `&n`, `n` a boxed scalar local/parameter: the INTERIOR pointer to the box's
+      // one field (`Val.iref r (.fld "v")`), not the box's bare `Val.ref`. See
+      // `boxedScalarAddr`'s doc comment: this is what makes a scalar out-parameter
+      // and an `&s->f`/`&a[i]` out-parameter the SAME runtime shape, so a callee's
+      // `*p` is `derefIref` for both.
+      else if (boxed.isDefined) boxedScalarAddr(boxed.get)
       else if (fnIdentity) expr(kids(0))
       else {
         val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
@@ -6443,8 +6559,7 @@ import scala.annotation.tailrec
                   "b" -> ujson.Obj("k" -> "name", "v" -> (cnm + "$off")))
       }
       else {
-        val target = nm.flatMap(ptrAliases.get) orElse nm.filter(closedOutParams.contains)
-        target.map(boxField).getOrElse(hole("op:indirection:" + addrKind(staticTypeOf(kids(0)))))
+        nm.filter(n => ptrAliases.contains(n) || closedOutParams.contains(n)).map(aliasOrOutParamRead).getOrElse(hole("op:indirection:" + addrKind(staticTypeOf(kids(0)))))
       }
     }
     // `++x` / `x++` in **expression** position. In statement position these are
@@ -7401,9 +7516,10 @@ import scala.annotation.tailrec
       // counterpart of the read case in `callExpr`'s `<operator>.indirection`
       // handling. Checked BEFORE the generic `<operator>`-prefixed catch-all below,
       // which still fires (unchanged `assign:lhs:indirection`) for every `*p` this
-      // cannot prove safe. `ptrAliases.getOrElse(nm, nm)` reads as: if `nm` aliases
-      // some OTHER boxed local, write through that; otherwise (must be because the
-      // guard's `closedOutParams` branch matched) `nm` itself already IS the ref.
+      // cannot prove safe. `aliasOrOutParamWrite` reads as: if `nm` aliases some
+      // OTHER boxed local, write that box's field; otherwise (the guard's
+      // `closedOutParams` branch matched) `nm` holds the caller's `&n`, an interior
+      // pointer (`boxedScalarAddr`), and is written through with `setDerefIref`.
       // `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` PROVABLY holding an
       // interior pointer VALUE for its whole lifetime (`ptrIrefNames`) -- write
       // side of `callExpr`'s matching `<operator>.indirection` read case. `p`
@@ -7430,9 +7546,7 @@ import scala.annotation.tailrec
                        rawLocalOrParamName(kidsOf(c)(0)).map(localName)
                          .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
         val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
-        val target = ptrAliases.getOrElse(nm, nm)
-        ujson.Obj("k" -> "setField", "r" -> boxRef(target), "f" -> "v",
-                  "v" -> combine(boxField(target)))
+        aliasOrOutParamWrite(nm, combine(aliasOrOutParamRead(nm)))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (aug.isDefined && !pureNode(r)) holeS("assign:aug-impure-receiver")
@@ -7602,7 +7716,36 @@ import scala.annotation.tailrec
         if (!(pureNode(a) && pureNode(b))) holeS("op:" + opName + ":impure-target")
         else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
                        "v" -> bump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
-      // `++*p` — the target is a dereference, which is the location model Core lacks.
+      // `(*p)++` / `++*p` / `(*p)--` / `--*p` in statement position, for exactly the
+      // pointers `assignTo`'s own `*p = v` write cases already trust: this is
+      // `*p = *p ± 1` with `p` read twice, so it is admitted under the SAME two
+      // conditions `assignTo` applies to the augmented `*p += 1` spelling of the
+      // identical statement -- `p` must be an interior-pointer expression
+      // (`isIrefExpr`, read/written via `derefIref`/`setDerefIref`) or a provable
+      // alias of one boxed local / a closed out-parameter (read/written via the
+      // box's own `"v"` field), and `p` must be PURE, since it is evaluated once
+      // for the read and once for the write. The pointee itself is a scalar here,
+      // not a pointer: the `isPointerType(staticTypeOf(tgt))` guard above has
+      // already holed `(*pp)++` on a `T**` (a pointer bump, which would need
+      // `sizeof` scaling), so `± 1` is ordinary integer arithmetic on the value
+      // read, exactly as `x++` on a scalar local is. An impure `p` (`(*p++)++`)
+      // keeps a hole under this function's existing `:impure-target` label.
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      !pureNode(kidsOf(c).head) &&
+                      (isIrefExpr(kidsOf(c).head) ||
+                       rawLocalOrParamName(kidsOf(c).head).map(localName)
+                         .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n))) =>
+        holeS("op:" + opName + ":impure-target")
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      isIrefExpr(kidsOf(c).head) =>
+        val pRef = expr(kidsOf(c).head)
+        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> bump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      rawLocalOrParamName(kidsOf(c).head).map(localName)
+                        .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
+        val nm = rawLocalOrParamName(kidsOf(c).head).map(localName).get
+        aliasOrOutParamWrite(nm, bump(aliasOrOutParamRead(nm)))
+      // `++*p` on any other pointer — the location model Core lacks.
       case _ => holeS("op:" + opName + ":unsupported-target")
     }
   }
@@ -7685,7 +7828,7 @@ import scala.annotation.tailrec
         Some(ujson.Obj("k" -> "derefIref", "p" -> expr(kidsOf(c)(0))))
       else {
         val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName)
-        nm.flatMap(ptrAliases.get).orElse(nm.filter(closedOutParams.contains)).map(boxField)
+        nm.filter(n => ptrAliases.contains(n) || closedOutParams.contains(n)).map(aliasOrOutParamRead)
       }
     case _ => None
   }
@@ -7791,6 +7934,13 @@ import scala.annotation.tailrec
       case ia if asIndex(ia).isDefined =>
         val (a, b) = asIndex(ia).get
         if (pureNode(a) && pureNode(b)) proceed() else (Nil, hole("op:" + opName + ":impure-target"))
+      // `(*p)++` used AS A VALUE -- `incrStmt`'s own `*p` cases do the bump (or
+      // hole, whose label `proceed()` propagates unchanged), and `targetReadExpr`
+      // already has the matching `*p` read, so the pre-/post-bump value is read
+      // from the same location exactly as for `x++`. Pure `p` only: it is read
+      // for the value AND inside the bump.
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 =>
+        if (pureNode(kidsOf(c).head)) proceed() else (Nil, hole("op:" + opName + ":impure-target"))
       case _ => (Nil, hole(genericLabel))
     }
   }
@@ -9273,7 +9423,14 @@ import scala.annotation.tailrec
                    boxedStructFieldOperand(operand).isDefined ||
                    pointerStructFieldOperand(operand).isDefined ||
                    boxedStructArrayIndexOperand(operand).isDefined ||
-                   pointerStructArrayIndexOperand(operand).isDefined =>
+                   pointerStructArrayIndexOperand(operand).isDefined ||
+                   // `p = &n`, `n` a boxed scalar: an interior pointer to `n`'s
+                   // box (`boxedScalarAddr`). Lets a pointer assigned the
+                   // addresses of SEVERAL boxed locals (`q = &a; ... q = &b;`,
+                   // which `ptrAliases`' single-assignment rule refuses) be
+                   // read/written with `derefIref`/`setDerefIref`, which follow
+                   // whichever box `q` holds at that moment.
+                   isBoxedScalarAddrOperand(operand) =>
               Some(None)
             case _ => None
           }
