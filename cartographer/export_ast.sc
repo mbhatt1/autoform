@@ -1930,16 +1930,34 @@ import scala.annotation.tailrec
     * with no answer, which is what a hole is for. */
   lazy val typeAliases: Map[String, String] = {
     val ds = cpg.typeDecl.l.filter(_.aliasTypeFullName.nonEmpty)
-    val byFull = ds.map(td => bareType(td.fullName) -> bareType(td.aliasTypeFullName.get)).toMap
+    // `casts-sizeof`: the qualified map used to be `.toMap` over every declaration,
+    // so a name declared more than once kept whichever declaration came LAST. In C
+    // the qualified name is the plain name, which made the agreement rule below dead
+    // code: on the full SQLite tree `i64` is `sqlite3_int64` in the extensions,
+    // `sqlite_int64` in the core and `long long int` in `tool/showwal.c`, and every
+    // cast to `i64` anywhere took `tool/`'s answer. The same agreement is required
+    // here. Two declarations with the same TEXT are one declaration parsed twice (a
+    // header included from several files) -- when one copy's alias field resolved and
+    // another's did not, the unresolved copy is not a disagreement. A name whose
+    // declarations really differ is left to `resolveIntType`'s width-agreement
+    // fallback (`aliasCandidates`), which accepts it only when every declaration
+    // resolves to the same width.
+    def agreeing(tds: List[TypeDecl]): Option[String] = {
+      def norm(td: TypeDecl) = td.code.replaceAll("\\s+", " ").trim
+      val resolvedTexts = tds.filter(td => bareType(td.aliasTypeFullName.get) != "ANY").map(norm).toSet
+      val effective = tds.filterNot(td => bareType(td.aliasTypeFullName.get) == "ANY" && resolvedTexts.contains(norm(td)))
+      effective.map(td => bareType(td.aliasTypeFullName.get)).distinct match {
+        case List(one) => Some(one)
+        case _         => None
+      }
+    }
+    val byFull = ds.groupBy(td => stripDuplicateSuffix(bareType(td.fullName))).flatMap { case (n, tds) => agreeing(tds).map(n -> _) }
     // A cast writes the *qualified* name it can see, and that is usually the TypeDecl's
     // `fullName`, so the qualified map is the primary one. The unqualified name is used
     // only when every declaration of that name in the program agrees on the target —
     // `Address` is `uintptr_t` in nine different V8 classes — because a short name that
     // means two things is exactly the case where guessing changes arithmetic.
-    val byShort = ds.groupBy(td => bareType(td.name)).collect {
-      case (n, tds) if tds.map(td => bareType(td.aliasTypeFullName.get)).distinct.size == 1 =>
-        n -> bareType(tds.head.aliasTypeFullName.get)
-    }
+    val byShort = ds.groupBy(td => stripDuplicateSuffix(bareType(td.name))).flatMap { case (n, tds) => agreeing(tds).map(n -> _) }
     val merged = byShort ++ byFull
 
     // `009-reduce-remaining-holes-4` US4: Joern's OWN alias-field resolution is
@@ -2014,13 +2032,65 @@ import scala.annotation.tailrec
       else {
         seen += t
         typeAliases.get(t) match {
-          case Some(n) => t = n
-          case None    => go = false
+          case Some(n) if n != "ANY" => t = n
+          case _ =>
+            // `casts-sizeof`: a name the program typedefs more than once with
+            // DIFFERENT spellings -- `i64` is `sqlite3_int64` in the extensions,
+            // `sqlite_int64` in the core and `long long int` in `tool/` -- is
+            // dropped by `typeAliases`' agreement rule, which compares the
+            // spellings. What has to agree is the width each one denotes: resolve
+            // every declaration independently and accept only when all of them
+            // resolve, to the same tag. One unresolvable declaration is enough to
+            // keep the hole.
+            res = aliasCandidates.get(t).filter(_.nonEmpty).flatMap { rhss =>
+              val ws = rhss.toList.map(r => if (seen.contains(bareType(r))) None else resolveIntTypeFrom(r, seen))
+              if (ws.forall(_.isDefined) && ws.flatten.distinct.size == 1) ws.head else None
+            }
+            go = false
         }
       }
     }
     res
     }
+  }
+
+  /** `resolveIntType` for an alias right-hand side met while already inside a
+    * resolution, carrying the names on the current chain so a cycle ends it. */
+  def resolveIntTypeFrom(ty: String, outer: Set[String]): Option[String] =
+    if (outer.size > 32) None
+    else {
+      val b = bareType(ty)
+      if (intTypeNames.contains(b)) intTypeNames.get(b)
+      else if (modelInts.contains(b)) modelInts.get(b)
+      else if (outer.contains(b) || isPointerType(b) || b.contains("(") || b == "ANY" || b.isEmpty) None
+      else typeAliases.get(b) match {
+        case Some(n) if n != "ANY" => resolveIntTypeFrom(n, outer + b)
+        case _ => aliasCandidates.get(b).filter(_.nonEmpty).flatMap { rhss =>
+          val ws = rhss.toList.map(r => resolveIntTypeFrom(r, outer + b))
+          if (ws.forall(_.isDefined) && ws.flatten.distinct.size == 1) ws.head else None
+        }
+      }
+    }
+
+  /** `casts-sizeof`: EVERY right-hand side the program gives a typedef name, from
+    * Joern's alias field (when resolved) and from the declaration's own
+    * `typedef RHS NAME;` text (the same conservative parse `typeAliases` uses) --
+    * the field first, since it has already expanded a macro right-hand side
+    * (`typedef UINT32_TYPE u32;` is `unsigned int` there). */
+  lazy val aliasCandidates: Map[String, Set[String]] = {
+    val pat = """^\s*typedef\s+([^,;\[\]()]+?)\s+([A-Za-z_]\w*)\s*;\s*$""".r
+    cpg.typeDecl.l.flatMap { td =>
+      val nm = bareType(td.name)
+      val fromField = td.aliasTypeFullName.map(bareType).filter(a => a.nonEmpty && a != "ANY").map(nm -> _)
+      val fromText = td.code.trim match {
+        case pat(rhs, n) if bareType(n) == nm => Some(nm -> bareType(rhs))
+        case _ => None
+      }
+      // A declaration whose field is unresolved AND whose text does not parse is
+      // an unknown right-hand side: recorded as `ANY`, which never resolves.
+      val any = if (td.aliasTypeFullName.exists(a => bareType(a) == "ANY") && fromText.isEmpty) Some(nm -> "ANY") else None
+      fromField.orElse(fromText).orElse(any).toList
+    }.groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
   }
 
   /** `005-sizeof-constant-folding`: byte count of a SCALAR type under the resolved
