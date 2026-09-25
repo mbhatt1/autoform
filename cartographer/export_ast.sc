@@ -24,7 +24,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 import scala.annotation.tailrec
 
 @main def exec(cpgPath: String, out: String = "ast.json", maxMethods: Int = 100000,
-               dataModel: String = "lp64") = {
+               dataModel: String = "lp64", cppDefines: String = "") = {
+  // `cppDefines`: the same comma-separated `NAME` / `NAME=VALUE` list the CPG was
+  // parsed with (`CPP_DEFINES` in `autoform.sh`). Only the NAMES are used, to decide
+  // which `#ifdef`s inside a struct body the parsed configuration compiles -- see
+  // `activeStructText`. Leaving it empty when the parse had defines would make those
+  // decisions against the wrong configuration, so the pipeline passes it through.
   importCpg(cpgPath)
 
   // `seqOf` and `moduleObjectsInit` (below) both fold a flat statement list into a
@@ -251,6 +256,24 @@ import scala.annotation.tailrec
   def isKernelMeta(code: String): Boolean = {
     val head = code.trim.takeWhile(c => c.isLetterOrDigit || c == '_')
     kernelMetaMacros.contains(head)
+  }
+
+  /** `casts-sizeof`: an UNKNOWN node the C frontend produced because it could not
+    * parse a declaration (`CASTProblemDeclaration`/`CASTProblemStatement`). */
+  def isParserProblem(u: Unknown): Boolean =
+    Option(u.parserTypeName).exists(_.startsWith("CASTProblem"))
+
+  /** `casts-sizeof`: exactly one `extern` declaration and nothing else -- see its use
+    * in `stmt`. Comments are stripped first so a `/* ... ; ... */` cannot hide a
+    * second statement; any `{`, `=` or interior `;` disqualifies. Restricted to a
+    * FUNCTION declaration (`NAME(` present): a block-scope `extern int x;` would also
+    * run no code, but it re-binds `x` to the file-scope object for the rest of the
+    * block, which a name-based translation could get wrong if a local `x` is in an
+    * enclosing scope -- so that form keeps its hole. */
+  def isBareExternDecl(code: String): Boolean = {
+    val c = code.replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("//[^\n]*", " ").trim
+    c.startsWith("extern ") && c.endsWith(";") && c.count(_ == ';') == 1 &&
+      !c.contains("{") && !c.contains("=") && """[A-Za-z_]\w*\s*\(""".r.findFirstIn(c).isDefined
   }
 
 
@@ -1826,7 +1849,26 @@ import scala.annotation.tailrec
     "int64_t" -> "i64", "longlong" -> "i64", "longlongint" -> "i64", "s64" -> "i64",
     "__s64" -> "i64",
     "uint64_t" -> "u64", "unsignedlonglong" -> "u64", "unsignedlonglongint" -> "u64",
-    "u64" -> "u64", "__u64" -> "u64"
+    "u64" -> "u64", "__u64" -> "u64",
+    // `casts-sizeof`: the remaining standard SPELLINGS of the same standard types.
+    // C11 6.7.2p2 says a type is named by a *multiset* of specifiers, in any order:
+    // `short unsigned int`, `unsigned short int` and `unsigned short` are one type.
+    // Joern writes whichever order the declaration (or its own typedef resolution)
+    // produced -- confirmed live on the SQLite amalgamation: `typedef UINT16_TYPE u16`
+    // resolves to `"unsigned shortint"`, and Lemon's `YYCODETYPE` to
+    // `"short unsigned int"` -- so `ht_slot` (`typedef u16 ht_slot`) and every
+    // `(YYCODETYPE)x` cast in the parser held as `op:cast:opaque-type` purely over word
+    // order. No width is chosen here that the language does not fix: `short` is 16
+    // bits and `long long` is 64 bits under every model in `dataModelTable`, and plain
+    // `signed` is `signed int`. (`long` spellings are model-dependent and go in that
+    // table instead.)
+    "unsignedshortint" -> "u16", "shortunsignedint" -> "u16", "shortunsigned" -> "u16",
+    "signedshort" -> "i16", "signedshortint" -> "i16", "shortsignedint" -> "i16",
+    "shortsigned" -> "i16",
+    "signed" -> "i32",
+    "signedlonglong" -> "i64", "signedlonglongint" -> "i64", "longlongsigned" -> "i64",
+    "longlongsignedint" -> "i64",
+    "longlongunsigned" -> "u64", "longlongunsignedint" -> "u64"
   )
 
   /** Integer types whose width is a property of the **target data model**.
@@ -1847,16 +1889,22 @@ import scala.annotation.tailrec
     "lp64" -> Map(
       "long" -> "i64", "longint" -> "i64", "signedlong" -> "i64",
       "unsignedlong" -> "u64", "longunsigned" -> "u64", "unsignedlongint" -> "u64",
+      "longunsignedint" -> "u64", "signedlongint" -> "i64", "longsignedint" -> "i64",
+      "longsigned" -> "i64",
       "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
       "intptr_t" -> "i64", "uintptr_t" -> "u64"),
     "llp64" -> Map(
       "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
       "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "longunsignedint" -> "u32", "signedlongint" -> "i32", "longsignedint" -> "i32",
+      "longsigned" -> "i32",
       "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
       "intptr_t" -> "i64", "uintptr_t" -> "u64"),
     "ilp32" -> Map(
       "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
       "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "longunsignedint" -> "u32", "signedlongint" -> "i32", "longsignedint" -> "i32",
+      "longsigned" -> "i32",
       "size_t" -> "u32", "ssize_t" -> "i32", "ptrdiff_t" -> "i32",
       "intptr_t" -> "i32", "uintptr_t" -> "u32")
   )
@@ -2262,9 +2310,18 @@ import scala.annotation.tailrec
     * answer, not merely a missed case. Found and fixed before any code shipped, by
     * reading `isPointerType`'s own definition rather than assuming shape checks
     * commute. */
+  // `casts-sizeof`: the same trap one step further. `arrayShape` needs a LITERAL
+  // bound, so `u16[BTCURSOR_MAX_DEPTH-1]` (a macro bound Joern keeps verbatim) and
+  // `char[]` fell through to the pointer case, which `isPointerType`'s `[...]` test
+  // accepted: every such array was sized as ONE POINTER. Measured on the
+  // amalgamation, `sizeof(BtCursor)` came out 120 where `gcc` says 296 (its two
+  // `[BTCURSOR_MAX_DEPTH-1]` arrays). An array whose bound is not a literal is not a
+  // pointer; it is `None` here, and `memberSizeAlign` resolves a macro bound against
+  // the declaring file where it can.
   def sizeofBytes(ty: String): Option[Int] = bareType(ty) match {
     case arrayShape(elem, n) => sizeofBytes(elem).map(_ * n.toInt)
     case t if functionPointerTypedefNames.contains(t) => pointerSizeofBytes
+    case t if t.contains("[")  => None
     case _                   => scalarSizeofBytes(ty).orElse(if (isPointerType(ty)) pointerSizeofBytes else None)
   }
 
@@ -2409,10 +2466,20 @@ import scala.annotation.tailrec
     * either side). Only ONE side needs to be confirmed pointer-shaped -- C
     * itself does not allow pointer+pointer, so if either operand already is
     * one, the other is necessarily the integer offset. */
+  // `casts-sizeof`: SUBTRACTION is not symmetric the way the note above says addition
+  // is. `p - n` is a pointer, but `p - q` (both pointers) is a `ptrdiff_t` INTEGER, and
+  // `n - p` is not C at all -- so a difference is pointer-shaped only when its LEFT
+  // operand is and its right one is not. The old either-side rule would have passed
+  // `(T*)(p - q)` through as though it were the pointer `p`.
   def arithOperandIsPointerShaped(n: AstNode): Boolean = n match {
-    case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
+    case c: Call if c.methodFullName == "<operator>.addition" =>
       kidsOf(c) match {
         case List(a, b) => castOperandIsPointerShaped(a) || castOperandIsPointerShaped(b)
+        case _ => false
+      }
+    case c: Call if c.methodFullName == "<operator>.subtraction" =>
+      kidsOf(c) match {
+        case List(a, b) => castOperandIsPointerShaped(a) && !castOperandIsPointerShaped(b)
         case _ => false
       }
     case _ => false
@@ -2480,7 +2547,87 @@ import scala.annotation.tailrec
     isPointerType(staticTypeOf(operand)) || isOp(operand, "<operator>.addressOf") ||
     isKnownOpaquePointerTypedef(staticTypeOf(operand)) || isKnownPointerReturningCall(operand) ||
     isKnownOpaquePointerField(operand) || castOperandIsItselfPointerCast(operand) ||
-    arithOperandIsPointerShaped(operand)
+    arithOperandIsPointerShaped(operand) ||
+    isFunctionPointerTypeString(staticTypeOf(operand)) || definedCallReturnsPointer(operand) ||
+    declaredFunctionPointerName(operand)
+
+  /** `casts-sizeof`: a function-pointer TYPE as Joern spells it on an expression --
+    * `void(*)()` (what `sqlite3OsDlSym` returns), `int(*)(Jim_Obj**,Jim_Obj**)`.
+    * `isPointerType` looks for a trailing `*` or `[]` and so misses the one pointer
+    * type whose spelling ends in `)`. A value of this type is a pointer, so casting it
+    * to another pointer type is the same representation-preserving pass-through the
+    * doc comment above argues for. */
+  def isFunctionPointerTypeString(ty: String): Boolean =
+    bareType(ty).matches("""^.*\(\*+\)\(.*\)$""")
+
+  /** `casts-sizeof`: return types of the functions DEFINED in this program, by short
+    * name -- `None` for a name whose definitions disagree on pointer-ness, or that has
+    * none. External stubs (a call site Joern could not bind, `ANY` return) are not
+    * definitions and are ignored. */
+  lazy val definedReturnPointerness: Map[String, Boolean] =
+    cpg.method.l.filterNot(_.isExternal).filterNot(_.name.startsWith("<"))
+      .groupBy(_.name).flatMap { case (nm, ms) =>
+        val kinds = ms.map { m =>
+          val rt = m.methodReturn.typeFullName
+          if (rt.isEmpty || rt == "ANY") None
+          else Some(isPointerType(rt) || isFunctionPointerTypeString(rt))
+        }
+        if (kinds.forall(_.isDefined) && kinds.flatten.distinct.size == 1) Some(nm -> kinds.head.get)
+        else None
+      }
+
+  /** `casts-sizeof`: `(const char*)sqlite3_value_text(argv[0])` and its siblings --
+    * the single largest `op:cast:pointer:int-to-pointer` shape on the full SQLite tree
+    * (~330 of ~900 sites). The call node is typed `ANY` because the calling file
+    * (an extension under `ext/`, or a `test_*.c`) never saw the prototype, but the
+    * function IS defined in this program (`src/vdbeapi.c`) with a pointer return type.
+    * That return type is not a guess about the call: C requires the call to agree
+    * with the definition. Only a name whose every in-program definition returns a
+    * pointer qualifies (`definedReturnPointerness`), so a `static` function of the
+    * same name returning an integer elsewhere makes the whole name ineligible. */
+  def definedCallReturnsPointer(n: AstNode): Boolean = n match {
+    case c: Call if !c.methodFullName.startsWith("<operator>") && c.name.nonEmpty &&
+                    !c.name.startsWith("<") =>
+      definedReturnPointerness.getOrElse(c.name, false)
+    case _ => false
+  }
+
+  /** `casts-sizeof`: `(sqlite3_xauth)xAuth`, where `xAuth` is a parameter declared as
+    * `int(*xAuth)(void*,int,const char*,const char*,const char*,const char*)`: Joern
+    * types the parameter as its function's RETURN type (`int`), so the value looked
+    * like an integer. The declaration's own source text is unambiguous -- the
+    * declarator `(*xAuth)(` makes `xAuth` a pointer to function -- and that is what is
+    * read, from the declaring LOCAL/PARAMETER node the identifier's REF edge names
+    * (never by name alone, so a same-named variable elsewhere cannot be confused). */
+  def declaredFunctionPointerName(n: AstNode): Boolean = n match {
+    case i: Identifier =>
+      val pat = ("""\(\s*\*+\s*(?:const\s+)?""" + java.util.regex.Pattern.quote(i.name) + """\s*\)\s*\(""").r
+      i._refOut.l.exists {
+        case p: MethodParameterIn => pat.findFirstIn(p.code).isDefined
+        case l: Local             => pat.findFirstIn(l.code).isDefined
+        case _                    => false
+      }
+    case _ => false
+  }
+
+  /** `casts-sizeof`: an identifier that names a FUNCTION DEFINED IN THIS PROGRAM, used
+    * as a value -- `(Tcl_ObjCmdProc*)test_config`, `(void*)sqlite3_column_bytes`
+    * (tests registering commands / API tables). Joern leaves these as plain
+    * identifiers of type `ANY` when it did not bind them to a `METHOD_REF`, which is
+    * why the existing `MethodRef` case cannot see them. Three conditions, all
+    * required: the identifier has no declaration as a variable (no REF edge, not a
+    * local/parameter name, not a known global), and exactly one function of that
+    * name is defined in the CPG -- whose full name is then what `fnValue` refers to,
+    * exactly as a `METHOD_REF` to it would be translated. */
+  def definedFunctionNamedBy(n: AstNode): Option[String] = n match {
+    case i: Identifier if !i._refOut.hasNext && !genuineLocalNames.contains(i.name) &&
+                          !localTypes.contains(i.name) && !globalTypes.contains(i.name) =>
+      cpg.method.nameExact(i.name).l.filterNot(_.isExternal) match {
+        case List(m) => Some(m.fullName)
+        case _       => None
+      }
+    case _ => None
+  }
 
   /** `char` is deliberately absent from `intTypeNames`: its signedness is
     * implementation-defined, so `static_cast<char>(300)` has no standard-mandated value.
@@ -2985,11 +3132,88 @@ import scala.annotation.tailrec
   // `structBodyText` must find a real `{...}` body to parse) -- safe to call
   // unconditionally and let IT decide, rather than pre-filtering with a
   // cruder check that can say no when the real answer is yes.
-  def memberSizeofBytes(ty: String): Option[Int] = bareType(ty) match {
-    case t if t.endsWith("[]")  => None
-    case arrayShape(elem, n)    => memberSizeofBytes(elem).map(_ * n.toInt)
-    case _ => sizeofBytes(ty).orElse(aggregateSizeofBytes(ty))
+  //
+  // `casts-sizeof`: returns (size, ALIGNMENT), not a size alone. The layout
+  // arithmetic below used to take every member's alignment to be its SIZE -- right for
+  // a scalar or a pointer, wrong for an array (`char a[10]` is aligned to 1, not 10)
+  // and for a nested aggregate (aligned to its strictest member, not to its size):
+  // `struct { char c; char a[10]; }` came out as 20 bytes where every C compiler
+  // makes it 11, a hole-free wrong `sizeof`. C11 6.2.8 / the psABIs: an array has its
+  // element's alignment; a struct or union the maximum of its members'.
+  //
+  // A scalar's alignment is its size under LP64 and LLP64 (1/2/4/8, the x86-64 and
+  // AArch64 psABIs and Windows x64 alike). Under ILP32 an 8-byte scalar's alignment
+  // inside a struct is ABI-dependent (4 on i386 System V, 8 on 32-bit ARM EABI), and
+  // under an unstated model it is unknown, so those members yield `None` -- a hole,
+  // not a guessed padding.
+  def scalarAlignOf(sz: Int): Option[Int] =
+    if (sz <= 4) Some(sz)
+    else dataModel.toLowerCase match {
+      case "lp64" | "llp64" => Some(sz)
+      case _                => None
+    }
+
+  def sizeofNormType(ty: String): String =
+    bareType(ty).replaceAll("""\*(?:const|volatile|restrict)+""", "*")
+
+  /** `casts-sizeof`: an array bound Joern kept as text -- a literal, an integer
+    * constant expression over literals (`(8-3)`, `(11+1)`, what a macro bound looks
+    * like after the frontend expanded it), or `IDENT [+-] INT` against the declaring
+    * file's `#define`s (`resolveMacroArraySize`). Only `+ - *` and parentheses are
+    * evaluated -- exact integer arithmetic, as C evaluates an integer constant
+    * expression of this size; a `/`, a `sizeof`, a cast or any identifier the table
+    * does not hold leaves it `None`. */
+  def arrayBound(n0: String, filePath: Option[String]): Option[Int] = {
+    val n = n0.trim
+    if (n.matches("""\d+""")) Some(n.toInt)
+    else if (n.matches("""[\d\s+\-*()]+""")) constIntExpr(n)
+    else filePath.flatMap(f => resolveMacroArraySize(n, f))
   }
+
+  def constIntExpr(src: String): Option[Int] = {
+    val toks = """\d+|[+\-*()]""".r.findAllIn(src).toList
+    var pos = 0
+    def peek = if (pos < toks.size) Some(toks(pos)) else None
+    def atom(): Option[BigInt] = peek match {
+      case Some("(") => pos += 1; val v = sum(); if (peek.contains(")")) { pos += 1; v } else None
+      case Some("-") => pos += 1; atom().map(-_)
+      case Some(t) if t.forall(_.isDigit) => pos += 1; Some(BigInt(t))
+      case _ => None
+    }
+    def prod(): Option[BigInt] = {
+      var acc = atom()
+      while (acc.isDefined && peek.contains("*")) { pos += 1; acc = for (a <- acc; b <- atom()) yield a * b }
+      acc
+    }
+    def sum(): Option[BigInt] = {
+      var acc = prod()
+      while (acc.isDefined && (peek.contains("+") || peek.contains("-"))) {
+        val op = toks(pos); pos += 1
+        acc = for (a <- acc; b <- prod()) yield if (op == "+") a + b else a - b
+      }
+      acc
+    }
+    val r = sum()
+    if (pos == toks.size) r.filter(v => v >= 0 && v <= Int.MaxValue).map(_.toInt) else None
+  }
+
+  def memberSizeAlign(ty: String, filePath: Option[String] = None): Option[(Int, Int)] = sizeofNormType(ty) match {
+    case t if t.endsWith("[]")  => None
+    case arrayShape(elem, n)    => memberSizeAlign(elem, filePath).map { case (sz, al) => (sz * n.toInt, al) }
+    // A one-dimensional array whose bound is a macro (`u16[BTCURSOR_MAX_DEPTH-1]`),
+    // resolved against the declaring file's own `#define`s exactly as `boxedArrays`
+    // resolves a local array's bound; unresolvable stays `None` (see `sizeofBytes`).
+    case arrayShapeAny(elem, n) if !elem.contains("[") =>
+      arrayBound(n, filePath).flatMap { nn =>
+        memberSizeAlign(elem, filePath).map { case (sz, al) => (sz * nn, al) }
+      }
+    case t => sizeofBytes(t) match {
+      case Some(sz) => scalarAlignOf(sz).map(al => (sz, al))
+      case None     => aggregateSizeAlign(ty)
+    }
+  }
+
+  def memberSizeofBytes(ty: String): Option[Int] = memberSizeAlign(ty).map(_._1)
 
   /** `006-reduce-remaining-holes`, Story 4 (FR-009/FR-010): the byte size of a
     * struct or union whose full layout is resolvable -- standard C aggregate
@@ -3171,15 +3395,18 @@ import scala.annotation.tailrec
     * factored out so `segmentSizes` below (a struct/union body) and this
     * function's own recursive call into a nested block use the exact same
     * offset/alignment rules, not two copies that could drift. */
-  def aggregateLayoutBytes(memberSizes: List[Int], isUnion: Boolean): Int = {
+  // `casts-sizeof`: over (size, alignment) pairs -- see `memberSizeAlign`. Each
+  // member is placed at the next multiple of its OWN alignment; the aggregate's
+  // alignment is the largest member alignment, and its size is rounded up to it.
+  def aggregateLayout(members: List[(Int, Int)], isUnion: Boolean): (Int, Int) = {
     var offset   = 0
     var maxAlign = 1
-    memberSizes.foreach { sz =>
-      if (sz > maxAlign) maxAlign = sz
-      if (!isUnion) { offset = ((offset + sz - 1) / sz) * sz; offset += sz }
+    members.foreach { case (sz, al) =>
+      if (al > maxAlign) maxAlign = al
+      if (!isUnion) { offset = ((offset + al - 1) / al) * al; offset += sz }
     }
-    val raw = if (isUnion) memberSizes.max else offset
-    ((raw + maxAlign - 1) / maxAlign) * maxAlign
+    val raw = if (isUnion) members.map(_._1).max else offset
+    (((raw + maxAlign - 1) / maxAlign) * maxAlign, maxAlign)
   }
 
   /** `009-reduce-remaining-holes-4`: the per-segment size-classification rules
@@ -3221,13 +3448,21 @@ import scala.annotation.tailrec
     * bounded-fixed-point mechanisms, because each recursive call operates on a
     * texually SMALLER, disjoint substring (the nested block's own inner body),
     * not a graph that could cycle. */
-  def segmentSizes(rawBody: String, filePath: String): Option[List[Int]] = {
+  // `casts-sizeof`: the body is first reduced to the members the parsed
+  // configuration actually compiles (`activeStructText`); a body whose conditionals
+  // cannot be decided yields `None`, the same as any other unreadable segment.
+  def segmentSizes(rawBody: String, filePath: String): Option[List[(Int, Int)]] =
+    activeStructText(rawBody).flatMap(segmentSizesActive(_, filePath))
+
+  def segmentSizesActive(rawBody: String, filePath: String): Option[List[(Int, Int)]] = {
     val body = rawBody.replaceAll("/\\*(?s:.*?)\\*/", "").replaceAll("//[^\n]*", "")
     val declLine   = """^(.*[\s\*])([A-Za-z_]\w*)$""".r
     val nestedKw   = """\A(union|struct)\s*(?:[A-Za-z_]\w*\s*)?\{""".r
-    val nameAt     = """^\s*([A-Za-z_]\w*)\s*;""".r
+    // `casts-sizeof`: the member name may carry array dimensions -- `struct
+    // IdList_item { char *zName; } a[1];` -- each resolved by `arrayBound`.
+    val nameAt     = """^\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*);""".r
     var pos    = 0
-    var sizes  = List.empty[Int]
+    var sizes  = List.empty[(Int, Int)]
     var ok     = true
     var sawAny = false
     while (ok && pos < body.length) {
@@ -3251,9 +3486,12 @@ import scala.annotation.tailrec
             if (closeIdx < 0) ok = false
             else nameAt.findPrefixMatchOf(body.substring(closeIdx + 1)) match {
               case Some(nm) =>
-                segmentSizes(body.substring(absOpen + 1, closeIdx), filePath) match {
-                  case Some(innerSizes) if innerSizes.nonEmpty =>
-                    sizes = sizes :+ aggregateLayoutBytes(innerSizes, isUnion)
+                val count = """\[([^\[\]]*)\]""".r.findAllMatchIn(Option(nm.group(2)).getOrElse(""))
+                  .map(_.group(1)).toList.foldLeft(Option(1))((acc, e) => acc.flatMap(a => arrayBound(e, Some(filePath)).map(_ * a)))
+                (segmentSizes(body.substring(absOpen + 1, closeIdx), filePath), count) match {
+                  case (Some(innerSizes), Some(n)) if innerSizes.nonEmpty =>
+                    val (isz, ial) = aggregateLayout(innerSizes, isUnion)
+                    sizes = sizes :+ ((isz * n, ial))
                     sawAny = true
                     pos = closeIdx + 1 + nm.end
                   case _ => ok = false
@@ -3270,17 +3508,22 @@ import scala.annotation.tailrec
                 sawAny = true
                 val segSize = seg match {
                   case nestedArrayDeclLine(tyPart, _, sizeExpr) if !tyPart.exists(",(){}:".contains(_)) =>
-                    val n =
-                      if (sizeExpr.trim.matches("""\d+""")) Some(sizeExpr.trim.toInt)
-                      else resolveMacroArraySize(sizeExpr, filePath)
-                    n.flatMap(nn => memberSizeofBytes(tyPart.trim).map(_ * nn))
+                    val n = arrayBound(sizeExpr, Some(filePath))
+                    n.flatMap(nn => memberSizeAlign(tyPart.trim, Some(filePath)).map { case (sz, al) => (sz * nn, al) })
+                  // `casts-sizeof`: `int (*xCmp)(void*,int,const void*,int,const void*)`
+                  // -- ONE pointer-to-function member, whatever its signature: pointer
+                  // size and alignment under the data model. Only the single-
+                  // declarator shape (see `isSingleFunctionPointerDecl`) qualifies.
+                  case _ if isSingleFunctionPointerDecl(seg) =>
+                    pointerSizeofBytes.flatMap(sz => scalarAlignOf(sz).map(al => (sz, al)))
+                  case _ if seg.contains(",") => None   // handled just below
                   case _ if seg.exists(",[(){}:".contains(_)) => None
-                  case declLine(tyPart, _) => memberSizeofBytes(tyPart.trim)
+                  case declLine(tyPart, _) => memberSizeAlign(tyPart.trim, Some(filePath))
                   case _ => None
                 }
-                segSize match {
-                  case Some(sz) => sizes = sizes :+ sz
-                  case None     => ok = false
+                segSize.map(List(_)).orElse(multiDeclaratorSizes(seg, filePath)) match {
+                  case Some(szs) => sizes = sizes ++ szs
+                  case None      => ok = false
                 }
               }
             }
@@ -3291,7 +3534,7 @@ import scala.annotation.tailrec
   }
 
   def anonymousNestedAggregateMemberSizes(td: TypeDecl, memberName: String,
-                                           isUnion: Boolean): Option[List[Int]] =
+                                           isUnion: Boolean): Option[List[(Int, Int)]] =
     anonymousNestedAggregates(td).get(memberName).filter(_._1 == isUnion)
       .flatMap { case (_, rawBody) => segmentSizes(rawBody, td.filename) }
 
@@ -3307,16 +3550,16 @@ import scala.annotation.tailrec
     * (the SAME per-segment rules `anonymousNestedAggregateMemberSizes` already
     * uses for an inner nested aggregate) to the struct's own top-level,
     * brace-matched body (`structBodyText`) instead. */
-  def structFieldSizesFromText(td: TypeDecl): Option[List[Int]] =
+  def structFieldSizesFromText(td: TypeDecl): Option[List[(Int, Int)]] =
     structBodyText(td).flatMap(body => segmentSizes(body, td.filename))
 
   /** `009-reduce-remaining-holes-4` US4: the byte size of an anonymous nested
     * union/struct member, via `anonymousNestedAggregateMemberSizes` above, using
     * the SAME layout arithmetic `aggregateSizeofBytes` already uses for a
     * normal, Joern-visible aggregate -- reused directly, not duplicated. */
-  def anonymousNestedAggregateSize(td: TypeDecl, memberName: String, isUnion: Boolean): Option[Int] =
+  def anonymousNestedAggregateSize(td: TypeDecl, memberName: String, isUnion: Boolean): Option[(Int, Int)] =
     anonymousNestedAggregateMemberSizes(td, memberName, isUnion)
-      .filter(_.nonEmpty).map(aggregateLayoutBytes(_, isUnion))
+      .filter(_.nonEmpty).map(aggregateLayout(_, isUnion))
 
   /** `010-reach-90pct-hole-free`: the byte size of `td`, via ITS OWN top-level
     * source text (`structFieldSizesFromText`), using the SAME layout
@@ -3327,8 +3570,8 @@ import scala.annotation.tailrec
     * (the "no members at all" case and the NEW "some members resolved
     * structurally, one did not" case) share one implementation rather than
     * two copies of the same alignment/offset arithmetic. */
-  def aggregateSizeofBytesViaText(td: TypeDecl): Option[Int] =
-    structFieldSizesFromText(td).map(szs => aggregateLayoutBytes(szs, td.code.trim.startsWith("union")))
+  def aggregateSizeofBytesViaText(td: TypeDecl): Option[(Int, Int)] =
+    aggregateIsUnion(td).flatMap(isUnion => structFieldSizesFromText(td).map(szs => aggregateLayout(szs, isUnion)))
 
   /** `010-reach-90pct-hole-free`: REWORKS how this whole function fails.
     * Before this push, the structural (member-list) path was ALL-OR-NOTHING:
@@ -3356,23 +3599,418 @@ import scala.annotation.tailrec
     * cannot be safely segmented), so a struct only remaining unresolved after
     * BOTH have been tried is a substantially stronger claim than either
     * alone. */
-  def aggregateSizeofBytes(ty: String): Option[Int] =
+  def aggregateSizeofBytes(ty: String): Option[Int] = aggregateSizeAlign(ty).map(_._1)
+
+  /** `casts-sizeof`: is this aggregate a UNION? Read from the declaration's own
+    * source up to its opening brace, which must name exactly one of `struct`/`union`.
+    * The old test, `td.code.startsWith("union")`, answered "struct" for every
+    * `typedef union { ... } YYMINORTYPE;` -- the declaration starts with `typedef` --
+    * and laid the union's members out one after another: `sizeof(yyStackEntry)` came
+    * out 200 where `gcc` says 24. */
+  //
+  // It is also the gate that the source window read from `td`'s line number really
+  // is `td`'s OWN declaration: the text before the first `{` must end in
+  // `struct TAG`/`union TAG` for this type's tag, or be an untagged
+  // `typedef struct`/`typedef union` whose closing brace is followed by this name.
+  // A struct declared on the same line as its enclosing one (`struct IL { int n;
+  // struct ILItem { char *z; } a[2]; ... }`) otherwise reads the ENCLOSING body as
+  // its own, and every text-based size built on that would describe the wrong type.
+  def aggregateIsUnion(td: TypeDecl): Option[Boolean] = {
+    val text = typeDeclSourceWindow(td)
+    val open = text.indexOf('{')
+    if (open < 0) None
+    else {
+      val head = text.substring(0, open).replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("//[^\n]*", " ")
+      val tag = java.util.regex.Pattern.quote(stripDuplicateSuffix(td.name))
+      val ownsBody =
+        ("""\b(?:struct|union)\s+""" + tag + """\s*$""").r.findFirstIn(head).isDefined ||
+        ("""\btypedef\s+(?:const\s+)?(?:struct|union)\s*$""".r.findFirstIn(head).isDefined &&
+          structBodyText(td).exists { b =>
+            val after = text.substring((open + 1 + b.length + 1) min text.length)
+            ("""^\s*""" + tag + """\s*;""").r.findFirstIn(after).isDefined
+          })
+      val u = """\bunion\b""".r.findFirstIn(head).isDefined
+      val st = """\bstruct\b""".r.findFirstIn(head).isDefined
+      if (ownsBody && u != st) Some(u) else None
+    }
+  }
+
+  /** `casts-sizeof`: every DEFINITION (a declaration with a body) of this aggregate's
+    * name has the same body. `sqlite3.c` defines `struct SQLiteThread` three times,
+    * for pthreads, Win32 and no threads, under `#if`s the frontend does not decide;
+    * whichever one a lookup happened to pick gave a `sizeof` for a configuration
+    * nobody chose (24 bytes, where the pthreads build's is 40). The same guard covers
+    * two unrelated `static` structs sharing a tag in different files. Byte-identical
+    * re-parses of one header (Joern's `<duplicate>N` copies) are one definition. */
+  def hasUniqueDefinition(td: TypeDecl): Boolean = {
+    val key = stripDuplicateSuffix(bareType(td.fullName))
+    val defs = typeDeclsByName.getOrElse(key, List(td)).filter(_.code.contains("{"))
+    // Compared on the declarations' own recorded text, not on a source window read
+    // from their line numbers: a `<duplicate>` copy can carry a line number a few
+    // lines off, and a window read from there finds some OTHER brace.
+    defs.map(_.code.replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("\\s+", " ").trim).distinct.size <= 1
+  }
+
+  /** `casts-sizeof`: a `sizeof` operand whose TYPE the frontend left unresolved, sized
+    * from the declaration it names instead. Three shapes, each read from the source
+    * the same way the aggregate layout itself is:
+    *
+    *   * `a[i]` where `a` is a ONE-dimensional array whose bound is not a literal
+    *     (`MemPage *apNew[NB+2]`, typed `MemPage*[NB+2]`): the element type is the
+    *     type before the brackets, whatever the bound is. A multi-dimensional array is
+    *     not attempted (`T[2][3]` indexed once is `T[3]`, and which bracket is outer in
+    *     Joern's spelling is not something to rely on here).
+    *   * `r->u` where `u` is an ANONYMOUS (or inline-tagged) union/struct member of
+    *     `r`'s struct -- typed by Joern as the bare keyword `union` -- sized from its
+    *     inline body (`anonymousNestedAggregateSize`).
+    *   * `r->u.f`: the member `f` declared inside that inline body, sized from its own
+    *     single declaration (`pMem->u.r` is `double r;` inside `union MemValue`).
+    *
+    * Every size still goes through `segmentSizes`/`memberSizeAlign`, so the refusals
+    * there (bit-fields, undecidable `#if`s, multi-declarators) apply unchanged. */
+  def sizeofOperandFromDecl(operand: AstNode): Option[Int] = {
+    def ownerTd(recv: AstNode): Option[TypeDecl] =
+      fieldReceiverAggregateType(staticTypeOf(recv)).flatMap(structTypeDeclOfAny)
+        .filter(td => hasUniqueDefinition(td) && aggregateIsUnion(td).isDefined)
+    operand match {
+      case c: Call if indexOps.contains(c.methodFullName) =>
+        asIndex(c).flatMap { case (r, _) =>
+          arrayShapeAny.findFirstMatchIn(bareType(staticTypeOf(r))) match {
+            case Some(m) if !m.group(1).contains("[") => memberSizeAlign(m.group(1)).map(_._1)
+            case _                                     => None
+          }
+        }
+      case _ =>
+        asField(operand).flatMap { case (recv, field) =>
+          ownerTd(recv).flatMap { td =>
+            anonymousNestedAggregates(td).get(field).flatMap { case (isUnion, _) =>
+              anonymousNestedAggregateSize(td, field, isUnion).map(_._1)
+            }
+          }.orElse(asField(recv).flatMap { case (recv2, outer) =>
+            ownerTd(recv2).flatMap { td =>
+              anonymousNestedAggregates(td).get(outer).flatMap { case (_, inner) =>
+                memberDeclSizeInBody(inner, field, td.filename)
+              }
+            }
+          })
+        }
+    }
+  }
+
+  /** `casts-sizeof`: `sizeof(aJournalMagic)` for `static const unsigned char
+    * aJournalMagic[] = { 0xd9, ... };` -- an array whose bound is fixed by its
+    * INITIALIZER (C11 6.7.9p22). Joern types it `unsigned char[]`, which the old
+    * pointer fallback answered with the pointer width: right for this one 8-byte
+    * table by coincidence, wrong for every other (`delays[]` in the busy handler is
+    * 12 bytes). The size is the initializer's element count times the element size,
+    * or, for a `char` array initialised by one string literal, the literal's length
+    * plus its terminating NUL.
+    *
+    * The declaring assignment is found by name in the scope the name resolves to --
+    * this method if it has a local of that name (a `static` table inside a function),
+    * otherwise the file-scope initialiser of this method's own file -- and must be
+    * unique there. Refused: designated initializers (`{ [2] = 7 }`, whose size is the
+    * largest index, not the count), Joern's truncated initializer lists (it caps
+    * them at 1000 elements), string literals with numeric escapes or adjacent-literal
+    * concatenation, and multi-dimensional arrays. */
+  def unsizedArraySize(operand: AstNode, inMethod: Option[Method]): Option[Int] = operand match {
+    case i: Identifier =>
+      val t = bareType(staticTypeOf(i))
+      if (!t.endsWith("[]") || t.count(_ == '[') != 1) None
+      else {
+        val elem = t.dropRight(2)
+        // `genuineLocalNames`, not `localTypes`: a file-scope global read inside a
+        // function also has a (closure-bound) LOCAL there, which is not where its
+        // initializer lives.
+        val isLocal = genuineLocalNames.contains(i.name)
+        val scopes: List[Method] =
+          if (isLocal) inMethod.toList
+          else cpg.method.nameExact("<global>").l.filter(_.filename == currentFile)
+        val inits = scopes.flatMap(_.ast.l.collect {
+          case a: Call if a.methodFullName == "<operator>.assignment" && kidsOf(a).headOption.exists {
+                 case id: Identifier => id.name == i.name
+                 case _              => false
+               } && a.code.trim.matches("""^""" + java.util.regex.Pattern.quote(i.name) + """\s*\[\s*\]\s*=[\s\S]*""") => a
+        })
+        inits match {
+          case List(a) => kidsOf(a) match {
+            case List(_, rhs: Call) if rhs.methodFullName == "<operator>.arrayInitializer" =>
+              val ks = kidsOf(rhs)
+              // A designator arrives as `[2] = 7` / `.f = v`, sometimes wrapped in a
+              // BLOCK (seen on a live fixture), so any child that is a block, an
+              // assignment or starts with `[`/`.` disqualifies the count.
+              val designated = ks.exists {
+                case k: Call  => k.methodFullName == "<operator>.assignment"
+                case _: Block => true
+                case k        => k.code.trim.startsWith("[") || k.code.trim.startsWith(".")
+              }
+              if (designated || ks.isEmpty || ks.size >= 1000 || ks.exists(_.code.contains("too-many-initializers"))) None
+              else memberSizeAlign(elem).map(_._1 * ks.size)
+            case List(_, lit: Literal) if Set("char", "signedchar", "unsignedchar").contains(elem) =>
+              val q = lit.code.trim
+              if (q.matches("""^"([^"\\]|\\[ntrabfv'"?\\])*"$""")) {
+                val inner = q.substring(1, q.length - 1)
+                Some(inner.replaceAll("""\\.""", "x").length + 1)
+              } else None
+            case _ => None
+          }
+          case _ => None
+        }
+      }
+    case _ => None
+  }
+
+  /** `casts-sizeof`: the size of member `name` declared in an aggregate body's text:
+    * the ONE top-level declaration (split on `;` at brace depth 0, after
+    * `activeStructText`) whose single declarator is `name`, sized as a one-member
+    * body by `segmentSizes`. `None` if the name is not found exactly once or shares
+    * its declaration with another declarator. */
+  def memberDeclSizeInBody(rawBody: String, name: String, filePath: String): Option[Int] =
+    activeStructText(rawBody).flatMap { body =>
+      val decls = scala.collection.mutable.ListBuffer.empty[String]
+      val cur = new StringBuilder
+      var depth = 0
+      body.foreach { ch =>
+        ch match {
+          case '{' => depth += 1; cur.append(ch)
+          case '}' => depth -= 1; cur.append(ch)
+          case ';' if depth == 0 => decls += cur.toString; cur.clear()
+          case _ => cur.append(ch)
+        }
+      }
+      val fnPtrName = """\(\s*\*+\s*(?:const\s+)?([A-Za-z_]\w*)\s*\)""".r
+      val lastIdent = """([A-Za-z_]\w*)\s*$""".r
+      def declName(d0: String): Option[String] = {
+        val d = stripNestedBraces(d0).trim
+        var pd = 0; var commas = 0
+        d.foreach {
+          case '(' | '[' => pd += 1
+          case ')' | ']' => pd -= 1
+          case ','       => if (pd == 0) commas += 1
+          case _         =>
+        }
+        if (commas > 0) None
+        else fnPtrName.findFirstMatchIn(d).map(_.group(1)).orElse {
+          val noDims = d.replaceAll(""":\s*\d+\s*$""", "").replaceAll("""(\s*\[[^\]]*\])+\s*$""", "")
+          lastIdent.findFirstMatchIn(noDims).map(_.group(1))
+        }
+      }
+      decls.toList.map(_.trim).filter(_.nonEmpty).filter(d => declName(d).contains(name)) match {
+        case List(d) => segmentSizes(d + ";", filePath).collect { case List((sz, _)) => sz }
+        case _       => None
+      }
+    }
+
+  /** `casts-sizeof`: `PgHdr *pDirty, *pDirtyTail;` / `int Y, M, D;` -- one
+    * declaration, several declarators. Each declarator's type is the shared
+    * specifier part plus its OWN `*`s and `[N]`s (C11 6.7.6: pointer and array
+    * derivations belong to the declarator, not to the specifiers), laid out in
+    * source order exactly like separate declarations. Only plain declarators --
+    * `*`s, a name, literal or macro-resolved dimensions -- qualify; anything with a
+    * parenthesis, brace, bit-field or initializer makes the whole segment `None`. */
+  def multiDeclaratorSizes(seg: String, filePath: String): Option[List[(Int, Int)]] =
+    if (seg.exists("(){}:=".contains(_))) None
+    else {
+      val parts = seg.split(",").map(_.trim).toList
+      // Lazy specifier part, then at least one space or `*` before the name, so the
+      // name can never be the tail of a longer identifier (`pDirty` is not `y`).
+      val first = """^(.*?[^\s\*])(\s+\**|\s*\*+)\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*)$""".r
+      val rest  = """^(\**)\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*)$""".r
+      def dims(d: String): Option[Int] =
+        """\[([^\[\]]*)\]""".r.findAllMatchIn(d).map(_.group(1).trim).toList
+          .foldLeft(Option(1)) { (acc, e) =>
+            acc.flatMap(a => arrayBound(e, Some(filePath)).map(_ * a))
+          }
+      def one(base: String, stars: String, dimText: String): Option[(Int, Int)] =
+        for { n <- dims(dimText); sa <- memberSizeAlign(base + stars) } yield (sa._1 * n, sa._2)
+      parts match {
+        case first(base, stars0, _, dims0) :: tail if parts.size > 1 && !base.trim.endsWith(",") =>
+          val heads = one(base.trim, stars0, dims0)
+          val tails = tail.map {
+            case rest(stars, _, d) => one(base.trim, stars, d)
+            case _                 => None
+          }
+          val all = heads :: tails
+          if (all.forall(_.isDefined)) Some(all.flatten) else None
+        case _ => None
+      }
+    }
+
+  /** `casts-sizeof`: `RET (*NAME)(ARGS)` with nothing after the parameter list's own
+    * closing parenthesis -- one pointer-to-function declarator. The parameter list is
+    * matched by depth counting, so `int (*a)(int), (*b)(int)` (two declarators) and
+    * `int (*a[4])(int)` (an ARRAY of pointers) do not qualify. */
+  def isSingleFunctionPointerDecl(seg: String): Boolean = {
+    val head = """^[^(){}\[\];,:]*\(\s*\*+\s*(?:const\s+)?[A-Za-z_]\w*\s*\)\s*\(""".r
+    head.findPrefixMatchOf(seg) match {
+      case None => false
+      case Some(m) =>
+        var depth = 1; var i = m.end; var close = -1
+        while (i < seg.length && close < 0) {
+          seg.charAt(i) match {
+            case '(' => depth += 1
+            case ')' => depth -= 1; if (depth == 0) close = i
+            case _   =>
+          }
+          i += 1
+        }
+        close >= 0 && seg.substring(close + 1).trim.isEmpty
+    }
+  }
+
+  /** `casts-sizeof`: macro names `#define`d anywhere in the corpus's own source, and
+    * the ones the frontend was told to define (`cppDefines`, mirroring the parse's
+    * `CPP_DEFINES`). Anything outside both sets, and not reserved to the
+    * implementation, is undefined in every translation unit of the parsed
+    * configuration. */
+  lazy val corpusDefinedMacros: Set[String] = {
+    val pat = """^\s*#\s*define\s+([A-Za-z_]\w*)""".r
+    cpg.file.name.l.filterNot(n => n == "<empty>" || n == "<includes>").distinct.flatMap { f =>
+      fileLines(f).flatMap(l => pat.findFirstMatchIn(l).map(_.group(1)))
+    }.toSet
+  }
+  lazy val frontendDefines: Set[String] =
+    cppDefines.split(",").map(_.trim.takeWhile(_ != '=').trim).filter(_.nonEmpty).toSet
+  def macroKnownUndefined(n: String): Boolean =
+    !n.startsWith("_") && !Set("unix", "linux", "i386").contains(n) &&
+      !corpusDefinedMacros.contains(n) && !frontendDefines.contains(n)
+
+  /** `casts-sizeof`: a struct body reduced to the lines the PARSED configuration
+    * compiles, or `None` when that cannot be decided.
+    *
+    * Joern's member list for a struct is the union of EVERY `#if` branch (confirmed on
+    * a two-branch fixture: `#ifdef X int b; #else char e; #endif` lists both `b` and
+    * `e`), while the function bodies it parses take exactly one branch -- the one the
+    * TU's own macros select, with nothing predefined from the command line. Laying
+    * out every branch at once gave `sizeof(Mem)` 48 against `gcc`'s 56, `Expr` 80
+    * against 72, `Table` 120 against 104. This decides the conditionals the same way
+    * the function bodies were decided, and only where that is certain:
+    * `#ifdef N`/`#ifndef N`/`#if defined(N)`/`#if !defined(N)`/`#else`/`#endif`, for an
+    * `N` that nothing in the corpus `#define`s, the frontend was not told to define,
+    * and the compiler does not reserve (no leading `_`). Any other directive (`#if`
+    * over an expression, `#elif`, `#include`, a macro the corpus does define
+    * somewhere) makes the whole body undecidable. `#define`/`#undef` lines are dropped:
+    * they occupy no storage. Comments are blanked first, keeping line structure. */
+  def activeStructText(raw: String): Option[String] = {
+    val noComments = """/\*(?s:.*?)\*/""".r.replaceAllIn(raw,
+      m => scala.util.matching.Regex.quoteReplacement(m.matched.filter(_ == '\n'))).replaceAll("//[^\n]*", "")
+    val ifdefP  = """^#\s*ifdef\s+([A-Za-z_]\w*)\s*$""".r
+    val ifndefP = """^#\s*ifndef\s+([A-Za-z_]\w*)\s*$""".r
+    val ifDefP  = """^#\s*if\s+defined\s*\(?\s*([A-Za-z_]\w*)\s*\)?\s*$""".r
+    val ifNDefP = """^#\s*if\s+!\s*defined\s*\(?\s*([A-Za-z_]\w*)\s*\)?\s*$""".r
+    // Each open conditional: (this branch taken, an `#else` already seen).
+    var stack = List.empty[(Boolean, Boolean)]
+    var ok = true
+    val out = new StringBuilder
+    def active = stack.forall(_._1)
+    noComments.split("\n", -1).foreach { line =>
+      if (ok) {
+        val t = line.trim
+        if (!t.startsWith("#")) { if (active) out.append(line) ; out.append('\n') }
+        else t match {
+          case ifdefP(n)  if macroKnownUndefined(n) => stack = (false, false) :: stack
+          case ifndefP(n) if macroKnownUndefined(n) => stack = (true, false) :: stack
+          case ifDefP(n)  if macroKnownUndefined(n) => stack = (false, false) :: stack
+          case ifNDefP(n) if macroKnownUndefined(n) => stack = (true, false) :: stack
+          case _ if t.matches("""#\s*else\b.*""") =>
+            stack match {
+              case (taken, false) :: rest => stack = (!taken, true) :: rest
+              case _                      => ok = false
+            }
+          case _ if t.matches("""#\s*endif\b.*""") =>
+            if (stack.isEmpty) ok = false else stack = stack.tail
+          case _ if t.matches("""#\s*(define|undef)\b.*""") => out.append('\n')
+          case _ => ok = false
+        }
+      }
+    }
+    if (ok && stack.isEmpty) Some(out.toString) else None
+  }
+
+  /** `casts-sizeof`: the NAMES of the members the struct's own source declares in
+    * the parsed configuration, or `None` when they cannot be read with certainty.
+    *
+    * This is the guard the structural (`td.member`) layout path was missing, for two
+    * separate frontend behaviours:
+    *
+    *   * Joern does not record a FUNCTION-POINTER member (`u16 (*xCellSize)(MemPage*,
+    *     u8*);`) in `TypeDecl.member` at all, so a layout computed from that list
+    *     silently omits it: against `gcc` on the amalgamation, `sizeof(MemPage)` came
+    *     out 160/120 (real: 136) and `sizeof(Walker)` 24 (real: 48).
+    *   * Joern's member list is the union of every `#if` branch (`activeStructText`),
+    *     so a member the configuration does not compile was laid out anyway.
+    *
+    * The structural path is used only when its member names are exactly (as a
+    * multiset) the declarator names read from the active source text: depth-0
+    * `;`-separated declarations, one declarator per depth-0 comma, a nested aggregate
+    * collapsed to its one member, a function-pointer declarator named by its
+    * `(*NAME)`. Otherwise the text path decides (or nobody does). */
+  def textMemberNames(td: TypeDecl): Option[List[String]] =
+    structBodyText(td).flatMap(activeStructText).flatMap { body =>
+      val flat = stripNestedBraces(body)
+      val segs = flat.split(";").map(_.trim).filter(_.nonEmpty).toList
+      val fnPtrName = """\(\s*\*+\s*(?:const\s+)?([A-Za-z_]\w*)\s*\)""".r
+      val lastIdent = """([A-Za-z_]\w*)\s*$""".r
+      val names = segs.flatMap { seg =>
+        // split on depth-0 commas
+        var depth = 0; val parts = scala.collection.mutable.ListBuffer.empty[String]
+        val cur = new StringBuilder
+        seg.foreach { ch =>
+          ch match {
+            case '(' | '[' => depth += 1; cur.append(ch)
+            case ')' | ']' => depth -= 1; cur.append(ch)
+            case ',' if depth == 0 => parts += cur.toString; cur.clear()
+            case _ => cur.append(ch)
+          }
+        }
+        parts += cur.toString
+        parts.toList.map { d0 =>
+          val d = d0.trim
+          fnPtrName.findFirstMatchIn(d).map(_.group(1)).getOrElse {
+            val noBits = d.replaceAll(""":\s*\d+\s*$""", "")
+            val noDims = noBits.replaceAll("""(\s*\[[^\]]*\])+\s*$""", "")
+            lastIdent.findFirstMatchIn(noDims).map(_.group(1)).getOrElse("")
+          }
+        }
+      }
+      if (names.exists(_.isEmpty)) None else Some(names)
+    }
+
+  def aggregateSizeAlign(ty: String): Option[(Int, Int)] =
     structTypeDeclOfAny(ty).flatMap { td =>
-      if (hasPackingAttribute(td) || !sizeofInProgress.add(td.fullName)) None
+      if (hasPackingAttribute(td) || !hasUniqueDefinition(td) || aggregateIsUnion(td).isEmpty ||
+          !sizeofInProgress.add(td.fullName)) None
       else try {
-        val members = td.member.l
-        if (members.isEmpty) aggregateSizeofBytesViaText(td)
+        val joernMembers = td.member.l
+        // `casts-sizeof`: laid out in SOURCE order. Joern's member list is not in
+        // declaration order -- it puts aggregate-typed members first (`IdList` comes
+        // back as `a, nId, eU4`; `Table` with `u` first) -- and layout is order-
+        // dependent, so the old walk over that list padded members in the wrong
+        // sequence. The order is taken from the declarators in the source
+        // (`textMemberNames`); when the two lists are not the same set of distinct
+        // names, the structural path is not used at all.
+        val textNames = textMemberNames(td)
+        val members: List[Member] = textNames match {
+          case Some(ns) if ns.distinct.size == ns.size && ns.sorted == joernMembers.map(_.name).sorted =>
+            val byName = joernMembers.map(m => m.name -> m).toMap
+            ns.map(byName)
+          case _ => Nil
+        }
+        if (joernMembers.isEmpty) aggregateSizeofBytesViaText(td)
+        // `casts-sizeof`: the member list must be exactly the declarators the source
+        // compiles, or the layout below would skip what Joern left out and include
+        // what the configuration leaves out -- see `textMemberNames`. The text-only
+        // path still gets its chance, on the same active text.
+        else if (members.isEmpty) aggregateSizeofBytesViaText(td)
         else {
-          val isUnion = td.code.trim.startsWith("union")
-          var offset = 0
-          var maxSize = 0
-          var maxAlign = 1
+          val isUnion = aggregateIsUnion(td).get
           var ok = true
+          var laid = List.empty[(Int, Int)]
           members.foreach { m =>
             if (ok) {
               if (isBitfieldMember(m)) ok = false
               else {
-                val direct = memberSizeofBytes(m.typeFullName)
+                val direct = memberSizeAlign(m.typeFullName, Some(td.filename))
                 // `009-reduce-remaining-holes-4` US4: try BOTH keywords rather than
                 // gating on `bareType(m.typeFullName) == "union"/"struct"` -- confirmed
                 // live that Joern does not consistently spell an anonymous nested
@@ -3393,20 +4031,14 @@ import scala.annotation.tailrec
                   else anonymousNestedAggregateSize(td, m.name, isUnion = true)
                          .orElse(anonymousNestedAggregateSize(td, m.name, isUnion = false))
                 resolved match {
-                  case Some(sz) if sz > 0 =>
-                    if (sz > maxAlign) maxAlign = sz
-                    if (isUnion) { if (sz > maxSize) maxSize = sz }
-                    else { offset = ((offset + sz - 1) / sz) * sz; offset += sz }
+                  case Some((sz, al)) if sz > 0 && al > 0 => laid = laid :+ ((sz, al))
                   case _ => ok = false
                 }
               }
             }
           }
           if (!ok) aggregateSizeofBytesViaText(td)
-          else {
-            val raw = if (isUnion) maxSize else offset
-            Some(((raw + maxAlign - 1) / maxAlign) * maxAlign)
-          }
+          else Some(aggregateLayout(laid, isUnion))
         }
       } finally sizeofInProgress.remove(td.fullName)
     }
@@ -5729,7 +6361,177 @@ import scala.annotation.tailrec
       val b = bareType(staticTypeOf(lhs))
       if (signedTypeNames.contains(b)) Some(">>")
       else if (unsignedTypeNames.contains(b)) Some(">>>")
-      else None
+      // `casts-sizeof`: the name tables above only know a type by its spelling. What
+      // decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3), and
+      // that is computable from resolved types whenever `cIntExprType` can compute it
+      // -- through typedef chains (`Bitmask` -> `u64`), casts, literals and the usual
+      // arithmetic conversions of an arithmetic sub-expression (`(c - 0x10000) >> 10`,
+      // `(i + 1) >> 3`, whose own CPG node is typed `ANY`). Tried only AFTER the
+      // tables, so no site that translated before changes operator.
+      //
+      // Only a promoted type of at most 32 bits is translated. Core's `.cLike`
+      // arithmetic is 32-bit (`Dialect.toNumConfig`), so a shift of a 64-bit operand
+      // would be computed at the wrong width -- that site gets the separate
+      // `op:shiftRight:64-bit-operand` label from `shiftRightHoleLabel` instead:
+      // its signedness IS known, what is missing is 64-bit arithmetic in Core.
+      else cIntExprType(lhs).map(cPromote) match {
+        case Some((signed, bits)) if bits <= 32 => Some(if (signed) ">>" else ">>>")
+        case _                                  => None
+      }
+    }
+
+  /** The hole label for a `>>`/`>>=` that `shiftRightOp` could not translate: the
+    * signedness was not recovered, or it was and the promoted operand is wider than
+    * the 32-bit arithmetic Core's `.cLike` dialect performs. */
+  def shiftRightHoleLabel(lhs: AstNode): String =
+    cIntExprType(lhs).map(cPromote) match {
+      case Some((_, bits)) if bits > 32 => "op:shiftRight:64-bit-operand"
+      case _                            => "op:shiftRight:unknown-signedness"
+    }
+
+  /** `casts-sizeof`: C integer-expression typing, from RESOLVED types only.
+    *
+    * The (signedness, width in bits) of `n`'s C type BEFORE the integer promotions, or
+    * `None` whenever any input is unresolved. Nothing is guessed:
+    *
+    *   * a leaf's type comes from `staticTypeOf` and is resolved with `resolveIntType`
+    *     (typedef chains, `dataModel` widths for `long`/`size_t`/...). Plain `char` and
+    *     `_Bool` are accepted as "narrower than `int`": the integer promotions take both
+    *     to `int` whatever `char`'s implementation-defined signedness (C11 6.3.1.1p2),
+    *     so no sign has to be chosen for them. Enumerations are REFUSED even though
+    *     `resolveIntType` sizes them as `int`: an enum's compatible type is
+    *     implementation-defined (GCC picks `unsigned int` when no enumerator is
+    *     negative), which changes the usual arithmetic conversions of `e - 1`.
+    *   * a bit-field member is refused: a narrow `unsigned` bit-field promotes to
+    *     `int`, not `unsigned int` (6.3.1.1p2), and its member type does not say so.
+    *     Checked by NAME against every bit-field member in the CPG, so a field whose
+    *     owner is uncertain is refused rather than looked up in the wrong struct.
+    *   * an identifier with no declaration the CPG can see (no REF edge, not a known
+    *     global) is refused: its `typeFullName` is then the frontend's guess.
+    *   * an integer literal gets the first type of C11 6.4.4.1's list for its base and
+    *     suffix that holds its value, with `long`'s width from `dataModel`;
+    *   * a cast has its target's type; `+ - * / % & | ^` and `?:` the usual arithmetic
+    *     conversions of their operands (6.3.1.8); shifts and unary `- + ~` the promoted
+    *     type of their (left) operand; comparisons and `! && ||` are `int`.
+    *
+    * Depth-bounded so a pathological expression cannot recurse without limit. */
+  lazy val bitfieldMemberNames: Set[String] =
+    cpg.member.l.filter(m => """:\s*\d+\s*$""".r.findFirstIn(m.code).isDefined).map(_.name).toSet
+
+  def cPromote(t: (Boolean, Int)): (Boolean, Int) = if (t._2 < 32) (true, 32) else t
+
+  def cUsualArith(a: (Boolean, Int), b: (Boolean, Int)): (Boolean, Int) = {
+    val (pa, pb) = (cPromote(a), cPromote(b))
+    if (pa._1 == pb._1) (pa._1, pa._2 max pb._2)
+    else {
+      val (u, s) = if (pa._1) (pb, pa) else (pa, pb)
+      // The unsigned operand wins unless the signed type is strictly wider, in which
+      // case it can represent every value of the unsigned one (6.3.1.8p1). With
+      // standard widths this is exactly the rank rule, including `unsigned long` vs
+      // `long long` under LP64 (both 64 bits: unsigned).
+      if (u._2 >= s._2) (false, u._2) else (true, s._2)
+    }
+  }
+
+  def cLongBits: Option[Int] = modelInts.get("long").map(_.drop(1).toInt)
+
+  def cIntLiteralType(code0: String): Option[(Boolean, Int)] = {
+    val code = code0.trim.stripPrefix("-").trim
+    val intLit = """^(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9][0-9]*)([uUlL]*)$""".r
+    if (code.matches("""^'([^'\\]|\\[ntr0\\'"abfv?])'$""")) Some((true, 32))
+    else code match {
+      case intLit(digits, suffix) =>
+        val v =
+          if (digits.startsWith("0x") || digits.startsWith("0X")) BigInt(digits.drop(2), 16)
+          else if (digits.length > 1 && digits.startsWith("0")) BigInt(digits.drop(1), 8)
+          else BigInt(digits)
+        val sfx = suffix.toLowerCase
+        val hasU = sfx.contains("u")
+        val nL = sfx.count(_ == 'l')
+        if (sfx.count(_ == 'u') > 1 || nL > 2 || (nL == 2 && !suffix.contains("ll") && !suffix.contains("LL"))) None
+        else {
+          val decimal = !(digits.startsWith("0x") || digits.startsWith("0X")) && !(digits.length > 1 && digits.startsWith("0"))
+          // Candidate (signed?, width) list of 6.4.4.1p5; `long` is `None` when the
+          // data model is unknown, which fails any literal that would need it.
+          val lng = cLongBits
+          def c(s: Boolean, w: Option[Int]) = w.map(b => (s, b))
+          val cands: List[Option[(Boolean, Int)]] = (hasU, nL, decimal) match {
+            case (false, 0, true)  => List(c(true, Some(32)), c(true, lng), c(true, Some(64)))
+            case (false, 0, false) => List(c(true, Some(32)), c(false, Some(32)), c(true, lng), c(false, lng), c(true, Some(64)), c(false, Some(64)))
+            case (true, 0, _)      => List(c(false, Some(32)), c(false, lng), c(false, Some(64)))
+            case (false, 1, true)  => List(c(true, lng), c(true, Some(64)))
+            case (false, 1, false) => List(c(true, lng), c(false, lng), c(true, Some(64)), c(false, Some(64)))
+            case (true, 1, _)      => List(c(false, lng), c(false, Some(64)))
+            case (false, 2, true)  => List(c(true, Some(64)))
+            case (false, 2, false) => List(c(true, Some(64)), c(false, Some(64)))
+            case (true, 2, _)      => List(c(false, Some(64)))
+            case _                 => Nil
+          }
+          def fits(t: (Boolean, Int)): Boolean =
+            if (t._1) v < (BigInt(1) << (t._2 - 1)) else v < (BigInt(1) << t._2)
+          // Walk the list in order; an unknown width BEFORE the first fit makes the
+          // answer unknowable, so stop there rather than skip it.
+          cands.iterator.map(o => o.map(t => (t, fits(t))))
+            .find(o => o.isEmpty || o.get._2).flatten.map(_._1)
+        }
+      case _ => None
+    }
+  }
+
+  def cLeafIntType(ty: String): Option[(Boolean, Int)] = {
+    val raw = ty.replace("const ", "").replace("volatile ", "").trim
+    val b = bareType(ty)
+    if (raw.startsWith("enum") || b.isEmpty || b == "ANY" || isPointerType(ty)) None
+    else if (b == "char") Some((true, 8))          // promotes to `int` either way
+    else if (b == "_Bool" || b == "bool") Some((false, 8))
+    else resolveIntType(ty).map(w => (w.head == 'i', w.drop(1).toInt))
+  }
+
+  def cIntExprType(n: AstNode, depth: Int = 0): Option[(Boolean, Int)] =
+    if (depth > 24) None
+    else {
+      def rec(k: AstNode) = cIntExprType(k, depth + 1)
+      val arith = Set("<operator>.addition", "<operator>.subtraction",
+        "<operator>.multiplication", "<operator>.division", "<operator>.modulo",
+        "<operator>.and", "<operator>.or", "<operator>.xor")
+      val boolish = Set("<operator>.lessThan", "<operator>.lessEqualsThan",
+        "<operator>.greaterThan", "<operator>.greaterEqualsThan", "<operator>.equals",
+        "<operator>.notEquals", "<operator>.logicalNot", "<operator>.logicalAnd",
+        "<operator>.logicalOr")
+      n match {
+        case l: Literal => cIntLiteralType(l.code)
+        case i: Identifier =>
+          if (i._refOut.hasNext || (globalTypes.contains(i.name) && !genuineLocalNames.contains(i.name)))
+            cLeafIntType(staticTypeOf(i))
+          else None
+        case c: Call =>
+          val mfn = c.methodFullName
+          val ks = kidsOf(c)
+          if (mfn == "<operator>.cast" && ks.size == 2) {
+            val tty = staticTypeOf(ks(0))
+            if (castTargetIsPointer(ks(0), tty)) None else cLeafIntType(tty)
+          }
+          else if (arith.contains(mfn) && ks.size == 2)
+            for (a <- rec(ks(0)); b <- rec(ks(1))) yield cUsualArith(a, b)
+          else if ((mfn == "<operator>.shiftLeft" || mfn == "<operator>.arithmeticShiftRight") && ks.size == 2)
+            rec(ks(0)).map(cPromote)
+          else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus" || mfn == "<operator>.not") && ks.size == 1)
+            rec(ks(0)).map(cPromote)
+          else if (boolish.contains(mfn)) Some((true, 32))
+          else if (mfn == "<operator>.conditional" && ks.size == 3)
+            for (a <- rec(ks(1)); b <- rec(ks(2))) yield cUsualArith(a, b)
+          else if (fieldOps.contains(mfn))
+            asField(c) match {
+              case Some((_, f)) if !bitfieldMemberNames.contains(f) => cLeafIntType(staticTypeOf(c))
+              case _ => None
+            }
+          else if (indexOps.contains(mfn) || mfn == "<operator>.indirection")
+            cLeafIntType(staticTypeOf(c))
+          // An ordinary call: its declared return type, as Joern recorded it.
+          else if (!mfn.startsWith("<operator>")) cLeafIntType(c.typeFullName)
+          else None
+        case _ => None
+      }
     }
 
   /** One element of a brace initializer, classified.
@@ -6023,7 +6825,7 @@ import scala.annotation.tailrec
       shiftRightOp(kids(0)) match {
         case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
-        case None     => hole("op:shiftRight:unknown-signedness")
+        case None     => hole(shiftRightHoleLabel(kids(0)))
       }
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
@@ -6199,6 +7001,12 @@ import scala.annotation.tailrec
       // represent them as.
       kids(1) match {
         case mr: MethodRef => expr(kids(1))
+        // `casts-sizeof`: a function DEFINED in this program, named by a bare
+        // identifier Joern did not bind to a `METHOD_REF`, cast to any pointer type --
+        // the same value the `MethodRef` case just above produces for it. See
+        // `definedFunctionNamedBy` for the three conditions that rule out a variable.
+        case i: Identifier if castTargetIsPointer(kids(0), tty) && definedFunctionNamedBy(i).isDefined =>
+          fnValue(definedFunctionNamedBy(i).get)
         // `010-reach-90pct-hole-free`: an EXTERNAL function referenced by BARE
         // NAME, cast to a known function-pointer typedef -- confirmed live,
         // `os_unix.c`'s own `aSyscall[]` table, `(sqlite3_syscall_ptr)close`
@@ -6266,6 +7074,17 @@ import scala.annotation.tailrec
               // this one is closed by naming a data model, not by a better frontend.
               else if (modelDependentNames.contains(bareType(tty)))
                 hole("op:cast:model-dependent")
+              // `casts-sizeof`: the two largest `op:cast:scalar` shapes on SQLite are
+              // not one problem, so they no longer share one label. A cast to a
+              // FLOATING type needs a float `Val` (blocked on wiring `Float.lean` in,
+              // exactly like `lit:float`); a cast to plain `char` needs a decision
+              // `dataModel` does not make -- `char` is signed on x86-64 System V and
+              // unsigned on AArch64 Linux, both LP64 -- so `(char)200` has no single
+              // answer to give.
+              else if (Set("float", "double", "longdouble").contains(bareType(tty)))
+                hole("op:cast:float")
+              else if (bareType(tty) == "char")
+                hole("op:cast:char-signedness")
               else hole("op:cast:" + addrKind(tty))
           }
       }
@@ -6612,11 +7431,45 @@ import scala.annotation.tailrec
       // tries the aggregate layout resolver above; every other shape is unchanged
       // from `005`, and an aggregate whose layout does not resolve falls through
       // to the exact same `op:sizeOf:object` hole below it always has.
-      sizeofBytes(ty).orElse(aggregateSizeofBytes(ty)) match {
+      // `casts-sizeof`: `memberSizeAlign` (not `aggregateSizeofBytes` alone) so an
+      // ARRAY of aggregates is sized too -- `sizeof(aSub)` for `struct Sublist
+      // aSub[13]` is 13 * sizeof(struct Sublist) by definition (C11 6.5.3.4p7: no
+      // padding between array elements beyond each element's own), which the
+      // scalar-only `sizeofBytes` array case could never reach -- and `char *const`
+      // (a const-qualified POINTER, the element type of `static char *const az[]`)
+      // is normalised to `char*` before `isPointerType` looks for a trailing `*`.
+      //
+      // `casts-sizeof`: a PARAMETER declared with array syntax (`u8 aBuf[16]`) has
+      // pointer type (C11 6.7.6.3p7), so its `sizeof` is the pointer width, never
+      // the array's. And a LOCAL array whose bound is a macro is sized against this
+      // method's own file's `#define`s, the table `boxedArrays` already trusts for
+      // exactly these locals.
+      val declNode = operand match {
+        case i: Identifier => i._refOut.l.headOption
+        case _             => None
+      }
+      val arrayParam = declNode.exists(_.isInstanceOf[MethodParameterIn]) && bareType(ty).contains("[")
+      val localFile = if (declNode.exists(_.isInstanceOf[Local])) Some(currentFile) else None
+      (if (arrayParam) pointerSizeofBytes
+       else sizeofBytes(ty).orElse(sizeofBytes(sizeofNormType(ty)))
+         .orElse(memberSizeAlign(ty, localFile).map(_._1))
+         .orElse(sizeofOperandFromDecl(operand))
+         .orElse(unsizedArraySize(operand, scala.util.Try(c.method).toOption))) match {
         case Some(n) => intLit(n)
         case None =>
           if (modelDependentNames.contains(bareType(ty))) hole("op:sizeOf:model-dependent")
-          else hole("op:sizeOf:" + addrKind(ty))
+          // `casts-sizeof`: an ARRAY whose bound could not be determined (a `[]`
+          // sized by an initializer this could not count, or a bound expression it
+          // could not evaluate). `addrKind` would call it `pointer`, which it is not.
+          // An array with literal bounds is labelled by its element type instead.
+          else {
+            val literalDims = """(\[\d+\])+$""".r
+            val t = bareType(ty)
+            val elem = literalDims.replaceFirstIn(t, "")
+            if (elem.contains("[")) hole("op:sizeOf:array-bound")
+            else if (elem != t) hole("op:sizeOf:" + addrKind(elem))
+            else hole("op:sizeOf:" + addrKind(ty))
+          }
       }
     }
     else if (mfn.startsWith("<operator>"))
@@ -7842,7 +8695,7 @@ import scala.annotation.tailrec
         case Some(op) =>
           val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
-        case None => (Nil, hole("op:shiftRight:unknown-signedness"))
+        case None => (Nil, hole(shiftRightHoleLabel(a)))
       }
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
@@ -8171,7 +9024,7 @@ import scala.annotation.tailrec
         case lhs :: rhs :: Nil =>
           shiftRightOp(lhs) match {
             case Some(op) => assignTo(lhs, rhs, Some(op))
-            case None     => holeS("op:shiftRight:unknown-signedness")
+            case None     => holeS(shiftRightHoleLabel(lhs))
           }
         case _ => holeS("assign:arity")
       }
@@ -8325,6 +9178,23 @@ import scala.annotation.tailrec
     // "cause". The parser type is a closed set and says the same thing about the remedy:
     // `CASTProblemDeclaration` means the C preprocessor was not run.
     case u: Unknown if isKernelMeta(u.code) => metaElided += 1; skip
+    // `casts-sizeof`: an unparsed `extern` DECLARATION -- `extern int SQLITE_TCLAPI
+    // sqlite3BtreeSharedCacheReport(void*, Tcl_Interp*, int, Tcl_Obj*CONST*);` inside
+    // a Tcl test's init function, unparseable only because `SQLITE_TCLAPI`/`CONST`
+    // were not expanded. An `extern` declaration only names something defined
+    // elsewhere: it allocates nothing and executes nothing, and at block scope it may
+    // not even carry an initializer (C11 6.7.9p5). `Stmt.skip` is therefore its exact
+    // translation. Recognised only when the text is ONE declaration -- starts with
+    // `extern`, ends with its single `;`, no `{` (a definition) and no `=` -- so an
+    // unparsed statement that merely begins with the word is never swallowed.
+    case u: Unknown if isParserProblem(u) && isBareExternDecl(u.code) => skip
+    // `casts-sizeof`: `x = va_arg(ap, int);`. `va_arg`'s second argument is a TYPE, so
+    // without `<stdarg.h>`'s builtin the frontend cannot parse the statement at all.
+    // Even parsed it would stay a hole -- Core has no C variadic calling convention
+    // to read the next argument from -- so it gets a label that says exactly that,
+    // instead of the generic "the preprocessor was not run" bucket.
+    case u: Unknown if isParserProblem(u) && """\bva_arg\s*\(""".r.findFirstIn(u.code).isDefined =>
+      holeS("stmt:va_arg")
     case u: Unknown    =>
       val kind = Option(u.parserTypeName).map(_.trim).filter(_.nonEmpty).getOrElse("node")
       holeS("stmt:UNKNOWN:" + kind)
