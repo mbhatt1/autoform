@@ -5883,7 +5883,11 @@ import scala.annotation.tailrec
           boxedStructFieldOperand(operand).isDefined ||
           pointerStructFieldOperand(operand).isDefined ||
           boxedStructArrayIndexOperand(operand).isDefined ||
-          pointerStructArrayIndexOperand(operand).isDefined
+          pointerStructArrayIndexOperand(operand).isDefined ||
+          // `011-address-of-local-arrays`: `&p[i]`, `p` itself `isIrefExpr` --
+          // translated to `p + i` (`irefElementAddrOf`), which is exactly the
+          // `+` case just below, so it yields a `Val.iref` for the same reason.
+          irefElementAddrOperand(operand).isDefined
         case _ => false
       }
     case c: Call if c.methodFullName == "<operator>.addition" =>
@@ -5909,6 +5913,159 @@ import scala.annotation.tailrec
         case _ => false
       }
     case _ => false
+  }
+
+  /** `011-address-of-local-arrays`: `&p[i]`, `p` an expression PROVABLY holding an
+    * interior pointer VALUE (`isIrefExpr`) -- e.g. a `ptrIrefNames` local walking a
+    * boxed array, or a parameter `closedIrefOutParam` verified always receives one.
+    *
+    * Faithful because C defines `&p[i]` as `&*(p + i)`, and `&*E` as exactly `E`
+    * (C11 6.5.3.2p3: "the result is as if both were omitted") -- so `&p[i]` IS the
+    * pointer value `p + i`, with no read of `p[i]` at all. `applyBinop`'s
+    * `Val.iref + Val.int` arm (Story 5) already implements exactly that arithmetic,
+    * and it is the SAME arm `p[i]`'s own read translation (`derefIref (p + i)`, the
+    * `isIrefExpr` case of `indexOps` in `callExpr`) already relies on -- this is that
+    * translation minus its outer `derefIref`, i.e. the `&` undoing the `*`, and
+    * nothing new. The two guards are the same safeguards that read path and
+    * `isIrefExpr`'s own `+` case rely on, made explicit:
+    *   - the INDEX must not be pointer-typed: C also accepts the commuted spelling
+    *     `i[p]`, where `asIndex`'s own positional receiver would be the integer;
+    *     refusing a pointer-typed index keeps the receiver/offset roles unambiguous.
+    *   - the RECEIVER must not itself be a top-level CAST: `&((u32*)p)[1]` advances
+    *     by `sizeof(u32)` bytes of `p`'s underlying object, whereas `Sel.idx`
+    *     arithmetic counts ELEMENTS of whatever the box was allocated as -- the
+    *     two only coincide when the element type is unchanged, which a cast is
+    *     exactly the evidence against. Such a site keeps its existing hole. */
+  def irefElementAddrOperand(operand: AstNode): Option[(AstNode, AstNode)] =
+    asIndex(operand).filter { case (recv, idx) =>
+      val recvIsCast = recv match {
+        case rc: Call => rc.methodFullName == "<operator>.cast"
+        case _ => false
+      }
+      val elemTy = staticTypeOf(operand)
+      !recvIsCast && !isPointerType(staticTypeOf(idx)) && isIrefExpr(recv) &&
+      // Never a site `callExpr`'s `&` case already answers differently: a
+      // byte-cursor receiver (`cursorAddrOf`, `Val.str` model) or an aggregate
+      // ELEMENT (`aggregate` identity), so `isIrefExpr`'s claim below always
+      // agrees with the translation `expr` actually produces for the same node.
+      !rawLocalOrParamName(recv).map(localName).exists(strCursorParams.contains) &&
+      !isClassType(elemTy) && addrKind(elemTy) != "object"
+    }
+  def irefElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    irefElementAddrOperand(operand).map { case (recv, idx) =>
+      ujson.Obj("k" -> "binop", "op" -> "+", "a" -> expr(recv), "b" -> expr(idx))
+    }
+
+  /** `011-address-of-local-arrays`: `&"text"[k]` -- the address of a character
+    * inside a STRING LITERAL (SQLite's own `&LEGACY_TEMP_SCHEMA_TABLE[7]` /
+    * `&PREFERRED_SCHEMA_TABLE[7]`, a macro expanding to a literal, used to name the
+    * `temp_schema` suffix without a second literal).
+    *
+    * A C string literal already translates to `Val.str` (its text), which is this
+    * exporter's established model of a `char*` pointing at the START of that text;
+    * a `char*` pointing partway into a string is, under the SAME model,
+    * `Expr.strFrom s k` -- the suffix from position `k` -- exactly the value
+    * `cursorAddrOf` (`&z[i]` on a byte cursor, the case just above in `callExpr`)
+    * already produces for the identical `&`-of-an-element-of-a-string shape. A
+    * literal is immutable (writing through it is UB), so no aliasing a `Val.str`
+    * copy could miss arises. Two guards, both about the literal TEXT matching the
+    * program's bytes position-for-position:
+    *   - no backslash in the unquoted text: `expr`'s own `Literal` case emits the
+    *     source spelling WITHOUT escape processing (`"a\tb"` stays four
+    *     characters), so an escape before position `k` would shift every later
+    *     position -- refused rather than decoded here;
+    *   - no embedded `"`: adjacent-literal concatenation (`"ab" "cd"`) would put
+    *     the quote characters themselves into the text.
+    * Out-of-range `k` needs no guard of its own: `strFrom` holes on a negative start
+    * and yields `""` past the end, and `k == length` (the terminator's address) is
+    * genuinely `""` in C. The index must not be pointer-typed (`k["text"]`), the
+    * same role-disambiguation guard as `irefElementAddrOf`. */
+  def literalElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    asIndex(operand).flatMap { case (recv, idx) =>
+      unwrapMacro(recv) match {
+        case l: Literal if cLikeFile && !isPointerType(staticTypeOf(idx)) =>
+          val t = l.code.trim
+          val body = if (t.length >= 2 && t.head == '"' && t.last == '"') Some(t.drop(1).dropRight(1)) else None
+          body.filter(b => !b.contains('\\') && !b.contains('"')).map { _ =>
+            ujson.Obj("k" -> "strFrom", "a" -> expr(recv), "b" -> expr(idx))
+          }
+        case i: Identifier if cLikeFile && !isPointerType(staticTypeOf(idx)) && constLiteralCharArray(i) =>
+          Some(ujson.Obj("k" -> "strFrom", "a" -> expr(recv), "b" -> expr(idx)))
+        case _ => None
+      }
+    }
+
+  /** `011-address-of-local-arrays`: is `i` a LOCAL `const char x[] = "text";` --
+    * the named-array spelling of the string literal `literalElementAddrOf` covers
+    * (SQLite's `getSafetyLevel`: `static const char zText[] = "onoffalse..."`,
+    * then `&zText[iOffset[i]]`)? Such an array is not boxed (no size in its type),
+    * and its one declaration already binds the name to exactly the literal's
+    * `Val.str` (`assign zText (str ...)`, the ordinary assignment path). It stays
+    * that value for the whole activation because it is `const` (never written)
+    * and an array (never reassigned) -- both checked, not assumed: the declared
+    * text carries `const` and no `*`, the type is a `char` array, the name is not
+    * boxed, and EVERY assignment to the name in the method is that single
+    * declaration from an escape-free plain literal (same text guards as the
+    * literal case). `static` makes no difference for a `const` object. */
+  def constLiteralCharArray(i: Identifier): Boolean = {
+    val nm = localName(i.name)
+    val ty = staticTypeOf(i)
+    val decls = i.method.local.l.filter(l => localName(l.name) == nm)
+    val assigns = i.method.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      .filter(a => kidsOf(a).headOption.exists {
+        case t: Identifier => localName(t.name) == nm
+        case _ => false
+      })
+      // The storage half of a sized declarator (`<operator>.alloc`) is not a write
+      // of a value; it translates on its own (and holes on its own if unmodelled).
+      .filterNot(a => kidsOf(a).lift(1).exists {
+        case c: Call => c.methodFullName == "<operator>.alloc"
+        case _ => false
+      })
+    isCStringType(ty) && ty.contains("[") && !boxedArrays.contains(nm) && !boxedLocals.contains(nm) &&
+    decls.size == 1 && {
+      val code = decls.head.code
+      code.split("[\\s\\[]+").contains("const") && !code.contains("*")
+    } &&
+    assigns.size == 1 && (kidsOf(assigns.head) match {
+      case List(_, l: Literal) =>
+        val t = l.code.trim
+        t.length >= 2 && t.head == '"' && t.last == '"' && {
+          val b = t.drop(1).dropRight(1)
+          !b.contains('\\') && !b.contains('"')
+        }
+      case _ => false
+    })
+  }
+
+  /** `011-address-of-local-arrays`: a more precise label for two `&`-residue shapes
+    * that are not array/field ADDRESSING at all, only spelled like it, so their
+    * generic `op:addressOf:element:*`/`op:addressOf:field:*` label pointed at the
+    * wrong remedy:
+    *   - `&((T*)0)[k]` -- SQLite's `SQLITE_INT_TO_PTR(k)`: an INTEGER smuggled
+    *     through a pointer-typed slot (thread results, `pUserData`). It is an
+    *     int-to-pointer conversion; `op:addressOf:element:int-to-pointer`.
+    *   - `&((T*)0)->f` -- the classic hand-rolled `offsetof(T, f)`: its value is a
+    *     struct-LAYOUT byte offset, which Core (no layout model) cannot know;
+    *     `op:addressOf:field:offsetof`.
+    * Both stay holes -- only the label changes. */
+  def addressOfResidueLabel(operand: AstNode): Option[String] = {
+    def isNullPtrCast(n: AstNode): Boolean = unwrapMacro(n) match {
+      case c: Call if c.methodFullName == "<operator>.cast" =>
+        kidsOf(c) match {
+          case List(_, lit: Literal) => isZeroLiteral(lit.code)
+          case List(_, inner)        => isNullPtrCast(inner)
+          case _ => false
+        }
+      case _ => false
+    }
+    asIndex(operand) match {
+      case Some((recv, _)) if isNullPtrCast(recv) => Some("op:addressOf:element:int-to-pointer")
+      case _ => asField(operand) match {
+        case Some((recv, _)) if isNullPtrCast(recv) => Some("op:addressOf:field:offsetof")
+        case _ => None
+      }
+    }
   }
 
   def callExpr(c: Call): ujson.Obj = {
@@ -6370,6 +6527,15 @@ import scala.annotation.tailrec
       // already cover the common bare-name case.
       lazy val chainArrIref = chainedStructArrayIndexOperand(kids(0))
       lazy val chainFieldIref = chainedStructFieldOperand(kids(0))
+      // `011-address-of-local-arrays`: two more `&X[i]` shapes that are, like
+      // `cursorAddrOf` above, nothing but C's own `&X[i] == X + i` identity applied
+      // to a receiver whose value Core ALREADY represents -- see
+      // `irefElementAddrOf`/`literalElementAddrOf`'s own doc comments for the full
+      // argument. Both are tried only AFTER every pre-existing case (lazily, so
+      // they cost nothing where an earlier case already matched), so no previously
+      // translated `&` site can change shape.
+      lazy val irefElemAddr = irefElementAddrOf(kids(0))
+      lazy val literalElemAddr = literalElementAddrOf(kids(0))
       if (cursorAddrOf.isDefined) {
         cursorAddrOf.get
       } else if (arrIref.isDefined) {
@@ -6396,10 +6562,12 @@ import scala.annotation.tailrec
       else if (aggregate) expr(kids(0))
       else if (boxed.isDefined) boxRef(boxed.get)
       else if (fnIdentity) expr(kids(0))
+      else if (irefElemAddr.isDefined) irefElemAddr.get
+      else if (literalElemAddr.isDefined) literalElemAddr.get
       else {
         val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
                 else kind
-        hole("op:addressOf:" + addrShape(kids(0)) + ":" + k)
+        hole(addressOfResidueLabel(kids(0)).getOrElse("op:addressOf:" + addrShape(kids(0)) + ":" + k))
       }
     }
     // `*p`. The dual of the above, and the same split — but the *identity* half is
@@ -7208,6 +7376,219 @@ import scala.annotation.tailrec
     case _ => None
   }
 
+  /** `011-address-of-local-arrays`: the DECLARATION statement of a boxed array/struct
+    * local (`boxedArrays`/`boxedStructs`) -- `T a[N];`, `T a[N] = {...};`,
+    * `char a[N] = "...";`, `struct S s = {...};`.
+    *
+    * Before this, every such statement became `skip`, on the argument that the
+    * function-entry prologue already allocated the box (every slot `.unit`). That is
+    * right for a declaration WITHOUT an initializer (an uninitialized C local's value
+    * is indeterminate; nothing may read it before writing it), and it stays `skip`.
+    * It was a SILENT WRONG ANSWER for one WITH an initializer, confirmed on a tiny
+    * repro: `int a[4] = {0}; return a[2];` exported hole-free and evaluated to
+    * `.unit`, not `0` -- C11 6.7.9p21 zero-initializes every element the brace list
+    * does not name, and the listed ones get their listed values. So the initializer
+    * is now translated, and only where that translation is exact:
+    *
+    *   - ARRAY, positional brace list `{v0, v1, ...}` (no designators: Joern
+    *     Block-wraps a designated element, which is refused), at most `N` values,
+    *     scalar INTEGER element type: `a[k] = vk` for each listed `k` (the same
+    *     `setDerefIref (irefIndex a k)` a plain `a[k] = v` statement already
+    *     emits), then `a[k] = 0` for every remaining `k` -- unrolled when short,
+    *     else a counted loop over a fresh `a$zi` counter (the `$` suffix keeps it
+    *     out of C's identifier space, `strCursorParams`' own `$off` convention).
+    *   - ARRAY of `char`-like elements initialized by a STRING LITERAL: its bytes
+    *     (ASCII only; no backslash, since `expr`'s `Literal` case does not decode
+    *     escapes), then the terminating `0` and the zero fill -- exactly the byte
+    *     array C builds (6.7.9p14). A literal longer than `N` is refused.
+    *   - STRUCT, positional brace list, EVERY member a scalar integer: member
+    *     `k` (declaration order) gets `vk`, the rest `0`, via `setField` -- the
+    *     same statement `s.f = v` already emits for a boxed struct.
+    *
+    * Each listed value must provably survive the implicit conversion to the element
+    * type unchanged, because `setDerefIref`/`setField` store it unconverted: an
+    * integer (or character) literal within the element type's range, or an
+    * expression whose own static type resolves to the SAME integer type. A bare
+    * `char` element (signedness implementation-defined) accepts only `0..127`.
+    * Anything else -- pointer/float/aggregate elements, designators, nested braces,
+    * a value needing conversion, a struct with a non-integer member, and (for a
+    * boxed STRUCT) any right-hand side that is not an initializer at all -- a
+    * whole-struct copy `s = t`/`s = *p`, which `skip` ALSO silently dropped (the
+    * one exception: `s = t` from a bare same-typed name with only scalar/pointer
+    * members, translated member-wise, see its own case below) -- becomes the
+    * statement hole `op:arrayDecl:boxed-initializer`: this commit turns a silent
+    * wrong answer into an honest hole where it cannot yet give the right one. */
+  def boxedAggregateInit(nm: String, lhs: AstNode, rhs: AstNode): ujson.Obj = {
+    val refuse = holeS("op:arrayDecl:boxed-initializer")
+    def isAlloc(n: AstNode) = n match {
+      case c: Call => c.methodFullName == "<operator>.alloc"
+      case _ => false
+    }
+    // Inclusive value range of an integer element type, or `None` when not a
+    // scalar integer this can reason about.
+    def intRange(ty: String): Option[(BigInt, BigInt)] = {
+      val plain = ty.replace("const ", "").replace("volatile ", "").trim
+      if (plain == "char") Some((BigInt(0), BigInt(127)))
+      else resolveIntType(ty).flatMap { tag =>
+        scala.util.Try(tag.drop(1).toInt).toOption.map { w =>
+          if (tag.startsWith("u")) (BigInt(0), BigInt(2).pow(w) - 1)
+          else (-BigInt(2).pow(w - 1), BigInt(2).pow(w - 1) - 1)
+        }
+      }
+    }
+    def literalValue(v: AstNode): Option[BigInt] = v match {
+      case l: Literal =>
+        val t = l.code.trim
+        parseIntLiteral(t).orElse(
+          if (t.length >= 3 && t.head == '\'' && t.last == '\'') charLiteralValue(t.drop(1).dropRight(1)).map(BigInt(_))
+          else None)
+      case c: Call if c.methodFullName == "<operator>.minus" =>
+        kidsOf(c) match { case List(x) => literalValue(x).map(-_); case _ => None }
+      case _ => None
+    }
+    // A POINTER-typed slot (data or function pointer; never an array member).
+    def ptrSlot(ty: String): Boolean =
+      !ty.contains("[") && (bareType(ty).endsWith("*") || ty.replace(" ", "").contains("(*)"))
+    def plainStringLiteral(v: AstNode): Boolean = v match {
+      case l: Literal =>
+        val t = l.code.trim
+        t.length >= 2 && t.head == '"' && t.last == '"' && {
+          val b = t.drop(1).dropRight(1)
+          !b.contains('\\') && !b.contains('"')
+        }
+      case _ => false
+    }
+    // An EXPLICIT pointer value is stored as exactly what `expr` makes of it -- the
+    // same value the equivalent statement `s.f = v;` already stores: a null
+    // constant (`0`/`NULL`, spelled as `s.f = 0`/`s.f = NULL` would be), a
+    // function designator (`MethodRef`, `fnValue`), or an escape-free string
+    // literal into a `char`-pointer slot (`Val.str`, this exporter's `char*`
+    // model). An IMPLICIT (omitted) pointer is refused instead -- see `zeroFor`.
+    def ptrValueOk(v: AstNode, ty: String): Boolean = v match {
+      case l: Literal if isNullLiteral(l) => true
+      case _: MethodRef => true
+      case l: Literal => plainStringLiteral(l) && isCStringType(ty)
+      case _ => false
+    }
+    def valueOk(v: AstNode, elemTy: String): Boolean = {
+      val simple = v match {
+        case _: Block => false
+        case c: Call => c.methodFullName != "<operator>.arrayInitializer" &&
+                        c.methodFullName != "<operator>.assignment"
+        case _ => true
+      }
+      simple && (intRange(elemTy) match {
+        case None => ptrSlot(elemTy) && ptrValueOk(v, elemTy)
+        case Some((lo, hi)) =>
+          literalValue(v) match {
+            case Some(x) => x >= lo && x <= hi
+            case None    => resolveIntType(staticTypeOf(v)).exists(t => resolveIntType(elemTy).contains(t))
+          }
+      })
+    }
+    val zero = intLit(0)
+    def elemWrite(k: ujson.Obj, v: ujson.Obj): ujson.Obj =
+      ujson.Obj("k" -> "setDerefIref",
+        "p" -> ujson.Obj("k" -> "irefIndex", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "i" -> k), "v" -> v)
+    def zeroFill(from: Int, n: Int): List[ujson.Obj] =
+      if (n - from <= 16) (from until n).toList.map(k => elemWrite(intLit(k), zero))
+      else {
+        val ctr = nm + "$zi"
+        val ctrE = ujson.Obj("k" -> "name", "v" -> ctr)
+        List(
+          ujson.Obj("k" -> "assign", "x" -> ctr, "e" -> intLit(from)),
+          ujson.Obj("k" -> "loop",
+            "c" -> ujson.Obj("k" -> "binop", "op" -> "<", "a" -> ctrE, "b" -> intLit(n)),
+            "body" -> seqOf(List(
+              elemWrite(ctrE, zero),
+              ujson.Obj("k" -> "assign", "x" -> ctr,
+                "e" -> ujson.Obj("k" -> "binop", "op" -> "+", "a" -> ctrE, "b" -> intLit(1)))))))
+      }
+    // A `static` local is initialized ONCE, before the program runs (6.2.4p3,
+    // 6.7.9p10), not each time its declaration is reached -- but the box is
+    // (re)allocated by the per-call prologue. For a `const` object the two are
+    // indistinguishable (nothing can write it between calls), so its initializer
+    // is translated like any other; a MUTABLE static (`static HashElem
+    // nullElement = {...}`) would silently lose writes from earlier calls, so it
+    // keeps a hole under its own label. Read from the declaration's own source
+    // text (`static ...`), the only place Joern records the storage class; every
+    // same-named local of the method is checked, so a shadowing ambiguity refuses.
+    val mutableStatic = lhs match {
+      case i: Identifier =>
+        i.method.local.l.filter(l => localName(l.name) == nm).exists { l =>
+          val toks = l.code.split("[\\s*]+").toList
+          val beforeName = l.code.takeWhile(_ != '[')
+          toks.contains("static") && !(toks.contains("const") && !beforeName.contains("*"))
+        }
+      case _ => false
+    }
+    if (isAlloc(rhs)) skip
+    else if (mutableStatic) holeS("op:arrayDecl:static-initializer")
+    else if (boxedArrays.contains(nm)) {
+      val n = boxedArrays(nm)
+      val elemTy = arrayShapeAny.findFirstMatchIn(bareType(staticTypeOf(lhs))).map(_.group(1).trim)
+      (elemTy, rhs) match {
+        case (Some(et), c: Call) if c.methodFullName == "<operator>.arrayInitializer" =>
+          val vs = kidsOf(c)
+          // Zero fill is `0` only for an INTEGER element (see the struct case's
+          // note on an omitted pointer's null): a pointer array must be listed in full.
+          if (vs.nonEmpty && vs.size <= n && vs.forall(v => valueOk(v, et)) &&
+              (vs.size == n || intRange(et).isDefined))
+            seqOf(vs.zipWithIndex.map { case (v, k) => elemWrite(intLit(k), expr(v)) } ++ zeroFill(vs.size, n))
+          else refuse
+        case (Some(et), l: Literal) if intRange(et).isDefined =>
+          val t = l.code.trim
+          val body = if (t.length >= 2 && t.head == '"' && t.last == '"') Some(t.drop(1).dropRight(1)) else None
+          body.filter(b => !b.contains('\\') && !b.contains('"') && b.forall(ch => ch >= ' ' && ch < 127) &&
+                           b.length <= n)
+            .map { b =>
+              seqOf(b.toList.zipWithIndex.map { case (ch, k) => elemWrite(intLit(k), intLit(ch.toInt)) } ++
+                    zeroFill(b.length, n))
+            }.getOrElse(refuse)
+        case _ => refuse
+      }
+    }
+    else {
+      val members: Option[List[(String, String)]] =
+        structTypeDeclOf(staticTypeOf(lhs)).map(_.member.l.sortBy(_.order).map(mm => mm.name -> mm.typeFullName))
+      (members, rhs) match {
+        case (Some(ms), c: Call) if c.methodFullName == "<operator>.arrayInitializer" &&
+                                    boxedStructs.get(nm).contains(ms.map(_._1)) =>
+          val vs = kidsOf(c)
+          // Listed members: integer or pointer (`valueOk`). OMITTED members are
+          // zero-initialized, which is `0` only for an INTEGER member -- an omitted
+          // pointer's null has two spellings in this exporter (`0` -> `.int 0`,
+          // `NULL` -> `.unit`) and picking one for it would be a guess.
+          if (vs.nonEmpty && vs.size <= ms.size && vs.zip(ms).forall { case (v, m) => valueOk(v, m._2) } &&
+              ms.drop(vs.size).forall(m => intRange(m._2).isDefined))
+            seqOf(ms.zipWithIndex.map { case ((f, _), k) =>
+              ujson.Obj("k" -> "setField", "r" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> f,
+                        "v" -> (if (k < vs.size) expr(vs(k)) else zero))
+            })
+          else refuse
+        // `s = t;` / `s = p->aFile[0];`, a side-effect-free (`pureNode`: names,
+        // field and index reads) source of the SAME struct type: C copies every
+        // member by value (6.5.16.1p2). Member-wise `s.f = SRC.f` is exactly that
+        // when no member is itself an aggregate (a nested struct/array member is a
+        // `Val.ref` in Core, so copying it would ALIAS where C copies) -- scalar
+        // integers and pointers only. `SRC` is pure, so reading it once per member
+        // repeats no side effect; it is never `s` itself.
+        case (Some(ms), src)
+            if pureNode(src) && !src.isInstanceOf[Literal] &&
+               boxedStructs.get(nm).contains(ms.map(_._1)) &&
+               !rawLocalOrParamName(src).map(localName).contains(nm) &&
+               structTypeDeclOf(staticTypeOf(src)).map(_.fullName) ==
+                 structTypeDeclOf(staticTypeOf(lhs)).map(_.fullName) &&
+               ms.forall(m => intRange(m._2).isDefined || ptrSlot(m._2)) =>
+          seqOf(ms.map { case (f, _) =>
+            ujson.Obj("k" -> "setField", "r" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> f,
+                      "v" -> ujson.Obj("k" -> "field", "a" -> expr(src), "f" -> f))
+          })
+        case _ => refuse
+      }
+    }
+  }
+
   def assignTo(lhs: AstNode, rhs: AstNode, aug: Option[String]): ujson.Obj = {
     val (prelude, rhsE) = valueOf(rhs)
     // `009-reduce-remaining-holes-4`: a PLAIN (non-augmented) `asIndex` target whose
@@ -7310,9 +7691,14 @@ import scala.annotation.tailrec
       // spec.md's own "no VLA/malloc-sized allocation" exclusion in spirit --
       // every quickstart.md Story 5 acceptance scenario only reads a
       // previously-WRITTEN element/field, never relies on this initializer).
+      // `011-address-of-local-arrays`: `skip` only for the initializer-free
+      // declaration; an initializer is now translated or holed, never dropped --
+      // see `boxedAggregateInit`'s own doc comment for the silent wrong answer
+      // this replaces.
       case i: Identifier if boxedArrays.contains(localName(i.name)) ||
                              boxedStructs.contains(localName(i.name)) =>
-        skip
+        if (aug.isEmpty) boxedAggregateInit(localName(i.name), i, rhs)
+        else holeS("op:arrayDecl:boxed-initializer")
       // `009-reduce-remaining-holes-4`: a LOCAL cursor variable's own single
       // defining assignment (`strCursorParams`'s local-variable generalization,
       // above) -- seeds BOTH halves of the pair at once, since unlike a PARAMETER
@@ -9275,6 +9661,19 @@ import scala.annotation.tailrec
                    boxedStructArrayIndexOperand(operand).isDefined ||
                    pointerStructArrayIndexOperand(operand).isDefined =>
               Some(None)
+            // `011-address-of-local-arrays`: `t = &p[i]` -- `p + i` in C
+            // (`irefElementAddrOf`), so sound PROVIDED `p` is itself tracked,
+            // exactly the `<operator>.addition` case below. The structural half
+            // of `irefElementAddrOperand`'s guards is re-checked here (that
+            // helper itself reads `ptrIrefNames`, which is what is being computed):
+            // a bare, uncast receiver, a non-pointer index, a non-aggregate
+            // element, and never a `char*` receiver, which could instead be a
+            // `strCursorParams` byte cursor (`Val.str` model, computed later).
+            case List(operand) if asIndex(operand).exists { case (r, i) =>
+                  rawLocalOrParamName(r).isDefined && !isPointerType(staticTypeOf(i)) &&
+                  !isCStringType(staticTypeOf(r)) &&
+                  !isClassType(staticTypeOf(operand)) && addrKind(staticTypeOf(operand)) != "object" } =>
+              Some(rawLocalOrParamName(asIndex(operand).get._1).map(localName))
             case _ => None
           }
         case src: Identifier if boxedArrays.contains(localName(src.name)) =>
