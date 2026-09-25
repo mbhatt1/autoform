@@ -1012,12 +1012,16 @@ import scala.annotation.tailrec
     * loop/switch exactly like `gotoAsBreak` (a `continue` there would bind to the
     * inner loop); see `methodBody`. */
   var gotoAsRestart: Option[String] = None
-  /** `011-control-flow-holes`: labels proved to sit at the very END of a loop body,
-    * every `goto` to which has that loop as its innermost enclosing loop/switch -- so
-    * the jump is exactly `continue`. Deliberately NOT cleared by `outsideLoopScope`:
+  /** `011-control-flow-holes`: labels that are a direct child of a loop/switch body,
+    * every `goto` to which has that loop/switch as its innermost enclosing one --
+    * label -> (rest of that body after the label, `"cont"` or `"brk"`). The jump is
+    * that tail followed by the exit. Deliberately NOT cleared by `outsideLoopScope`:
     * the proof is per-`goto`-site (innermost enclosing construct), made once in
-    * `methodBody`, not a property of the current scope. */
-  var gotoAsLoopEnd: Set[String] = Set.empty
+    * `methodBody` (`blockExitLabels`), not a property of the current scope. */
+  var gotoAsBlockExit: Map[String, (List[AstNode], String)] = Map.empty
+  /** `011-control-flow-holes`: AST nodes the `gotoAsBlockExit` splice may still copy
+    * in the current function (reset per function in `methodBody`). */
+  var blockExitSpliceBudget: Int = 0
 
   /** C and C++ specifically, as opposed to the whole `cLike` *dialect* family (which
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
@@ -8678,10 +8682,36 @@ import scala.annotation.tailrec
         // (`outsideLoopScope` clears `gotoAsRestart`).
         case "GOTO" if gotoAsRestart.isDefined && kids.map(_.code.trim) == List(gotoAsRestart.get) =>
           ujson.Obj("k" -> "cont")
-        // `011-control-flow-holes`: `goto L`, `L` proved to be the last thing in the
-        // body of this site's innermost enclosing loop -- `continue` (see `methodBody`).
-        case "GOTO" if kids.size == 1 && gotoAsLoopEnd.contains(kids.head.code.trim) =>
-          ujson.Obj("k" -> "cont")
+        // `011-control-flow-holes`: `goto L`, `L` a direct child of the body of this
+        // site's innermost enclosing loop/switch -- the rest of that body from `L`,
+        // then `continue` (loop) / `break` (switch). See `methodBody`'s
+        // `blockExitLabels`; a re-entrant expansion keeps the hole.
+        //
+        // Bounded: a `goto` inside a large `switch` (SQLite's `sqlite3VdbeExec` opcode
+        // dispatch) would otherwise copy most of the switch body at every site, nested
+        // copies multiplying -- confirmed to exhaust the JVM heap, and even when it
+        // fits, every copy duplicates the tail's own unrelated holes into the ledger.
+        // So a tail is spliced only if it is small (<= 400 AST nodes), contains no
+        // `goto` of its own (no chained expansion), and fits the per-function
+        // `blockExitSpliceBudget`; otherwise the site keeps the `control:GOTO` hole --
+        // a size limit, never a different translation.
+        case "GOTO" if kids.size == 1 && gotoAsBlockExit.contains(kids.head.code.trim) &&
+                       !expandingGotoLabels.contains(kids.head.code.trim) && {
+                         val tl = gotoAsBlockExit(kids.head.code.trim)._1
+                         val sz = tl.map(_.ast.size).sum
+                         sz <= 400 && sz <= blockExitSpliceBudget &&
+                           !tl.exists(_.ast.exists {
+                             case g: ControlStructure => g.controlStructureType == "GOTO"
+                             case _                   => false
+                           })
+                       } =>
+          val label = kids.head.code.trim
+          val (tail, exit) = gotoAsBlockExit(label)
+          blockExitSpliceBudget -= tail.map(_.ast.size).sum
+          expandingGotoLabels += label
+          val result = seqOf(stmts(tail) :+ ujson.Obj("k" -> exit))
+          expandingGotoLabels -= label
+          result
         case "BREAK"    => ujson.Obj("k" -> "brk")
         case "CONTINUE" => ujson.Obj("k" -> "cont")
         case "ELSE" | "CATCH" | "FINALLY" => seqOf(kids.map(stmt))
@@ -8910,51 +8940,88 @@ import scala.annotation.tailrec
       }
       ks.indexWhere(_ eq cur)
     }
-    /** `011-control-flow-holes`: labels that sit at the very END of a loop body --
+    /** `011-control-flow-holes`: labels in the body block (directly, or via plain `{}` blocks) of a
+      * loop or switch `S`, every `goto` to which has `S` itself as its innermost
+      * enclosing `for`/`while`/`do`/`switch`:
       *
-      *     for (...) { ...; if (c) goto next; ...; next: ; }
+      *     for (...) { ...; if (c) goto next; ...; next: T; }
+      *     switch (op) { case A: if (v) goto dflt; ...; default: dflt: T; }
       *
-      * -- where every `goto` targeting the label has THAT loop as its innermost
-      * enclosing `for`/`while`/`do`/`switch`. Such a jump is exactly `continue`:
-      * both transfer control to the end of the loop body (C11 6.8.6.2p2 defines
-      * `continue` as a jump to a point just before the end of the body -- the
-      * label's own position), after which a `for` runs its step (`pushStep` rewrites
-      * the emitted `continue` into `step; continue`, exactly as for a written one), a
-      * `while` its test and a `do` its test (`pushDoTest`, likewise). A goto nested in
-      * an inner loop or switch is rejected (its `continue` would bind to that inner
-      * construct), and so is a label followed by anything but empty statements.
-      * These labels and their jumps are then removed from what the function-level
-      * mechanisms below consider, since this one fully accounts for them. */
-    val loopEndLabels: Set[String] = {
+      * Such a jump means "run the rest of `S`'s body from the label, `T`, then leave
+      * the body the way reaching its end does" -- and each `S` has a Core statement
+      * for exactly that exit: the end of a LOOP body is `continue` (C11 6.8.6.2p2
+      * defines `continue` as a jump to just before the end of the body; `pushStep` /
+      * `pushDoTest` then give a `for` its step and a `do` its test, exactly as for a
+      * written `continue`), and the end of a SWITCH body is `break` (the switch is
+      * done; `Stmt.breakBlock` catches it). So the `goto` is replaced by a copy of `T`
+      * followed by that exit -- the same tail-splice `gotoTailStmts` uses at function
+      * level, with the loop/switch exit playing the role of its trailing `return`:
+      * the copy can never complete `.normal`, so nothing after the `goto` site runs.
+      * A `break`/`continue` inside `T` binds to `S` in the copy exactly as in the
+      * original (the copy sits inside `S` too, and the site has no nearer
+      * loop/switch). `case`/`default` markers inside `T` are dropped (falling past a
+      * case label is a no-op; the value node after a `case` marker is not a
+      * statement). A `goto` inside a nested loop/switch is rejected (the exit would
+      * bind to that inner construct). A `goto` from within `T` itself to the same
+      * label would re-expand forever; `expandingGotoLabels` turns that into the
+      * ordinary `control:GOTO` hole. These labels and their jumps are removed from
+      * what the function-level mechanisms below consider, since this one fully
+      * accounts for them. Values: (tail nodes, exit statement kind). */
+    val blockExitLabels: Map[String, (List[AstNode], String)] = {
       def innermost(n: AstNode): Option[AstNode] = ancestorsTo(n).reverse.collectFirst {
         case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) => cs
       }
-      def isEmptyStmt(n: AstNode): Boolean = n match {
-        case b: Block => kidsOf(b).isEmpty && Set("", ";").contains(stripBlockCode(b.code))
-        case _        => false
+      def dropCaseMarkers(ns: List[AstNode]): List[AstNode] = ns match {
+        case (j: JumpTarget) :: _ :: rest if j.parserTypeName == "CASTCaseStatement" => dropCaseMarkers(rest)
+        case (j: JumpTarget) :: rest if j.parserTypeName == "CASTDefaultStatement"   => dropCaseMarkers(rest)
+        case n :: rest => n :: dropCaseMarkers(rest)
+        case Nil       => Nil
       }
-      allLabels.filter { l =>
-        val sameName = allLabels.count(_.name == l.name) == 1
-        val loopOk = parentOf(l) match {
+      // The label may also sit inside PLAIN nested blocks within that body
+      // (`default: { dflt: ...; }`, SQLite's `sqlite3ExprIfTrue`): a plain `{ }`
+      // block is not a control construct, so when it ends control simply continues
+      // with the statements after it in its own enclosing block. The tail is then
+      // the rest of the innermost block after the label, followed by the rest of each
+      // enclosing plain block after the block it contains, up to the loop/switch
+      // body -- exactly the statements C executes, in order. Only `Block`-in-`Block`
+      // nesting is walked; any other construct in between (an `if` branch, ...)
+      // disqualifies the label.
+      def climb(n: AstNode, acc: List[AstNode]): Option[(Block, List[AstNode], AstNode)] =
+        parentOf(n) match {
           case Some(blk: Block) =>
             val sibs = kidsOf(blk)
-            val at = sibs.indexWhere(_ eq l)
-            val lastInBody = at >= 0 && sibs.drop(at + 1).forall(isEmptyStmt)
-            val loopOpt = parentOf(blk).collect {
-              case cs: ControlStructure if Set("FOR", "WHILE", "DO").contains(cs.controlStructureType) &&
+            val at = sibs.indexWhere(_ eq n)
+            if (at < 0) None
+            else {
+              val acc2 = acc ++ sibs.drop(at + 1)
+              parentOf(blk) match {
+                case Some(outer: Block) => climb(blk, acc2)
+                case _                  => Some((blk, acc2, n))
+              }
+            }
+          case _ => None
+        }
+      allLabels.flatMap { l =>
+        val sameName = allLabels.count(_.name == l.name) == 1
+        climb(l, Nil) match {
+          case Some((blk, tailNodes, _)) if sameName =>
+            val ownerOpt = parentOf(blk).collect {
+              case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) &&
                                            !cs.condition.l.exists(_ eq blk) &&
                                            (cs.controlStructureType != "FOR" || blk.order == 4) => cs
             }
             val myJumps = allJumps.filter(g => kidsOf(g).map(_.code.trim) == List(l.name))
-            lastInBody && loopOpt.isDefined && myJumps.nonEmpty &&
-              myJumps.forall(g => innermost(g).exists(_ eq loopOpt.get))
-          case _ => false
+            if (ownerOpt.isDefined && myJumps.nonEmpty &&
+                myJumps.forall(g => innermost(g).exists(_ eq ownerOpt.get))) {
+              val exit = if (ownerOpt.get.controlStructureType == "SWITCH") "brk" else "cont"
+              Some(l.name -> (dropCaseMarkers(tailNodes), exit))
+            } else None
+          case _ => None
         }
-        sameName && loopOk
-      }.map(_.name).toSet
+      }.toMap
     }
-    val labels = allLabels.filterNot(l => loopEndLabels.contains(l.name))
-    val jumps  = allJumps.filterNot(g => kidsOf(g).size == 1 && loopEndLabels.contains(kidsOf(g).head.code.trim))
+    val labels = allLabels.filterNot(l => blockExitLabels.contains(l.name))
+    val jumps  = allJumps.filterNot(g => kidsOf(g).size == 1 && blockExitLabels.contains(kidsOf(g).head.code.trim))
     /** `010-reach-90pct-hole-free` US6: generalizes `tailAlwaysExits` below from
       * "is `ks.last` a bare `Return`" to "does a forward scan from this label's
       * own position reach a bare `Return` (truncate there -- everything after is
@@ -9202,8 +9269,10 @@ import scala.annotation.tailrec
       targets == List(labels.head.name) &&
       jumps.forall(g => !insideLoop(g) && { val i = topIndex(g); i > idx })
 
-    val savedLoopEnd = gotoAsLoopEnd
-    gotoAsLoopEnd = loopEndLabels
+    val savedBlockExit = gotoAsBlockExit
+    val savedBudget = blockExitSpliceBudget
+    gotoAsBlockExit = blockExitLabels
+    blockExitSpliceBudget = 4000
     val out =
       if (singleLabelOk) {
         val saved = gotoAsBreak
@@ -9240,7 +9309,8 @@ import scala.annotation.tailrec
         result
       }
       else stmt(body)
-    gotoAsLoopEnd = savedLoopEnd
+    gotoAsBlockExit = savedBlockExit
+    blockExitSpliceBudget = savedBudget
     out
   }
 
