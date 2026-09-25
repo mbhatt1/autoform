@@ -1151,6 +1151,11 @@ import scala.annotation.tailrec
     * itself starting empty does. */
   var closedIrefOutParamViaVtableTransitive: Set[(String, Int)] = Set.empty
 
+  /** Pointer-indirection family: `computeClosedIrefOutParamsTransitive`'s most recent
+    * result, recomputed by the driver at the start of every whole-program pass (see
+    * that `def`'s comment for why it is no longer a `lazy val`). */
+  var closedIrefOutParamsTransitive: Set[(String, Int)] = Set.empty
+
   /** `010-reach-90pct-hole-free`: SQLite's own small, well-documented memory-
     * allocation API surface, mapped to the 0-based position (in `kidsOf`'s own
     * left-to-right order) of the argument carrying the BYTE COUNT of the buffer
@@ -3779,7 +3784,54 @@ import scala.annotation.tailrec
           }
         }
       }
-    baseCase.orElse(chainCase)
+    // `(*pp)->f` / `&(*pp)->f`: `*q` where `q` is a bare `ptrIrefNames` name whose
+    // pointee type is a pointer to a known struct -- the `Type **pp` linked-list walk
+    // (`for(pp=&pTab->pTrigger; *pp; pp=&(*pp)->pNext)`). `q` holds a `Val.iref` to
+    // the cell storing that struct pointer, so `derefIref q` reads the stored pointer
+    // VALUE -- the same `Val.ref` a `p->q` field read yields in `chainCase` above, and
+    // subject to the same caveat (a null stored there makes the next hop a dynamic
+    // hole, never a value). Only ever true once `ptrIrefNames` is populated, i.e.
+    // never during `ptrIrefNames`' own classification (see `irefDerefFieldDep`).
+    def derefCase: Option[(ujson.Value, String)] = x match {
+      case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+        kidsOf(ind) match {
+          case List(q) =>
+            rawLocalOrParamName(q).map(localName).filter(ptrIrefNames.contains).flatMap { qn =>
+              val bt = bareType(staticTypeOf(ind))
+              if (bt.endsWith("*") && isClassType(bt.dropRight(1)))
+                structTypeDeclOf(bt.dropRight(1)).map(td =>
+                  (ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "name", "v" -> qn)): ujson.Value,
+                   stripDuplicateSuffix(bareType(td.fullName))))
+              else None
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+    baseCase.orElse(chainCase).orElse(derefCase)
+  }
+
+  /** For `ptrIrefNames`' classifier: `&(*q)->f` (optionally `&(*q)->arr[i]`), `q` a
+    * bare local/parameter name, `*q` a pointer to a known struct -- the shape
+    * `pointerBaseExpr`'s `derefCase` turns into `irefField (derefIref q) f` once `q`
+    * is tracked. Returns `q`: the assignment is an interior pointer PROVIDED `q` is
+    * one, which is exactly a `Some(Some(q))` dependency in that fixed point. */
+  def irefDerefFieldDep(operand: AstNode): Option[String] = {
+    val fieldPart = asIndex(operand).map(_._1).getOrElse(operand)
+    asField(fieldPart).flatMap { case (base, _) =>
+      base match {
+        case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+          kidsOf(ind) match {
+            case List(q) =>
+              val bt = bareType(staticTypeOf(ind))
+              if (bt.endsWith("*") && isClassType(bt.dropRight(1)) && structTypeDeclOf(bt.dropRight(1)).isDefined)
+                rawLocalOrParamName(q).map(localName)
+              else None
+            case _ => None
+          }
+        case _ => None
+      }
+    }
   }
 
   /** `010-reach-90pct-hole-free` US3 (T024): the general form of
@@ -4552,7 +4604,17 @@ import scala.annotation.tailrec
     * passed through. See `closedOutParamsTransitive`'s own doc comment for the full
     * argument and the fixed-point's shape -- this is that same structure verbatim,
     * with only the base-case predicate swapped. */
-  lazy val closedIrefOutParamsTransitive: Set[(String, Int)] = {
+  //
+  // Pointer-indirection family: no longer a `lazy val` but recomputed at the start of
+  // every whole-program pass (the driver's priming loop, like
+  // `closedIrefOutParamViaVtableTransitive`), because its `classify` now also accepts
+  // an argument that is a name ALREADY tracked in the calling method
+  // (`irefNamesByMethod`, the previous pass's `ptrIrefNames`) -- `wideClosedIrefParam`'s
+  // own base case, which that function could not combine with forwarding: a callee
+  // whose call sites mix `&x`, a tracked local cursor, and a forwarded parameter
+  // (`sqlite3GetVarint`'s `p`) was closed by neither. The result only grows across
+  // passes, since `irefNamesByMethod` only grows.
+  def computeClosedIrefOutParamsTransitive(): Set[(String, Int)] = {
     sealed trait ArgShape
     case object Ok extends ArgShape
     case object Bad extends ArgShape
@@ -4592,6 +4654,12 @@ import scala.annotation.tailrec
       // forwarded parameter).
       case bare @ (_: Identifier | _: MethodParameterIn)
           if irefArrayEligible(bare, bare.file.name.headOption.getOrElse("")) => Ok
+      // A name the calling method's own previous-pass `ptrIrefNames` tracks: it holds
+      // an interior pointer at every point of that method, so at this call too.
+      case i: Identifier
+          if irefNamesByMethod.getOrElse(i.method.fullName, Set.empty).contains(localName(i.name)) => Ok
+      case p: MethodParameterIn
+          if irefNamesByMethod.getOrElse(p.method.fullName, Set.empty).contains(localName(p.name)) => Ok
       case i: Identifier =>
         i.method.parameter.l.find(_.name == i.name) match {
           case Some(p) => Fwd(p.method.fullName, p.index)
@@ -9432,6 +9500,21 @@ import scala.annotation.tailrec
                    // whichever box `q` holds at that moment.
                    isBoxedScalarAddrOperand(operand) =>
               Some(None)
+            // `&(*q)->f`: interior pointer iff `q` is (see `irefDerefFieldDep`).
+            // Checked BEFORE the chain shapes: those cannot see through `*q` while
+            // `ptrIrefNames` is being computed (it is empty here), but the order
+            // makes that independence explicit rather than incidental.
+            case List(operand) if irefDerefFieldDep(operand).isDefined =>
+              Some(irefDerefFieldDep(operand))
+            // `&p->q->f` / `&p->q->arr[i]`: the chain forms `callExpr`'s
+            // `<operator>.addressOf` case already translates to `irefField`/
+            // `irefIndex` over `pointerBaseExpr` (`chainFieldIref`/`chainArrIref`),
+            // so the assigned value is an interior pointer exactly as for the
+            // single-hop shapes above.
+            case List(operand)
+                if chainedStructFieldOperand(operand).isDefined ||
+                   chainedStructArrayIndexOperand(operand).isDefined =>
+              Some(None)
             case _ => None
           }
         case src: Identifier if boxedArrays.contains(localName(src.name)) =>
@@ -9505,6 +9588,21 @@ import scala.annotation.tailrec
                        !boxedLocals.contains(localName(p.name)))
           .map(p => localName(p.name)).toSet
 
+      // A dependency on the name ITSELF (`p = p + n`, `pp = &(*pp)->pNext`) is
+      // satisfied inductively: every value `p` is ever assigned is then either
+      // self-sufficient, derived from another tracked name, or derived from `p`'s
+      // own PREVIOUS value, which was one of those. Two conditions keep the base
+      // case real rather than vacuous: `p` must have at least one assignment that
+      // does NOT depend on itself, and a PARAMETER must itself be trusted
+      // (`paramTracked`) -- its incoming value is the unassigned "previous value",
+      // and nothing else says the caller passed an interior pointer. (A local read
+      // before any assignment is `unit`, which only makes `derefIref`/arithmetic a
+      // dynamic hole.)
+      val paramNames: Set[String] = m.parameter.l.map(pp => localName(pp.name)).toSet
+      def selfDepOk(nm: String, cs: List[Option[Option[String]]]): Boolean =
+        cs.exists(_.exists(dep => !dep.contains(nm))) &&
+        (!paramNames.contains(nm) || paramTracked.contains(nm))
+
       var tracked: Set[String] = paramTracked ++ ptrIrefAllocNames.keySet ++
         classified.collect {
           case (nm, cs) if !disqualified(nm) && cs.forall(_.exists(_.isEmpty)) => nm
@@ -9522,7 +9620,8 @@ import scala.annotation.tailrec
         for (_ <- 1 to 4) {
           val newlyQualified = classified.collect {
             case (nm, cs) if !disqualified(nm) && !tracked(nm) &&
-                             cs.forall(c => c.exists(dep => dep.isEmpty || tracked(dep.get))) => nm
+                             cs.forall(c => c.exists(dep => dep.isEmpty || tracked(dep.get) ||
+                                                              (dep.get == nm && selfDepOk(nm, cs)))) => nm
           }.toSet
           tracked = tracked ++ newlyQualified
         }
@@ -9995,10 +10094,12 @@ import scala.annotation.tailrec
   // behind, converges over repeated passes" discipline `wideClosedIrefParam`
   // itself already accepts implicitly by reading `irefNamesByMethod` live.
   for (_ <- 1 to 2) {
+    closedIrefOutParamsTransitive = computeClosedIrefOutParamsTransitive()
     closedIrefOutParamViaVtableTransitive = computeClosedIrefOutParamViaVtableTransitive()
     methods.foreach(emit(_, false))
     moduleMethods.foreach(emit(_, true))
   }
+  closedIrefOutParamsTransitive = computeClosedIrefOutParamsTransitive()
   closedIrefOutParamViaVtableTransitive = computeClosedIrefOutParamViaVtableTransitive()
   val funcs = methods.map(emit(_, false))
   val inits = moduleMethods.map(emit(_, true))
