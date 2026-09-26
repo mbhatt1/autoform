@@ -57,7 +57,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import llm, pyvalues as pv, schema
+from . import fuzz, llm, pyvalues as pv, schema
 from .formalize import LEAN_SLOTS, lake
 
 HERE = Path(__file__).resolve()
@@ -1477,6 +1477,10 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
                 points.append(p)
         rt = runtime.run(points) if points else []
         ev = evaluate(module, lean_root, work, f'a{rnd}', callee_src, cand, lean_name, fn.info.name, points, rt)
+        # fuzz.py: once the model agrees on traced + boundary inputs, search for more (coverage-guided,
+        # shrunk); minimal counterexamples land in ev.disagreements and feed the repair below.
+        fuzz.extend(ev, fn=fn, cand=cand, lean_name=lean_name, module=module, lean_root=lean_root, work=work,
+                    stem=f'z{rnd}', callee_src=callee_src, points=points, rt=rt, runtime=runtime, traced=traced)
         if not ev.elaborates:
             res.log.append(f'round {rnd}: does not elaborate')
             if best is None:
@@ -1797,7 +1801,9 @@ def main(argv=None) -> int:
     ap.add_argument('--repairs', type=int, default=3)
     ap.add_argument('--no-second', action='store_true', help='skip the independent translation B')
     ap.add_argument('--no-build', action='store_true')
+    fuzz.add_arguments(ap)
     a = ap.parse_args(argv)
+    fuzz.configure(a)
     from .pipeline import default_lean_root
     tr = model(a.source, a.out, a.lean_root or default_lean_root(), module=a.module, functions=a.function,
                parallel=a.parallel, repairs=a.repairs, second=not a.no_second, tests=a.tests,
