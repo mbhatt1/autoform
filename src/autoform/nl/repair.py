@@ -64,6 +64,12 @@ DOC_PRE = {'nonnegative': '{p} >= 0', 'non-negative': '{p} >= 0', 'positive': '{
            'non-zero': '{p} != 0', 'not zero': '{p} != 0'}
 
 
+def margin(probs: dict) -> float:
+    """Top-1 minus top-2 probability; near 0 the judge could not separate its options."""
+    top = sorted((probs or {}).values(), reverse=True) + [0.0, 0.0]
+    return round(top[0] - top[1], 4)
+
+
 def _d(x):
     return asdict(x) if hasattr(x, '__dataclass_fields__') else dict(x)
 
@@ -417,6 +423,7 @@ def adjudicate(translation: dict, statements: list, checks: list, out_dir, *, ju
                        round=round_no, status=chk['status'], english=prop.get('text', stmt.get('english')),
                        evidence=prop.get('evidence') or [], counterexample=ce, allowed=allowed, facts=facts,
                        classification=d['chosen'], probabilities=d['probabilities'], forced=bool(d.get('forced')),
+                       margin=margin(d['probabilities']),
                        decision=d['decision_id'], parent=(lineage.get(stmt['id']) or {}).get('parent'))
             records.append(rec)
             cls = d['chosen']
@@ -462,7 +469,8 @@ def adjudicate(translation: dict, statements: list, checks: list, out_dir, *, ju
             chosen = next(o for o in options if o['id'] == pick['chosen'])
             rec['repair'].update(chosen=chosen['id'], kind=chosen['kind'], text=chosen['text'],
                                  english=chosen.get('english'), decision=pick['decision_id'],
-                                 options=[o['id'] for o in options], probabilities=pick['probabilities'])
+                                 options=[o['id'] for o in options], probabilities=pick['probabilities'],
+                                 margin=margin(pick['probabilities']))
             if chosen['kind'] == 'reject':
                 rec['disposition'] = 'rejected_by_repair'
                 continue

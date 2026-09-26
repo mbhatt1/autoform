@@ -94,9 +94,11 @@ def budget_summary(run_info: dict, selection: dict, budget: dict, proofs_by: dic
     skipped['prove'] = [dict(statement=k, reason=p.get('reason', '')[:120]) for k, p in proofs_by.items()
                         if str(p.get('reason', '')).startswith('budget exhausted')]
     return dict(budget_usd=(run_info or {}).get('budget_usd', (selection or {}).get('budget_usd')),
-                spent_usd=(run_info or {}).get('cost_usd'), planned_usd=(selection or {}).get('planned_usd'),
+                spent_usd=round(sum((v.get('cost_usd') or 0) + (v.get('earlier_cost_usd') or 0)
+                                    for v in stages.values()), 4), planned_usd=(selection or {}).get('planned_usd'),
                 estimates=(selection or {}).get('estimates'),
-                by_stage={k: v.get('cost_usd') for k, v in stages.items() if v.get('cost_usd') is not None},
+                by_stage={k: round((v.get('cost_usd') or 0) + (v.get('earlier_cost_usd') or 0), 4)
+                          for k, v in stages.items() if v.get('cost_usd') is not None},
                 skipped={k: v for k, v in skipped.items() if v})
 
 
@@ -185,7 +187,7 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                 if row:
                     entry['judge']['judgment'] = (row.get('judgment') or {}).get('label')
                 entry['adjudication'] = {k: rec.get(k) for k in (
-                    'classification', 'allowed', 'forced', 'facts', 'disposition', 'cross_validation',
+                    'classification', 'allowed', 'forced', 'margin', 'facts', 'disposition', 'cross_validation',
                     'repair', 'repaired_by', 'model_defect', 'round', 'decision')} if rec else None
                 entry['parent'] = (lineage.get(s['id']) or {}).get('parent')
                 entry['lineage'] = _lineage(s['id'], lineage) if entry['parent'] else []
@@ -472,10 +474,13 @@ def _judge_lines(p: dict) -> list:
     if a:
         r = a.get('repair') or {}
         out.append(f"  - counterexample reading: {a.get('classification')}"
-                   + (' (forced by the gates)' if a.get('forced') else f" among {', '.join(a.get('allowed') or [])}")
+                   + (' (forced by the gates)' if a.get('forced') else f" among {', '.join(a.get('allowed') or [])}"
+                      f" (margin {a.get('margin')})")
                    + f" → {a.get('disposition')}")
         if r.get('chosen'):
             out.append(f"  - repair: {r.get('chosen')} ({r.get('kind')})"
+                       + (f" (margin {r.get('margin')}{', a tie: review' if (r.get('margin') or 0) < 0.02 else ''})"
+                          if r.get('margin') is not None else '')
                        + (f": \"{r.get('english')}\"" if r.get('english') else '')
                        + (f" → `{a.get('repaired_by')}`" if a.get('repaired_by') else '')
                        + (f"; {r.get('skipped')}" if r.get('skipped') else ''))

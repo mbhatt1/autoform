@@ -252,7 +252,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
         if resume and prev.get('status') in ('ok', 'resumed') and prev.get('input_hash') == inputs \
                 and all((out / FILES[k]).is_file() for k in keys) \
                 and prev.get('output_hash') == _hash(*[_file_bytes(out, k) for k in keys]):
-            rec.update(status='resumed', seconds=0.0, cost_usd=0.0, output_hash=prev['output_hash'])
+            rec.update(status='resumed', seconds=0.0, cost_usd=0.0, output_hash=prev['output_hash'],
+                       earlier_cost_usd=round((prev.get('cost_usd') or 0) + (prev.get('earlier_cost_usd') or 0), 4))
             save()
             continue
         for k in keys:   # its inputs changed (or no resume): never let later stages read it

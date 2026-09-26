@@ -205,6 +205,9 @@ restatement (`p2` → `p2_r1`) goes through formalize → check again, and later
 refuted again is adjudicated again, for at most `--repair-rounds` rounds (default 2); a
 refutation after the last round is classified but not repaired (`repair_limit`). Every
 repaired property and statement keeps a `parent` link, and the report shows the lineage.
+Each classification and repair choice carries its margin (top-1 minus top-2 probability);
+a repair chosen with a margin below 0.02 is marked "a tie: review" (SemIf's bf16 logits do
+tie, and the tie then falls to the first option).
 
 ### Decision log and JEVBench
 
