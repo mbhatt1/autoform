@@ -37,17 +37,24 @@ def prove_main(argv) -> int:
     ap.add_argument('--attempts', type=int, default=2)
     ap.add_argument('--work', type=Path, default=Path('.autoform-work/prover'))
     ap.add_argument('--dry-run', action='store_true', help='report proofs without editing the file')
+    ap.add_argument('--budget-usd', type=float, help='stop starting agent runs once this much is spent')
+    ap.add_argument('--cache', type=Path, help='accepted-proof cache (default: <work>/cache; re-checked on hit)')
+    ap.add_argument('--no-cache', action='store_true')
     a = ap.parse_args(argv)
     root = _root(a.root)
     jobs = prover.jobs_from_file(a.file, a.theorem or None)
     if not jobs:
         print('no sorry-proved (or named) theorems found')
         return 0
-    results = prover.prove_many(jobs, root, a.work, parallel=a.parallel, attempts=a.attempts)
+    results = prover.prove_many(jobs, root, a.work, parallel=a.parallel, attempts=a.attempts,
+                                budget_usd=a.budget_usd,
+                                cache_dir=None if a.no_cache else (a.cache or a.work / 'cache'))
     text = a.file.read_text()
     for job, res in zip(jobs, results):
         print(f'{res.status:8s} {res.name}  ({res.seconds}s, ${res.cost_usd})' +
               (f'  axioms={res.axioms}' if res.status == 'PROVED' else f'  {res.reason[:160]!r}'))
+        if res.restored:
+            print(f'         restored tracked files the agent modified: {res.restored}')
         if res.status == 'PROVED' and not a.dry_run:
             head, tail = text.split(job.statement, 1)
             rest = tail.split(':=', 1)[1]

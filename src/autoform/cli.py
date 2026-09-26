@@ -655,6 +655,8 @@ def main(argv=None):
                          help="with --machine: functions to compare (default: those whose code changed)")
     regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
                          help="with --machine: the Linux target to compile for (default: aarch64)")
+    sub.add_parser("autoformalize", add_help=False,
+                   help="code -> English -> Lean statements -> checks -> kernel proofs (autoformalize --help)")
     sub.add_parser("formalize", add_help=False,
                    help="infer candidate claims, rank them with a SemIf judge, verify in Lean (formalize --help)")
     machine = sub.add_parser("machine", add_help=False, help="binary/assembly frontend (machine --help for options)")
@@ -665,6 +667,10 @@ def main(argv=None):
         # The claim/judge/verify harness owns its own flags (autoform/harness/cli.py).
         from .harness.cli import main as formalize
         return formalize(values[1:])
+    if values[:1] == ['autoformalize']:
+        # The natural-language autoformalizer owns its own flags (autoform/nl/pipeline.py).
+        from .nl.pipeline import main as autoformalize
+        return autoformalize(values[1:])
     # A URL alone is the full assurance workflow; explicit subcommands still work.
     index = 0
     while index < len(values):

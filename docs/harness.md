@@ -236,6 +236,18 @@ Lean runtime (`lake env lean`) until the file checks. Its answer is never truste
 * the file is re-elaborated from scratch and `#print axioms` must list only `propext`,
   `Classical.choice` and `Quot.sound`.
 
+Confinement and bookkeeping (defence in depth; the kernel check above is the trust argument):
+the agent's only tools are `./check.sh` (runs `lake env lean` from the Lean root, only on
+files in its job directory, refusing files that `#eval`/`run_cmd`/touch `IO.Process`),
+Read, Edit, Write, Grep and Glob; the Lean root's status and dirty-file contents are
+snapshotted around every agent run and any tracked file it changed is restored (and the
+attempt rejected); a timed-out agent is killed with its process group; the forbidden-token
+screen ignores comments and string literals (and also refuses `#eval`, `run_tac`, `elab`,
+`macro`, `unsafe`, `debug.*` options); the statement/proof split is bracket-, comment- and
+`let`-aware; accepted proofs are cached by sha256(prefix, statement, lean-toolchain,
+lake-manifest) and a hit is re-checked, never trusted (`--cache`, `--no-cache`);
+`--budget-usd` caps total spend; every exchange is saved in the job directory.
+
 In `formalize`, `--prover claude` sends every selected claim that ended BOUNDED_PROVED or
 UNKNOWN without a witness to the agent; an accepted proof upgrades it to PROVED (the
 certificate is the re-checked file). `autoform formalize prove FILE.lean [--theorem N]`
