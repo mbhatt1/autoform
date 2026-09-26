@@ -13,6 +13,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
+from . import schema
 from .schema import FILES, ProofResult, dump, lean_imports
 
 OK_STATUS = 'BOUNDED_HOLDS'
@@ -41,7 +42,7 @@ def header(translation: dict) -> str:
     mods = lean_imports(translation)
     if not any(m.startswith('Autoform.Generated.') for m in mods):
         mods.append('Autoform.Lang.Core.Semantics')   # the af_eval header names runFunc
-    return ''.join(f'import {m}\n' for m in mods) + text[len(own):]
+    return ''.join(f'import {m}\n' for m in mods) + text[len(own):] + schema.lean_opens(translation)
 
 
 def blueprint(stmt: dict, fn: dict | None, check: dict | None, translation: dict) -> str:

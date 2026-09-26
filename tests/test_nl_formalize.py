@@ -76,7 +76,7 @@ def test_shape_checks():
     pre_r = dict(ADD_OK, pre='r matches .val _')
     assert any('pre mentions' in p for p in F.shape_problems(f, F.parse_candidate(pre_r)))
     float_t = dict(ADD_OK, binders=[{'name': 'a', 'type': 'Float'}, {'name': 'b', 'type': 'Int'}])
-    assert any("use Int, Bool or String" in p for p in F.shape_problems(f, F.parse_candidate(float_t)))
+    assert any("use Int, Bool, String or Val" in p for p in F.shape_problems(f, F.parse_candidate(float_t)))
     sneaky = dict(ADD_OK, post='r matches .val _ || (by sorry)')
     assert any('plain term' in p for p in F.shape_problems(f, F.parse_candidate(sneaky)))
     c_add = fn(translation('PipelineC'), 'add')

@@ -13,12 +13,21 @@ For every statement that elaborates, over one finite domain of concrete inputs:
                    refute_<t> : chk_<t> <point> = false := by decide +kernel
                  REFUTED_MODEL needs the certificate; BOUNDED_HOLDS needs `bounded_` and
                  `nonvac_` accepted with standard axioms only.
-  runtime check  (Python) the REAL function is run in CPython on the same points; each
-                 outcome is encoded as an `EResult` literal and the statement's `post` is
+  runtime check  (Python) the REAL function is run in CPython on the same points (the
+                 model stage's runner: methods run on a receiver rebuilt from its recorded
+                 state, constructors build the object); each outcome is encoded as an
+                 `EResult` literal (autoform.nl.pyvalues: ints, bools, strs, None, floats
+                 by IEEE bits, tuples, lists, dicts in insertion order, sets in canonical
+                 order, bytes, objects of modelled classes; a `#post` statement sees
+                 `.tuple [result, receiver after the call]`) and the statement's `post` is
                  evaluated on it in Lean. A failing real execution is certified like a
                  model witness (`rtrefute_<t>`) and gives REFUTED_RUNTIME unless the model
-                 is refuted too. Outcomes that have no faithful literal (floats, objects,
+                 is refuted too. Outcomes with no faithful literal (other objects,
                  timeouts) are skipped, never guessed.
+
+Binders are Int/Nat/Bool/String (finite domains built here) or Val, whose domain is the
+function's validated sample inputs recorded by the model stage (`FunctionInfo.samples`:
+receivers, containers, ... exactly as the tests produced them).
 
 Soundness: BOUNDED_HOLDS is a statement about the translated program on the listed
 points, nothing more. The Python encoding of runtime outcomes is trusted (small, total,
@@ -32,6 +41,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
@@ -40,6 +50,7 @@ from pathlib import Path
 from ..harness.compiler import accessors, lean_str
 from ..harness.cpir import integer_range
 from ..harness.verifier import axioms_of, certified, run_lean
+from . import pyvalues as pv
 from . import schema
 
 MAX_PARALLEL = 2
@@ -49,14 +60,17 @@ POINT_TIMEOUT = 5              # one real call
 
 INT_BASE = [0, 1, -1, 2, -2, 3, 10, -10, 100, 7, -7, 255, 256, 2 ** 31 - 1, -2 ** 31, 2 ** 31]
 STR_BASE = ['', 'a', 'admin', 'root', 'A', ' ', 'ab']
-LEAN_TYPES = {'Int': 'int', 'ℤ': 'int', 'Nat': 'nat', 'ℕ': 'nat', 'Bool': 'bool', 'String': 'str'}
-LEAN_TYPE_NAME = {'int': 'Int', 'nat': 'Nat', 'bool': 'Bool', 'str': 'String'}
+LEAN_TYPES = {'Int': 'int', 'ℤ': 'int', 'Nat': 'nat', 'ℕ': 'nat', 'Bool': 'bool', 'String': 'str', 'Val': 'val'}
+LEAN_TYPE_NAME = {'int': 'Int', 'nat': 'Nat', 'bool': 'Bool', 'str': 'String', 'val': 'Val'}
+MAX_SAMPLE_ROWS = 24
 VAL_RE = re.compile(r"^\s*\(?\s*(?:Val|Autoform\.Core\.Val)?\.(int|bool|str)\s+\(?\s*([A-Za-z_][\w']*)\s*\)?\s*\)?\s*$")
 
 
 # --- Lean literals ---------------------------------------------------------------
 
 def lean_value(kind: str, v) -> str:
+    if kind == 'val':
+        return pv.lean_lit(v)
     if kind == 'bool':
         return 'true' if v else 'false'
     if kind == 'int':
@@ -77,7 +91,7 @@ def tuple_type(kinds) -> str:
     return ' × '.join(LEAN_TYPE_NAME[k] for k in kinds) if kinds else 'Unit'
 
 
-def encode_outcome(desc: dict):
+def encode_outcome(desc: dict):   # the pre-model runner's format (kept for deep translations' tests)
     """A CPython outcome (as described by the runner) → Lean `EResult` literal, or None.
 
     Only outcomes with an unambiguous Core counterpart are encoded; everything else
@@ -104,6 +118,8 @@ def encode_outcome(desc: dict):
 def describe_outcome(desc) -> str:
     if not isinstance(desc, dict):
         return 'not run'
+    if 'k' in desc:        # the model stage's runner (pyvalues tags)
+        return pv.display(pv.canon_outcome(desc)) if pv.canon_outcome(desc) else desc['k']
     if desc.get('kind') == 'exception':
         return f"raises {desc.get('type')}"
     if desc.get('kind') == 'value':
@@ -204,8 +220,31 @@ def domain(binders: list, fn: dict | None, language: str, cap: int = 64):
             raise ValueError(f"binder {b.get('name')} : {b.get('type')} has no finite domain")
         p = by_name.get(b.get('name')) or (params[i] if i < len(params) else {})
         kinds.append(kind)
-        per.append(binder_values(kind, p.get('integer_type', '') or '', ints, strs))
-    return kinds, product_capped(per, max(1, cap))
+        per.append(binder_values(kind, p.get('integer_type', '') or '', ints, strs) if kind != 'val' else None)
+    vals = [i for i, k in enumerate(kinds) if k == 'val']
+    if not vals:
+        return kinds, product_capped(per, max(1, cap))
+    # Val binders range jointly over the validated sample inputs (a receiver together with
+    # the arguments it was called with), crossed with the finite scalar domains.
+    rows = []
+    for smp in (fn or {}).get('samples') or []:
+        if len(smp) == len(binders):
+            row = [smp[i] for i in vals]
+            if row not in rows:
+                rows.append(row)
+    if not rows:
+        raise ValueError('a Val binder needs sample inputs of the same arity (none recorded)')
+    scalars = [i for i, k in enumerate(kinds) if k != 'val']
+    combos = product_capped([rows[:MAX_SAMPLE_ROWS]] + [per[i] for i in scalars], max(1, cap))
+    points = []
+    for c in combos:
+        point = [None] * len(binders)
+        for i, v in zip(vals, c[0]):
+            point[i] = v
+        for i, v in zip(scalars, c[1:]):
+            point[i] = v
+        points.append(point)
+    return kinds, points
 
 
 # --- per-statement Lean text ---------------------------------------------------------
@@ -248,7 +287,7 @@ class Plan:
         self.types = [LEAN_TYPE_NAME[k] for k in self.kinds]
         vals = [b.get('val', '') for b in self.binders if b.get('val', '').strip()]
         self.call = (translation['call_template']
-                     .replace('{name}', lean_str(st['function']))
+                     .replace('{name}', lean_str(schema.call_name(st)))
                      .replace('{args}', '[' + ', '.join(vals) + ']'))
         self.runtime = None            # [(point_index, desc, lean literal or None)]
         self.runtime_note = ''
@@ -342,10 +381,11 @@ def header(module) -> str:
     """`module` is the Translation (its call_template decides the imports, see
     schema.lean_imports: an AI model imports Autoform.NLModel.<M>) or a deep module suffix."""
     mods = schema.lean_imports(module) if isinstance(module, dict) else [f'Autoform.Generated.{module}']
+    opens = schema.lean_opens(module) if isinstance(module, dict) else ''
     return (''.join(f'import {m}\n' for m in mods) + 'import Lean.Data.Json\n'
             'set_option autoImplicit false\nset_option maxRecDepth 100000\n'
             'set_option maxHeartbeats 4000000\nset_option linter.all false\nset_option maxErrors 100000\n'
-            'open Autoform.Core\n\n')
+            'open Autoform.Core\n' + opens + '\n')
 
 
 def assemble(module, blocks: list) -> tuple[str, dict]:
@@ -420,29 +460,38 @@ print("AUTOFORM_RUNTIME " + json.dumps(out))
 '''
 
 
+RECEIVER_KINDS = ('method', 'property', 'constructor')
+
+
 def runtime_target(translation: dict, fn: dict | None):
-    """(path, function name) of a real top-level Python function, or (None, reason)."""
+    """(path, qualified name within the module) of a real Python function, method or
+    constructor, or (None, reason)."""
     if (translation.get('language') or '').lower() != 'python':
         return None, f"runtime check supports Python only; language is {translation.get('language')!r}"
     if fn is None:
         return None, 'function not in the translation'
     qual = fn.get('name', '')
     local = qual.split('<module>.', 1)[-1] if '<module>.' in qual else fn.get('source_name', '')
-    if not fn.get('source_name') or '.' in local or not str(fn.get('file', '')).endswith('.py'):
-        return None, 'runtime check supports top-level Python functions only'
+    kind = fn.get('kind') or 'function'
+    if not fn.get('source_name') or not str(fn.get('file', '')).endswith('.py') or \
+            ('.' in local and kind not in RECEIVER_KINDS + ('static',)):
+        return None, 'runtime check supports top-level Python functions and modelled methods only'
     path = Path(translation.get('source_root', '')) / fn['file']
     if not path.is_file():
         return None, f'source file {path} not found'
-    return path, fn['source_name']
+    return path, local
 
 
-def python_args(plan: Plan, point):
-    """Positional Python arguments in the order the binders are passed, or None."""
-    args = []
+def python_point(plan: Plan, point):
+    """The point as pyvalues tags, one per binder passed to the call, or None."""
+    tags = []
     by_name = dict(zip(plan.names, zip(plan.kinds, point)))
     for b in plan.binders:
         val = (b.get('val') or '').strip()
         if not val:
+            continue
+        if val == b.get('name') and by_name.get(val, ('',))[0] == 'val':
+            tags.append(by_name[val][1])
             continue
         m = VAL_RE.match(val)
         if not m or m.group(2) not in by_name:
@@ -450,33 +499,47 @@ def python_args(plan: Plan, point):
         ctor, (kind, v) = m.group(1), by_name[m.group(2)]
         if {'int': ('int', 'nat'), 'bool': ('bool',), 'str': ('str',)}[ctor].count(kind) == 0:
             return None
-        args.append(v)
-    return args
+        tags.append(pv.tag(v))
+    return tags
 
 
-def run_runtime(translation: dict, fn: dict | None, plan: Plan, timeout=RUNTIME_TIMEOUT):
-    path, name = runtime_target(translation, fn)
+def python_args(plan: Plan, point):
+    """Positional Python arguments in the order the binders are passed, or None."""
+    tags = python_point(plan, point)
+    return None if tags is None else [pv.untag(t) for t in tags]
+
+
+def run_runtime(translation: dict, fn: dict | None, plan: Plan, timeout=RUNTIME_TIMEOUT, work: Path | None = None):
+    path, qual = runtime_target(translation, fn)
     if path is None:
-        plan.runtime_note = name
+        plan.runtime_note = qual
         return
-    calls = [python_args(plan, p) for p in plan.points]
+    calls = [python_point(plan, p) for p in plan.points]
     if any(c is None for c in calls):
-        plan.runtime_note = 'binder `val`s are not plain .int/.bool/.str of a binder; runtime check skipped'
+        plan.runtime_note = 'binder `val`s are not plain .int/.bool/.str of a binder (or a Val binder); runtime check skipped'
         return
-    try:
-        proc = subprocess.run([sys.executable, '-c', RUNNER, str(path), name,
-                               str(translation.get('source_root', '')), str(POINT_TIMEOUT)],
-                              input=json.dumps(calls), cwd=path.parent, capture_output=True, text=True,
-                              timeout=timeout)
-    except subprocess.TimeoutExpired:
-        plan.runtime_note = f'runtime batch exceeded {timeout}s'
+    from . import model as M
+    root = Path(translation.get('source_root', '')).resolve()
+    import_root, dotted = M._package_info(root, path.resolve())
+    classes = [fn['receiver']] if fn.get('receiver') else []
+    cfg = M.runner_config(import_root, dotted, path.resolve(), qual, fn.get('kind') or 'function', classes)
+    cfg['per'] = POINT_TIMEOUT
+    with tempfile.TemporaryDirectory() as tmp:
+        descs, err = M.run_points(cfg, calls, Path(work) if work else Path(tmp), f'rt_{plan.tag}',
+                                  cwd=import_root, timeout=timeout)
+    if err:
+        plan.runtime_note = 'runtime runner failed: ' + err[-400:]
         return
-    m = re.search(r'^AUTOFORM_RUNTIME (.*)$', proc.stdout, re.M)
-    if not m:
-        plan.runtime_note = 'runtime runner failed: ' + (proc.stderr or proc.stdout)[-400:]
-        return
-    descs = json.loads(m.group(1))
-    plan.runtime = [(i, d, encode_outcome(d)) for i, d in enumerate(descs)]
+    post = plan.st.get('entry') == 'post'
+    out = []
+    for i, d in enumerate(descs):
+        if not post:
+            d = {k: v for k, v in d.items() if k != 'post'}
+        elif d.get('k') == 'ok' and 'post' not in d:
+            d = {'k': 'no-post'}
+        lit = pv.lean_outcome(d)
+        out.append((i, d, lit[1:-1] if lit else None))
+    plan.runtime = out
 
 
 # --- per-function driver ---------------------------------------------------------------
@@ -499,7 +562,7 @@ def check_function(translation, fn, plans, work: Path, lean_root: Path, runtime:
     started = time.time()
     if runtime:
         for p in plans:
-            run_runtime(translation, fn, p)
+            run_runtime(translation, fn, p, work=work / 'runtime')
     else:
         for p in plans:
             p.runtime_note = 'runtime check disabled'

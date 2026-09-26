@@ -102,7 +102,62 @@ IMPURE_MODULES = {
 }
 MUTATING_METHODS = {'append', 'extend', 'insert', 'pop', 'remove', 'clear', 'update', 'add', 'discard',
                     'setdefault', 'popitem', 'sort', 'reverse', 'write', '__setitem__', '__delitem__'}
-PURE_DECORATORS = {'staticmethod', 'functools.lru_cache', 'lru_cache', 'functools.cache', 'cache'}
+PURE_DECORATORS = {'staticmethod', 'functools.lru_cache', 'lru_cache', 'functools.cache', 'cache', 'property'}
+# Bases whose instances carry a builtin payload (not attributes): not modelled as structures.
+BUILTIN_BASES = {'dict', 'list', 'set', 'frozenset', 'tuple', 'str', 'bytes', 'bytearray', 'int', 'float',
+                 'complex', 'bool', 'collections.OrderedDict', 'collections.defaultdict', 'collections.deque',
+                 'collections.Counter', 'OrderedDict', 'defaultdict', 'deque', 'Counter'}
+EXCEPTION_BASES = re.compile(r'(^|\.)(BaseException|Exception|\w+Error|\w+Warning)$')
+# Receiver syntax that calls a dunder method of the receiver's class.
+SYNTAX_DUNDERS = {'getitem': '__getitem__', 'setitem': '__setitem__', 'delitem': '__delitem__',
+                  'contains': '__contains__', 'len': '__len__', 'iter': '__iter__'}
+
+
+@dataclass
+class _Class:
+    """A class defined in the repository (the unit a Lean structure is generated for)."""
+    name: str                           # Python name
+    qual: str                           # qualified within its module ("Outer.Inner")
+    mod: '_Module'
+    node: ast.ClassDef
+    bases: list = field(default_factory=list)     # [('repo', _Class) | ('builtin', dotted) | ('external', dotted)]
+    methods: dict = field(default_factory=dict)   # mangled name -> FunctionDef
+    reason: str | None = None                     # why its methods are not modelled
+
+    @property
+    def dotted(self) -> str:
+        """`type(obj).__module__ + '.' + __qualname__` of its instances (pyvalues.class_name)."""
+        return f'{self.mod.dotted or self.mod.path.stem}.{self.qual}'
+
+    def mro(self) -> list:
+        """Repository classes in method-resolution order (left-to-right depth-first, deduplicated
+        keeping the last occurrence, which agrees with C3 for the hierarchies found in practice)."""
+        seq = []
+
+        def visit(c):
+            seq.append(c)
+            for kind, b in c.bases:
+                if kind == 'repo':
+                    visit(b)
+        visit(self)
+        out = []
+        for i, c in enumerate(seq):
+            if c not in seq[i + 1:]:
+                out.append(c)
+        return out
+
+    def external_bases(self) -> list:
+        out = []
+        for c in self.mro():
+            out += [b for k, b in c.bases if k == 'external' and b not in out]
+        return out
+
+    def lookup(self, attr: str):
+        """(defining _Class, FunctionDef) of a method along the repository MRO, or None."""
+        for c in self.mro():
+            if attr in c.methods:
+                return c, c.methods[attr]
+        return None
 
 
 @dataclass
@@ -116,6 +171,7 @@ class _Module:
     imports: dict = field(default_factory=dict)   # alias -> ('module', dotted) | ('name', dotted, name)
     top_funcs: dict = field(default_factory=dict)  # name -> qualified function name
     globals: set = field(default_factory=set)     # module-level assigned names
+    classes: dict = field(default_factory=dict)   # qualified class name -> _Class
 
 
 @dataclass
@@ -127,6 +183,17 @@ class _Fn:
     first_lines: list                   # def line and decorator lines (co_firstlineno candidates)
     reason: str | None = None           # why it is not attempted
     callees: list = field(default_factory=list)
+    kind: str = 'function'              # function | static | method | property | constructor
+    cls: _Class | None = None           # the receiver's class (methods, properties, constructors)
+    unmodelled: list = field(default_factory=list)   # receiver calls that leave the model
+
+    @property
+    def attr(self) -> str:
+        return self.qual.rsplit('.', 1)[-1]
+
+    @property
+    def has_receiver(self) -> bool:
+        return self.kind in ('method', 'property')
 
 
 def _mangle(name: str, cls: str | None) -> str:
@@ -254,6 +321,83 @@ def _walk_defs(mod: _Module):
     yield from visit(mod.tree.body, '', None)
 
 
+def _collect_classes(mod: _Module):
+    def visit(body, prefix):
+        for n in body:
+            if isinstance(n, ast.ClassDef):
+                c = _Class(n.name, prefix + n.name, mod, n)
+                for m in n.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        c.methods[_mangle(m.name, n.name)] = m
+                mod.classes[c.qual] = c
+                visit(n.body, prefix + n.name + '.')
+    visit(mod.tree.body, '')
+
+
+def _resolve_class(mod: _Module, expr, by_dotted: dict):
+    """A base-class expression → ('repo', _Class) | ('builtin', name) | ('external', dotted)."""
+    dotted = _dotted(expr) or ast.unparse(expr)
+    head, _, rest = dotted.partition('.')
+    if dotted in mod.classes:
+        return 'repo', mod.classes[dotted]
+    imp = mod.imports.get(head)
+    full = dotted
+    if imp:
+        full = '.'.join(([imp[1]] if imp[0] == 'module' else [x for x in (imp[1], imp[2]) if x])
+                        + ([rest] if rest else []))
+        for i in range(full.count('.'), 0, -1):
+            mname, cq = full.rsplit('.', i)[0], '.'.join(full.split('.')[-i:])
+            other = by_dotted.get(mname)
+            if other is not None and cq in other.classes:
+                return 'repo', other.classes[cq]
+        # re-exported through a repository module (`from .compat import MutableMapping`)
+        mname, _, name = full.rpartition('.')
+        other = by_dotted.get(mname)
+        if other is not None and name in other.imports:
+            inner = other.imports[name]
+            full = '.'.join([inner[1]] if inner[0] == 'module' else [x for x in (inner[1], inner[2]) if x])
+    if dotted in BUILTIN_BASES or full in BUILTIN_BASES or full.startswith('builtins.'):
+        return 'builtin', full
+    return 'external', full
+
+
+def _link_classes(mods: dict):
+    by_dotted = {m.dotted: m for m in mods.values() if m.dotted}
+    for mod in mods.values():
+        for c in mod.classes.values():
+            c.bases = [_resolve_class(mod, b, by_dotted) for b in c.node.bases]
+    for mod in mods.values():
+        for c in mod.classes.values():
+            for k in c.mro():
+                bad = [b for kind, b in k.bases if kind == 'builtin']
+                if bad:
+                    c.reason = (f'class with a builtin base ({bad[0]}): its instances carry a builtin '
+                                'payload, not attributes')
+                    break
+                exc = [b for kind, b in k.bases if kind == 'external' and EXCEPTION_BASES.search(b)]
+                if exc:
+                    c.reason = f'exception class (base {exc[0]})'
+                    break
+            if c.reason is None and any(isinstance(d, ast.Call) or _dotted(d) not in (None, 'dataclass')
+                                        for d in c.node.decorator_list):
+                c.reason = 'decorated class (the decorator may change its instances)'
+            if c.reason is None and any(k.node.keywords for k in c.mro()):
+                c.reason = 'class with keywords in its bases (metaclass)'
+
+
+def method_kind(node, cls) -> str:
+    if cls is None:
+        return 'function'
+    decos = _decorator_names(node)
+    if 'staticmethod' in decos:
+        return 'static'
+    if 'property' in decos:
+        return 'property'
+    if node.name == '__init__':
+        return 'constructor'
+    return 'method'
+
+
 def _decorator_names(node) -> list:
     out = []
     for d in node.decorator_list:
@@ -291,14 +435,32 @@ def _impure_module(mod: _Module, name: str) -> str | None:
     return None
 
 
-def screen(node, mod: _Module, cls: str | None) -> str | None:
-    """Why the function is not pure enough to model as a plain Lean def (None: attempt it)."""
+def screen(node, mod: _Module, cls=None) -> str | None:
+    """Why the function is not pure enough to model as a plain Lean def (None: attempt it).
+
+    Methods are attempted: the receiver becomes a Lean structure and a method that mutates
+    it returns the new structure (see `method_kind`). What stays out: real I/O, time,
+    randomness, network, subprocesses, module-level mutable state, generators, closures,
+    classmethods (class-level state), property setters, and classes whose instances carry a
+    builtin payload (dict/list/... bases) or are exceptions."""
     if isinstance(node, ast.AsyncFunctionDef):
         return 'async function (coroutine)'
     decos = _decorator_names(node)
     if cls is not None and 'staticmethod' not in decos:
-        return 'method: the receiver object\'s state is not modelled'
-    other = [d for d in decos if d not in PURE_DECORATORS]
+        if isinstance(cls, _Class) and cls.reason:
+            return cls.reason
+        if 'classmethod' in decos:
+            return 'classmethod (class-level state is not modelled)'
+        if any(d.endswith(('.setter', '.deleter')) for d in decos):
+            return 'property setter/deleter (called through attribute assignment)'
+        a = node.args
+        if not (a.posonlyargs + a.args):
+            return 'method without a receiver parameter'
+    elif 'classmethod' in decos:
+        return 'classmethod (class-level state is not modelled)'
+    other = [d for d in decos if d not in PURE_DECORATORS and not (d == 'property' and cls is not None)]
+    if cls is None and 'property' in decos:
+        other.append('property')
     if other:
         return 'decorated by ' + ', '.join(other) + ' (the decorator changes its behaviour)'
     a = node.args
@@ -375,6 +537,134 @@ def _callees(node, mod: _Module, mods_by_dotted: dict, local: set) -> list:
     return out
 
 
+def _fn_name(c: _Class, attr: str) -> str:
+    return f'{c.mod.rel}:<module>.{c.qual}.{attr}'
+
+
+def _receiver_uses(node, recv: str) -> list:
+    """Methods of the receiver `recv` the body uses: explicit calls `recv.m(...)`, attribute
+    reads `recv.m` that may be properties, and syntax (`recv[k]`, `k in recv`, `len(recv)`,
+    `del recv[k]`, `iter(recv)`, `for x in recv`)."""
+    out = []
+
+    def add(a):
+        if a not in out:
+            out.append(a)
+    for n in ast.walk(node):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) \
+                and n.func.value.id == recv:
+            add(n.func.attr)
+        elif isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == recv:
+            add(n.attr)
+        elif isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name) and n.value.id == recv:
+            add({ast.Load: '__getitem__', ast.Store: '__setitem__', ast.Del: '__delitem__'}[type(n.ctx)])
+        elif isinstance(n, ast.Compare) and any(isinstance(o, (ast.In, ast.NotIn)) for o in n.ops) \
+                and any(isinstance(c, ast.Name) and c.id == recv for c in n.comparators):
+            add('__contains__')
+        elif isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ('len', 'iter') \
+                and n.args and isinstance(n.args[0], ast.Name) and n.args[0].id == recv:
+            add('__len__' if n.func.id == 'len' else '__iter__')
+        elif isinstance(n, (ast.For, ast.comprehension)) and isinstance(n.iter, ast.Name) and n.iter.id == recv:
+            add('__iter__')
+    return out
+
+
+def _method_links(fn: '_Fn', mods_by_dotted: dict):
+    """Callees and unmodelled receiver calls of a method (fills fn.callees / fn.unmodelled)."""
+    node, cls = fn.node, fn.cls
+    a = node.args
+    recv = (a.posonlyargs + a.args)[0].arg if fn.kind in ('method', 'property', 'constructor') and \
+        (a.posonlyargs + a.args) else None
+    if recv:
+        for attr in _receiver_uses(node, recv):
+            mangled = _mangle(attr, cls.name) if attr.startswith('__') and not attr.endswith('__') else attr
+            hit = cls.lookup(mangled)
+            if hit is not None:
+                name = _fn_name(hit[0], mangled)
+                if name != fn.info.name and name not in fn.callees:
+                    fn.callees.append(name)
+            elif cls.external_bases() and not any(t.attr == attr for t in _stored_attrs(cls)) \
+                    and mangled not in _class_data(cls):
+                ext = ', '.join(cls.external_bases())
+                note = (f'{recv}.{attr}: inherited from an external base ({ext}); not modelled')
+                if attr.startswith('__') and attr.endswith('__') and attr not in SYNTAX_DUNDERS.values():
+                    continue      # object protocol (e.g. __class__), not a mixin method
+                if note not in fn.unmodelled:
+                    fn.unmodelled.append(note)
+    # `Base.meth(self, ...)` and default-argument aliases `f=Base.meth` on repository classes
+    exprs = [n.func for n in ast.walk(node) if isinstance(n, ast.Call)] + list(a.defaults)
+    for e in exprs:
+        dotted = _dotted(e) if isinstance(e, ast.Attribute) else None
+        if not dotted:
+            continue
+        head, _, attr = dotted.rpartition('.')
+        kind, target = _resolve_class(fn.mod, ast.parse(head, mode='eval').body, mods_by_dotted) \
+            if head else (None, None)
+        if kind == 'repo':
+            mangled = _mangle(attr, target.name)
+            hit = target.lookup(mangled)
+            if hit is not None:
+                name = _fn_name(hit[0], mangled)
+                if name != fn.info.name and name not in fn.callees:
+                    fn.callees.append(name)
+
+
+def _class_data(cls: _Class) -> set:
+    """Names assigned in the class bodies along the repository MRO (class attributes)."""
+    out = set()
+    for c in cls.mro():
+        for n in c.node.body:
+            targets = n.targets if isinstance(n, ast.Assign) else [n.target] if isinstance(n, ast.AnnAssign) else []
+            for t in targets:
+                if isinstance(t, ast.Name):
+                    out.add(_mangle(t.id, c.name))
+    return out
+
+
+def _stored_attrs(cls: _Class) -> list:
+    """`self.x = ...` targets anywhere in the class's repository MRO (instance attributes)."""
+    out = []
+    for c in cls.mro():
+        for m in c.methods.values():
+            args = m.args.posonlyargs + m.args.args
+            if not args:
+                continue
+            recv = args[0].arg
+            for n in ast.walk(m):
+                if isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Store) and \
+                        isinstance(n.value, ast.Name) and n.value.id == recv:
+                    out.append(n)
+    return out
+
+
+def static_fields(cls: _Class) -> list:
+    """Instance attribute names from `__slots__` and `self.x = ...` along the repository MRO
+    (private names mangled by their defining class)."""
+    out = []
+    for c in cls.mro():
+        for n in c.node.body:
+            if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__slots__' for t in n.targets):
+                try:
+                    slots = ast.literal_eval(n.value)
+                except ValueError:
+                    slots = ()
+                for s in ([slots] if isinstance(slots, str) else slots):
+                    s = _mangle(s, c.name)
+                    if s not in out:
+                        out.append(s)
+        for m in c.methods.values():
+            args = m.args.posonlyargs + m.args.args
+            if not args:
+                continue
+            for n in ast.walk(m):
+                if isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Store) and \
+                        isinstance(n.value, ast.Name) and n.value.id == args[0].arg:
+                    s = _mangle(n.attr, c.name)
+                    if s not in out:
+                        out.append(s)
+    return out
+
+
 def _test_dirs(root: Path, extra=()) -> list:
     dirs = [root / d for d in ('tests', 'test') if (root / d).is_dir()]
     dirs += [Path(d).resolve() for d in extra or () if Path(d).is_dir()]
@@ -433,9 +723,11 @@ def _discover(source_root: Path, functions=None, tests=()):
     root = Path(source_root).resolve()
     mods = _parse_modules(root)
     for mod in mods.values():
+        _collect_classes(mod)
         for node, qual, cls in _walk_defs(mod):
             if cls is None:
                 mod.top_funcs[node.name] = f'{mod.rel}:<module>.{qual}'
+    _link_classes(mods)
     by_dotted = {m.dotted: m for m in mods.values() if m.dotted}
     fns = []
     for mod in mods.values():
@@ -443,15 +735,23 @@ def _discover(source_root: Path, functions=None, tests=()):
         for node, qual, cls in _walk_defs(mod):
             name = f'{mod.rel}:<module>.{qual}'
             params = _params(node)
-            if cls is not None and 'staticmethod' not in _decorator_names(node) and params:
-                pass   # keep `self` as written: methods are listed, not attempted
+            klass = mod.classes.get(qual.rsplit('.', 1)[0]) if cls is not None else None
+            kind = method_kind(node, klass)
+            if kind in ('method', 'property') and params:
+                params[0].sort = 'object'
+            elif kind == 'constructor' and params:
+                params = params[1:]       # `Cls(args)`: the receiver is created, not passed
             info = schema.FunctionInfo(
                 name=name, source_name=node.name, file=mod.rel, line=node.lineno, params=params,
-                returns=_annotation_sort(node.returns), hole_free=False, holes=[], call_closed=False,
-                needs_init=False, source=_segment(lines, node), doc=ast.get_docstring(node) or '')
-            fn = _Fn(info, node, mod, qual, [node.lineno] + [d.lineno for d in node.decorator_list])
-            fn.reason = screen(node, mod, cls)
+                returns='object' if kind == 'constructor' else _annotation_sort(node.returns), hole_free=False,
+                holes=[], call_closed=False, needs_init=False, source=_segment(lines, node),
+                doc=ast.get_docstring(node) or '', kind=kind, receiver=klass.dotted if klass else '')
+            fn = _Fn(info, node, mod, qual, [node.lineno] + [d.lineno for d in node.decorator_list],
+                     kind=kind, cls=klass)
+            fn.reason = screen(node, mod, klass)
             fn.callees = _callees(node, mod, by_dotted, _local_names(node))
+            if klass is not None and kind != 'static':
+                _method_links(fn, by_dotted)
             fns.append(fn)
     by_name = {f.info.name: f for f in fns}
     for f in fns:
@@ -495,17 +795,25 @@ def discover(source_root: Path, *, functions=None, tests=()) -> list:
 # ---------------------------------------------------------------- Lean types and dispatcher
 
 SCALARS = {'Int': ('dInt', 'Val.int'), 'Bool': ('dBool', 'Val.bool'), 'String': ('dStr', 'Val.str'),
-           'Unit': ('dUnit', 'eUnit'), 'Val': ('dVal', 'id'), 'Fl': ('dFl', 'Val.float')}
+           'Unit': ('dUnit', 'eUnit'), 'Val': ('dVal', 'id'), 'Fl': ('dFl', 'Val.float'),
+           'Bytes': ('dBytes', 'eBytes')}
+UNARY = {'Option': ('dOpt', 'eOpt'), 'List': ('dList', 'eList'), 'Tuple': ('dTuple', 'eTuple'),
+         'PySet': ('dSet', 'eSet'), 'FrozenSet': ('dFrozenSet', 'eFrozenSet')}
 SORT_OF = {'Int': 'int', 'Bool': 'bool', 'String': 'str', 'Fl': 'float'}
 TYPE_TOKEN = re.compile(r'\s*(×|\(|\)|[A-Za-z_][A-Za-z0-9_.]*)')
+TYPE_HELP = ('use Int, Bool, String, Unit, Val, Fl, Bytes, Option τ, List τ, Tuple τ, PySet τ, FrozenSet τ, '
+             'Dict κ ν, τ × σ, Except String τ, or the receiver structure')
 
 
 class TypeError_(ValueError):
     pass
 
 
-def parse_type(text: str):
-    """'List (Option Int) × String' → ('Prod', [('List', ('Option', 'Int')), 'String'])."""
+def parse_type(text: str, structs=()):
+    """'List (Option Int) × String' → ('Prod', [('List', ('Option', 'Int')), 'String']).
+
+    Atoms are the SCALARS and the names in `structs` (generated receiver structures, parsed
+    as ('Struct', name)); `Dict κ ν` is ('Dict', κ, ν)."""
     toks, pos, text = [], 0, text.strip()
     while pos < len(text):
         m = TYPE_TOKEN.match(text, pos)
@@ -525,10 +833,14 @@ def parse_type(text: str):
 
     def app():
         nonlocal i
-        if i < len(toks) and toks[i] in ('Option', 'List'):
+        if i < len(toks) and toks[i] in UNARY:
             head = toks[i]
             i += 1
             return (head, atom())
+        if i < len(toks) and toks[i] == 'Dict':
+            i += 1
+            k = atom()
+            return ('Dict', k, atom())
         if i < len(toks) and toks[i] == 'Except':
             if i + 1 < len(toks) and toks[i + 1] == 'String':
                 i += 2
@@ -551,35 +863,48 @@ def parse_type(text: str):
         t = t.split('.')[-1] if t.startswith(('Autoform.Core.', 'Core.')) else t
         if t in SCALARS:
             return t
-        hint = ' (use Int for Python int)' if t == 'Nat' else ' (use Fl, never Float)' if t == 'Float' else ''
-        raise TypeError_(f'unsupported type {t!r}{hint}; use Int, Bool, String, Unit, Val, Fl, '
-                         'Option τ, List τ, τ × σ, Except String τ')
+        if t in structs:
+            return ('Struct', t)
+        hint = ' (use Int for Python int)' if t == 'Nat' else ' (use Fl, never Float)' if t == 'Float' else \
+            ' (a Python set is PySet τ)' if t in ('Set', 'Finset', 'HashSet') else \
+            ' (a Python dict is Dict κ ν)' if t in ('HashMap', 'RBMap', 'Std.HashMap', 'AssocList') else ''
+        raise TypeError_(f'unsupported type {t!r}{hint}; {TYPE_HELP}')
 
     out = prod()
     if i != len(toks):
         raise TypeError_(f'trailing tokens in type {text!r}')
     if isinstance(out, tuple) and out[0] == 'Prod' and len(out[1]) > 4:
-        raise TypeError_('tuples of more than 4 components are not supported')
+        raise TypeError_('tuples of more than 4 components are not supported (use Tuple Val)')
     return out
+
+
+def _children(t) -> list:
+    if isinstance(t, str):
+        return []
+    if t[0] == 'Prod':
+        return list(t[1])
+    if t[0] == 'Dict':
+        return [t[1], t[2]]
+    if t[0] == 'Struct':
+        return []
+    return [t[1]]
 
 
 def _has_except(t) -> bool:
     if isinstance(t, str):
         return False
-    if t[0] == 'Except':
-        return True
-    if t[0] == 'Prod':
-        return any(_has_except(x) for x in t[1])
-    return _has_except(t[1])
+    return t[0] == 'Except' or any(_has_except(x) for x in _children(t))
 
 
 def decoder(t) -> str:
     if isinstance(t, str):
         return SCALARS[t][0]
-    if t[0] == 'Option':
-        return f'(dOpt {decoder(t[1])})'
-    if t[0] == 'List':
-        return f'(dList {decoder(t[1])})'
+    if t[0] == 'Struct':
+        return f'dObj_{t[1]}'
+    if t[0] in UNARY:
+        return f'({UNARY[t[0]][0]} {decoder(t[1])})'
+    if t[0] == 'Dict':
+        return f'(dDict {decoder(t[1])} {decoder(t[2])})'
     if t[0] == 'Prod':
         return f'(dTup{len(t[1])} ' + ' '.join(decoder(x) for x in t[1]) + ')'
     raise TypeError_('Except is only allowed as the outermost return type')
@@ -588,18 +913,36 @@ def decoder(t) -> str:
 def encoder(t) -> str:
     if isinstance(t, str):
         return SCALARS[t][1]
-    if t[0] == 'Option':
-        return f'(eOpt {encoder(t[1])})'
-    if t[0] == 'List':
-        return f'(eList {encoder(t[1])})'
+    if t[0] == 'Struct':
+        return f'eObj_{t[1]}'
+    if t[0] in UNARY:
+        return f'({UNARY[t[0]][1]} {encoder(t[1])})'
+    if t[0] == 'Dict':
+        return f'(eDict {encoder(t[1])} {encoder(t[2])})'
     if t[0] == 'Prod':
         return f'(eTup{len(t[1])} ' + ' '.join(encoder(x) for x in t[1]) + ')'
     raise TypeError_('Except is only allowed as the outermost return type')
 
 
+def show_type(t) -> str:
+    """Lean text of a parsed type (for prompts and records)."""
+    if isinstance(t, str):
+        return t
+    if t[0] == 'Struct':
+        return t[1]
+    if t[0] == 'Prod':
+        return ' × '.join(f'({show_type(x)})' if isinstance(x, tuple) and x[0] == 'Prod' else show_type(x)
+                          for x in t[1])
+    args = _children(t)
+    return t[0] + ' ' + ' '.join(show_type(x) if isinstance(x, str) or x[0] == 'Struct' else f'({show_type(x)})'
+                                 for x in args) if t[0] != 'Except' else f'Except String ({show_type(t[1])})'
+
+
 def sort_of(t) -> str:
     if isinstance(t, tuple) and t[0] == 'Except':
         t = t[1]
+    if isinstance(t, tuple) and t[0] == 'Struct':
+        return 'object'
     return SORT_OF.get(t, 'any') if isinstance(t, str) else 'any'
 
 
@@ -607,26 +950,39 @@ def sort_of(t) -> str:
 class Sig:
     params: list        # [{'name', 'type': parsed, 'kind', 'default'}]
     returns: object     # parsed return type (may be ('Except', τ))
+    kind: str = 'function'      # function | static | method | property | constructor
+    struct: str | None = None   # the receiver structure (methods) / the constructed one
+    mutates: bool = False       # returns (result, receiver') — a method that changes its receiver
 
     @property
     def raises(self) -> bool:
         return isinstance(self.returns, tuple) and self.returns[0] == 'Except'
 
+    @property
+    def inner(self):
+        return self.returns[1] if self.raises else self.returns
 
-def parse_sig(params: list, returns: str) -> Sig:
+    @property
+    def result(self):
+        """The Python-visible result type (the first component for a mutating method)."""
+        return self.inner[1][0] if self.mutates else self.inner
+
+
+def parse_sig(params: list, returns: str, *, structs=(), kind: str = 'function', struct: str | None = None,
+              mutates=False) -> Sig:
     out, seen_default, var = [], False, 0
     for i, p in enumerate(params or []):
         if not isinstance(p, dict):
             raise TypeError_(f'parameter #{i + 1} is not an object')
-        kind = str(p.get('kind') or 'positional')
-        if kind not in ('positional', 'varargs'):
-            raise TypeError_(f'parameter kind {kind!r} must be positional or varargs')
-        t = parse_type(str(p.get('type', '')))
+        pkind = str(p.get('kind') or 'positional')
+        if pkind not in ('positional', 'varargs'):
+            raise TypeError_(f'parameter kind {pkind!r} must be positional or varargs')
+        t = parse_type(str(p.get('type', '')), structs)
         if _has_except(t):
             raise TypeError_('parameters cannot have an Except type')
         default = p.get('default')
         default = None if default in (None, '', 'null') else str(default)
-        if kind == 'varargs':
+        if pkind == 'varargs':
             var += 1
             if not (isinstance(t, tuple) and t[0] == 'List'):
                 raise TypeError_('a varargs parameter must have type `List τ`')
@@ -636,31 +992,45 @@ def parse_sig(params: list, returns: str) -> Sig:
             seen_default = True
         elif seen_default:
             raise TypeError_('a parameter without default follows one with a default')
-        out.append({'name': str(p.get('name', f'p{i}')), 'type': t, 'kind': kind, 'default': default})
+        out.append({'name': str(p.get('name', f'p{i}')), 'type': t, 'kind': pkind, 'default': default})
     if var > 1:
         raise TypeError_('at most one varargs parameter')
-    r = parse_type(str(returns or ''))
+    r = parse_type(str(returns or ''), structs)
     inner = r[1] if isinstance(r, tuple) and r[0] == 'Except' else r
     if _has_except(inner):
         raise TypeError_('Except must be the outermost return type')
-    return Sig(out, r)
+    mutates = bool(mutates) and mutates not in ('false', 'False', 0)
+    if kind in ('method', 'property'):
+        if not out or out[0]['type'] != ('Struct', struct) or out[0]['kind'] != 'positional' \
+                or out[0]['default'] is not None:
+            raise TypeError_(f'the first parameter must be the receiver `self` of type {struct} (no default)')
+        if mutates:
+            if not (isinstance(inner, tuple) and inner[0] == 'Prod' and len(inner[1]) == 2
+                    and inner[1][1] == ('Struct', struct)):
+                raise TypeError_(f'a mutating method ("mutates": true) returns `τ × {struct}` (or '
+                                 f'`Except String (τ × {struct})`): the Python result and the receiver after '
+                                 f'the call; write a product result type in parentheses: `(A × B) × {struct}`')
+    elif mutates:
+        raise TypeError_('"mutates" is only for methods')
+    if kind == 'constructor':
+        if inner != ('Struct', struct):
+            raise TypeError_(f'the constructor (__init__) returns the new object: `{struct}` or '
+                             f'`Except String {struct}`; do not list `self` as a parameter')
+        if any(p['type'] == ('Struct', struct) and p['name'] == 'self' for p in out):
+            raise TypeError_('the constructor does not take `self`: list only the arguments after it')
+    return Sig(out, r, kind, struct, mutates)
 
 
-def wrapper(lean_name: str, sig: Sig) -> str:
-    """`call_<lean_name> : List Val → EResult`: decode, run, encode. Generated, never model-written."""
+def _alternatives(sig: Sig) -> list:
+    """[(pattern, [decoder exprs], [bind patterns], [lean call args])] for each accepted arity."""
     fixed = [p for p in sig.params if p['kind'] == 'positional']
     var = next((p for p in sig.params if p['kind'] == 'varargs'), None)
-    inner = sig.returns[1] if sig.raises else sig.returns
-    res = f'resE {encoder(inner)}' if sig.raises else f'resV {encoder(inner)}'
     required = sum(1 for p in fixed if p['default'] is None)
     arities = [len(fixed)] if var else list(range(len(fixed), required - 1, -1))
-    lines = [f'def call_{lean_name} : List Val → EResult']
+    out = []
     for k in arities:
         pats = [f'a{i}' for i in range(k)]
-        if var:
-            pattern = ' :: '.join(pats + ['rest'])
-        else:
-            pattern = '[' + ', '.join(pats) + ']'
+        pattern = ' :: '.join(pats + ['rest']) if var else '[' + ', '.join(pats) + ']'
         discr = [f'{decoder(fixed[i]["type"])} a{i}' for i in range(k)]
         binds = [f'some x{i}' for i in range(k)]
         args = [f'x{i}' for i in range(k)] + [f'({fixed[i]["default"]})' for i in range(k, len(fixed))]
@@ -668,31 +1038,101 @@ def wrapper(lean_name: str, sig: Sig) -> str:
             discr.append(f'dListAux {decoder(var["type"][1])} rest')
             binds.append('some xs')
             args.append('xs')
+        out.append((pattern, discr, binds, args))
+    return out
+
+
+def _one_wrapper(name: str, lean_name: str, sig: Sig, enc_of) -> str:
+    """`def name : List Val → EResult` over every arity; `enc_of(args)` is the result encoder."""
+    res = 'resE' if sig.raises else 'resV'
+    lines = [f'def {name} : List Val → EResult']
+    for pattern, discr, binds, args in _alternatives(sig):
         app = f'({lean_name} {" ".join(args)})' if args else lean_name
+        call = f'{res} {enc_of(args)} {app}'
         if discr:
-            body = (f'\n    match {", ".join(discr)} with\n    | {", ".join(binds)} => {res} {app}\n'
+            body = (f'\n    match {", ".join(discr)} with\n    | {", ".join(binds)} => {call}\n'
                     f'    | {", ".join("_" for _ in discr)} => .hole "nl:arg-type"')
         else:
-            body = f' {res} {app}'
+            body = f' {call}'
         lines.append(f'  | {pattern} =>{body}')
+    var = any(p['kind'] == 'varargs' for p in sig.params)
+    fixed = [p for p in sig.params if p['kind'] == 'positional']
     if not (var and not fixed):
         lines.append('  | _ => .hole "nl:arg-count"')
     return '\n'.join(lines) + '\n'
 
 
+def wrapper(lean_name: str, sig: Sig) -> str:
+    """The generated (never model-written) glue for one def: `call_<lean_name> : List Val →
+    EResult` decodes, runs and encodes the Python-visible result. A method also gets
+    `call_<lean_name>_post`, whose value is `.tuple [result, receiver after the call]` (a
+    method that does not mutate returns its receiver unchanged)."""
+    if sig.kind not in ('method', 'property'):
+        return _one_wrapper(f'call_{lean_name}', lean_name, sig, lambda args: encoder(sig.inner))
+    enc = encoder(sig.result)
+    obj = encoder(('Struct', sig.struct))
+    if sig.mutates:
+        result = _one_wrapper(f'call_{lean_name}', lean_name, sig, lambda args: f'(eFst {enc})')
+        post = _one_wrapper(f'call_{lean_name}_post', lean_name, sig, lambda args: f'(eTup2 {enc} {obj})')
+    else:
+        result = _one_wrapper(f'call_{lean_name}', lean_name, sig, lambda args: enc)
+        post = _one_wrapper(f'call_{lean_name}_post', lean_name, sig, lambda args: f'(ePure {enc} {obj} {args[0]})')
+    return result + '\n' + post
+
+
 def dispatcher(entries: list) -> str:
-    """entries: [(qualified name, lean_name)] → the `call` function."""
+    """entries: [(qualified name, lean_name[, kind])] → the `call` function. A method has a
+    second entry `<qualified name>#post` (see `wrapper`)."""
     lines = ['def call (name : String) (args : List Val) : EResult :=', '  match name with']
-    for qual, lean_name in entries:
+    for e in entries:
+        qual, lean_name = e[0], e[1]
         lines.append(f'  | {pv.lean_str(qual)} => call_{lean_name} args')
+        if len(e) > 2 and e[2] in ('method', 'property'):
+            lines.append(f'  | {pv.lean_str(qual + "#post")} => call_{lean_name}_post args')
     lines.append('  | _ => .hole "nl:unknown-function"')
     return '\n'.join(lines) + '\n'
 
 
+CANON = r'''
+mutual
+def {v} : Val → String
+  | .int n => "i:" ++ toString n
+  | .bool b => "b:" ++ toString b
+  | .str s => "s:" ++ toString (s.toList.map Char.toNat)
+  | .unit => "none"
+  | .float x => if x.isNaN then "f:nan" else "f:" ++ toString x.bits
+  | .list vs => "L(" ++ {l} vs ++ ")"
+  | .tuple vs => "T(" ++ {l} vs ++ ")"
+  | .dict kvs => "D(" ++ {d} kvs ++ ")"
+  | .fn n => "F:" ++ n
+  | .bobj n v => "X:" ++ n ++ "(" ++ {v} v ++ ")"
+  | _ => "?"
+def {l} : List Val → String
+  | [] => ""
+  | v :: vs => {v} v ++ "," ++ {l} vs
+def {d} : List (Val × Val) → String
+  | [] => ""
+  | (k, v) :: kvs => {v} k ++ "=" ++ {v} v ++ ";" ++ {d} kvs
+end
+'''
+
 PRELUDE = r'''
 /-! Argument decoding and result encoding shared by every model in this module.
 Generated by autoform.nl.model; all definitions are structurally recursive, so the kernel
-evaluates `call` on concrete arguments. -/
+evaluates `call` on concrete arguments.
+
+Python data in `Val` (see autoform/nl/pyvalues.py): tuples are `.tuple`, lists `.list`,
+dicts `.dict` (association list in insertion order), bytes `.bobj "bytes" (.list [.int b..])`,
+sets `.bobj "set" (.list elems)` with the elements sorted by their canonical string
+(`canonV`) and deduplicated (the encoders below normalize, so a model may keep any order),
+objects of modelled classes `.bobj "obj:<module>.<Class>" (.dict [(.str attr, v), ...])`
+with the attributes sorted by name. -/
+''' + CANON.replace('{v}', 'canonV').replace('{l}', 'canonL').replace('{d}', 'canonD') + r'''
+abbrev Tuple (α : Type) := List α
+abbrev Bytes := List Nat
+abbrev PySet (α : Type) := List α
+abbrev FrozenSet (α : Type) := List α
+abbrev Dict (κ ν : Type) := List (κ × ν)
 def dInt : Val → Option Int | .int n => some n | _ => none
 def dBool : Val → Option Bool | .bool b => some b | _ => none
 def dStr : Val → Option String | .str s => some s | _ => none
@@ -706,6 +1146,9 @@ def dListAux {α : Type} (d : Val → Option α) : List Val → Option (List α)
     | _, _ => none
 def dList {α : Type} (d : Val → Option α) : Val → Option (List α)
   | .list vs => dListAux d vs
+  | _ => none
+def dTuple {α : Type} (d : Val → Option α) : Val → Option (List α)
+  | .tuple vs => dListAux d vs
   | _ => none
 def dOpt {α : Type} (d : Val → Option α) : Val → Option (Option α)
   | .unit => some none
@@ -727,11 +1170,49 @@ def dTup4 {α β γ δ : Type} (da : Val → Option α) (db : Val → Option β)
     | some x, some y, some z, some w => some (x, y, z, w)
     | _, _, _, _ => none
   | _ => none
+def dByte : Val → Option Nat
+  | .int n => if 0 ≤ n ∧ n < 256 then some n.toNat else none
+  | _ => none
+def dBytes : Val → Option (List Nat)
+  | .bobj n (.list vs) => if n == "bytes" then dListAux dByte vs else none
+  | _ => none
+def dSet {α : Type} (d : Val → Option α) : Val → Option (List α)
+  | .bobj n (.list vs) => if n == "set" then dListAux d vs else none
+  | _ => none
+def dFrozenSet {α : Type} (d : Val → Option α) : Val → Option (List α)
+  | .bobj n (.list vs) => if n == "frozenset" then dListAux d vs else none
+  | _ => none
+def dPairs {κ ν : Type} (dk : Val → Option κ) (dv : Val → Option ν) :
+    List (Val × Val) → Option (List (κ × ν))
+  | [] => some []
+  | (k, v) :: kvs => match dk k, dv v, dPairs dk dv kvs with
+    | some a, some b, some r => some ((a, b) :: r)
+    | _, _, _ => none
+def dDict {κ ν : Type} (dk : Val → Option κ) (dv : Val → Option ν) : Val → Option (List (κ × ν))
+  | .dict kvs => dPairs dk dv kvs
+  | _ => none
+def dField (k : String) : List (Val × Val) → Option Val
+  | [] => none
+  | (.str k', v) :: kvs => if k == k' then some v else dField k kvs
+  | _ :: kvs => dField k kvs
+def insKey (x : Val) : List Val → List Val
+  | [] => [x]
+  | y :: ys => if canonV x == canonV y then y :: ys
+    else if decide (canonV x < canonV y) then x :: y :: ys else y :: insKey x ys
+def sortKey : List Val → List Val
+  | [] => []
+  | x :: xs => insKey x (sortKey xs)
 def eUnit (_ : Unit) : Val := .unit
 def eOpt {α : Type} (e : α → Val) : Option α → Val
   | none => .unit
   | some a => e a
 def eList {α : Type} (e : α → Val) (xs : List α) : Val := .list (xs.map e)
+def eTuple {α : Type} (e : α → Val) (xs : List α) : Val := .tuple (xs.map e)
+def eBytes (xs : List Nat) : Val := .bobj "bytes" (.list (xs.map fun n => .int n))
+def eSet {α : Type} (e : α → Val) (xs : List α) : Val := .bobj "set" (.list (sortKey (xs.map e)))
+def eFrozenSet {α : Type} (e : α → Val) (xs : List α) : Val := .bobj "frozenset" (.list (sortKey (xs.map e)))
+def eDict {κ ν : Type} (ek : κ → Val) (ev : ν → Val) (kvs : List (κ × ν)) : Val :=
+  .dict (kvs.map fun p => (ek p.1, ev p.2))
 def eTup2 {α β : Type} (ea : α → Val) (eb : β → Val) : α × β → Val
   | (a, b) => .tuple [ea a, eb b]
 def eTup3 {α β γ : Type} (ea : α → Val) (eb : β → Val) (ec : γ → Val) : α × β × γ → Val
@@ -739,32 +1220,49 @@ def eTup3 {α β γ : Type} (ea : α → Val) (eb : β → Val) (ec : γ → Val
 def eTup4 {α β γ δ : Type} (ea : α → Val) (eb : β → Val) (ec : γ → Val) (ed : δ → Val) :
     α × β × γ × δ → Val
   | (a, b, c, d) => .tuple [ea a, eb b, ec c, ed d]
+def eFst {α β : Type} (ea : α → Val) : α × β → Val
+  | (a, _) => ea a
+def ePure {α β : Type} (ea : α → Val) (eb : β → Val) (b : β) (a : α) : Val := .tuple [ea a, eb b]
 def resV {α : Type} (e : α → Val) (a : α) : EResult := .val (e a)
+/-- `.error "nl:unmodelled"` marks a path the model leaves out (e.g. a call to a mixin
+method inherited from an external base): it is a hole, never a Python exception. -/
 def resE {α : Type} (e : α → Val) : Except String α → EResult
   | .ok a => .val (e a)
-  | .error n => .exn (.str n)
+  | .error n => if n == "nl:unmodelled" then .hole n else .exn (.str n)
+
+/-! Helpers for statements about Python data (exported to statement files by
+`schema.lean_opens`). All are total and kernel-evaluable. -/
+/-- The attribute `attr` of an encoded object (`.unit` when absent or not an object). -/
+def vField (o : Val) (attr : String) : Val :=
+  match o with
+  | .bobj _ (.dict kvs) => (dField attr kvs).getD .unit
+  | _ => .unit
+def vLookup (k : Val) : List (Val × Val) → Option Val
+  | [] => none
+  | (k', v) :: kvs => if Val.beq k k' then some v else vLookup k kvs
+/-- `d[k]` for a dict (or a dict-valued attribute), by Python equality. -/
+def vGet (d : Val) (k : Val) : Option Val :=
+  match d with
+  | .dict kvs => vLookup k kvs
+  | _ => none
+def vElems : Val → List Val
+  | .list vs => vs
+  | .tuple vs => vs
+  | .dict kvs => kvs.map Prod.fst
+  | .bobj _ (.list vs) => vs
+  | .str s => s.toList.map fun c => .str (String.singleton c)
+  | _ => []
+/-- The keys of a dict in insertion order (elements of a list/tuple/set). -/
+def vKeys (d : Val) : List Val := vElems d
+/-- `k in d` for a dict (keys), list, tuple or set, by Python equality. -/
+def vHas (d : Val) (k : Val) : Bool := (vElems d).any (Val.beq k)
+/-- `len(d)` of a str, list, tuple, dict, set or bytes. -/
+def vLen : Val → Int
+  | .str s => s.length
+  | v => (vElems v).length
 '''
 
-RENDER = r'''
-mutual
-def rv : Val → String
-  | .int n => "i:" ++ toString n
-  | .bool b => "b:" ++ toString b
-  | .str s => "s:" ++ toString (s.toList.map Char.toNat)
-  | .unit => "none"
-  | .float x => if x.isNaN then "f:nan" else "f:" ++ toString x.bits
-  | .list vs => "L(" ++ rl vs ++ ")"
-  | .tuple vs => "T(" ++ rl vs ++ ")"
-  | .dict kvs => "D(" ++ rd kvs ++ ")"
-  | .fn n => "F:" ++ n
-  | _ => "?"
-def rl : List Val → String
-  | [] => ""
-  | v :: vs => rv v ++ "," ++ rl vs
-def rd : List (Val × Val) → String
-  | [] => ""
-  | (k, v) :: kvs => rv k ++ "=" ++ rv v ++ ";" ++ rd kvs
-end
+RENDER = CANON.replace('{v}', 'rv').replace('{l}', 'rl').replace('{d}', 'rd') + r'''
 def rr : EResult → String
   | .val v => "ok " ++ rv v
   | .exn (.str n) => "exn " ++ n
@@ -776,6 +1274,196 @@ def sameR : EResult → EResult → Bool
   | .exn a, .exn b => Val.beq a b
   | _, _ => false
 '''
+
+
+# ---------------------------------------------------------------- receiver structures
+
+@dataclass
+class Structure:
+    """The Lean structure generated for a repository class: one field per instance
+    attribute (all attributes along the repository MRO that its instances carry), types
+    inferred from the attribute values observed while the tests ran."""
+    cls: str                    # pyvalues.class_name of the instances
+    lean: str                   # structure name, e.g. S_Cache
+    fields: list                # [(python attr, lean field, parsed type)] sorted by attr
+    observed: int = 0           # receiver states observed
+    decodable: int = 0          # observed states whose attribute set and values fit the structure
+    source: str = 'observed'    # observed | static (no instance seen: static attributes typed Val)
+
+    def text(self) -> str:
+        tag = pv.lean_str('obj:' + self.cls)
+        n = len(self.fields)
+        lines = [f'/-- Python class `{self.cls}` (instance attributes, sorted). -/',
+                 f'structure {self.lean} where']
+        lines += [f'  {lf} : {show_type(t)}' for _, lf, t in self.fields]
+        if not self.fields:
+            lines[-1] += '\n  mk ::'
+        lines.append(f'def dObj_{self.lean} : Val → Option {self.lean}')
+        if self.fields:
+            discr = ', '.join(f'(dField {pv.lean_str(a)} kvs).bind {decoder(t)}' for a, _, t in self.fields)
+            binds = ', '.join(f'some x{i}' for i in range(n))
+            build = '{ ' + ', '.join(f'{lf} := x{i}' for i, (_, lf, _) in enumerate(self.fields)) + ' }'
+            lines += [f'  | .bobj n (.dict kvs) =>',
+                      f'    if n == {tag} && kvs.length == {n} then',
+                      f'      match {discr} with',
+                      f'      | {binds} => some {build}',
+                      f'      | {", ".join("_" for _ in range(n))} => none',
+                      f'    else none']
+        else:
+            lines += [f'  | .bobj n (.dict kvs) => if n == {tag} && kvs.length == 0 then some {{}} else none']
+        lines.append('  | _ => none')
+        items = ', '.join(f'(.str {pv.lean_str(a)}, {encoder(t)} s.{lf})' for a, lf, t in self.fields)
+        lines.append(f'def eObj_{self.lean} (s : {self.lean}) : Val := .bobj {tag} (.dict [{items}])')
+        return '\n'.join(lines) + '\n'
+
+    def describe(self) -> str:
+        rows = [f'  {lf} : {show_type(t)}    -- Python attribute `{a}`' for a, lf, t in self.fields]
+        return (f'structure {self.lean} where    -- instances of {self.cls}\n' + '\n'.join(rows)
+                + ('\n  (no attributes)' if not rows else ''))
+
+
+def field_ident(attr: str, taken: set) -> str:
+    base = 'f_' + re.sub(r'[^A-Za-z0-9_]', '_', attr)
+    name, k = base, 2
+    while name in taken:
+        name, k = f'{base}_{k}', k + 1
+    taken.add(name)
+    return name
+
+
+def _join(a, b):
+    """Least upper bound of two inferred types (None = no information yet, 'NoneT' = only None)."""
+    if a is None:
+        return b
+    if b is None or a == b:
+        return a
+    if a == 'NoneT':
+        return b if isinstance(b, tuple) and b[0] == 'Option' else ('Option', b)
+    if b == 'NoneT':
+        return _join(b, a)
+    if isinstance(a, tuple) and a[0] == 'Option':
+        inner = _join(a[1], b[1] if isinstance(b, tuple) and b[0] == 'Option' else b)
+        return 'Val' if inner == 'Val' else ('Option', inner)
+    if isinstance(b, tuple) and b[0] == 'Option':
+        return _join(b, a)
+    if isinstance(a, tuple) and isinstance(b, tuple) and a[0] == b[0] and len(a) == len(b):
+        if a[0] == 'Prod':
+            if len(a[1]) != len(b[1]):
+                return ('Tuple', _fin(_join_all(a[1] + b[1])))
+            return ('Prod', [_join(x, y) for x, y in zip(a[1], b[1])])
+        return (a[0],) + tuple(_join(x, y) for x, y in zip(a[1:], b[1:]))
+    if isinstance(a, tuple) and isinstance(b, tuple) and {a[0], b[0]} == {'Prod', 'Tuple'}:
+        p, t = (a, b) if a[0] == 'Prod' else (b, a)
+        return ('Tuple', _join(t[1], _join_all(p[1])))
+    return 'Val'
+
+
+def _join_all(ts):
+    out = None
+    for t in ts:
+        out = _join(out, t)
+    return out
+
+
+def _fin(t):
+    """Close an inferred type: unknown element types become Val; nested None-only → Val."""
+    if t is None or t == 'NoneT':
+        return 'Val'
+    if isinstance(t, str):
+        return t
+    if t[0] == 'Prod':
+        return ('Prod', [_fin(x) for x in t[1]])
+    if t[0] == 'Option':
+        inner = _fin(t[1])
+        return 'Val' if inner == 'Val' else ('Option', inner)
+    return (t[0],) + tuple(_fin(x) for x in t[1:])
+
+
+def infer_type(t):
+    """Inferred Lean type of one tagged value (None = no information: an empty container's element)."""
+    k = t[0]
+    if k == 'n':
+        return 'NoneT'
+    simple = {'i': 'Int', 'b': 'Bool', 's': 'String', 'f': 'Fl', 'y': 'Bytes'}
+    if k in simple:
+        return simple[k]
+    if k == 'l':
+        return ('List', _join_all(infer_type(x) for x in t[1]))
+    if k == 't':
+        if 2 <= len(t[1]) <= 4:
+            return ('Prod', [infer_type(x) for x in t[1]])
+        return ('Tuple', _join_all(infer_type(x) for x in t[1]))
+    if k == 'd':
+        return ('Dict', _join_all(infer_type(a) for a, _ in t[1]), _join_all(infer_type(b) for _, b in t[1]))
+    if k == 'S':
+        return ('FrozenSet' if t[2] == 'frozenset' else 'PySet', _join_all(infer_type(x) for x in t[1]))
+    return 'Val'
+
+
+def _fits(t, typ) -> bool:
+    """Does the tagged value decode at the inferred type (mirrors the Lean decoders)?"""
+    k = t[0]
+    if typ == 'Val':
+        return True
+    if isinstance(typ, tuple) and typ[0] == 'Option':
+        return k == 'n' or _fits(t, typ[1])
+    table = {'Int': 'i', 'Bool': 'b', 'String': 's', 'Fl': 'f', 'Bytes': 'y', 'Unit': 'n'}
+    if isinstance(typ, str):
+        return table.get(typ) == k
+    head = typ[0]
+    if head in ('List', 'Tuple'):
+        return k == ('l' if head == 'List' else 't') and all(_fits(x, typ[1]) for x in t[1])
+    if head in ('PySet', 'FrozenSet'):
+        return k == 'S' and t[2] == ('set' if head == 'PySet' else 'frozenset') and all(_fits(x, typ[1]) for x in t[1])
+    if head == 'Dict':
+        return k == 'd' and all(_fits(a, typ[1]) and _fits(b, typ[2]) for a, b in t[1])
+    if head == 'Prod':
+        return k == 't' and len(t[1]) == len(typ[1]) and all(_fits(x, y) for x, y in zip(t[1], typ[1]))
+    return False
+
+
+def infer_structure(cls: _Class, states: list, lean: str) -> Structure:
+    """The structure for `cls` from the receiver states observed for it (pyvalues 'O' tags).
+
+    The attribute set is the most common one among the observations (an instance with other
+    attributes does not decode, and such inputs are skipped and counted); each attribute's
+    type is the join of its observed values' types (mixed types → Val). With no
+    observations, the attributes assigned in the class's code are used, typed Val."""
+    sets = {}
+    for s in states:
+        key = tuple(a for a, _ in s[2])
+        sets[key] = sets.get(key, 0) + 1
+    taken: set = set()
+    if sets:
+        attrs = max(sets.items(), key=lambda kv: (kv[1], -len(kv[0])))[0]
+        types = {a: None for a in attrs}
+        for s in states:
+            if tuple(a for a, _ in s[2]) == attrs:
+                for a, v in s[2]:
+                    types[a] = _join(types[a], infer_type(v))
+        fields = [(a, field_ident(a, taken), _fin(types[a])) for a in sorted(attrs)]
+        st = Structure(cls.dotted, lean, fields, observed=len(states))
+        st.decodable = sum(1 for s in states if st.fits(s))
+        return st
+    fields = [(a, field_ident(a, taken), 'Val') for a in sorted(static_fields(cls))]
+    return Structure(cls.dotted, lean, fields, source='static')
+
+
+def _structure_fits(self: Structure, state) -> bool:
+    if state[0] != 'O' or state[1] != self.cls or [a for a, _ in state[2]] != [a for a, _, _ in self.fields]:
+        return False
+    return all(_fits(v, t) for (_, v), (_, _, t) in zip(state[2], self.fields))
+
+
+Structure.fits = _structure_fits
+
+
+PRELUDE_TAIL = ''   # structures are appended per module (see structures_text)
+
+
+def structures_text(structs: list) -> str:
+    return '\n'.join(s.text() for s in structs)
+
 
 HEADER = ('import Autoform.Lang.Core.Syntax\nset_option autoImplicit false\nset_option maxRecDepth 100000\n'
           'set_option maxHeartbeats 4000000\nset_option linter.all false\n')
@@ -841,40 +1529,106 @@ try:
 except AttributeError:
     pass
 wanted = {}
-for f, lines, key in cfg['wanted']:
+for f, lines, key, kind, cls, qual, modname in cfg['wanted']:
     for ln in lines:
-        wanted[(os.path.realpath(f), ln)] = key
+        wanted.setdefault((os.path.realpath(f), ln), []).append((key, kind, cls, qual, modname))
+classes = set(cfg.get('classes') or [])
 limit = cfg['limit']
-records, stats, known = {}, {'calls': 0, 'kwargs': 0, 'unencodable': 0}, {}
+records, states, known, funcs = {}, {}, {}, {}
+stats = {'calls': 0, 'kwargs': 0, 'unencodable': 0, 'other_receiver': 0, 'defaults_dropped': 0}
+def defaults_of(key, qual, modname):
+    if key not in funcs:
+        d = ()
+        try:
+            obj = sys.modules[modname]
+            for part in qual.split('.'):
+                obj = getattr(obj, part)
+            obj = getattr(obj, 'fget', obj)
+            d = tuple(getattr(obj, '__defaults__', None) or ())
+        except (KeyError, AttributeError):
+            pass
+        funcs[key] = d
+    return funcs[key]
+def snapshot(cls, obj):
+    try:
+        t = json.dumps(pv.tag(obj, 0, classes))
+    except (pv.Unencodable, ValueError, TypeError, RecursionError):
+        return
+    bucket = states.setdefault(cls, {})
+    if len(bucket) < 4 * limit:
+        bucket[t] = None
 def tracer(frame, event, arg):
     if event != 'call':
         return None
     code = frame.f_code
-    key = known.get(code, 0)
-    if key == 0:
-        key = known[code] = wanted.get((os.path.realpath(code.co_filename), code.co_firstlineno))
-    if key is None:
+    entries = known.get(code, 0)
+    if entries == 0:
+        entries = known[code] = wanted.get((os.path.realpath(code.co_filename), code.co_firstlineno))
+    if entries is None:
         return None
     if code.co_flags & 0x3a0:        # generator / coroutine / async generator
         return None
-    stats['calls'] += 1
     loc = frame.f_locals
     n, k = code.co_argcount, code.co_kwonlyargcount
+    entry = entries[0]
+    if entry[1] in ('method', 'property', 'constructor'):
+        if n == 0:
+            return None
+        recv_cls = pv.class_name(type(loc.get(code.co_varnames[0])))
+        entry = next((e for e in entries if e[2] == recv_cls), None)
+        if entry is None:
+            stats['other_receiver'] += 1
+            return None
+    key, kind, cls, qual, modname = entry
+    stats['calls'] += 1
     try:
         args = [loc[x] for x in code.co_varnames[:n]]
         i = n + k
+        extra = []
         if code.co_flags & 0x04:
-            args += list(loc[code.co_varnames[i]]); i += 1
+            extra = list(loc[code.co_varnames[i]]); i += 1
         if code.co_flags & 0x08 and loc[code.co_varnames[i]]:
             stats['kwargs'] += 1
             return None
-        tagged = json.dumps([pv.tag(a) for a in args])
-    except (pv.Unencodable, KeyError, ValueError, TypeError, RecursionError):
+    except (KeyError, IndexError):
         stats['unencodable'] += 1
         return None
-    bucket = records.setdefault(key, {})
-    if len(bucket) < limit:
-        bucket[tagged] = None
+    defaults = defaults_of(key, qual, modname)
+    cut = n
+    while defaults and cut > n - len(defaults) and args[cut - 1] is defaults[cut - 1 - (n - len(defaults))]:
+        cut -= 1
+    first = 1 if kind == 'constructor' else 0
+    tags = []
+    try:
+        for j, a in enumerate(args):
+            if j < first:
+                continue
+            try:
+                tags.append(pv.tag(a, 0, classes))
+            except pv.Unencodable:
+                if j >= cut and not extra and j > 0:
+                    stats['defaults_dropped'] += 1
+                    break              # this and every later argument is the unencodable default
+                raise
+        else:
+            tags += [pv.tag(a, 0, classes) for a in extra]
+        tagged = json.dumps(tags)
+    except (pv.Unencodable, ValueError, TypeError, RecursionError):
+        stats['unencodable'] += 1
+        tagged = None
+    if kind in ('method', 'property'):
+        snapshot(cls, args[0])
+    if tagged is not None:
+        bucket = records.setdefault(key, {})
+        if len(bucket) < limit:
+            bucket[tagged] = None
+    if kind == 'constructor':
+        self_name = code.co_varnames[0]
+        def local(fr, ev, a):
+            if ev == 'return':
+                snapshot(cls, fr.f_locals.get(self_name))
+            return local
+        return local
     return None
 buf = io.StringIO()
 ran = []
@@ -897,6 +1651,7 @@ try:
 finally:
     sys.settrace(None); threading.settrace(None)
 json.dump({'records': {k: [json.loads(t) for t in v] for k, v in records.items()}, 'stats': stats,
+           'states': {c: [json.loads(t) for t in v] for c, v in states.items()},
            'runs': ran, 'log_tail': buf.getvalue()[-1500:]}, open(cfg['out'], 'w'))
 '''
 
@@ -923,25 +1678,44 @@ with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
     if cfg['dotted']:
         mod = importlib.import_module(cfg['dotted'])
     else:
-        s = importlib.util.spec_from_file_location('autoform_subject', cfg['path'])
-        mod = importlib.util.module_from_spec(s); sys.modules['autoform_subject'] = mod
+        name = os.path.splitext(os.path.basename(cfg['path']))[0]
+        s = importlib.util.spec_from_file_location(name, cfg['path'])
+        mod = importlib.util.module_from_spec(s); sys.modules[name] = mod
         s.loader.exec_module(mod)
-obj = mod
-for part in cfg['qual'].split('.'):
-    obj = getattr(obj, part)
+kind = cfg.get('kind') or 'function'
+classes = set(cfg.get('classes') or [])
+parts = cfg['qual'].split('.')
+owner = mod
+for part in parts[:-1]:
+    owner = getattr(owner, part)
+if kind == 'constructor':
+    target = owner
+elif kind == 'property':
+    target = None
+    for c in owner.__mro__:
+        if parts[-1] in c.__dict__:
+            target = c.__dict__[parts[-1]].fget
+            break
+else:
+    target = getattr(owner, parts[-1])
 out = []
 for point in cfg['points']:
     try:
         args = [pv.untag(t) for t in point]
+        if kind in ('method', 'property') and (not args or type(args[0]) is not owner):
+            raise ValueError('the receiver is not an instance of ' + pv.class_name(owner))
     except Exception as e:
         out.append({'k': 'bad-input', 'why': repr(e)[:200]}); continue
     signal.setitimer(signal.ITIMER_REAL, cfg['per'])
     try:
         with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-            v = obj(*args)
+            v = target(*args)
         signal.setitimer(signal.ITIMER_REAL, 0)
         try:
-            out.append({'k': 'ok', 'v': pv.tag(v)})
+            r = {'k': 'ok', 'v': pv.tag(v, 0, classes)}
+            if kind in ('method', 'property'):
+                r['post'] = pv.tag(args[0], 0, classes)
+            out.append(r)
         except pv.Unencodable as e:
             out.append({'k': 'unencodable', 'why': str(e)[:200]})
     except _Deadline:
@@ -975,32 +1749,62 @@ def _run_script(script: str, cfg: dict, work: Path, stem: str, timeout: int, cwd
     return json.loads(out_path.read_text()), ''
 
 
-def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path) -> tuple:
-    """Run the repository's tests under a tracer; {qualified name: [point]} and stats."""
+def _modname(mod: _Module) -> str:
+    return mod.dotted or mod.path.stem
+
+
+def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, classes=()) -> tuple:
+    """Run the repository's tests under a tracer.
+
+    Returns ({qualified name: [point]}, stats); stats['states'] maps each class in `classes`
+    to the receiver states observed (pyvalues 'O' tags: before every call of one of its
+    traced methods, and after every traced constructor). A method's point starts with its
+    receiver's state; a constructor's point omits the receiver. A trailing argument that
+    is the parameter's own (unencodable) default object, e.g. a sentinel or a function
+    alias, is dropped, so the call is replayed with the default."""
     if not fns or not test_dirs:
-        return {}, {'note': 'no tests to trace'}
+        return {}, {'note': 'no tests to trace', 'states': {}}
     roots = []
     for f in fns:
         r = str(f.mod.import_root)
         if r not in roots:
             roots.append(r)
     sys_path = roots + [str(Path(d).resolve().parent) for d in test_dirs]
+    classes = sorted(set(classes) | {f.cls.dotted for f in fns if f.cls is not None and f.kind != 'static'})
     cfg = {'sys_path': sys_path, 'tests': [str(Path(d).resolve()) for d in test_dirs], 'limit': TRACE_LIMIT,
-           'wanted': [[str(f.mod.path), f.first_lines, f.info.name] for f in fns]}
+           'classes': classes,
+           'wanted': [[str(f.mod.path), f.first_lines, f.info.name, f.kind,
+                       f.cls.dotted if f.cls is not None else '', f.qual, _modname(f.mod)] for f in fns]}
     data, err = _run_script(TRACER, cfg, work, 'trace', TRACE_TIMEOUT)
     if data is None:
-        return {}, {'error': err}
-    stats = dict(data['stats'], runs=data['runs'],
+        return {}, {'error': err, 'states': {}}
+    stats = dict(data['stats'], runs=data['runs'], states=data.get('states', {}),
                  traced={k: len(v) for k, v in data['records'].items()})
     return data['records'], stats
+
+
+def runner_config(import_root, dotted, path, qual: str, kind: str = 'function', classes=()) -> dict:
+    return {'sys_path': [str(import_root)], 'dotted': dotted, 'path': str(path), 'qual': qual,
+            'kind': kind, 'classes': sorted(classes), 'per': POINT_TIMEOUT}
+
+
+def run_points(cfg: dict, points: list, work: Path, stem: str, cwd=None, timeout=RUNTIME_TIMEOUT) -> tuple:
+    """Run the real function on tagged points in CPython: ([outcome dict], error text)."""
+    data, err = _run_script(RUNNER, dict(cfg, points=points), work, stem, timeout, cwd=cwd)
+    if data is None or len(data) != len(points):
+        return [{'k': 'runner-failed'}] * len(points), err or 'runner returned a wrong number of results'
+    return data, ''
 
 
 class Runtime:
     """CPython outcomes of one function, cached by input point."""
 
-    def __init__(self, fn: _Fn, work: Path):
+    def __init__(self, fn: _Fn, work: Path, classes=()):
         self.fn, self.work, self.cache, self.error = fn, work, {}, ''
         self.calls = 0
+        mod = fn.mod
+        cls = {fn.cls.dotted} if fn.cls is not None else set()
+        self.cfg = runner_config(mod.import_root, mod.dotted, mod.path, fn.qual, fn.kind, cls | set(classes))
 
     def run(self, points: list) -> list:
         todo = []
@@ -1010,14 +1814,10 @@ class Runtime:
                 todo.append(k)
         if todo:
             self.calls += 1
-            mod = self.fn.mod
-            cfg = {'sys_path': [str(mod.import_root)], 'dotted': mod.dotted, 'path': str(mod.path),
-                   'qual': self.fn.qual, 'per': POINT_TIMEOUT, 'points': [json.loads(k) for k in todo]}
-            data, err = _run_script(RUNNER, cfg, self.work, f'runtime{self.calls}', RUNTIME_TIMEOUT,
-                                    cwd=mod.import_root)
-            if data is None or len(data) != len(todo):
-                self.error = err or 'runner returned a wrong number of results'
-                data = [{'k': 'runner-failed'}] * len(todo)
+            data, err = run_points(self.cfg, [json.loads(k) for k in todo], self.work, f'runtime{self.calls}',
+                                   cwd=self.fn.mod.import_root)
+            if err:
+                self.error = err
             for k, r in zip(todo, data):
                 self.cache[k] = r
         return [self.cache[json.dumps(p)] for p in points]
@@ -1047,8 +1847,28 @@ def _literals(source: str):
     return ints[:12], strs[:8]
 
 
-def values_for(t, ints=(), strs=(), depth=0) -> list:
-    """Python values of Lean type `t`, most informative first."""
+class _Tagged:
+    """An already-tagged value (a receiver state) inside a boundary combination."""
+
+    def __init__(self, t):
+        self.t = t
+
+
+def _hashable(xs) -> list:
+    out = []
+    for x in xs:
+        try:
+            hash(x)
+        except TypeError:
+            continue
+        if x not in out and not any(type(x) is not type(y) and x == y for y in out):
+            out.append(x)
+    return out
+
+
+def values_for(t, ints=(), strs=(), depth=0, receivers=()) -> list:
+    """Python values of Lean type `t`, most informative first (`receivers`: tagged states of
+    the receiver structure, used for a parameter of structure type)."""
     if isinstance(t, str):
         if t == 'Int':
             return list(dict.fromkeys([0, 1, -1] + list(ints)[:6] + INT_VALUES))
@@ -1060,23 +1880,49 @@ def values_for(t, ints=(), strs=(), depth=0) -> list:
             return [None]
         if t == 'Fl':
             return FLOAT_VALUES
+        if t == 'Bytes':
+            return [b'', b'a', b'\x00', b'ab', b'\xff\x00', (strs[0].encode() if strs else b'hello')]
         return VAL_VALUES
+    if t[0] == 'Struct':
+        return [_Tagged(r) for r in receivers]
     if depth > 2:
         return []
     if t[0] == 'Option':
-        return [None] + values_for(t[1], ints, strs, depth + 1)[:8]
-    if t[0] == 'List':
-        e = values_for(t[1], ints, strs, depth + 1)[:6]
+        return [None] + values_for(t[1], ints, strs, depth + 1, receivers)[:8]
+    if t[0] in ('List', 'Tuple'):
+        e = values_for(t[1], ints, strs, depth + 1, receivers)[:6]
         out = [[]]
         if e:
             out += [[e[0]], e[:2], e[:3], list(reversed(e[:4])), [e[-1], e[0], e[-1]]]
             if len(e) > 3:
                 out.append(e[1:5])
+        return out if t[0] == 'List' else [tuple(x) for x in out]
+    if t[0] in ('PySet', 'FrozenSet'):
+        e = _hashable(values_for(t[1], ints, strs, depth + 1, receivers))[:6]
+        make = set if t[0] == 'PySet' else frozenset
+        return [make(x) for x in ([], e[:1], e[:2], e[1:4], e[:5])]
+    if t[0] == 'Dict':
+        ks = _hashable(values_for(t[1], ints, strs, depth + 1, receivers))[:5]
+        vs = values_for(t[2], ints, strs, depth + 1, receivers)[:5] or [None]
+        out = [{}]
+        for n in (1, 2, 3):
+            if len(ks) >= n:
+                out.append({k: vs[i % len(vs)] for i, k in enumerate(ks[:n])})
+        if len(ks) >= 2:
+            out.append({ks[1]: vs[0], ks[0]: vs[-1]})
         return out
     if t[0] == 'Prod':
-        per = [values_for(x, ints, strs, depth + 1)[:4] for x in t[1]]
+        per = [values_for(x, ints, strs, depth + 1, receivers)[:4] for x in t[1]]
         return [tuple(c) for c in _product(per, 12)]
     return []
+
+
+def _tag_value(v):
+    if isinstance(v, _Tagged):
+        return v.t
+    if isinstance(v, (tuple, list)) and any(isinstance(x, _Tagged) for x in v):
+        return ['t' if isinstance(v, tuple) else 'l', [_tag_value(x) for x in v]]
+    return pv.tag(v)
 
 
 def _product(per: list, cap: int) -> list:
@@ -1095,15 +1941,19 @@ def _count(per) -> int:
     return n
 
 
-def boundary_points(sig: Sig, source: str, cap: int = BOUNDARY_CAP) -> list:
+def boundary_points(sig: Sig, source: str, cap: int = BOUNDARY_CAP, receivers=()) -> list:
+    """Typed boundary inputs. For a method, the receiver ranges over `receivers` (tagged
+    states observed in the tests), and the other parameters over their types' values."""
     ints, strs = _literals(source)
     per = []
     for p in sig.params:
         if p['kind'] == 'varargs':
-            elems = values_for(p['type'][1], ints, strs)[:5]
+            elems = values_for(p['type'][1], ints, strs, receivers=receivers)[:5]
             per.append([('*', e) for e in [[], elems[:1], elems[:2], elems[1:4], elems[:3]]])
         else:
-            per.append(values_for(p['type'], ints, strs))
+            per.append(values_for(p['type'], ints, strs, receivers=receivers))
+    if any(not p for p in per):
+        return []
     out = []
     for combo in _product(per, cap):
         args = []
@@ -1113,7 +1963,7 @@ def boundary_points(sig: Sig, source: str, cap: int = BOUNDARY_CAP) -> list:
             else:
                 args.append(v)
         try:
-            out.append([pv.tag(a) for a in args])
+            out.append([_tag_value(a) for a in args])
         except pv.Unencodable:
             continue
     return out
@@ -1125,9 +1975,13 @@ CONVENTIONS = r'''
 Lean conventions (Lean 4 core, no Mathlib; the namespace `Autoform.Core` is open):
 - Types. Python int → `Int` (unbounded; never `Nat` for a Python int), bool → `Bool`,
   str → `String`, a value that may be None → `Option τ` (None is `none`), list → `List τ`,
-  fixed-length tuple → `τ × σ` (up to 4 components), returning None → `Unit`. A Python tuple
-  of variable length (or of a tuple subclass) is a `Val` built with `.tuple vs`: `List τ` is a
-  Python *list*, and a list never equals a tuple.
+  fixed-length tuple → `τ × σ` (up to 4 components), variable-length tuple → `Tuple τ`
+  (an abbreviation of `List τ` that the dispatcher encodes as a Python tuple: a list never
+  equals a tuple), dict → `Dict κ ν` (= `List (κ × ν)`, an association list in Python's
+  insertion order: assigning an existing key keeps its position, a new key goes last,
+  deleting removes it), set → `PySet τ` and frozenset → `FrozenSet τ` (= `List τ`; order and
+  duplicates are irrelevant: the dispatcher sorts and deduplicates when encoding), bytes →
+  `Bytes` (= `List Nat`, each 0..255), returning None → `Unit`.
   Python float → `Fl` only if unavoidable (IEEE binary64 bit patterns; never Lean `Float`). API:
   `FConfig.python.ofInt (n : Int) : FResult` and `FConfig.python.add/sub/mul/div (x y : Fl) : FResult`
   (`inductive FResult | ok (x : Fl) | exn (name : String) | ub (s : String) | unmodelled (s : String)`),
@@ -1163,11 +2017,55 @@ Lean conventions (Lean 4 core, no Mathlib; the namespace `Autoform.Core` is open
   no `namespace`, `open`, `import`, `theorem`, `instance`, `structure`, `#eval`.
 '''
 
+METHOD_CONVENTIONS = r'''
+Methods and objects (this function is {what} of class `{cls}`):
+- The receiver's state is the generated Lean structure below; its fields are the instance
+  attributes (private names as CPython mangles them), typed from the values seen while the
+  project's tests ran. Read a field as `self.f_x`; build a changed state with
+  `{{ self with f_x := v }}`. Class-level attributes and the class's own source are shown
+  in the module context; a class attribute that is never assigned per instance is a constant.
+{structure}
+- A method is a Lean function whose FIRST parameter is the receiver, named `self`, of type
+  `{S}` (list it first in "params"; no default). The other parameters follow in Python order.
+- If the method can change any attribute of the receiver (assignment, `del`, or a mutating
+  call on an attribute such as `self.d[k] = v`, `self.d.pop(k)`, `self.xs.append(x)`), set
+  "mutates": true and return the Python result together with the receiver AFTER the call:
+  `τ × {S}` (or `Except String (τ × {S})`). A result that is a product is parenthesized:
+  `(A × B) × {S}`. A method returning None has result `Unit`. Otherwise "mutates": false and
+  return just the result. The receiver's state after a raised exception is not compared.
+- A constructor (`__init__`) does not take `self`: its parameters are the arguments after it,
+  and it returns the new object `{S}` (or `Except String {S}`), with every field set exactly as
+  `__init__` leaves it (including attributes set by base-class `__init__`s it calls).
+- Calls to other methods of the receiver (`self.m(...)`, `self[k]`, `k in self`, `len(self)`)
+  run THOSE methods (for this class, following Python's method resolution); implement their
+  effect on the structure (you may reuse translated callees below if their receiver type is
+  `{S}`, else write helpers).
+{unmodelled}'''
+
 KEYS_A = ['english', 'params', 'returns', 'lean']
 KEYS_B = ['params', 'returns', 'lean']
 
 
-def _function_block(fn: _Fn, lean_name: str, callees: list, context: str) -> str:
+def _keys(keys: list, fn: _Fn) -> list:
+    return keys[:-1] + ['mutates', keys[-1]] if fn.has_receiver else keys
+
+
+def _method_block(fn: _Fn, struct) -> str:
+    if fn.cls is None or fn.kind == 'static' or struct is None:
+        return ''
+    what = {'method': 'a method', 'property': 'a property getter (called as `obj.name`)',
+            'constructor': 'the constructor'}[fn.kind]
+    unmod = ''
+    if fn.unmodelled:
+        unmod = ('- NOT MODELLED (inherited from a base class outside the repository): '
+                 + '; '.join(fn.unmodelled) + '. Any path that reaches such a call must return '
+                 '`.error "nl:unmodelled"` (so the result type is `Except String ...`); that path is then '
+                 'excluded from the comparison with Python. Do not guess what the external method does.\n')
+    return METHOD_CONVENTIONS.format(what=what, cls=struct.cls, S=struct.lean, structure=struct.describe(),
+                                     unmodelled=unmod)
+
+
+def _function_block(fn: _Fn, lean_name: str, callees: list, context: str, struct=None) -> str:
     info = fn.info
     lines = [f'NAME: {lean_name}',
              f'Python function: {info.name}  ({info.file}:{info.line})',
@@ -1179,17 +2077,34 @@ def _function_block(fn: _Fn, lean_name: str, callees: list, context: str) -> str
         lines += [f"  {t['location']}: {t['text']}" for t in info.tests[:10]]
     if info.callers:
         lines.append('Called by: ' + ', '.join(info.callers[:6]))
+    method = _method_block(fn, struct)
+    if method:
+        lines.append(method)
+        if any(not (isinstance(d, ast.Constant)) for d in fn.node.args.defaults):
+            lines.append('- A parameter whose default is an object sentinel or a function alias (e.g. '
+                         '`cache_setitem=Cache.__setitem__`, `default=__marker`) is part of the method\'s '
+                         'interface only when callers pass it. Omit an alias parameter that callers never '
+                         'pass; for a sentinel, model the behaviour both when it is omitted and when a value '
+                         'is passed (e.g. an `Option τ` parameter with default `none` if `None` is never '
+                         'passed explicitly).')
     if callees:
         lines.append('Functions it calls that are already translated (call their Lean defs; they are '
                      'validated against Python):')
         for qual, lname, src in callees:
-            lines.append(f'  {qual} is `{lname}`:\n```lean\n{src.strip()[:1500]}\n```')
+            lines.append(f'  {qual} is `{lname}`:\n```lean\n{src.strip()[:2500]}\n```')
     if context:
         lines += ['Module context (imports, constants, classes it may use):', '```python', context, '```']
     return '\n'.join(lines)
 
 
-def prompt_a(block: str) -> str:
+def _reply_keys_text(fn) -> str:
+    if fn is None or not fn.has_receiver:
+        return ''
+    return ('"mutates" (true if the method can change the receiver: then "returns" is `τ × S` or '
+            '`Except String (τ × S)` with S the receiver structure; false otherwise), ')
+
+
+def prompt_a(block: str, fn=None) -> str:
     return ('You translate one Python function into a plain Lean 4 definition. The definition will be '
             'run on many inputs next to the real Python function and the results compared exactly, so it '
             'must be faithful to Python semantics on the domain the function is used with, including '
@@ -1201,20 +2116,21 @@ def prompt_a(block: str) -> str:
             '\n\nReply with JSON keys: "english" (the description), "params" (a list of {"name", "type", '
             '"kind": "positional"|"varargs", "default": null or a Lean term}, in Python parameter order), '
             '"returns" (the Lean return type of NAME exactly as in the def, e.g. "Int" or '
-            '"Except String Int"), "lean" (the Lean source of the definitions).')
+            '"Except String Int"), ' + _reply_keys_text(fn) + '"lean" (the Lean source of the definitions).')
 
 
-def prompt_b(block: str) -> str:
+def prompt_b(block: str, fn=None) -> str:
     return ('Independent re-implementation check. Read the Python code below and write a Lean 4 function '
             'that returns exactly what the Python code returns (or raises exactly what it raises) for '
             'every argument tuple of the types you choose. Work directly from the code: do not describe '
             'it first, just translate each statement faithfully.\n' + CONVENTIONS + '\n' + block +
             '\n\nReply with JSON keys: "params" ([{"name", "type", "kind", "default"}] in Python order), '
-            '"returns" (the Lean return type of NAME), "lean" (the Lean definitions).')
+            '"returns" (the Lean return type of NAME), ' + _reply_keys_text(fn) +
+            '"lean" (the Lean definitions).')
 
 
 def repair_prompt(base: str, cand: dict, problem: str) -> str:
-    prev = {k: cand.get(k) for k in ('params', 'returns', 'lean') if k in cand}
+    prev = {k: cand.get(k) for k in ('params', 'returns', 'mutates', 'lean') if k in cand}
     return (base + '\n\n## Your previous answer was rejected\n```json\n' + json.dumps(prev, indent=1,
                                                                                      ensure_ascii=False)
             + '\n```\n' + problem.strip() +
@@ -1224,17 +2140,26 @@ def repair_prompt(base: str, cand: dict, problem: str) -> str:
 
 def _module_context(fn: _Fn, limit: int = 5000) -> str:
     text = fn.mod.text
+    extra = ''
+    own = []
+    if fn.cls is not None and fn.kind != 'static':
+        # the receiver's repository base classes from other modules, in full (up to a bound)
+        own = [c.node for c in fn.cls.mro()]
+        others = [c for c in fn.cls.mro()[1:] if c.mod is not fn.mod]
+        segs = [f'# {c.mod.rel}\n' + (ast.get_source_segment(c.mod.text, c.node) or '') for c in others]
+        extra = '\n'.join(segs)[:6000]
+        limit = max(limit, 9000)
     if len(text) <= limit:
-        return text.strip()
+        return (text.strip() + ('\n\n' + extra if extra else '')).strip()
     parts = []
     for node in fn.mod.tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         seg = ast.get_source_segment(text, node) or ''
-        if isinstance(node, ast.ClassDef) and len(seg) > 1500:
+        if isinstance(node, ast.ClassDef) and node not in own and len(seg) > 1500:
             seg = seg[:1500] + '\n    ...'
         parts.append(seg)
-    return '\n'.join(parts)[:limit]
+    return ('\n'.join(parts)[:limit] + ('\n\n' + extra if extra else '')).strip()
 
 
 # ---------------------------------------------------------------- one Lean run
@@ -1246,10 +2171,18 @@ class Candidate:
     problems: list = field(default_factory=list)
 
 
-def _candidate(data: dict, lean_name: str) -> Candidate:
+def _truthy(x) -> bool:
+    return x is True or str(x).strip().lower() == 'true'
+
+
+def _candidate(data: dict, lean_name: str, fn: _Fn | None = None, struct: 'Structure | None' = None,
+               structs=()) -> Candidate:
     c = Candidate(data)
+    kind = fn.kind if fn is not None and fn.kind != 'static' else 'function'
     try:
-        c.sig = parse_sig(data.get('params') or [], data.get('returns') or '')
+        c.sig = parse_sig(data.get('params') or [], data.get('returns') or '', structs=structs, kind=kind,
+                          struct=struct.lean if struct is not None else None,
+                          mutates=_truthy(data.get('mutates')) if kind in ('method', 'property') else False)
     except (TypeError_, ValueError) as exc:
         c.problems.append(f'signature: {exc}')
     lean = data.get('lean')
@@ -1260,27 +2193,34 @@ def _candidate(data: dict, lean_name: str) -> Candidate:
     return c
 
 
+def entry_name(qual: str, kind: str) -> str:
+    """The dispatcher entry a differential test evaluates: a method's `#post` entry, which
+    also returns the receiver after the call."""
+    return qual + '#post' if kind in ('method', 'property') else qual
+
+
 def scratch_file(module: str, callee_src: str, cand_src: str, wrap: str, qual: str, lean_name: str,
-                 points: list, kernel: list) -> tuple:
+                 points: list, kernel: list, structs_src: str = '', kind: str = 'function') -> tuple:
     """(text, spans); spans['check'] is the first line of the evaluation section."""
     ns = f'Autoform.NLModel.{module}'
-    parts = [HEADER, f'namespace {ns}', 'open Autoform.Core', PRELUDE, callee_src, '-- candidate']
+    parts = [HEADER, f'namespace {ns}', 'open Autoform.Core', PRELUDE, structs_src, callee_src, '-- candidate']
     text = '\n'.join(parts) + '\n'
     spans = {'candidate': text.count('\n') + 1}
     text += cand_src.rstrip() + '\n\n'
     spans['wrapper'] = text.count('\n') + 1
-    text += wrap + '\n' + dispatcher([(qual, lean_name)]) + f'end {ns}\n\n'
+    entry = entry_name(qual, kind)
+    text += wrap + '\n' + dispatcher([(qual, lean_name, kind)]) + f'end {ns}\n\n'
     spans['check'] = text.count('\n') + 1
     text += 'namespace AutoformNLCheck\nopen Autoform.Core\n' + RENDER
     text += 'def pts : List (List Val) := [\n  ' + ',\n  '.join(
         '[' + ', '.join(pv.lean_lit(t) for t in p) + ']' for p in points) + ']\n'
     text += (f'#eval (pts.zipIdx.forM fun (p, i) => IO.println ("AFR " ++ toString i ++ " " ++ '
-             f'rr ({ns}.call {pv.lean_str(qual)} p)))\n')
+             f'rr ({ns}.call {pv.lean_str(entry)} p)))\n')
     spans['kernel'] = {}
     for i, lit in kernel:
         spans['kernel'][text.count('\n') + 1] = i
         args = '[' + ', '.join(pv.lean_lit(t) for t in points[i]) + ']'
-        text += (f'theorem kchk_{i} : sameR ({ns}.call {pv.lean_str(qual)} {args}) {lit} = true := by\n'
+        text += (f'theorem kchk_{i} : sameR ({ns}.call {pv.lean_str(entry)} {args}) {lit} = true := by\n'
                  f'  decide +kernel\n')
     text += 'end AutoformNLCheck\n'
     return text, spans
@@ -1316,6 +2256,7 @@ class Evaluation:
     outputs: list = field(default_factory=list)   # canonical strings (None if missing)
     compared: int = 0
     skipped: int = 0
+    unmodelled: int = 0                           # points on a path the model marks nl:unmodelled
     disagreements: list = field(default_factory=list)
     kernel_failures: list = field(default_factory=list)
     kernel_checked: int = 0
@@ -1323,8 +2264,8 @@ class Evaluation:
 
 
 def evaluate(module: str, lean_root: Path, work: Path, stem: str, callee_src: str, cand: Candidate,
-             lean_name: str, qual: str, points: list, runtime: list | None, kernel_points: int = KERNEL_POINTS
-             ) -> Evaluation:
+             lean_name: str, qual: str, points: list, runtime: list | None, kernel_points: int = KERNEL_POINTS,
+             structs_src: str = '', kind: str = 'function') -> Evaluation:
     ev = Evaluation()
     wrap = wrapper(lean_name, cand.sig)
     kernel = []
@@ -1332,8 +2273,8 @@ def evaluate(module: str, lean_root: Path, work: Path, stem: str, callee_src: st
         # one point per outcome kind first (a return and a raise, when both occur), then fill
         lits = [(i, pv.lean_outcome(r), r.get('k')) for i, r in enumerate(runtime)]
         lits = [x for x in lits if x[1] is not None]
-        for kind in ('ok', 'exn'):
-            first = next((x for x in lits if x[2] == kind), None)
+        for k in ('ok', 'exn'):
+            first = next((x for x in lits if x[2] == k), None)
             if first:
                 kernel.append(first[:2])
         for x in lits:
@@ -1342,7 +2283,8 @@ def evaluate(module: str, lean_root: Path, work: Path, stem: str, callee_src: st
             if x[0] not in [j for j, _ in kernel]:
                 kernel.append(x[:2])
         kernel = kernel[:kernel_points]
-    text, spans = scratch_file(module, callee_src, cand.data['lean'], wrap, qual, lean_name, points, kernel)
+    text, spans = scratch_file(module, callee_src, cand.data['lean'], wrap, qual, lean_name, points, kernel,
+                               structs_src, kind)
     path = work / f'{stem}.lean'
     path.write_text(text)
     code, log, ev.seconds = run_lean(lean_root, path)
@@ -1357,7 +2299,7 @@ def evaluate(module: str, lean_root: Path, work: Path, stem: str, callee_src: st
         where = []
         for ln, msg in early[:8]:
             part = 'your definitions' if cand_start <= ln < spans['wrapper'] else \
-                'the generated dispatcher (does the def match the declared "params"/"returns"?)' \
+                'the generated dispatcher (does the def match the declared "params"/"returns"/"mutates"?)' \
                 if ln >= spans['wrapper'] else 'the prelude'
             where.append(f'line {ln} ({part}): {msg[:1200]}')
         ev.errors = ('Lean rejected the definitions:\n' + '\n'.join(where) +
@@ -1377,25 +2319,35 @@ def evaluate(module: str, lean_root: Path, work: Path, stem: str, callee_src: st
         return ev
     for ln, msg in errs:
         i = spans['kernel'].get(ln, spans['kernel'].get(ln - 1))
-        if i is not None:
+        if i is not None and not (ev.outputs[i] or '').startswith('hole nl:unmodelled'):
             ev.kernel_failures.append({'point': i, 'error': msg[:500]})
-    ev.kernel_checked = len(kernel)
+    ev.kernel_checked = len([i for i, _ in kernel if not (ev.outputs[i] or '').startswith('hole nl:unmodelled')])
     if runtime is not None:
-        for i, (p, r) in enumerate(zip(points, runtime)):
-            rt = pv.canon_outcome(r)
-            if rt is None:
-                ev.skipped += 1
-                continue
-            ev.compared += 1
-            if ev.outputs[i] != rt:
-                ev.disagreements.append({'point': i, 'inputs': pv.show_args(p), 'model': pv.display(ev.outputs[i]),
-                                         'runtime': pv.display(rt), 'model_raw': ev.outputs[i], 'runtime_raw': rt})
+        compare(ev, points, runtime)
     return ev
 
 
-def counterexample_text(ev: Evaluation, name: str) -> str:
+def compare(ev: Evaluation, points: list, runtime: list):
+    """Fill compared/skipped/unmodelled/disagreements from the model outputs and CPython outcomes."""
+    for i, (p, r) in enumerate(zip(points, runtime)):
+        rt = pv.canon_outcome(r)
+        if rt is None:
+            ev.skipped += 1
+            continue
+        if (ev.outputs[i] or '').startswith('hole nl:unmodelled'):
+            ev.unmodelled += 1
+            continue
+        ev.compared += 1
+        if ev.outputs[i] != rt:
+            ev.disagreements.append({'point': i, 'inputs': pv.show_args(p), 'model': pv.display(ev.outputs[i]),
+                                     'runtime': pv.display(rt), 'model_raw': ev.outputs[i], 'runtime_raw': rt})
+
+
+def counterexample_text(ev: Evaluation, name: str, kind: str = 'function') -> str:
+    what = (' (a method\'s outcome is shown as (result, receiver after the call))'
+            if kind in ('method', 'property') else '')
     lines = [f'Differential test: {len(ev.disagreements)} of {ev.compared} inputs disagree with the real Python '
-             f'function. Examples (Python arguments → real Python outcome vs. your Lean model):']
+             f'function. Examples (Python arguments → real Python outcome vs. your Lean model){what}:']
     for d in ev.disagreements[:MAX_SHOWN]:
         lines.append(f'  {name}{d["inputs"]}: Python {d["runtime"]}; Lean model {d["model"]}')
     if ev.kernel_failures and not ev.disagreements:
@@ -1417,9 +2369,14 @@ class _Result:
     record: schema.LeanModel | None = None
     points: list = field(default_factory=list)
     outputs: list = field(default_factory=list)
+    runtime: list = field(default_factory=list)
     cost: float = 0.0
     seconds: float = 0.0
     log: list = field(default_factory=list)
+
+    @property
+    def entry(self) -> str:
+        return entry_name(self.fn.info.name, self.fn.kind)
 
 
 def _ask(prompt: str, keys: list, work: Path, ask) -> tuple:
@@ -1429,11 +2386,40 @@ def _ask(prompt: str, keys: list, work: Path, ask) -> tuple:
         return None, str(exc)
 
 
+@dataclass
+class _Context:
+    """What every function of one run shares: the receiver structures and their states."""
+    structs: dict = field(default_factory=dict)      # class dotted -> Structure
+    receivers: dict = field(default_factory=dict)    # class dotted -> [tagged states] (fitting)
+
+    @property
+    def names(self) -> set:
+        return {s.lean for s in self.structs.values()}
+
+    @property
+    def text(self) -> str:
+        return structures_text(list(self.structs.values()))
+
+    def struct_of(self, fn: _Fn):
+        if fn.cls is None or fn.kind == 'static':
+            return None
+        return self.structs.get(fn.cls.dotted)
+
+
 def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: Path, traced: list,
-                   done: dict, *, repairs: int = 3, second: bool = True, ask=None) -> _Result:
+                   done: dict, *, repairs: int = 3, second: bool = True, ask=None, ctx: _Context | None = None
+                   ) -> _Result:
     t0 = time.time()
+    ctx = ctx or _Context()
     work.mkdir(parents=True, exist_ok=True)
     res = _Result(fn, lean_name)
+    struct = ctx.struct_of(fn)
+    receivers = ctx.receivers.get(fn.cls.dotted, []) if struct is not None else []
+    if struct is not None and fn.has_receiver:
+        kept = [p for p in traced if p and struct.fits(p[0])]
+        if len(kept) != len(traced):
+            res.log.append(f'{len(traced) - len(kept)} traced calls skipped: receiver does not fit {struct.lean}')
+        traced = kept
     callees = [done[c] for c in fn.callees if c in done and done[c].lean_src]
     # transitive callee sources, in dependency order
     order, seen = [], set()
@@ -1450,37 +2436,41 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
         add(r)
     callee_src = '\n'.join(r.lean_src.rstrip() + '\n' for r in order)
     block = _function_block(fn, lean_name, [(r.fn.info.name, r.lean_name, r.lean_src) for r in callees],
-                            _module_context(fn))
-    runtime = Runtime(fn, work)
-    base = prompt_a(block)
+                            _module_context(fn), struct)
+    runtime = Runtime(fn, work, {s.cls for s in ctx.structs.values()})
+    base = prompt_a(block, fn)
+    keys = _keys(KEYS_A, fn)
     prompt = base
     best = None          # (score, round, cand, ev, points, rt)
     rounds = 0
     for rnd in range(repairs + 1):
         rounds = rnd
-        data, c = _ask(prompt, KEYS_A, work, ask)
+        data, c = _ask(prompt, keys, work, ask)
         if data is None:
             res.log.append(f'round {rnd}: model error: {c}')
             break
         res.cost += c
-        cand = _candidate(data, lean_name)
+        cand = _candidate(data, lean_name, fn, struct, ctx.names)
         if cand.problems:
             problem = 'It was rejected before Lean ran:\n' + '\n'.join('- ' + p for p in cand.problems)
             res.log.append(f'round {rnd}: ' + '; '.join(cand.problems))
             prompt = repair_prompt(base, data, problem)
             continue
         points = list(traced[:MAX_POINTS])
-        for p in boundary_points(cand.sig, fn.info.source):
+        for p in boundary_points(cand.sig, fn.info.source, receivers=receivers):
             if len(points) >= MAX_POINTS:
                 break
             if p not in points:
                 points.append(p)
         rt = runtime.run(points) if points else []
-        ev = evaluate(module, lean_root, work, f'a{rnd}', callee_src, cand, lean_name, fn.info.name, points, rt)
+        ev = evaluate(module, lean_root, work, f'a{rnd}', callee_src, cand, lean_name, fn.info.name, points, rt,
+                      structs_src=ctx.text, kind=fn.kind)
         # fuzz.py: once the model agrees on traced + boundary inputs, search for more (coverage-guided,
-        # shrunk); minimal counterexamples land in ev.disagreements and feed the repair below.
-        fuzz.extend(ev, fn=fn, cand=cand, lean_name=lean_name, module=module, lean_root=lean_root, work=work,
-                    stem=f'z{rnd}', callee_src=callee_src, points=points, rt=rt, runtime=runtime, traced=traced)
+        # shrunk); minimal counterexamples land in ev.disagreements and feed the repair below. Methods
+        # are not fuzzed yet (fuzz inputs cannot build receivers); their state is compared above.
+        if fn.kind == 'function':
+            fuzz.extend(ev, fn=fn, cand=cand, lean_name=lean_name, module=module, lean_root=lean_root, work=work,
+                        stem=f'z{rnd}', callee_src=callee_src, points=points, rt=rt, runtime=runtime, traced=traced)
         if not ev.elaborates:
             res.log.append(f'round {rnd}: does not elaborate')
             if best is None:
@@ -1490,12 +2480,13 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
         score = (0 if not ev.disagreements and not ev.kernel_failures else 1,
                  len(ev.disagreements) + len(ev.kernel_failures))
         res.log.append(f'round {rnd}: {ev.compared} compared, {len(ev.disagreements)} disagree, '
-                       f'{len(ev.kernel_failures)} kernel failures, {ev.skipped} skipped')
+                       f'{len(ev.kernel_failures)} kernel failures, {ev.skipped} skipped, '
+                       f'{ev.unmodelled} unmodelled')
         if best is None or score <= best[0]:
             best = (score, rnd, cand, ev, points, rt)
         if score[0] == 0:
             break
-        prompt = repair_prompt(base, data, counterexample_text(ev, fn.info.source_name))
+        prompt = repair_prompt(base, data, counterexample_text(ev, fn.info.source_name, fn.kind))
     status, notes = 'FAILED', []
     rec = schema.LeanModel(function=fn.info.name, lean_name=f'Autoform.NLModel.{module}.{lean_name}',
                            lean_source='', signature='', status='FAILED', repairs=rounds)
@@ -1508,11 +2499,10 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
         return res
     _, _, cand, ev, points, rt = best
     res.lean_src = cand.data['lean'].rstrip() + '\n\n' + wrapper(lean_name, cand.sig)
-    res.sig, res.data, res.points, res.outputs = cand.sig, cand.data, points, ev.outputs
+    res.sig, res.data, res.points, res.outputs, res.runtime = cand.sig, cand.data, points, ev.outputs, rt
     rec.lean_source = cand.data['lean'].rstrip() + '\n'
-    params = ' '.join(f"({p['name']} : {cand.data['params'][i].get('type')})"
-                      for i, p in enumerate(cand.sig.params))
-    rec.signature = f'{params} : {cand.data.get("returns")}'.strip()
+    params = ' '.join(f"({p['name']} : {show_type(p['type'])})" for p in cand.sig.params)
+    rec.signature = f'{params} : {show_type(cand.sig.returns)}'.strip()
     rec.tests_run = ev.compared
     rec.disagreements = [{k: d[k] for k in ('inputs', 'model', 'runtime')} for d in ev.disagreements[:20]]
     if ev.disagreements:
@@ -1529,6 +2519,12 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
     notes.append(f'{ev.compared} inputs compared ({traced_n} traced from tests, {len(points) - traced_n} '
                  f'boundary), {ev.skipped} skipped (no faithful encoding or timeout), '
                  f'kernel-evaluated {ev.kernel_checked - len(ev.kernel_failures)}/{ev.kernel_checked}')
+    if fn.has_receiver:
+        notes.append(f'receiver {struct.lean}; outcomes compared as (result, receiver after the call); '
+                     f'mutates={cand.sig.mutates}')
+    if ev.unmodelled:
+        notes.append(f'{ev.unmodelled} inputs reach an unmodelled call (nl:unmodelled) and were not compared: '
+                     + '; '.join(fn.unmodelled))
     if runtime.error:
         notes.append('runtime: ' + runtime.error[:300])
     if cand.data.get('english'):
@@ -1538,7 +2534,7 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
     # --- translation B
     if second and ev.elaborates:
         rec.second_translation, bnote, bcost = second_translation(
-            fn, lean_name, module, lean_root, work, block, callee_src, points, rt, ev, ask)
+            fn, lean_name, module, lean_root, work, block, callee_src, points, rt, ev, ask, ctx)
         res.cost += bcost
         notes.append(bnote)
     rec.level = 'L0' if status == 'VALIDATED' and rec.second_translation != 'disagrees' else 'none'
@@ -1557,28 +2553,31 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
     return res
 
 
-def second_translation(fn, lean_name, module, lean_root, work, block, callee_src, points, rt, ev_a, ask):
+def second_translation(fn, lean_name, module, lean_root, work, block, callee_src, points, rt, ev_a, ask,
+                       ctx: _Context | None = None):
     """('agrees'|'disagrees'|'not_run', note, cost). One Lean-error repair; no semantic feedback."""
-    base = prompt_b(block)
+    ctx = ctx or _Context()
+    struct = ctx.struct_of(fn)
+    base = prompt_b(block, fn)
     prompt, cost = base, 0.0
     for attempt in range(2):
-        data, c = _ask(prompt, KEYS_B, work, ask)
+        data, c = _ask(prompt, _keys(KEYS_B, fn), work, ask)
         if data is None:
             return 'not_run', f'translation B: model error: {c}', cost
         cost += c
-        cand = _candidate(data, lean_name)
+        cand = _candidate(data, lean_name, fn, struct, ctx.names)
         if cand.problems:
             prompt = repair_prompt(base, data, 'Rejected before Lean ran:\n' + '\n'.join(cand.problems))
             continue
         ev = evaluate(module, lean_root, work, f'b{attempt}', callee_src, cand, lean_name, fn.info.name,
-                      points, None, kernel_points=0)
+                      points, None, kernel_points=0, structs_src=ctx.text, kind=fn.kind)
         if not ev.elaborates:
             prompt = repair_prompt(base, data, ev.errors)
             continue
         diff, vs_python = [], 0
         compared = 0
         for i, (a, b) in enumerate(zip(ev_a.outputs, ev.outputs)):
-            if 'nl:arg-type' in (a or '') or 'nl:arg-type' in (b or ''):
+            if any(x in (a or '') or x in (b or '') for x in ('nl:arg-type', 'nl:unmodelled')):
                 continue
             compared += 1
             if a != b:
@@ -1597,24 +2596,93 @@ def second_translation(fn, lean_name, module, lean_root, work, block, callee_src
     return 'not_run', 'translation B did not elaborate', cost
 
 
+# ---------------------------------------------------------------- structures
+
+def struct_ident(cls: _Class, taken: set) -> str:
+    base = 'S_' + re.sub(r'_+', '_', re.sub(r'[^A-Za-z0-9_]', '_', cls.qual)).strip('_')
+    if base in taken:
+        base = 'S_' + re.sub(r'[^A-Za-z0-9_]', '_', cls.mod.rel.rsplit('.', 1)[0]) + '_' + base[2:]
+    name, k = base, 2
+    while name in taken:
+        name, k = f'{base}_{k}', k + 1
+    taken.add(name)
+    return name
+
+
+def build_structures(classes: dict, states: dict, lean_root: Path, work: Path, module: str,
+                     check: bool = True) -> tuple:
+    """Infer one structure per class and validate it in Lean: the structures must elaborate,
+    and every observed state (up to 12 per class) must round-trip `eObj (dObj state)` to its
+    own canonical encoding. A structure whose inferred types do not elaborate falls back to
+    `Val` fields. Returns (_Context, report)."""
+    taken: set = set()
+    ctx = _Context()
+    for dotted in sorted(classes):
+        st = infer_structure(classes[dotted], states.get(dotted, []), struct_ident(classes[dotted], taken))
+        ctx.structs[dotted] = st
+        fits = [s for s in states.get(dotted, []) if st.fits(s)]
+        fits.sort(key=lambda s: len(json.dumps(s)))
+        uniq = []
+        for s in fits:
+            if s not in uniq:
+                uniq.append(s)
+        ctx.receivers[dotted] = uniq[:6] + [s for s in uniq[6:][-2:]]
+    report = {d: {'structure': s.lean, 'fields': [[a, lf, show_type(t)] for a, lf, t in s.fields],
+                  'source': s.source, 'observed': s.observed, 'decodable': s.decodable}
+              for d, s in ctx.structs.items()}
+    if not check or not ctx.structs:
+        return ctx, report
+    for attempt in range(2):
+        rows = []
+        for d, s in ctx.structs.items():
+            for st in [x for x in states.get(d, []) if s.fits(x)][:12]:
+                rows.append((d, s, st))
+        ns = f'Autoform.NLModel.{module}'
+        text = (HEADER + f'namespace {ns}\nopen Autoform.Core\n' + PRELUDE + ctx.text + f'end {ns}\n'
+                + 'namespace AutoformNLCheck\nopen Autoform.Core\n' + RENDER
+                + ''.join(f'#eval IO.println ("AFS {i} " ++ (match ({ns}.dObj_{s.lean} {pv.lean_lit(st)}).map '
+                          f'{ns}.eObj_{s.lean} with | some v => rv v | none => "none"))\n'
+                          for i, (_, s, st) in enumerate(rows))
+                + 'end AutoformNLCheck\n')
+        work.mkdir(parents=True, exist_ok=True)
+        path = work / f'structures{attempt}.lean'
+        path.write_text(text)
+        code, log, _ = run_lean(lean_root, path)
+        errs = lean_errors(log, path)
+        if code == 0 and not errs:
+            outs = {int(m.group(1)): m.group(2) for m in re.finditer(r'^AFS (\d+) (.*)$', log, re.M)}
+            for d in report:
+                report[d]['roundtrip_checked'] = report[d]['roundtrip_ok'] = 0
+            for i, (d, s, st) in enumerate(rows):
+                report[d]['roundtrip_checked'] += 1
+                report[d]['roundtrip_ok'] += outs.get(i) == pv.canon(st)
+            return ctx, report
+        # fall back to Val-typed fields for every structure and try once more
+        for d, s in ctx.structs.items():
+            s.fields = [(a, lf, 'Val') for a, lf, _ in s.fields]
+            report[d]['fields'] = [[a, lf, 'Val'] for a, lf, _ in s.fields]
+            report[d]['note'] = 'inferred types did not elaborate; fields typed Val: ' + log[-400:]
+    raise RuntimeError('generated structures do not elaborate:\n' + log[-2000:])
+
+
 # ---------------------------------------------------------------- module, build, driver
 
 MODULE_MARK = '-- Generated by autoform.nl.model'
 
 
-def module_text(module: str, results: list) -> str:
+def module_text(module: str, results: list, structs_src: str = '') -> str:
     ns = f'Autoform.NLModel.{module}'
     body = [MODULE_MARK + ' (per-run build product; not tracked).', HEADER.rstrip(), '',
             '/-! Plain Lean models of Python functions, written by a language model and validated',
             'against CPython by differential testing (autoform.nl.model). See models.json for the',
             'evidence behind each definition; nothing here is trusted beyond it. -/', '',
-            f'namespace {ns}', 'open Autoform.Core', PRELUDE]
+            f'namespace {ns}', 'open Autoform.Core', PRELUDE, structs_src]
     for r in results:
         body.append(f'-- model of {r.fn.info.name}: {r.record.status}'
                     + (f' ({r.record.level})' if r.record.level != 'none' else ''))
         body.append(r.lean_src.rstrip())
         body.append(f'-- end model of {r.fn.info.name}\n')
-    body.append(dispatcher([(r.fn.info.name, r.lean_name) for r in results]))
+    body.append(dispatcher([(r.fn.info.name, r.lean_name, r.fn.kind) for r in results]))
     body.append(f'end {ns}\n')
     return '\n'.join(body)
 
@@ -1650,7 +2718,7 @@ def smoke(lean_root: Path, module: str, results: list, work: Path) -> list:
     rows, expect = [], []
     for r in results:
         for p, o in zip(r.points, r.outputs):
-            rows.append(f'({pv.lean_str(r.fn.info.name)}, [' + ', '.join(pv.lean_lit(t) for t in p) + '])')
+            rows.append(f'({pv.lean_str(r.entry)}, [' + ', '.join(pv.lean_lit(t) for t in p) + '])')
             expect.append((r.fn.info.name, o))
     if not rows:
         return []
@@ -1704,9 +2772,28 @@ def default_module(source_root) -> str:
     return dm(str(source_root))
 
 
+SAMPLES = 24          # validated input points kept per function for the check stage's domain
+SAMPLE_BYTES = 4000
+
+
+def _samples(r: _Result) -> list:
+    """Input points on which the model agreed with CPython (traced ones first), small ones."""
+    out = []
+    for p, o, rt in zip(r.points, r.outputs, r.runtime or [None] * len(r.points)):
+        if rt is None or pv.canon_outcome(rt) != o or len(json.dumps(p)) > SAMPLE_BYTES:
+            continue
+        if p not in out:
+            out.append(p)
+        if len(out) >= SAMPLES:
+            break
+    return out
+
+
 def model(source_root, out_dir, lean_root, *, module=None, functions=None, parallel=3, repairs=3,
-          second=True, tests=(), ask=None, do_build=True) -> schema.Translation:
-    """Model every pure-enough function; write translation.json, models.json and the module."""
+          second=True, tests=(), ask=None, do_build=True, budget_usd=None) -> schema.Translation:
+    """Model every pure-enough function and method; write translation.json, models.json and
+    the module. `tests`: extra test directories (besides <source>/tests and <source>/test).
+    `budget_usd`: no new function is started once the spend reaches it."""
     t0 = time.time()
     source_root, out_dir, lean_root = Path(source_root).resolve(), Path(out_dir), Path(lean_root).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1719,28 +2806,60 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
     skipped = [f for f in fns if f.reason is not None]
     notes = [f'skipped {f.info.name}: {f.reason}' for f in skipped]
     if functions:
-        found = {f.info.name for f in fns} | {f.info.source_name for f in fns} | {f.qual for f in fns}
+        found = {f.info.name for f in fns} | {f.info.source_name for f in fns} | {f.qual for f in fns} \
+            | {f.info.file for f in fns}
         notes += [f'requested function {w!r} not found' for w in functions if w not in found]
     t_trace = time.time()
-    traced, trace_stats = trace_tests(attempt, source_root, _test_dirs(source_root, tests), work / 'trace')
+    classes = {f.cls.dotted: f.cls for f in attempt if f.cls is not None and f.kind != 'static'}
+    traced, trace_stats = trace_tests(attempt, source_root, _test_dirs(source_root, tests), work / 'trace',
+                                      classes=list(classes))
+    states = trace_stats.pop('states', {}) or {}
+    trace_stats['receiver_states'] = {c: len(v) for c, v in states.items()}
     trace_secs = round(time.time() - t_trace, 1)
+    ctx, struct_report = build_structures(classes, states, lean_root, work / 'structures', module,
+                                          check=do_build or ask is None)
+    # a method needs receiver states to be tested against
+    late = []
+    for f in attempt:
+        st = ctx.struct_of(f)
+        if f.has_receiver and st is not None and not ctx.receivers.get(f.cls.dotted) and not traced.get(f.info.name):
+            late.append((f, f'no instance of {f.cls.dotted} fitting its structure was observed in the tests '
+                            '(no receiver states to test the method on)'))
+    for f, why in late:
+        f.reason = why
+        attempt.remove(f)
+        skipped.append(f)
+        notes.append(f'skipped {f.info.name}: {why}')
     taken: set = set()
     names = {f.info.name: lean_ident(f.info.name, taken) for f in attempt}
     done: dict = {}
     order = []
+    spent = [0.0]
+    over_budget = []
     for level in _levels(attempt):
         def job(f):
+            if budget_usd is not None and spent[0] >= budget_usd:
+                over_budget.append(f.info.name)
+                return None
             stem = re.sub(r'[^A-Za-z0-9_]', '_', names[f.info.name])
-            return model_function(f, names[f.info.name], module, lean_root, work / stem,
-                                  traced.get(f.info.name, []), dict(done), repairs=repairs, second=second, ask=ask)
+            r = model_function(f, names[f.info.name], module, lean_root, work / stem,
+                               traced.get(f.info.name, []), dict(done), repairs=repairs, second=second, ask=ask,
+                               ctx=ctx)
+            spent[0] += r.cost
+            return r
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as pool:
             for r in pool.map(job, level):
+                if r is None:
+                    continue
                 done[r.fn.info.name] = r
                 order.append(r)
+    if over_budget:
+        notes.append(f'budget ${budget_usd} reached: {len(over_budget)} functions not attempted: '
+                     + ', '.join(over_budget[:40]))
     modelled = [r for r in order if r.lean_src]
     build_info = {}
     if modelled:
-        text = module_text(module, modelled)
+        text = module_text(module, modelled, ctx.text)
         path = write_module(lean_root, module, text)
         build_info['module_file'] = str(path)
         if do_build:
@@ -1763,9 +2882,12 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
         info = r.fn.info
         info.needs_init = False
         if r.sig is not None:
-            for p, sp in zip(info.params, r.sig.params):
-                p.sort = sort_of(sp['type']) if sp['kind'] == 'positional' else 'any'
-            info.returns = sort_of(r.sig.returns)
+            info.params = [schema.Param(sp['name'], sort_of(sp['type']) if sp['kind'] == 'positional' else 'any')
+                           for sp in r.sig.params]
+            info.lean_types = [show_type(sp['type']) for sp in r.sig.params]
+            info.returns = sort_of(r.sig.result)
+            info.mutates = r.sig.mutates
+        info.samples = _samples(r)
         ok = rec.status in ('VALIDATED', 'UNTESTABLE')
         info.hole_free = info.call_closed = ok
         info.holes = [] if ok else [f'nl:model-{rec.status.lower()}']
@@ -1778,20 +2900,36 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
         call_template=f'Autoform.NLModel.{module}.call {{name}} {{args}}', fuel=0, functions=infos, notes=notes)
     schema.dump(tr, out_dir / schema.FILES['translation'])
     schema.dump([r.record for r in order], out_dir / schema.FILES['models'])
+    kinds = {}
+    for f in fns:
+        kinds.setdefault(f.kind, {'discovered': 0, 'attempted': 0})
+        kinds[f.kind]['discovered'] += 1
+        kinds[f.kind]['attempted'] += f.info.name in {r.fn.info.name for r in order}
     meta = {
-        'module': module, 'discovered': len(fns), 'attempted': len(attempt), 'skipped': len(skipped),
+        'module': module, 'discovered': len(fns), 'attempted': len(order), 'skipped': len(skipped),
+        'not_attempted_budget': len(over_budget), 'by_kind': kinds,
         'statuses': {s: sum(1 for r in order if r.record.status == s)
                      for s in ('VALIDATED', 'DISAGREES', 'UNTESTABLE', 'FAILED')},
         'L0': sum(1 for r in order if r.record.level == 'L0'),
         'cost_usd': round(sum(r.cost for r in order), 4), 'seconds': round(time.time() - t0, 1),
-        'trace_seconds': trace_secs, 'trace': trace_stats, 'build': build_info,
-        'functions': [{'function': r.fn.info.name, 'lean_name': r.lean_name, 'status': r.record.status,
-                       'tests_run': r.record.tests_run, 'repairs': r.record.repairs,
+        'trace_seconds': trace_secs, 'trace': trace_stats, 'structures': struct_report, 'build': build_info,
+        'skip_reasons': _reason_counts(skipped),
+        'functions': [{'function': r.fn.info.name, 'kind': r.fn.kind, 'lean_name': r.lean_name,
+                       'status': r.record.status, 'tests_run': r.record.tests_run, 'repairs': r.record.repairs,
                        'second_translation': r.record.second_translation, 'level': r.record.level,
+                       'mutates': bool(r.sig and r.sig.mutates),
                        'cost_usd': round(r.cost, 4), 'seconds': r.seconds, 'log': r.log} for r in order],
     }
     (out_dir / 'model.meta.json').write_text(json.dumps(meta, indent=1, default=str))
     return tr
+
+
+def _reason_counts(skipped: list) -> dict:
+    out = {}
+    for f in skipped:
+        key = re.sub(r'\(.*', '', re.sub(r'calls \S+, which', 'calls X, which', f.reason or '')).strip()[:80]
+        out[key] = out.get(key, 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
 
 def main(argv=None) -> int:
@@ -1807,6 +2945,7 @@ def main(argv=None) -> int:
     ap.add_argument('--tests', action='append', default=[], help='extra test directory (named tests)')
     ap.add_argument('--parallel', type=int, default=3)
     ap.add_argument('--repairs', type=int, default=3)
+    ap.add_argument('--budget-usd', type=float, help='start no new function once the spend reaches this')
     ap.add_argument('--no-second', action='store_true', help='skip the independent translation B')
     ap.add_argument('--no-build', action='store_true')
     fuzz.add_arguments(ap)
@@ -1815,7 +2954,7 @@ def main(argv=None) -> int:
     from .pipeline import default_lean_root
     tr = model(a.source, a.out, a.lean_root or default_lean_root(), module=a.module, functions=a.function,
                parallel=a.parallel, repairs=a.repairs, second=not a.no_second, tests=a.tests,
-               do_build=not a.no_build)
+               do_build=not a.no_build, budget_usd=a.budget_usd)
     meta = json.loads((a.out / 'model.meta.json').read_text())
     for f in meta['functions']:
         print(f"{f['status']:10s} {f['level']:4s} tests={f['tests_run']:<4d} repairs={f['repairs']} "

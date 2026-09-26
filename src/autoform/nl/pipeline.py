@@ -185,7 +185,7 @@ def _result_cost(result) -> float:
 def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=True, runtime=True,
         budget_usd=None, resume=True, ref=None, subdir=None, domain_size=64, parallel=None,
         deep=False, deep_too=False, second=True, repairs=3, judge=None, max_properties_per_function=None,
-        repair_rounds=2) -> dict:
+        repair_rounds=2, tests=()) -> dict:
     """`judge=None` runs without the judge stages (select, adjudicate); the CLI default is 'auto'."""
     source = str(source)
     if not is_url(source) and Path(source).exists():
@@ -200,6 +200,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
     out = Path(out) if out else Path.cwd() / 'artifacts/nl' / module
     out.mkdir(parents=True, exist_ok=True)
     functions = list(functions or [])
+    tests = [str(Path(t).resolve()) for t in tests or ()]   # extra test directories (--tests)
     runf = out / 'run.json'
     previous = {}
     if resume and runf.is_file():
@@ -210,7 +211,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
     info = {'source': source, 'module': module, 'mode': mode, 'lean_root': str(lean_root), 'out': str(out),
             'functions': functions, 'prove': prove, 'runtime': runtime, 'budget_usd': budget_usd,
             'second': second, 'judge': judge, 'max_properties_per_function': max_properties_per_function,
-            'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
+            'tests': tests, 'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
     spent = 0.0
 
     def save():
@@ -233,9 +234,10 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             inputs = _hash(source_fingerprint(source), module, str(lean_root), ref, subdir)
         elif stage == 'model':
             inputs = _hash('model', source_fingerprint(source), module, str(lean_root), ref, subdir, functions,
-                           second, repairs)
+                           second, repairs, *([tests] if tests else []))
         else:
-            extra = {'describe': [functions], 'check': [runtime, domain_size], 'prove': [budget_usd],
+            extra = {'describe': [functions] + ([tests] if tests else []), 'check': [runtime, domain_size],
+                     'prove': [budget_usd],
                      'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size],
                      'select': [judge, budget_usd, max_properties_per_function, prove],
                      'adjudicate': [judge, _file_bytes(out, 'english'), _file_bytes(out, 'selection'), runtime,
@@ -283,12 +285,16 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         kw['functions'] = functions
                     if parallel:
                         kw['parallel'] = parallel
+                    if tests:
+                        kw['tests'] = tests
                     result = fn(root, out, str(lean_root), module=module, repairs=repairs, second=second, **kw)
                 else:
                     translation = _load(out, 'translation')
                     if stage == 'describe':
                         if functions:
                             kw['functions'] = functions
+                        if tests:
+                            kw['tests'] = tests
                         result = fn(translation, out, **kw)
                     elif stage == 'formalize':
                         selection = _load(out, 'selection') if judge else None
@@ -412,12 +418,16 @@ def main(argv=None) -> int:
     ap.add_argument('--ref', help='git ref to check out')
     ap.add_argument('--subdir', help='directory inside the source to analyze')
     ap.add_argument('--no-resume', action='store_true', help='rerun every stage')
+    ap.add_argument('--tests', action='append', default=[], metavar='DIR',
+                    help='a test directory outside the source tree (repeatable); its tests are traced '
+                         'for model inputs and shown to describe')
     a = ap.parse_args(argv)
     res = run(a.source, module=a.module, out=a.out, lean_root=a.lean_root, functions=a.functions,
               prove=not a.no_prove, runtime=not a.no_runtime, budget_usd=a.budget_usd, resume=not a.no_resume,
               ref=a.ref, subdir=a.subdir, domain_size=a.domain_size, parallel=a.parallel, deep=a.deep,
               deep_too=a.deep_too, second=not a.no_second, repairs=a.repairs, judge=a.judge,
-              max_properties_per_function=a.max_properties_per_function, repair_rounds=a.repair_rounds)
+              max_properties_per_function=a.max_properties_per_function, repair_rounds=a.repair_rounds,
+              tests=a.tests)
     for name, st in res['run']['stages'].items():
         print(f"{name:10s} {st.get('status'):9s} {st.get('seconds', '')!s:>8}s  ${st.get('cost_usd', 0)}"
               + (f"  {st['error'].splitlines()[0][:140]}" if st.get('error') else ''))

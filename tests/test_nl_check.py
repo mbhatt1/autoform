@@ -113,7 +113,9 @@ def test_runtime_runner_executes_real_function(tmp_path):
                                fn='m.py:<module>.g'), gfn, tr, 16)
     K.run_runtime(tr, gfn, plan)
     by_point = {tuple(plan.points[i]): lit for i, _, lit in plan.runtime}
-    assert by_point == {(False,): None, (True,): 'EResult.val Val.unit'}
+    # floats are encoded exactly (IEEE bits), no longer skipped
+    assert by_point == {(False,): f'EResult.val (Val.float (Fl.ofBits {K.pv.float_bits(1.5)}))',
+                        (True,): 'EResult.val Val.unit'}
 
 
 def test_runtime_skipped_for_other_languages_and_methods():

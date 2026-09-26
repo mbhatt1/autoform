@@ -1,25 +1,47 @@
 """Python values ↔ tagged JSON ↔ Lean `Val` literals ↔ canonical outcome strings.
 
-Used by the model stage (model.py) on both sides of a differential test. This file has no
-imports from the package: the tracer and the CPython runner load it by path inside a
-subprocess whose `sys.path` belongs to the repository under test.
+Used by the model stage (model.py) on both sides of a differential test, and by the check
+stage's runtime comparison. This file has no imports from the package: the tracer and the
+CPython runner load it by path inside a subprocess whose `sys.path` belongs to the
+repository under test.
 
 Tagged JSON (transport between processes; exact, no approximation):
     None → ["n"]   bool → ["b", true]   int → ["i", "123"]   float → ["f", "<ieee bits>"]
     str → ["s", "..."]   tuple → ["t", [...]]   list → ["l", [...]]
-    dict → ["d", [[k, v], ...]]   builtin type object → ["F", "int"]
-Tuple/list/str subclasses are encoded as their base (Python equality agrees with the base);
-anything else (objects, sets, bytes, lone surrogates, huge values) is `Unencodable`.
+    dict → ["d", [[k, v], ...]]  (insertion order)   builtin type object → ["F", "int"]
+    bytes → ["y", "<hex>"]
+    set / frozenset → ["S", [...], "set"|"frozenset"]  (elements in canonical order)
+    object of a modelled class → ["O", "<module>.<Class>", [[attr, v], ...], {attr: type}]
+        attributes sorted by name; the optional map names the exact container type of an
+        attribute whose value is a dict/list/set subclass (e.g. collections.OrderedDict) so
+        the CPython side can restore it. Objects are encoded only for the classes `tag` is
+        given (`classes`); a class's instances are rebuilt by `untag` without running
+        `__init__` (`__new__`, then every recorded attribute is set).
+Tuple/list/str/dict subclasses are encoded as their base (Python equality agrees with the
+base); anything else (other objects, bytearray, lone surrogates, huge values) is
+`Unencodable`.
+
+Lean `Val` (`lean_lit`): the scalars, `.list`, `.tuple`, `.dict` (association list in
+insertion order) as they are; bytes are `.bobj "bytes" (.list [.int b, ...])`; sets are
+`.bobj "set" (.list elems)` / `.bobj "frozenset" (.list elems)` with the elements sorted by
+their canonical strings and duplicates removed, so equal sets have equal encodings (the
+generated dispatcher normalizes a model's set the same way); objects are
+`.bobj "obj:<module>.<Class>" (.dict [(.str attr, v), ...])`.
 
 Canonical outcome strings are what the Lean side prints for `EResult` (see RENDER in
 model.py) and what `canon_outcome` computes for a CPython outcome; two outcomes agree iff
 the strings are equal:
     ok i:-4 | ok b:true | ok s:[97, 98] | ok none | ok f:<bits>|f:nan | ok T(i:1,i:2,)
-    ok L(...) | ok D(k=v;...) | ok F:int | exn ZeroDivisionError | hole nl:arg-type
+    ok L(...) | ok D(k=v;...) | ok F:int | ok X:bytes(L(i:1,)) | ok X:set(L(...))
+    ok X:obj:pkg.C(D(s:[..]=v;...)) | exn ZeroDivisionError | hole nl:arg-type
+A method's outcome also carries the receiver after the call: the runner returns
+{"k": "ok", "v": result, "post": receiver} and the canonical string is
+`ok T(<result>,<receiver>,)`, which is what the dispatcher's `<name>#post` entry returns.
 """
 from __future__ import annotations
 
 import builtins
+import importlib
 import math
 import struct
 
@@ -41,7 +63,38 @@ def bits_float(n: int) -> float:
     return struct.unpack('<d', struct.pack('<Q', n))[0]
 
 
-def tag(v, depth: int = 0):
+def class_name(cls) -> str:
+    return f'{cls.__module__}.{cls.__qualname__}'
+
+
+def _slot_names(cls) -> list:
+    out = []
+    for c in cls.__mro__:
+        slots = c.__dict__.get('__slots__', ())
+        if isinstance(slots, str):
+            slots = (slots,)
+        for s in slots:
+            if s in ('__dict__', '__weakref__'):
+                continue
+            if s.startswith('__') and not s.endswith('__'):
+                s = '_' + c.__name__.lstrip('_') + s
+            out.append(s)
+    return out
+
+
+def obj_state(v) -> dict:
+    """The instance attributes of an object: its __dict__ plus every slot that is set."""
+    state = dict(getattr(v, '__dict__', None) or {})
+    for s in _slot_names(type(v)):
+        try:
+            state[s] = object.__getattribute__(v, s)
+        except AttributeError:
+            pass
+    return state
+
+
+def tag(v, depth: int = 0, classes=None):
+    """`classes`: class_name()s of modelled classes whose instances are encoded as objects."""
     if depth > MAX_DEPTH:
         raise Unencodable('nested too deeply')
     if v is None:
@@ -63,20 +116,60 @@ def tag(v, depth: int = 0):
         except UnicodeEncodeError:
             raise Unencodable('str with lone surrogates')
         return ['s', s]
+    if type(v) is bytes:
+        if len(v) > MAX_STR:
+            raise Unencodable('bytes too long')
+        return ['y', v.hex()]
+    if classes and class_name(type(v)) in classes:
+        state = obj_state(v)
+        if len(state) > MAX_ELEMS:
+            raise Unencodable('object with too many attributes')
+        fields, types = [], {}
+        for k in sorted(state):
+            x = state[k]
+            fields.append([k, tag(x, depth + 1, classes)])
+            if isinstance(x, (dict, list, set)) and type(x) not in (dict, list, set):
+                types[k] = class_name(type(x))
+        return ['O', class_name(type(v)), fields] + ([types] if types else [])
     if isinstance(v, (tuple, list)):
         if len(v) > MAX_ELEMS:
             raise Unencodable('sequence too long')
-        return ['t' if isinstance(v, tuple) else 'l', [tag(x, depth + 1) for x in v]]
+        return ['t' if isinstance(v, tuple) else 'l', [tag(x, depth + 1, classes) for x in v]]
     if isinstance(v, dict):
         if len(v) > MAX_ELEMS:
             raise Unencodable('dict too long')
-        return ['d', [[tag(k, depth + 1), tag(x, depth + 1)] for k, x in v.items()]]
+        return ['d', [[tag(k, depth + 1, classes), tag(x, depth + 1, classes)] for k, x in v.items()]]
+    if type(v) in (set, frozenset):
+        if len(v) > MAX_ELEMS:
+            raise Unencodable('set too long')
+        elems = sorted((tag(x, depth + 1, classes) for x in v), key=canon)
+        keys = [canon(e) for e in elems]
+        if len(set(keys)) != len(keys):
+            raise Unencodable('set with equal elements of different types')
+        return ['S', elems, type(v).__name__]
     if isinstance(v, type) and getattr(builtins, v.__name__, None) is v:
         return ['F', v.__name__]
     raise Unencodable(type(v).__name__)
 
 
-def untag(t):
+def resolve(name: str):
+    """'collections.OrderedDict' / 'pkg.mod.Outer.Inner' → the object (longest importable prefix)."""
+    parts = name.split('.')
+    for i in range(len(parts) - 1, 0, -1):
+        try:
+            obj = importlib.import_module('.'.join(parts[:i]))
+        except ImportError:
+            continue
+        try:
+            for p in parts[i:]:
+                obj = getattr(obj, p)
+            return obj
+        except AttributeError:
+            continue
+    raise ValueError(f'cannot resolve {name!r}')
+
+
+def untag(t, resolver=None):
     k = t[0]
     if k == 'n':
         return None
@@ -88,12 +181,28 @@ def untag(t):
         return bits_float(int(t[1]))
     if k == 's':
         return t[1]
+    if k == 'y':
+        return bytes.fromhex(t[1])
     if k == 't':
-        return tuple(untag(x) for x in t[1])
+        return tuple(untag(x, resolver) for x in t[1])
     if k == 'l':
-        return [untag(x) for x in t[1]]
+        return [untag(x, resolver) for x in t[1]]
     if k == 'd':
-        return {untag(a): untag(b) for a, b in t[1]}
+        return {untag(a, resolver): untag(b, resolver) for a, b in t[1]}
+    if k == 'S':
+        elems = [untag(x, resolver) for x in t[1]]
+        return frozenset(elems) if t[2] == 'frozenset' else set(elems)
+    if k == 'O':
+        res = resolver or resolve
+        cls = res(t[1])
+        obj = cls.__new__(cls)
+        types = t[3] if len(t) > 3 else {}
+        for attr, x in t[2]:
+            val = untag(x, resolver)
+            if attr in types:
+                val = res(types[attr])(val)
+            object.__setattr__(obj, attr, val)
+        return obj
     if k == 'F':
         v = getattr(builtins, t[1], None)
         if isinstance(v, type):
@@ -121,6 +230,17 @@ def lean_str(s: str) -> str:
     return ''.join(out)
 
 
+def set_elems(t) -> list:
+    """Elements of a set tag in canonical order, duplicates (equal canonical strings) removed."""
+    out, seen = [], set()
+    for x in sorted(t[1], key=canon):
+        c = canon(x)
+        if c not in seen:
+            seen.add(c)
+            out.append(x)
+    return out
+
+
 def lean_lit(t) -> str:
     """A Lean term of type `Val` (Autoform.Core open)."""
     k = t[0]
@@ -141,6 +261,13 @@ def lean_lit(t) -> str:
         return '(Val.dict [' + ', '.join(f'({lean_lit(a)}, {lean_lit(b)})' for a, b in t[1]) + '])'
     if k == 'F':
         return f'(Val.fn {lean_str(t[1])})'
+    if k == 'y':
+        return '(Val.bobj "bytes" (Val.list [' + ', '.join(f'(Val.int {b})' for b in bytes.fromhex(t[1])) + ']))'
+    if k == 'S':
+        return f'(Val.bobj {lean_str(t[2])} (Val.list [' + ', '.join(lean_lit(x) for x in set_elems(t)) + ']))'
+    if k == 'O':
+        return (f'(Val.bobj {lean_str("obj:" + t[1])} (Val.dict ['
+                + ', '.join(f'(Val.str {lean_str(a)}, {lean_lit(x)})' for a, x in t[2]) + ']))')
     raise ValueError(f'bad tag {t!r}')
 
 
@@ -162,12 +289,22 @@ def canon(t) -> str:
         return 'D(' + ''.join(canon(a) + '=' + canon(b) + ';' for a, b in t[1]) + ')'
     if k == 'F':
         return 'F:' + t[1]
+    if k == 'y':
+        return 'X:bytes(L(' + ''.join(f'i:{b},' for b in bytes.fromhex(t[1])) + '))'
+    if k == 'S':
+        return f'X:{t[2]}(L(' + ''.join(canon(x) + ',' for x in set_elems(t)) + '))'
+    if k == 'O':
+        return (f'X:obj:{t[1]}(D(' + ''.join(canon(['s', a]) + '=' + canon(x) + ';' for a, x in t[2])
+                + '))')
     raise ValueError(f'bad tag {t!r}')
 
 
 def canon_outcome(res: dict):
-    """A runner result → canonical string, or None when it has no faithful encoding."""
+    """A runner result → canonical string, or None when it has no faithful encoding.
+    A result with a post-state (`post`, methods) is `ok T(<result>,<receiver after>,)`."""
     if res.get('k') == 'ok':
+        if 'post' in res:
+            return 'ok T(' + canon(res['v']) + ',' + canon(res['post']) + ',)'
         return 'ok ' + canon(res['v'])
     if res.get('k') == 'exn':
         return 'exn ' + res['t']
@@ -177,6 +314,8 @@ def canon_outcome(res: dict):
 def lean_outcome(res: dict):
     """A runner result → Lean `EResult` literal, or None."""
     if res.get('k') == 'ok':
+        if 'post' in res:
+            return f'(EResult.val (Val.tuple [{lean_lit(res["v"])}, {lean_lit(res["post"])}]))'
         return f'(EResult.val {lean_lit(res["v"])})'
     if res.get('k') == 'exn':
         return f'(EResult.exn (Val.str {lean_str(res["t"])}))'
@@ -198,6 +337,24 @@ def _parse(s: str, i: int):
         body = s[i + 3:j]
         text = ''.join(chr(int(x)) for x in body.split(',') if x.strip())
         return repr(text), j + 1
+    if s.startswith('X:', i):
+        j = s.index('(', i)
+        name = s[i + 2:j]
+        if name == 'bytes':
+            k = s.index(')', j + 1)
+            data = bytes(int(x[2:]) for x in s[j + 3:k].split(',') if x.strip())
+            assert s[k + 1] == ')'
+            return repr(data), k + 2
+        inner, k = _parse(s, j + 1)
+        assert s[k] == ')'
+        if name in ('set', 'frozenset'):
+            body = inner[1:-1]
+            text = ('{' + body + '}' if body else 'set()') if name == 'set' else 'frozenset({' + body + '})'
+        elif name.startswith('obj:'):
+            text = f'<{name[4:]} {inner}>'
+        else:
+            text = f'{name}({inner})'
+        return text, k + 1
     if s[i:i + 2] in ('T(', 'L(', 'D('):
         kind, i = s[i], i + 2
         items = []
@@ -248,8 +405,26 @@ def display(outcome: str | None) -> str:
     return outcome
 
 
+def show(t) -> str:
+    """Python-looking text of one tagged value (objects shown by their attributes)."""
+    k = t[0]
+    if k == 'O':
+        return f'<{t[1]} ' + ', '.join(f'{a}={show(x)}' for a, x in t[2]) + '>'
+    if k in ('t', 'l'):
+        items = [show(x) for x in t[1]]
+        if k == 't':
+            return '(' + ', '.join(items) + (',)' if len(items) == 1 else ')')
+        return '[' + ', '.join(items) + ']'
+    if k == 'd':
+        return '{' + ', '.join(f'{show(a)}: {show(b)}' for a, b in t[1]) + '}'
+    if k == 'S':
+        body = ', '.join(show(x) for x in set_elems(t))
+        return ('{' + body + '}' if body else 'set()') if t[2] == 'set' else 'frozenset({' + body + '})'
+    return repr(untag(t))
+
+
 def show_args(point) -> str:
     try:
-        return '(' + ', '.join(repr(untag(t)) for t in point) + ')'
-    except (ValueError, TypeError):
+        return '(' + ', '.join(show(t) for t in point) + ')'
+    except (ValueError, TypeError, KeyError, IndexError):
         return str(point)

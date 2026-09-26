@@ -65,6 +65,12 @@ class FunctionInfo:
     doc: str = ''
     tests: list = field(default_factory=list)   # [{"location", "text"}] lines calling it
     callers: list = field(default_factory=list)  # qualified names
+    # --- model path (autoform.nl.model); defaults describe a plain function ---
+    kind: str = 'function'    # function | static | method | property | constructor
+    receiver: str = ''        # class of the receiver / constructed object ("pkg.mod.Cls")
+    mutates: bool = False     # a method whose model returns the receiver's new state
+    samples: list = field(default_factory=list)  # validated input points (pyvalues tags), for check domains
+    lean_types: list = field(default_factory=list)  # Lean type of each param in the model (for binders)
 
 
 @dataclass
@@ -150,6 +156,26 @@ class Statement:
     elaborates: bool = False
     elaboration_log: str = ''
     attempts: int = 0
+    # '' : r is the function's result; 'post' : a method statement about the receiver after
+    # the call, `r` is `call "<function>#post" args` = `.val (.tuple [result, receiver'])`
+    entry: str = ''
+
+
+def call_name(statement) -> str:
+    """The dispatcher name a statement's call uses (see Statement.entry)."""
+    st = statement if isinstance(statement, dict) else asdict(statement)
+    return st['function'] + ('#post' if st.get('entry') == 'post' else '')
+
+
+def lean_opens(translation) -> str:
+    """`open` line for the Val helpers (vField, vGet, ...) an AI model module exports to
+    statements; '' for a deep translation."""
+    tr = asdict(translation) if hasattr(translation, '__dataclass_fields__') else translation
+    mods = [m for m in ENTRY_MODULE.findall(tr.get('call_template') or '') if m.startswith('Autoform.NLModel.')]
+    return f'open {mods[0]} ({" ".join(VAL_HELPERS)})\n' if mods else ''
+
+
+VAL_HELPERS = ('vField', 'vGet', 'vHas', 'vLen', 'vKeys', 'vElems')
 
 
 @dataclass

@@ -153,7 +153,7 @@ def test_purity_screen_reasons(repo):
     assert 'closure' in why['make']
     assert 'random' in why['pick']
     assert 'stamp' in why['uses_stamp']                            # impurity is transitive
-    assert why['Box.get'].startswith('method')
+    assert why['Box.get'] is None                                  # methods are attempted now
     by = {f.info.name: f.info for f in fns}
     assert by['pkg/core.py:<module>.add'].hole_free and by['pkg/core.py:<module>.add'].call_closed
     assert not by['pkg/core.py:<module>.stamp'].hole_free
@@ -179,8 +179,7 @@ def test_value_tags_canon_and_lean_literals():
     assert pv.tag(T((1,))) == ['t', [['i', '1']]]                    # tuple subclasses encode as tuples
     with pytest.raises(pv.Unencodable):
         pv.tag(object())
-    with pytest.raises(pv.Unencodable):
-        pv.tag({1, 2})
+    assert pv.tag({2, 1}) == ['S', [['i', '1'], ['i', '2']], 'set']   # sets: canonical order
     assert pv.lean_lit(pv.tag(-3)) == '(Val.int (-3))'
     assert pv.lean_lit(pv.tag('a"\n')) == '(Val.str "a\\"\\n")'
     assert pv.lean_lit(pv.tag((None,))) == '(Val.tuple [Val.unit])'
@@ -310,7 +309,7 @@ def answer(lean, english='x'):
 
 
 def fake_evaluate(module, lean_root, work, stem, callee_src, cand, lean_name, qual, points, runtime,
-                  kernel_points=M.KERNEL_POINTS):
+                  kernel_points=M.KERNEL_POINTS, **kw):
     """Python stand-in for the Lean run: interpret the two candidate shapes used here."""
     ev = M.Evaluation(elaborates=True)
     for p in points:

@@ -78,9 +78,12 @@ Rules:
 5. No properties about performance, logging, timing, memory or side channels.
 6. The property must be about THIS function's result, not about the implementation's
    internal steps or local variables.
-7. Functions that are methods receive their object implicitly; state properties in terms
-   of the listed parameters and the returned value, and mention the receiver state only
-   when unavoidable ("if key is not in the cache, ...").
+7. Methods ("kind": "method"/"property") take their receiver as the first parameter (sort
+   "object"). State properties in terms of the parameters, the returned value and, for a
+   method that changes its receiver ("mutates": true), the receiver's state after the call
+   ("after c.push(x), c.peek() returns x", "after d.pop(k), k is not in d"): its instance
+   attributes and what they hold. A constructor ("kind": "constructor") returns the new
+   object; describe its initial state.
 Keys: return one entry per function, using the "key" given for it.
 """
 
@@ -119,6 +122,8 @@ def _brief(fn: dict, key: str, language: str) -> dict:
                 for p in fn.get('params') or []],
         returns=fn.get('returns', 'any'),
         needs_init=bool(fn.get('needs_init')),
+        **({'kind': fn['kind'], 'receiver': fn.get('receiver', ''), 'mutates': bool(fn.get('mutates'))}
+           if fn.get('kind') not in (None, 'function') else {}),
         doc=(fn.get('doc') or '')[:1200],
         tests=[dict(location=t.get('location', ''), text=(t.get('text') or '')[:200])
                for t in (fn.get('tests') or [])[:MAX_TESTS]],
@@ -290,19 +295,44 @@ def _ask_batch(batch: list, language: str, model: str | None) -> tuple[dict, flo
     return {str(e.get('key')): e for e in entries if isinstance(e, dict)}, cost, None
 
 
+def tests_from(fns: list, test_dirs) -> int:
+    """Fill `tests` of functions that have none from lines of the test files in `test_dirs`
+    that call them by name (`name(` or `.name(`); returns how many functions got some."""
+    from .model import _test_lines
+    lines = _test_lines([Path(d) for d in test_dirs or () if Path(d).is_dir()])
+    got = 0
+    for fn in fns:
+        if fn.get('tests') or not fn.get('source_name'):
+            continue
+        name = fn['source_name']
+        if name.startswith('__') and name.endswith('__'):
+            continue
+        call = re.compile(r'(?<![\w])' + re.escape(name) + r'\s*\(')
+        hits = [{'location': loc, 'text': line.strip()[:240]} for loc, line, _ in lines
+                if call.search(line) and not re.match(r'\s*def\s', line)][:MAX_TESTS]
+        if hits:
+            fn['tests'] = hits
+            got += 1
+    return got
+
+
 def describe(translation: dict, out_dir: Path, *, functions=None, parallel: int = 4,
              batch_size: int = BATCH, model: str | None = None,
-             use_model: bool | None = None) -> list:
+             use_model: bool | None = None, tests=()) -> list:
     """Write out_dir/english.json ([EnglishSpec]) and english.meta.json; return the specs.
 
     functions: optional names (qualified or source) to restrict to.
     use_model: None = use the CLI when available; False = fallback only.
+    tests: extra test directories whose lines calling a function are shown as evidence
+    (for functions the translation recorded no test lines for).
     """
     t0 = time.time()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     language = translation.get('language', '')
     fns = [_fi(f) for f in translation.get('functions') or []]
+    if tests:
+        tests_from(fns, tests)
     chosen = _select(fns, functions)
     skipped, todo = [], []
     for fn in chosen:
@@ -357,9 +387,10 @@ def main(argv=None):
     ap.add_argument('--function', action='append')
     ap.add_argument('--parallel', type=int, default=4)
     ap.add_argument('--fallback', action='store_true', help='do not call the model')
+    ap.add_argument('--tests', action='append', default=[], help='extra test directory')
     a = ap.parse_args(argv)
     specs = describe(schema.load(a.translation), a.out_dir, functions=a.function,
-                     parallel=a.parallel, use_model=False if a.fallback else None)
+                     parallel=a.parallel, use_model=False if a.fallback else None, tests=a.tests)
     print(f'{len(specs)} specs -> {a.out_dir / schema.FILES["english"]}')
 
 

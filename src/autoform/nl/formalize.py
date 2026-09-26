@@ -2,7 +2,10 @@
 
 For each `EnglishProperty` the model proposes only the *pieces* of a statement:
 
-    binders  one per function parameter, in order: a Lean name and a type (Int/Bool/String)
+    binders  one per function parameter, in order: a Lean name and a type (Int/Bool/String,
+             or Val for an object, container or other value, passed as is)
+    observe  (methods only) "post" to state a property of the receiver after the call: the
+             call is then `<name>#post`, whose value is `.tuple [result, receiver']`
     pre      a Lean `Bool` over the binders
     post     a Lean `Bool` over the binders and `r : EResult`
 
@@ -49,13 +52,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import llm, schema
+from . import llm, pyvalues as pv, schema
 
 LEAN_SLOTS = threading.BoundedSemaphore(3)   # max concurrent Lean processes, process-wide
 LEAN_TIMEOUT = 600
 
-TYPES = {'Int': '.int', 'Bool': '.bool', 'String': '.str'}
-SORT_TYPES = {'int': {'Int'}, 'bool': {'Bool'}, 'str': {'String'}}   # 'any'/'float': free
+TYPES = {'Int': '.int', 'Bool': '.bool', 'String': '.str', 'Val': ''}
+SORT_TYPES = {'int': {'Int'}, 'bool': {'Bool'}, 'str': {'String'}, 'object': {'Val'}}   # 'any'/'float': free
+RECEIVER_KINDS = ('method', 'property')
 KEYWORDS = {
     'at', 'by', 'do', 'else', 'end', 'from', 'fun', 'have', 'if', 'import', 'in', 'let',
     'match', 'namespace', 'open', 'section', 'show', 'then', 'theorem', 'with', 'where',
@@ -93,7 +97,7 @@ def build_call(template: str, name: str, args: list) -> str:
 
 
 def binder_val(b: dict) -> str:
-    return f"{TYPES[b['type']]} {b['name']}"
+    return f"{TYPES[b['type']]} {b['name']}".strip()
 
 
 def assemble(binders: list, pre: str, post: str, call: str) -> str:
@@ -163,6 +167,25 @@ Facts about the model:
   `match r with | .val (.int n) => ... | _ => false`. Always make the catch-all case `false`
   unless the English really allows any outcome: a hole or running out of fuel is not a
   normal return.
+* Python data in `Val` (AI-model translations): a tuple is `.tuple vs`, a list `.list vs`, a
+  dict `.dict kvs` (association list in insertion order), bytes `.bobj "bytes" (.list [.int b, ...])`,
+  a set `.bobj "set" (.list elems)` (elements in a canonical sorted order, no duplicates), an
+  object of a modelled class `.bobj "obj:<module>.<Class>" (.dict [(.str "<attr>", v), ...])`
+  (instance attributes, sorted by name; private ones mangled as CPython does, e.g.
+  `_Cache__data`). Helpers (total, usable in pre/post): `vField o "attr" : Val` (an object's
+  attribute, `.unit` if absent), `vGet d k : Option Val` (dict lookup by Python equality),
+  `vHas d k : Bool` (`k in d` for a dict, list, tuple or set), `vLen v : Int` (`len`),
+  `vKeys d : List Val` (a dict's keys in order), `vElems v : List Val` (list/tuple/set elements).
+* Binders of type `Val` range over values recorded from the project's tests (receivers,
+  containers, ...), so use `Val` for a parameter whose Lean model type is not Int/Bool/String,
+  and for the receiver `self` of a method (always `Val`). Constrain their shape in `pre`
+  (e.g. `vHas (vField self "_Cache__data") k`).
+* Methods. The first parameter of a method is its receiver `self` (an encoded object). By
+  default `r` is the method's Python result. To state what the method does to the receiver,
+  set "observe": "post": then `r` is `.val (.tuple [result, self'])` where `self'` is the
+  receiver after the call, e.g. `match r with | .val (.tuple [_, s']) => vHas (vField s' "d") k
+  | _ => false`; an exception is still `.exn (.str "E")`. A constructor (`__init__`) takes the
+  arguments after `self` and returns the new object: `.val (.bobj "obj:..." (.dict ...))`.
 '''
 
 EXAMPLES = r'''
@@ -200,7 +223,8 @@ EXAMPLES = r'''
 RULES = r'''
 ## Rules
 * Exactly one binder per function parameter, in parameter order; the i-th binder is passed
-  as the i-th argument (`.int x` for Int, `.bool x` for Bool, `.str x` for String). Reuse the
+  as the i-th argument (`.int x` for Int, `.bool x` for Bool, `.str x` for String, `x` itself
+  for Val). Reuse the
   parameter name unless it clashes with a Lean keyword; never name a binder `r`.
 * To fix an argument to a constant ("quotient(a, 0)"), keep the binder and constrain it in
   `pre` (`b == 0`).
@@ -250,6 +274,20 @@ def describe_function(translation: dict, fn: dict) -> str:
              f"Function: {fn.get('source_name') or fn['name']}({params})  -> {fn.get('returns', 'any')}",
              f"Qualified name in the Lean program: {fn['name']}",
              f"File: {fn.get('file', '?')}:{fn.get('line') or '?'}"]
+    kind = fn.get('kind') or 'function'
+    if fn.get('lean_types'):
+        lines.append('Lean model parameter types: ' + ', '.join(
+            f"{p['name']} : {t}" for p, t in zip(fn['params'], fn['lean_types'])))
+    if kind in RECEIVER_KINDS:
+        lines.append(f"This is a {'method' if kind == 'method' else 'property getter'} of {fn.get('receiver')}; "
+                     f"the first parameter is the receiver (binder type Val). It "
+                     + ('CAN CHANGE the receiver: "observe": "post" exposes the receiver after the call.'
+                        if fn.get('mutates') else 'does not change the receiver.'))
+    elif kind == 'constructor':
+        lines.append(f"This is the constructor of {fn.get('receiver')}: it returns the new object.")
+    if fn.get('samples'):
+        lines.append('Example inputs recorded from the tests (Python view): ' + '; '.join(
+            pv.show_args(p) for p in fn['samples'][:3])[:1500])
     if fn.get('source'):
         lines += ['Source:', '```', fn['source'].rstrip(), '```']
     if fn.get('doc'):
@@ -275,8 +313,10 @@ def build_prompt(translation: dict, fn: dict, spec: dict, prop: dict) -> str:
         '## The property to formalize',
         f"[{prop.get('kind', 'postcondition')}] {prop['text']}",
         '',
-        'Reply with JSON {"binders": [{"name": ..., "type": "Int"|"Bool"|"String"}, ...], '
-        '"pre": "<Lean Bool>", "post": "<Lean Bool using r>", "note": "<one line, optional>"}.',
+        'Reply with JSON {"binders": [{"name": ..., "type": "Int"|"Bool"|"String"|"Val"}, ...], '
+        '"pre": "<Lean Bool>", "post": "<Lean Bool using r>", '
+        + ('"observe": "result"|"post", ' if (fn.get('kind') in RECEIVER_KINDS) else '')
+        + '"note": "<one line, optional>"}.',
     ])
 
 
@@ -307,7 +347,8 @@ def parse_candidate(data: dict) -> dict:
             b['val'] = binder_val(b)
     pre = str(data.get('pre') if data.get('pre') is not None else 'true').strip() or 'true'
     post = str(data.get('post') or '').strip()
-    return {'binders': binders, 'pre': pre, 'post': post, 'note': str(data.get('note') or '')}
+    entry = 'post' if str(data.get('observe') or '').strip().lower() in ('post', 'state') else ''
+    return {'binders': binders, 'pre': pre, 'post': post, 'note': str(data.get('note') or ''), 'entry': entry}
 
 
 def mentions_r(expr: str) -> bool:
@@ -331,12 +372,14 @@ def shape_problems(fn: dict, cand: dict, call: str | None = None, lean_prop: str
             problems.append(f'duplicate binder name {b["name"]!r}')
         seen.add(b['name'])
         if b['type'] not in TYPES:
-            problems.append(f'binder {b["name"]!r} has type {b["type"]!r}; use Int, Bool or String')
+            problems.append(f'binder {b["name"]!r} has type {b["type"]!r}; use Int, Bool, String or Val')
         elif i < len(params):
             allowed = SORT_TYPES.get(params[i].get('sort', 'any'))
             if allowed and b['type'] not in allowed:
                 problems.append(f'parameter {params[i]["name"]} has sort {params[i]["sort"]}; '
                                 f'binder {b["name"]!r} must have type {sorted(allowed)[0]}')
+    if cand.get('entry') == 'post' and fn.get('kind') not in RECEIVER_KINDS:
+        problems.append('"observe": "post" is only for methods')
     if not cand['post']:
         problems.append('post is empty')
     elif not mentions_r(cand['post']):
@@ -365,6 +408,7 @@ def scratch_text(translation: dict, thm: str, cand: dict, lean_prop: str) -> str
     return '\n'.join([
         *[f'import {m}' for m in schema.lean_imports(translation)],
         'open Autoform.Core',
+        schema.lean_opens(translation).rstrip(),
         'set_option linter.unusedVariables false',
         '-- pre',
         f"#check {pre_fun}((({cand['pre']})) : Bool)",
@@ -428,7 +472,7 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
             break
         cost += c
         cand = parse_candidate(data)
-        call = build_call(translation['call_template'], fn['name'],
+        call = build_call(translation['call_template'], fn['name'] + ('#post' if cand.get('entry') == 'post' else ''),
                           [b.get('val', b['name']) for b in cand['binders']])
         lean_prop = assemble(cand['binders'], cand['pre'], cand['post'], call)
         text = scratch_text(translation, thm, cand, lean_prop)
@@ -449,7 +493,7 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
         lean_prop=lean_prop,
         binders=[{'name': b['name'], 'type': b['type'], 'val': b.get('val', '')} for b in cand['binders']],
         pre=cand['pre'], post=cand['post'], elaborates=ok,
-        elaboration_log='\n'.join(log), attempts=attempts)
+        elaboration_log='\n'.join(log), attempts=attempts, entry=cand.get('entry', ''))
     return stmt, {'id': sid, 'elaborates': ok, 'attempts': attempts, 'cost_usd': cost,
                   'seconds': round(time.time() - t0, 1)}
 
