@@ -216,6 +216,17 @@ RULES = r'''
 
 def lean_body(translation: dict, fn: dict) -> str:
     """The function's `def` from the generated module, if it can be found."""
+    models = [m for m in schema.lean_imports(translation) if m.startswith('Autoform.NLModel.')]
+    if models:   # an AI model module: the section autoform.nl.model wrote for this function
+        path = Path(translation['lean_root']).joinpath(*models[0].split('.')).with_suffix('.lean')
+        try:
+            text = path.read_text()
+        except OSError:
+            return ''
+        m = re.search(r'^-- model of ' + re.escape(fn['name']) + r':.*?\n(.*?)^-- end model of ',
+                      text, re.M | re.S)
+        body = m.group(1).strip() if m else ''
+        return body if len(body) <= 6000 else body[:6000] + '\n  ... (truncated)'
     path = Path(translation['lean_root']) / 'Autoform' / 'Generated' / (translation['module'] + '.lean')
     try:
         text = path.read_text()
@@ -245,7 +256,9 @@ def describe_function(translation: dict, fn: dict) -> str:
         lines += ['Docstring: ' + fn['doc']]
     body = lean_body(translation, fn)
     if body:
-        lines += ['Its translation into the Lean model (Core syntax):', '```lean', body, '```']
+        kind = ('a plain Lean def; `call` decodes the Val arguments, runs it and encodes the result'
+                if 'NLModel' in translation.get('call_template', '') else 'Core syntax')
+        lines += [f'Its translation into the Lean model ({kind}):', '```lean', body, '```']
     return '\n'.join(lines)
 
 
@@ -350,7 +363,7 @@ def scratch_text(translation: dict, thm: str, cand: dict, lean_prop: str) -> str
     bs = ' '.join(f"({b['name']} : {b['type']})" for b in cand['binders'])
     pre_fun = f'fun {bs} => ' if bs else ''
     return '\n'.join([
-        f"import Autoform.Generated.{translation['module']}",
+        *[f'import {m}' for m in schema.lean_imports(translation)],
         'open Autoform.Core',
         'set_option linter.unusedVariables false',
         '-- pre',
@@ -384,7 +397,7 @@ def errors_only(log: str) -> str:
     out, keep = [], False
     for line in log.splitlines():
         if re.match(r'^\S+\.lean:\d+:\d+: ', line):
-            keep = ': error:' in line
+            keep = bool(re.search(r': error(\([^)]*\))?:', line))
         elif re.match(r'^(error|warning):', line):
             keep = line.startswith('error')
         if keep:

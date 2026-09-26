@@ -44,7 +44,9 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
     if tools:
         cmd += ['--allowedTools', tools, '--permission-mode', 'acceptEdits']
     else:
-        cmd += ['--allowedTools', '']
+        # `--allowedTools ''` alone does not stop the model from *attempting* a tool call, which
+        # ends a one-turn session with error_max_turns and no text; `--tools ''` removes them.
+        cmd += ['--allowedTools', '', '--tools', '']
     if model or os.environ.get('AUTOFORM_LLM_MODEL'):
         cmd += ['--model', model or os.environ['AUTOFORM_LLM_MODEL']]
     env = {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}
@@ -61,7 +63,7 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
     except ValueError:
         raise LLMError('unparseable CLI output: ' + (out or err)[-500:])
     if data.get('is_error'):
-        raise LLMError('model error: ' + str(data.get('result'))[:500])
+        raise LLMError('model error: ' + str(data.get('result') or [data.get('subtype'), data.get('errors')])[:500])
     text, cost = data.get('result') or '', float(data.get('total_cost_usd') or 0)
     if cache and not tools:
         CACHE.mkdir(parents=True, exist_ok=True)

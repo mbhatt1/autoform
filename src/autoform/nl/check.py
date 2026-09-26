@@ -338,15 +338,19 @@ class Plan:
         return '\n'.join(out)
 
 
-def header(module: str) -> str:
-    return (f'import Autoform.Generated.{module}\nimport Lean.Data.Json\n'
+def header(module) -> str:
+    """`module` is the Translation (its call_template decides the imports, see
+    schema.lean_imports: an AI model imports Autoform.NLModel.<M>) or a deep module suffix."""
+    mods = schema.lean_imports(module) if isinstance(module, dict) else [f'Autoform.Generated.{module}']
+    return (''.join(f'import {m}\n' for m in mods) + 'import Lean.Data.Json\n'
             'set_option autoImplicit false\nset_option maxRecDepth 100000\n'
             'set_option maxHeartbeats 4000000\nset_option linter.all false\nset_option maxErrors 100000\n'
             'open Autoform.Core\n\n')
 
 
-def assemble(module: str, blocks: list) -> tuple[str, dict]:
-    """blocks: [(tag, defs, checks)] → (text, {tag: (defs_first, defs_last, block_last)})."""
+def assemble(module, blocks: list) -> tuple[str, dict]:
+    """blocks: [(tag, defs, checks)] → (text, {tag: (defs_first, defs_last, block_last)}).
+    `module`: the Translation or a deep module suffix (see `header`)."""
     lines = header(module).splitlines()
     spans = {}
     for tag, defs, checks in blocks:
@@ -362,7 +366,7 @@ def assemble(module: str, blocks: list) -> tuple[str, dict]:
 
 def errors_by_line(output: str, path: Path) -> list:
     out = []
-    for m in re.finditer(r'^(.*?):(\d+):(\d+): error: (.*(?:\n(?!\S*:\d+:\d+: ).*)*)', output, re.M):
+    for m in re.finditer(r'^(.*?):(\d+):(\d+): error(?:\([^)]*\))?: (.*(?:\n(?!\S*:\d+:\d+: ).*)*)', output, re.M):
         if Path(m.group(1)).name == path.name:
             out.append((int(m.group(2)), m.group(4).strip()))
     return out
@@ -491,7 +495,7 @@ def _idx(text):
 
 def check_function(translation, fn, plans, work: Path, lean_root: Path, runtime: bool, stem: str) -> dict:
     """All statements of one function: one pass-1 Lean run, at most one pass-2 run."""
-    module = translation['module']
+    module = translation   # header() derives the imports from the call_template
     started = time.time()
     if runtime:
         for p in plans:

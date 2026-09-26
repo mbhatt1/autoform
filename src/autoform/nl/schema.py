@@ -18,6 +18,7 @@ is decided by the Lean kernel, and their plausibility is tested on real executio
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -78,6 +79,29 @@ class Translation:
     # {args} (a Lean `List Val` literal) whose type is `EResult`, e.g.
     #   'runFunc Autoform.Generated.M.program 1000 {name} {args}'
     # or an initialized-state form built on `init_const`. Statements must use it.
+    # A model Translation (autoform.nl.model) uses 'Autoform.NLModel.M.call {name} {args}';
+    # `lean_imports` derives the modules a Lean file must import from the template.
+
+
+ENTRY_MODULE = re.compile(r'\b(Autoform\.(?:NLModel|NL)\.[A-Za-z0-9_]+)\.call[FH]?\b')
+
+
+def lean_imports(translation) -> list:
+    """The Lean modules a file stating facts about `translation`'s call_template must import.
+
+    An AI model translation names its module in the template (`Autoform.NLModel.<M>.call`)
+    and needs nothing else (there is no `Autoform.Generated.<M>` for it); a deep translation
+    needs `Autoform.Generated.<module>` plus any initialized entry module its template names
+    (`Autoform.NL.<M>.callF`), and any further modules listed under `modules`."""
+    tr = asdict(translation) if hasattr(translation, '__dataclass_fields__') else translation
+    mods = list(dict.fromkeys(ENTRY_MODULE.findall(tr.get('call_template') or '')))
+    if not any(m.startswith('Autoform.NLModel.') for m in mods) and tr.get('module'):
+        mods.insert(0, f"Autoform.Generated.{tr['module']}")
+    for m in tr.get('modules') or []:
+        extra = m if m.startswith('Autoform.') else f'Autoform.Generated.{m}'
+        if extra not in mods:
+            mods.append(extra)
+    return mods
 
 
 @dataclass

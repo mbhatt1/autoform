@@ -13,7 +13,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
-from .schema import FILES, ProofResult, dump
+from .schema import FILES, ProofResult, dump, lean_imports
 
 OK_STATUS = 'BOUNDED_HOLDS'
 DEFAULT_CACHE = Path(os.environ.get('AUTOFORM_PROOF_CACHE', Path.home() / '.cache/autoform/proofs'))
@@ -30,14 +30,18 @@ def theorem_name(statement_id: str) -> str:
 
 
 def header(translation: dict) -> str:
-    """compiler.header for the translation's module, plus any further modules it names."""
+    """compiler.header (tactics, options, af_eval) with the imports the translation's
+    call_template needs (schema.lean_imports) in place of `import Autoform.Generated.<M>`:
+    an AI model translation imports Autoform.NLModel.<M>, which has no Generated twin."""
     from autoform.harness import compiler
     module = translation['module']
-    extra = [m for m in translation.get('modules', []) or [] if m != module]
     text = compiler.header(module)
-    if extra:
-        text = ''.join(f'import Autoform.Generated.{m}\n' for m in extra) + text
-    return text
+    own = f'import Autoform.Generated.{module}\n'
+    assert text.startswith(own), 'compiler.header no longer starts with the module import'
+    mods = lean_imports(translation)
+    if not any(m.startswith('Autoform.Generated.') for m in mods):
+        mods.append('Autoform.Lang.Core.Semantics')   # the af_eval header names runFunc
+    return ''.join(f'import {m}\n' for m in mods) + text[len(own):]
 
 
 def blueprint(stmt: dict, fn: dict | None, check: dict | None, translation: dict) -> str:
@@ -46,7 +50,17 @@ def blueprint(stmt: dict, fn: dict | None, check: dict | None, translation: dict
         lines.append(f"Precondition (Bool): {stmt['pre']}")
     if stmt.get('post'):
         lines.append(f"Postcondition over the result r : EResult (Bool): {stmt['post']}")
-    lines.append(f"The call is `{translation.get('call_template', '')}` on the translated program "
+    model_ns = next((m for m in lean_imports(translation) if m.startswith('Autoform.NLModel.')), None)
+    if model_ns:
+        from .formalize import lean_body
+        body = lean_body(translation, fn) if fn else ''
+        lines.append(f"The call is `{translation.get('call_template', '')}`: a plain Lean dispatcher in "
+                     f"`{model_ns}` (AI-written model, validated against the real code) that decodes the `Val` "
+                     "arguments, runs the def below and encodes the result.")
+        if body:
+            lines.append('The model (namespace ' + model_ns + '):\n```lean\n' + body + '\n```')
+    else:
+        lines.append(f"The call is `{translation.get('call_template', '')}` on the translated program "
                  f"{translation.get('program_const', '')}; `af_eval` symbolically evaluates it.")
     if fn:
         if fn.get('doc'):
@@ -64,7 +78,13 @@ def blueprint(stmt: dict, fn: dict | None, check: dict | None, translation: dict
         lines.append(ev + '.')
         if check.get('detail'):
             lines.append('Check detail: ' + str(check['detail'])[:600])
-    lines.append('Typical proof: `intro ...` then `af_eval` then `simp`/`omega`/`split`/`decide`.')
+    if model_ns:
+        lines.append(f'Typical proof: `intro a b h`, `simp at h`, then `simp [{model_ns}.call, <call_py_f>, <py_f>, '
+                     f'{model_ns}.dInt, {model_ns}.resV, {model_ns}.resE, h]` (unfold the dispatcher, its '
+                     '`call_…` wrapper, the def and the decoders), then `omega`/`split`/`decide` as needed. '
+                     '`af_eval` does not apply (there is no `runFunc`).')
+    else:
+        lines.append('Typical proof: `intro ...` then `af_eval` then `simp`/`omega`/`split`/`decide`.')
     return '\n'.join(lines)
 
 

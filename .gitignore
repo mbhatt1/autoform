@@ -114,3 +114,7 @@ dist/
 # Per-run modules written by the NL autoformalizer (autoform.nl.translate); always NL*-named.
 Autoform/Generated/NL*.lean
 Autoform/NL/NL*.lean
+# Model-stage modules (autoform.nl.model) are per-repository build products; only the tiny
+# hand-written fixture used by tests/test_nl_refine.py is tracked.
+Autoform/NLModel/*.lean
+!Autoform/NLModel/TestFixturePython.lean

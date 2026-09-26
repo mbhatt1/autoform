@@ -26,6 +26,35 @@ Each stage reads and writes JSON in one run directory (default `artifacts/nl/<Mo
 skips any stage whose inputs and outputs are unchanged, and a failed stage does not stop
 the rest: later stages run on whatever exists, and the report is always written.
 
+## The model stage
+
+`src/autoform/nl/model.py` (`python -m autoform.nl.model <src> --out DIR [--tests DIR]`):
+
+1. **Discovery** with Python's `ast`: every top-level function and method, named
+   `path/mod.py:<module>.Class.meth` like the deep translation. A static screen skips
+   methods (receiver state), generators, closures, decorated functions and anything that
+   touches I/O, time, randomness, subprocesses, the network, files or module-level state
+   (transitively through repository callees); the reason is kept in `translation.notes`.
+2. **Translation A.** The model states in English what the function computes, then writes
+   a plain Lean `def`: `Int` for Python int, `Bool`, `String`, `Option`, `List`, tuples,
+   `Val` for genuinely mixed values, `Fl` (IEEE bits) only for floats; raising is
+   `Except String τ` with the exact exception class name; `//` and `%` are `Int.fdiv` and
+   `Int.fmod`. Callees are translated first and offered to the caller.
+3. **Dispatcher.** Generated, not written by the model: `call : String → List Val → EResult`
+   decodes arguments (a wrong shape is `.hole "nl:arg-type"`), runs the def and encodes the
+   result (`.error e` becomes `.exn (.str e)`). Everything is structurally recursive, so the
+   kernel evaluates `call` (`decide +kernel`); a few points per function are checked so.
+4. **Differential validation.** Inputs are the argument tuples observed while the repo's
+   own tests run under a tracer, plus typed boundary values. The real function runs in
+   CPython (subprocess, per-call timeout), the model in one batched `#eval`, and outcomes are
+   compared exactly. Counterexamples go back to the model for up to `--repairs` rounds.
+5. **Translation B.** An independent translation from the code alone runs on the same
+   inputs; `second_translation` records whether it agrees with A.
+
+The module is `Autoform/NLModel/<M>.lean` (a build product, not tracked), built with
+`lake build Autoform.NLModel.<M>`. Later stages import the module that the translation's
+`call_template` names (`schema.lean_imports`).
+
 ## Trust levels
 
 Every function gets a level, and every statement inherits one:
