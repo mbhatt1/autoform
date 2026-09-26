@@ -135,6 +135,11 @@ def build_host(source_dir, files, out_dir, *, includes=(), defines=()):
     clang = tool('clang')
     out = Path(out_dir) / ('host.dylib' if sys.platform == 'darwin' else 'host.so')
     flags = COMMON_FLAGS + ['-isystem', str(SHIM), '-fPIC']
+    if sys.platform == 'darwin':
+        # The library is loaded by this interpreter's architecture; clang's default target
+        # depends on how clang itself was launched, which once produced an unloadable
+        # x86_64 dylib under an arm64 Python in the full test run.
+        flags += ['-arch', platform.machine()]
     if platform.machine() in ('arm64', 'aarch64'):
         flags.append('-mgeneral-regs-only')
     flags += [arg for inc in includes for arg in ('-I', str(inc))] + ['-D' + d for d in defines]
@@ -276,6 +281,47 @@ class LiftedFunction:
         """Run the Lean model on each argument tuple; returns value or error text."""
         if not inputs:
             return []
+        text, namespace = self._runner(inputs)
+        text += '\n'.join([
+            f'namespace {namespace}',
+            f'open Autoform.PCode Autoform.Machine.{self.module}',
+            '#eval cases.forM fun c => IO.println (match runWith c rets with',
+            '  | .ok vs => "@@ok " ++ toString vs',
+            '  | .error e => "@@error " ++ e)',
+            f'end {namespace}', ''])
+        path = self.work / f'Eval{len(list(self.work.glob("Eval*.lean")))}.lean'
+        path.write_text(text, encoding='utf-8')
+        code, output = lean(['env', 'lean', path])
+        lines = [line[2:] for line in output.splitlines() if line.startswith('@@')]
+        if code or len(lines) != len(inputs):
+            raise RegressError(f'evaluating {self.symbol} on the model failed:\n{output[-3000:]}')
+        results = []
+        for line in lines:
+            if line.startswith('ok '):
+                parts = [int(x) for x in re.findall(r'\d+', line[3:])]
+                results.append(combine_result(parts, self.signature))
+            else:
+                results.append('error: ' + line[6:])
+        return results
+
+    def fault_check(self, args, why, label):
+        """A Lean theorem, decided by the kernel, that the function faults with `why` on `args`."""
+        text, namespace = self._runner([args])
+        text += '\n'.join([
+            f'namespace {namespace}',
+            f'open Autoform.PCode Autoform.Machine.{self.module}',
+            'theorem faults : (match runWith (cases.headD []) rets with',
+            f'    | .error e => e == {json.dumps(why)} | .ok _ => false) = true := by decide +kernel',
+            '#print axioms faults',
+            f'end {namespace}', ''])
+        path = self.work / f'Fault_{label}.lean'
+        path.write_text(text, encoding='utf-8')
+        code, output = lean(['env', 'lean', path])
+        if code or 'sorryAx' in output:
+            raise RegressError(f'kernel check of the fault in {self.symbol}({args}) failed:\n{output[-3000:]}')
+        return str(path)
+
+    def _runner(self, inputs):
         rows = []
         for args in inputs:
             registers, memory, _ = call_setup(self.target, self.signature, args)
@@ -301,24 +347,8 @@ class LiftedFunction:
             'def cases : List (List (Varnode × Nat)) := [',
             ',\n'.join('  ' + row for row in rows), ']',
             f'def rets : List Varnode := {rets}',
-            '#eval cases.forM fun c => IO.println (match runWith c rets with',
-            '  | .ok vs => "@@ok " ++ toString vs',
-            '  | .error e => "@@error " ++ e)',
             f'end {namespace}', ''])
-        path = self.work / f'Eval{len(list(self.work.glob("Eval*.lean")))}.lean'
-        path.write_text(text, encoding='utf-8')
-        code, output = lean(['env', 'lean', path])
-        lines = [line[2:] for line in output.splitlines() if line.startswith('@@')]
-        if code or len(lines) != len(inputs):
-            raise RegressError(f'evaluating {self.symbol} on the model failed:\n{output[-3000:]}')
-        results = []
-        for line in lines:
-            if line.startswith('ok '):
-                parts = [int(x) for x in re.findall(r'\d+', line[3:])]
-                results.append(combine_result(parts, self.signature))
-            else:
-                results.append('error: ' + line[6:])
-        return results
+        return text, namespace
 
     def kernel_check(self, args, expected, label):
         """A Lean theorem, proved by the kernel, that the function returns `expected`."""
@@ -426,7 +456,11 @@ def model_divergences(base, head, inputs, maximum, chunk=100):
         batch = inputs[start:start + chunk]
         evaluated += len(batch)
         for args, b, h in zip(batch, base.evaluate(batch), head.evaluate(batch)):
-            if isinstance(b, int) and isinstance(h, int) and b != h:
+            faulted = [v for v in (b, h) if isinstance(v, str)]
+            if b != h and (isinstance(b, int) or isinstance(h, int)) and \
+                    not any('out-of-fuel' in v for v in faulted):
+                # A value on one side and a fault (e.g. division by zero) on the other is a
+                # divergence too: it is how a crash fix, or a newly introduced crash, looks.
                 found.append((args, b, h))
         if len(found) >= maximum:
             break
@@ -474,9 +508,24 @@ def compare_function(symbol, base_elf, head_elf, target, work, *, native_libs=No
         b_model, h_model = base.evaluate([args])[0], head.evaluate([args])[0]
         entry = dict(inputs=list(args), base=b_model, head=h_model, native_confirmed=False,
                      kernel_checked=False, origin='given' if args in given else 'search')
-        if not (isinstance(b_model, int) and isinstance(h_model, int)):
+        if not isinstance(b_model, int) and not isinstance(h_model, int):
             entry['note'] = 'the lifted model did not return on this input'
             record['witnesses'].append(entry)
+            continue
+        if not (isinstance(b_model, int) and isinstance(h_model, int)):
+            if any('out-of-fuel' in str(v) for v in (b_model, h_model)):
+                entry['note'] = 'one version did not finish within the fuel budget; not a fault'
+                record['witnesses'].append(entry)
+                continue
+            label = '_'.join(str(a) for a in args)[:80]
+            checks = {}
+            for side, fn, value in (('base', base, b_model), ('head', head, h_model)):
+                checks[side] = (fn.kernel_check(args, value, f'{side}_{label}') if isinstance(value, int)
+                                else fn.fault_check(args, value[len('error: '):], f'{side}_{label}'))
+            entry.update(lean_checks=checks, kernel_checked=True, kind='fault',
+                         note='one version faults in the lifted model where the other returns')
+            record['witnesses'].append(entry)
+            confirmed.append(entry)
             continue
         if method == 'native':
             if (b_model, h_model) != (b_native, h_native):

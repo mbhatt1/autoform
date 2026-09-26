@@ -335,6 +335,12 @@ def source_sweep() -> dict:
         # `artifacts/.../Autoform/Tactics/Portfolio.lean` -- a copy, not the project.
         if rel.startswith("artifacts/") or "/artifacts/" in rel:
             continue
+        # And again for `.autoform-work/`, the CLI's gitignored workspace: it keeps backup
+        # copies of `.lake/packages` (aesop, batteries test suites with deliberate `sorry`
+        # and `axiom`), which failed the strict gate with 44 findings none of which is in
+        # the project.
+        if rel.startswith(".autoform-work/") or "/.autoform-work/" in rel:
+            continue
         scanned += 1
         try:
             raw = path.read_text(encoding="utf-8", errors="replace")
