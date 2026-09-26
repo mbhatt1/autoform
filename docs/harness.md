@@ -222,3 +222,24 @@ autoform formalize diff artifacts/harness/Fixed/report.json artifacts/harness/Vu
 
 To regenerate, run the commands above. The numbers move with the judge model, the
 templates and the interpreter.
+
+## The prover agent (`--prover claude`, `autoform formalize prove`)
+
+A Gauss-style loop: an autonomous agent (headless Claude Code, on the logged-in plan) gets
+one theorem, the file text before it and a natural-language blueprint, and works with a
+Lean runtime (`lake env lean`) until the file checks. Its answer is never trusted:
+
+* the returned proof (and any helper lemmas) is spliced under the **original** statement
+  recovered from the job, so editing the statement proves nothing;
+* `sorry`, `admit`, `native_decide`, `axiom`, `implemented_by` and `extern` are refused
+  before Lean runs;
+* the file is re-elaborated from scratch and `#print axioms` must list only `propext`,
+  `Classical.choice` and `Quot.sound`.
+
+In `formalize`, `--prover claude` sends every selected claim that ended BOUNDED_PROVED or
+UNKNOWN without a witness to the agent; an accepted proof upgrades it to PROVED (the
+certificate is the re-checked file). `autoform formalize prove FILE.lean [--theorem N]`
+fills `sorry`s — or re-proves named theorems, e.g. those a corpus re-land broke — and
+writes back only accepted proofs. First result (2026-09-26): the owner-only property of
+`PipelineSecurityScoped.authorize`, which the tactic ladder only bounded, proved for all
+integers in 70 s.

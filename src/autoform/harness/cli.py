@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +23,44 @@ def _root(path):
     if not (root / 'lakefile.toml').is_file() and not (root / 'lakefile.lean').is_file():
         raise SystemExit(f'autoform formalize: {root} is not a Lean project (use --root or --workspace)')
     return root
+
+
+def prove_main(argv) -> int:
+    """Fill `sorry`s (or re-prove named theorems) with the prover agent; write back only
+    proofs the kernel accepted under the original statement."""
+    from . import prover
+    ap = argparse.ArgumentParser(prog='autoform formalize prove')
+    ap.add_argument('file', type=Path)
+    ap.add_argument('--theorem', action='append', default=[], help='theorem to (re)prove; default: every sorry')
+    ap.add_argument('--root', default='.')
+    ap.add_argument('--parallel', type=int, default=2)
+    ap.add_argument('--attempts', type=int, default=2)
+    ap.add_argument('--work', type=Path, default=Path('.autoform-work/prover'))
+    ap.add_argument('--dry-run', action='store_true', help='report proofs without editing the file')
+    a = ap.parse_args(argv)
+    root = _root(a.root)
+    jobs = prover.jobs_from_file(a.file, a.theorem or None)
+    if not jobs:
+        print('no sorry-proved (or named) theorems found')
+        return 0
+    results = prover.prove_many(jobs, root, a.work, parallel=a.parallel, attempts=a.attempts)
+    text = a.file.read_text()
+    for job, res in zip(jobs, results):
+        print(f'{res.status:8s} {res.name}  ({res.seconds}s, ${res.cost_usd})' +
+              (f'  axioms={res.axioms}' if res.status == 'PROVED' else f'  {res.reason[:160]!r}'))
+        if res.status == 'PROVED' and not a.dry_run:
+            head, tail = text.split(job.statement, 1)
+            rest = tail.split(':=', 1)[1]
+            # The old proof runs to the first non-blank line that starts in column 0;
+            # docstrings and attributes of the next declaration are kept.
+            nxt = re.search(r'\n(?=\S)', rest)
+            after = rest[nxt.start() + 1:] if nxt else ''
+            text = (head + (res.helpers.strip() + '\n\n' if res.helpers.strip() else '') + job.statement.rstrip() +
+                    ' :=\n' + res.proof.strip() + '\n\n' + after)
+    if not a.dry_run:
+        a.file.write_text(text)
+    (a.work / 'results.json').write_text(json.dumps([r.__dict__ for r in results], indent=1, default=str))
+    return 0 if all(r.status == 'PROVED' for r in results) else 1
 
 
 def main(argv=None) -> int:
@@ -43,6 +82,8 @@ def main(argv=None) -> int:
         return 1 if changes['lost'] else 0
     if argv[:1] == ['bench']:
         return bench.main(argv[1:])
+    if argv[:1] == ['prove']:
+        return prove_main(argv[1:])
     ap = argparse.ArgumentParser(prog='autoform formalize',
                                  description='Generate candidate claims, rank them with a SemIf (OpenJev) judge, '
                                              'verify them in the Lean kernel, refine on counterexamples.')
@@ -65,6 +106,10 @@ def main(argv=None) -> int:
     ap.add_argument('--cache', type=Path, help='proof cache directory (default: <root>/.autoform-harness/cache)')
     ap.add_argument('--no-cache', action='store_true')
     ap.add_argument('--no-native', action='store_true', help='do not execute source code to replay witnesses')
+    ap.add_argument('--prover', default='none', choices=('none', 'claude'),
+                    help='let an autonomous agent (headless Claude Code) attempt universal proofs of '
+                         'bounded/undecided claims; every proof is re-checked by the kernel')
+    ap.add_argument('--prover-parallel', type=int, default=2)
     ap.add_argument('--baseline', type=Path, help='previous report.json: also write formalization-diff.md')
     a = ap.parse_args(argv)
     root = _root(a.root)
@@ -73,7 +118,8 @@ def main(argv=None) -> int:
                    functions=a.function, top_k=a.top_k, max_refinements=a.max_refinements, fuel=a.fuel,
                    timeout=a.timeout, deep_proofs=a.deep_proofs, build=a.build,
                    cache=None if a.no_cache else (a.cache or root / '.autoform-harness/cache'),
-                   temperature=a.judge_temperature, native=not a.no_native)
+                   temperature=a.judge_temperature, native=not a.no_native,
+                   prover=a.prover, prover_parallel=a.prover_parallel)
     try:
         h = Harness(opts)
         data = h.run()

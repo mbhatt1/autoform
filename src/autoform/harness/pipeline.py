@@ -46,6 +46,8 @@ class Options:
     cache: Path | None = None
     temperature: Path | None = None
     native: bool = True
+    prover: str = 'none'          # none | claude : an agent attempts universal proofs
+    prover_parallel: int = 2
 
 
 def _git_revision(path: Path | None):
@@ -187,6 +189,8 @@ class Harness:
             selected += self.propose(fn)
         self.verify(selected)
         self.refine([c for c in selected if self.claims[c]['result']['status'] == 'REFUTED'])
+        if self.o.prover != 'none':
+            self.prove_open()
         self.diagnose()
         return self.finish(time.time() - started)
 
@@ -480,6 +484,40 @@ class Harness:
             for (cid, rec), d in zip(items, decisions):
                 rec['proof_value'] = dict(label=d['chosen'], probabilities=d['probabilities'],
                                           decision=d['decision_id'])
+
+    # --- autonomous prover (outside the trusted base; kernel re-checks its output) -----
+    def prove_open(self):
+        """Established only on a finite domain, or undecided without a witness: ask the
+        prover agent for a universal proof. Accepted only after an independent re-check of
+        the original statement; otherwise the status is unchanged."""
+        from . import compiler, prover
+        jobs, owners = [], {}
+        for cid, rec in self.claims.items():
+            r = rec['result']
+            if not rec['selected'] or rec['claim']['structural'] or r.get('backend') != 'lean-kernel':
+                continue
+            if r.get('status') not in ('BOUNDED_PROVED', 'UNKNOWN') or r.get('witness'):
+                continue
+            claim, fn = rec['claim'], self.program.by_id[rec['function']]
+            ob = compiler.Obligation(claim, fn, self.program, self.o.module, self.o.fuel)
+            name = 'universal_' + ob.tag
+            blueprint = (C.render_claim(claim, self.program) + '\n' + (claim.get('description') or '') +
+                         '\nSource:\n' + (self.contexts[fn.id].get('body') or '')[:1500] +
+                         ('\nThe kernel already checked it on %d domain points.' % r.get('domain_size', 0)
+                          if r.get('status') == 'BOUNDED_PROVED' else ''))
+            jobs.append(prover.Job(name=name, prefix=compiler.header(self.o.module),
+                                   statement=f'theorem {name} : {ob.prop()}', blueprint=blueprint))
+            owners[name] = cid
+        if not jobs:
+            return
+        results = prover.prove_many(jobs, self.root, self.out / 'prover', parallel=self.o.prover_parallel)
+        for res in results:
+            rec = self.claims[owners[res.name]]
+            rec['prover'] = {k: v for k, v in res.__dict__.items() if k != 'proof'}
+            if res.status == 'PROVED':
+                rec['result'].update(status='PROVED', universal_proof=True, proved_by='prover-agent',
+                                     lean_file=res.certificate, lean_file_sha256='sha256:' + res.certificate_sha256,
+                                     theorems=rec['result'].get('theorems', []) + [res.name])
 
     # --- ledger, certificates, confidence, report ------------------------------------
     def finish(self, seconds) -> dict:

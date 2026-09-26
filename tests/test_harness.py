@@ -570,3 +570,57 @@ def test_a_precondition_already_assumed_is_not_offered_again(tmp_path):
     [shift] = [o for o in cegis.repairs(claim, result, fn, ctx) if o['id'].startswith('SHIFT_IN_RANGE')]
     repaired = C.validate(shift['claim'], p)
     assert not [o for o in cegis.repairs(repaired, result, fn, ctx) if o['id'].startswith('SHIFT_IN_RANGE')]
+
+
+# --- prover agent: the kernel, not the agent, decides ------------------------------------
+
+from autoform.harness import prover  # noqa: E402
+
+
+class _ScriptedAgent:
+    """Stands in for the model: replies with a fixed text, whatever the prompt says."""
+    name = 'scripted'
+
+    def __init__(self, reply):
+        self.reply = reply
+
+    def run(self, prompt, cwd):
+        return self.reply, 0.0
+
+
+def _job(statement='theorem t (a b : Nat) : a + b = b + a'):
+    return prover.Job(name='t', prefix='import Autoform.Lang.Core.Semantics\n', statement=statement)
+
+
+def test_jobs_from_file_and_blueprints(tmp_path):
+    f = tmp_path / 'x.lean'
+    f.write_text('import Std\n/-- commutes -/\ntheorem a (n : Nat) : n + 0 = n := by\n  sorry\n\n'
+                 'theorem b : True := trivial\n\ntheorem c : 1 = 1 := sorry\n')
+    jobs = prover.jobs_from_file(f)
+    assert [j.name for j in jobs] == ['a', 'c'] and jobs[0].blueprint == 'commutes'
+    assert [j.name for j in prover.jobs_from_file(f, ['b'])] == ['b']
+
+
+@pytest.mark.parametrize('reply', [
+    '<proof>by\n  sorry</proof>',                                # forbidden construct
+    '<proof>by\n  native_decide</proof>',
+    '<proof>FAILED</proof><reason>too hard</reason>',
+])
+def test_prover_rejects_without_lean(tmp_path, reply):
+    r = prover.prove(_job(), ROOT, tmp_path, agent=_ScriptedAgent(reply), attempts=1)
+    assert r.status == 'FAILED'
+
+
+@pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
+def test_prover_accepts_only_kernel_checked_proofs_of_the_original_statement(tmp_path):
+    good = prover.prove(_job(), ROOT, tmp_path / 'good',
+                        agent=_ScriptedAgent('<proof>by\n  exact Nat.add_comm a b</proof>'), attempts=1)
+    assert good.status == 'PROVED' and set(good.axioms) <= prover.ALLOWED_AXIOMS
+    wrong = prover.prove(_job(), ROOT, tmp_path / 'wrong',
+                         agent=_ScriptedAgent('<proof>by\n  rfl</proof>'), attempts=1)
+    assert wrong.status == 'FAILED' and 'independent check failed' in wrong.reason
+    # A helper that restates the goal as an axiom-free lemma is fine; one that smuggles an
+    # axiom is caught by the forbidden-token screen before Lean even runs.
+    cheat = prover.prove(_job(), ROOT, tmp_path / 'cheat', attempts=1, agent=_ScriptedAgent(
+        '<helpers>axiom magic : ∀ a b : Nat, a + b = b + a</helpers><proof>by\n  exact magic a b</proof>'))
+    assert cheat.status == 'FAILED'
