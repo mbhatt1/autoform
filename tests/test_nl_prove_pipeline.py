@@ -311,8 +311,12 @@ def test_budget_stops_agent_runs(tmp_path, monkeypatch):
     _fake_lean(monkeypatch)
     agent = Scripted('<proof>FAILED</proof>', cost=1.0)
     jobs = [_job(n) for n in ('a', 'b', 'c')]
+    # Each call reserves its estimate ($0.60) first: after the first call spends $1.00, a second
+    # would need $1.60 of a $1.50 budget, so it is never started (no overshoot).
     res = prover.prove_many(jobs, tmp_path, tmp_path / 'w', parallel=1, budget_usd=1.5, agent=agent, attempts=1)
-    assert [r.status for r in res] == ['FAILED', 'FAILED', 'BUDGET'] and agent.calls == 2
+    assert [r.status for r in res] == ['FAILED', 'BUDGET', 'BUDGET'] and agent.calls == 1
+    res = prover.prove_many(jobs, tmp_path, tmp_path / 'w2', parallel=1, budget_usd=2.5, agent=agent, attempts=1)
+    assert [r.status for r in res] == ['FAILED', 'FAILED', 'BUDGET']
     assert 'budget' in res[2].reason
 
 

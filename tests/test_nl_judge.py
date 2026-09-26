@@ -116,10 +116,12 @@ def test_budget_allocation_stops_and_records_reasons(tmp_path):
 def test_max_properties_per_function(tmp_path):
     sel = J.select(translation(), ENGLISH, tmp_path, judge='heuristic', max_properties_per_function=2)
     r = rows(sel)
-    assert sum(x['selected'] for x in r.values()) == 2
+    # The cap trims implementation-only properties; documented (docstring/test) ones are exempt.
+    internal = {k: x for k, x in r.items() if not x['external']}
+    assert all(x['selected'] for x in r.values() if x['external'])
     assert all('max-properties-per-function 2' in x['skip_reason'] for x in r.values() if not x['selected'])
-    picked = {k for k, x in r.items() if x['selected']}
-    assert picked == set(sorted(r, key=lambda k: -r[k]['utility'])[:2])
+    assert all(x['rank'] >= 2 for x in r.values() if not x['selected'])
+    assert all(x['selected'] for x in internal.values() if x['rank'] < 2)
 
 
 def test_formalize_stops_when_budget_is_spent(tmp_path, monkeypatch):
@@ -375,6 +377,10 @@ def test_pipeline_with_judge_reports_lineage_budget_and_findings(tmp_path, monke
     bugs = rep['findings']['potential_bugs']
     assert [b['id'] for b in bugs] == [statement_id(ADD, 'p6')] and bugs[0]['classification'] == 'REAL_BUG'
     assert any(x['id'] == statement_id(ADD, 'p5') for x in rep['findings']['model_defects'])
+    # p3 is stated by a test and refuted: the judge repaired it, but the contradiction with the
+    # documented behaviour must still be listed (a repair never hides it).
+    sus = {x['id']: x for x in rep['findings']['suspected_bugs']}
+    assert sus[statement_id(ADD, 'p3')]['documented_intent_contradicted'] is True
     # Repair lineage: the refuted p3 was restated under a precondition and the restatement holds.
     add = next(f for f in rep['functions'] if f['name'] == ADD)
     by = {p['id']: p for p in add['properties']}

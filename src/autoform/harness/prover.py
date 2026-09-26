@@ -138,18 +138,30 @@ class Result:
 
 
 class Budget:
-    """Total spend cap shared by concurrent jobs. Checked before each agent call, so
-    calls already in flight may overshoot by at most one call per worker."""
+    """Total spend cap shared by concurrent jobs. Each agent call first *reserves* an
+    estimate (`reserve`), so concurrent workers cannot all start on the last dollar; the
+    reservation is replaced by the real cost when the call returns (`charge`)."""
 
-    def __init__(self, limit_usd: float | None = None):
-        self.limit, self.spent, self._lock = limit_usd, 0.0, threading.Lock()
+    def __init__(self, limit_usd: float | None = None, estimate_usd: float = 0.60):
+        self.limit, self.spent, self.reserved = limit_usd, 0.0, 0.0
+        self.estimate, self._lock = estimate_usd, threading.Lock()
 
     def exhausted(self) -> bool:
         with self._lock:
-            return self.limit is not None and self.spent >= self.limit
+            return self.limit is not None and self.spent + self.reserved >= self.limit
 
-    def charge(self, usd: float):
+    def reserve(self) -> bool:
+        """Claim an estimate for one call; False (and nothing claimed) if it would not fit."""
         with self._lock:
+            if self.limit is not None and self.spent + self.reserved + self.estimate > self.limit + 1e-9:
+                return False
+            self.reserved += self.estimate
+            return True
+
+    def charge(self, usd: float, reserved: bool = False):
+        with self._lock:
+            if reserved:
+                self.reserved = max(0.0, self.reserved - self.estimate)
             self.spent += float(usd or 0)
 
 
@@ -443,7 +455,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
     toolchain = (root / 'lean-toolchain').read_text().strip() if (root / 'lean-toolchain').exists() else '?'
     restored, untracked, transcripts, status = [], [], [], 'FAILED'
     for attempt in range(1, attempts + 1):
-        if budget is not None and budget.exhausted():
+        if budget is not None and not budget.reserve():
             status, reason = 'BUDGET', (reason + '\n' if reason else '') + 'budget exhausted before attempt %d' % attempt
             break
         if agent is None:
@@ -474,7 +486,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
             untracked += u
         cost += c
         if budget is not None:
-            budget.charge(c)
+            budget.charge(c, reserved=True)
         tr = workdir / f'{job.name}.attempt{attempt}.transcript.json'
         tr.write_text(json.dumps({'agent': getattr(agent, 'name', type(agent).__name__), 'prompt': prompt,
                                   'reply': reply, 'cost_usd': c, 'seconds': round(time.time() - t0, 1),

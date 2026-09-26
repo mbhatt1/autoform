@@ -269,7 +269,9 @@ def allocate(rows: list, budget_usd, max_per_function, est: dict) -> float:
     for i, r in enumerate(order):
         r['order'] = i
         r['est_cost_usd'] = est['per_property_usd']
-        if max_per_function is not None and r['rank'] >= max_per_function:
+        # The cap trims implementation-only guesses; a property the docs or tests state is
+        # never dropped by it (it can still lose to the budget, in priority order).
+        if max_per_function is not None and r['rank'] >= max_per_function and not r.get('external'):
             r.update(selected=False, skip_reason=f"max-properties-per-function {max_per_function} "
                                                  f"(rank {r['rank'] + 1} in its function)")
             continue
@@ -329,6 +331,7 @@ def select(translation: dict, english: list, out_dir, *, judge='auto', budget_us
             rows.append(dict(function=fn['name'], source_name=fn.get('source_name'), property=p['id'],
                              statement=statement_id(fn['name'], p['id']), text=p['text'], kind=p.get('kind'),
                              evidence=p.get('evidence') or [],
+                             external=bool(external_evidence(p.get('evidence'))),
                              judgment=dict(label=max(probs, key=probs.get), probabilities=probs,
                                            decision=judged[p['id']]['decision_id']),
                              selection_probability=round(sel.get(p['id'], 0), 4), intent=intents.get(p['id']),

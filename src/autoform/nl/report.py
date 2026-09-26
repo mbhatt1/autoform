@@ -55,6 +55,11 @@ LEVELS = ('L1', 'L0', 'deep', 'none')
 REFUTED = ('REFUTED_MODEL', 'REFUTED_RUNTIME')
 
 
+def _external(evidence) -> list:
+    from .judge import external_evidence
+    return external_evidence(evidence)
+
+
 def _d(x):
     return asdict(x) if hasattr(x, '__dataclass_fields__') else dict(x)
 
@@ -206,6 +211,12 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                                 parent=entry.get('parent'))
                 if rec and validated and c['status'] == 'REFUTED_MODEL':
                     disp = rec.get('disposition')
+                    # The judge may repair a spec, but it may not hide that the code contradicts
+                    # behaviour the docs or tests state: such a refutation is always listed.
+                    documented = bool(_external(entry.get('evidence')))
+                    if disp not in ('finding', 'suspected_bug', 'model_defect') and documented:
+                        item['documented_intent_contradicted'] = True
+                        disp = 'suspected_bug'
                     (bugs if disp == 'finding' else suspected if disp == 'suspected_bug'
                      else defects if disp == 'model_defect' else adjudicated).append(item)
                 elif judged and not rec and validated and c['status'] == 'REFUTED_MODEL':
