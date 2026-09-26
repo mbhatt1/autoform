@@ -1,0 +1,98 @@
+[
+ {
+  "id": "policy_py__module__authorize__p1",
+  "function": "policy.py:<module>.authorize",
+  "property": "p1",
+  "english": "authorize returns true iff owner equals caller",
+  "lean_prop": "∀ (owner : String) (caller : String), (true) = true → (fun (r : EResult) => match r with | .val (.bool x) => x == (owner == caller) | _ => false) (runFunc Autoform.Generated.PipelineSecurityScoped.program 1000 \"policy.py:<module>.authorize\" [.str owner, .str caller]) = true",
+  "binders": [
+   {
+    "name": "owner",
+    "type": "String",
+    "val": ".str owner"
+   },
+   {
+    "name": "caller",
+    "type": "String",
+    "val": ".str caller"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.bool x) => x == (owner == caller) | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "policy_py__module__authorize__p2",
+  "function": "policy.py:<module>.authorize",
+  "property": "p2",
+  "english": "authorize always grants access (false)",
+  "lean_prop": "∀ (owner : String) (caller : String), (true) = true → (fun (r : EResult) => match r with | .val (.bool x) => x == (true) | _ => false) (runFunc Autoform.Generated.PipelineSecurityScoped.program 1000 \"policy.py:<module>.authorize\" [.str owner, .str caller]) = true",
+  "binders": [
+   {
+    "name": "owner",
+    "type": "String",
+    "val": ".str owner"
+   },
+   {
+    "name": "caller",
+    "type": "String",
+    "val": ".str caller"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.bool x) => x == (true) | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "policy_py__module__authorize__p3",
+  "function": "policy.py:<module>.authorize",
+  "property": "p3",
+  "english": "authorize on integer ids: true iff equal",
+  "lean_prop": "∀ (owner : Int) (caller : Int), (true) = true → (fun (r : EResult) => match r with | .val (.bool x) => x == (owner == caller) | _ => false) (runFunc Autoform.Generated.PipelineSecurityScoped.program 1000 \"policy.py:<module>.authorize\" [.int owner, .int caller]) = true",
+  "binders": [
+   {
+    "name": "owner",
+    "type": "Int",
+    "val": ".int owner"
+   },
+   {
+    "name": "caller",
+    "type": "Int",
+    "val": ".int caller"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val (.bool x) => x == (owner == caller) | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ },
+ {
+  "id": "policy_py__module__authorize__p4",
+  "function": "policy.py:<module>.authorize",
+  "property": "p4",
+  "english": "authorize never raises",
+  "lean_prop": "∀ (owner : String) (caller : String), (true) = true → (fun (r : EResult) => match r with | .val _ => true | _ => false) (runFunc Autoform.Generated.PipelineSecurityScoped.program 1000 \"policy.py:<module>.authorize\" [.str owner, .str caller]) = true",
+  "binders": [
+   {
+    "name": "owner",
+    "type": "String",
+    "val": ".str owner"
+   },
+   {
+    "name": "caller",
+    "type": "String",
+    "val": ".str caller"
+   }
+  ],
+  "pre": "true",
+  "post": "match r with | .val _ => true | _ => false",
+  "elaborates": true,
+  "elaboration_log": "",
+  "attempts": 1
+ }
+]
