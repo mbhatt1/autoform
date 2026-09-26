@@ -65,6 +65,8 @@ PYVALUES = HERE.with_name('pyvalues.py')
 LEAN_TIMEOUT = 600
 BUILD_TIMEOUT = 1800
 TRACE_TIMEOUT = 900
+# The interpreter that runs the code under test (tracer, differential runner, check stage).
+SUBJECT_PYTHON = os.environ.get('AUTOFORM_PYTHON') or sys.executable
 RUNTIME_TIMEOUT = 300          # one CPython batch
 POINT_TIMEOUT = 2.0            # one real call, seconds
 TRACE_LIMIT = 120              # distinct traced argument tuples kept per function
@@ -771,6 +773,14 @@ def _discover(source_root: Path, functions=None, tests=()):
                     f.reason = f'calls {g.info.source_name}, which is not pure ({g.reason})'
                     changed = True
                     break
+    # a method's receiver is built by its class's __init__: if that is not modelled because it
+    # uses time, randomness, I/O, ... (e.g. a `timer=time.monotonic` default), neither is the method
+    for f in fns:
+        if f.reason is None and f.cls is not None and f.kind in ('method', 'property'):
+            hit = f.cls.lookup('__init__')
+            init = by_name.get(_fn_name(hit[0], '__init__')) if hit else None
+            if init is not None and init.reason and not init.reason.startswith('its receiver'):
+                f.reason = f'its receiver is built by {init.qual}, which is not modelled ({init.reason})'
     lines = _test_lines(_test_dirs(root, tests))
     for f in fns:
         f.info.tests = _tests_for(f, lines)
@@ -1740,7 +1750,7 @@ def _run_script(script: str, cfg: dict, work: Path, stem: str, timeout: int, cwd
     env['PYTHONHASHSEED'] = '0'
     env['PYTHONDONTWRITEBYTECODE'] = '1'
     try:
-        proc = subprocess.run([sys.executable, '-c', script, str(cfg_path)], cwd=str(cwd or work), env=env,
+        proc = subprocess.run([SUBJECT_PYTHON, '-c', script, str(cfg_path)], cwd=str(cwd or work), env=env,
                               capture_output=True, text=True, timeout=timeout, start_new_session=True)
     except subprocess.TimeoutExpired:
         return None, f'timed out after {timeout}s'

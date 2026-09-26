@@ -287,6 +287,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         kw['parallel'] = parallel
                     if tests:
                         kw['tests'] = tests
+                    if budget_usd is not None:   # the model stage starts no new function past it
+                        kw['budget_usd'] = budget_usd
                     result = fn(root, out, str(lean_root), module=module, repairs=repairs, second=second, **kw)
                 else:
                     translation = _load(out, 'translation')
