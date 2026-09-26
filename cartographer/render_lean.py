@@ -585,7 +585,8 @@ def _run_main():
     dialect = infer_dialect(funcs)
     if dialect == '.python':
         funcs = lower_truth_values(lower_truth_conditions(funcs))
-    auxiliary = [helper for function in funcs for kind in ('generatorHelpers', 'truthHelpers')
+    auxiliary = [helper for function in funcs
+                 for kind in ('generatorHelpers', 'truthHelpers', 'decoratedEntries')
                  for helper in function.get(kind, [])]
 
     out = [

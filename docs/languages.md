@@ -937,11 +937,24 @@ language's own specification, cited beside the rule in `cartographer/export_ast.
   (`command`, `group`, `Context.lookup_default`, `Command.main`, `Parameter.get_default`,
   `get_current_context`); re-measure with `scripts/lang_matrix.py` after re-export.
 * **External decorators are named.** Language Reference §8.7: `@f def g` is `g = f(g)`,
-  evaluated when the definition executes. A decorator the program defines still holes as
-  `call:python-decorator-binding` (applying it at definition time is the next step); one
-  from outside the program (`contextlib.contextmanager` on `augment_usage_errors`,
-  `functools.wraps(f)`) is `decorator:external:<dotted name>` — a different gap with its
-  own count. A decorated method is this gap, not `call:python-receiver-signature`.
+  evaluated when the definition executes. A decorator from outside the program
+  (`contextlib.contextmanager` on `augment_usage_errors`, `functools.wraps(f)`) is
+  `decorator:external:<dotted name>` — a different gap with its own count. A decorated
+  method is this gap, not `call:python-receiver-signature`.
+* **Program decorators are applied at definition time** (§8.7). The raw body is exported
+  as `<name><undecorated>`: a plain function (a decorated method keeps `self` as its first
+  parameter, since the decorator receives the function object, not a bound method). The
+  defining scope binds `name = d1(d2(<raw>))`, reading every decorator expression as a
+  VALUE (`Expr.callValue`: callee before argument, so decorator expressions evaluate
+  top-down and apply bottom-up). A module-level function is not pre-bound by
+  `<module-objects>`; its source name is an auxiliary entry forwarding to the module
+  attribute. A module-level class body writes each decorated method's class attribute
+  (`ClassAttribute.stored`) at the class statement; reading it through an instance binds
+  a stored function as a method (§3.2.8.4, §3.3.2.4), and a possible descriptor object is
+  `class-attribute:<attr>:descriptor-object`. Class-body shapes that cannot be applied in
+  the module scope are `decorator:class-body:*`. `scripts/differential.py` routes traced
+  frames of a decorated `def` to its raw body (`undecoratedOf`), since that frame IS the
+  raw function object. Fixture: `examples/python_control/decorators.py`.
 * **Negative numeric defaults are literals.** `def read(self, n=-1)`: §8.7 evaluates the
   default once when the `def` executes, so `-1` is the constant −1 and binds like any
   literal. `-True` is deliberately not one.

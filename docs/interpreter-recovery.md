@@ -11,7 +11,7 @@ source tests; earlier successful build messages do not establish semantic fideli
 
 | Slice | Existing work under `.claude/worktrees/` | Next work |
 |---|---|---|
-| Decorators | `agent-a01d6352dbddae745` | Joern already emits nested applications in the defining scope; preserve these rather than applying decorators in the module-object initializer. Separate the original body from the bound decorated value, including direct oracle entry points and method descriptors. |
+| Decorators | `agent-a01d6352dbddae745` | Applied at definition time for in-program decorators (languages §16.J): raw bodies are `<name><undecorated>`, source entries are auxiliary forwarding functions, class-body methods bind through stored class attributes, and traced frames compare against the raw body. External decorators remain `decorator:external:*` for Milestone 3. |
 | Generators | `agent-a80201a5d8016fae2`, commit `bb6d0f0` | The main checkout now compiles ordinary generator functions to suspended heap frames. The eager consumer substitution from this worktree remains unmerged. Complete the explicit protocol and iterator gaps below. |
 | Exception handlers | `agent-a2612eb7fc5911288` | Validate imported names, aliases, shadowing and multiple inheritance against real CPGs and CPython. |
 | Expression statements | `agent-accbd26162643b16c` | Recovered and extended in the main checkout; see languages §17.R4 and the source numeric tests. |
@@ -32,9 +32,10 @@ Joern emits `target = decorate(2)(decorate(3)(def target(...)))` at the definiti
 including nested definitions inside functions. Core's `callValue` already evaluates
 the callee before its arguments. The recovered exporter now also carries statements
 through computed callees and snapshots them before later argument statements. This
-is a prerequisite for decorators, not a completed decorator implementation: named
-calls can still bypass a rebound callable through static resolution, and the pipeline
-must distinguish a raw function body from the decorated source entry point.
+was the prerequisite. The decorator work now reads each decorator expression as a value
+rather than a static callee, renames the raw body so no static or suffix resolution can
+bypass the rebound name, and records `undecoratedOf`/`decoratedEntries` so the pipeline
+distinguishes the raw body from the decorated source entry point.
 
 The generator implementation needs a resumable interpreter state. Python saves
 locals, the instruction position and pending exception handling across a yield, while

@@ -107,7 +107,8 @@ def analyse(path: str) -> dict:
     ast = analysis_functions(deep_json.load(path))
     dialect = dialect_of(ast)
     # Program.table includes auxiliary frame functions; Program.funcs does not.
-    helpers = [helper for f in ast for helper in f.get("generatorHelpers", [])]
+    helpers = [helper for f in ast for kind in ("generatorHelpers", "decoratedEntries")
+               for helper in f.get(kind, [])]
     names = [f["name"] for f in ast + helpers]
     res = Resolver(names, dialect)
     sites = collections.Counter()

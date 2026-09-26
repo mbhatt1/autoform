@@ -135,6 +135,19 @@ def compared_hole_coverage(holefree, compared):
 PY_NAME = re.compile(r'(?P<file>.+?):<module>\.(?P<qual>.+)')
 
 
+def undecorated_bodies(funcs):
+    """Source name -> exported RAW body, for definitions whose in-program decorators
+    are applied at definition time (Language Reference §8.7).
+
+    A traced CPython frame of a decorated `def` executes the function object the
+    decorators RECEIVED -- its code is the raw body -- whatever the source name is bound
+    to afterwards. The exporter keeps that body under `<name><undecorated>` (with
+    `undecoratedOf` naming the source spelling), and the source name is an auxiliary
+    entry that calls the decorated binding. Comparing a raw frame against the entry
+    would compare two different functions, so frames are routed to the raw body."""
+    return {f["undecoratedOf"]: f["name"] for f in funcs if f.get("undecoratedOf")}
+
+
 def classify(f):
     """(relfile, qualname, is_method) for a Python AST entry, or None."""
     m = PY_NAME.fullmatch(f["name"])
@@ -838,7 +851,8 @@ def trace_return_is_normal(frame):
 
 
 def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
-                params_by_name=None, live=None, pool=None, encoder_factory=Encoder):
+                params_by_name=None, live=None, pool=None, encoder_factory=Encoder,
+                raw_bodies=None):
     """Run the project's test suite under `sys.settrace`, recording calls into `wanted`.
 
     Each record is a fully-encoded snapshot taken *at call time*, so later mutation of
@@ -856,6 +870,10 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         order = frame_param_order(code)
         loc = frame.f_locals
         self_name = order[0][0] if order and order[0][0] == "self" else None
+        # A decorated method's raw body keeps `self` as an ordinary first parameter: the
+        # decorators' wrapper passes it positionally, and Core injects no receiver.
+        if self_name is not None and (params_by_name.get(key) or [None])[:1] == [self_name]:
+            self_name = None
         enc = encoder_factory()
         try:
             slf, args = bind_args(order, loc, enc, params_by_name.get(key), self_name)
@@ -942,6 +960,7 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         if hit is None: return None
         rel, qual = hit
         key = "%s:<module>.%s" % (rel, qual)
+        key = (raw_bodies or {}).get(key, key)
         if key not in wanted or counts.get(key, 0) >= limit_per_fn: return None
         if code.co_flags & (inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ASYNC_GENERATOR):
             stats['skip_suspended_frame'] = stats.get('skip_suspended_frame', 0) + 1
@@ -2246,7 +2265,15 @@ def main():
     elif lang == "python":
         wanted, methods, modlevel = set(), [], []
         candidates = python_sampling_candidates(funcs)
+        raw_bodies = undecorated_bodies(funcs)
         for f in candidates:
+            if f.get("undecoratedOf"):
+                # Reached only by traced frames of the raw function object; a random
+                # or constructed call through the source name reaches the decorated
+                # binding instead, which is a different function (§8.7).
+                if classify({"name": f["undecoratedOf"]}):
+                    wanted.add(f["name"])
+                continue
             c = classify(f)
             if not c: continue
             rel, qual, is_meth = c
@@ -2286,7 +2313,7 @@ def main():
         if test_dirs and index:
             print("test suite: %s" % ", ".join(test_dirs))
             traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats,
-                                 params_by_name, live, pool, encoder_factory)
+                                 params_by_name, live, pool, encoder_factory, raw_bodies)
         elif not test_dirs:
             print("test suite: none discovered under %s (pass --tests DIR)" % src_root)
         else:

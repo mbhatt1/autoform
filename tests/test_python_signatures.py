@@ -36,6 +36,7 @@ mapper = lambda a=2: a
         positional_only=False, keyword_only=False, parameters=['a', 'args', 'kwargs'],
         firstPositional='a', decorated=False, privateParameters=False, isMethod=False,
         staticMethod=False, property=False, classMethod=False, decoratorNames=[],
+        decoratorRefusal=None,
         overloadStub=False, receiverThenCollectors=False, generator=None,
         nonlocalUses=[], nonlocalDefines=[],
         positionalOnly=[], keywordOnly=[], required=['a'])

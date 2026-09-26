@@ -934,8 +934,31 @@ def boundMethodAdapter (name : String) : Func :=
     body := .ret (.mcall (.name "<bound:self>") name
       [.starred (.name "<bound:args>"), .dstarred (.name "<bound:kwargs>")]) }
 
+/-- The reserved name of a Python function bound to an instance through a class attribute.
+It is not a builtin method name (`Stdlib.knowsMethod` has no `<function>`), so it cannot be
+confused with `boundMethodAdapter`. -/
+def boundFunctionName : String := "<bound-method>.<function>"
+
+/-- A **bound method** of a function stored as a class attribute. Language Reference
+§3.2.8.4 ("Instance methods"): when an instance method object is called, "the underlying
+function is called, inserting the class instance in front of the argument list". The
+captured `<bound:function>` is the stored value itself -- a function, a closure or a boxed
+function object -- so calling the adapter applies it exactly as `Expr.callValue` does,
+with the receiver as the first positional argument and the rest passed through. -/
+def boundFunctionAdapter : Func :=
+  { name := boundFunctionName,
+    params := ["<bound:args>", "<bound:kwargs>"],
+    vararg := some "<bound:args>", kwarg := some "<bound:kwargs>",
+    body := .ret (.callValue (.name "<bound:function>")
+      [.name "<bound:self>", .starred (.name "<bound:args>"), .dstarred (.name "<bound:kwargs>")]) }
+
+/-- The bound-method value of `function` for the instance at `receiver`. -/
+def boundFunctionValue (function : Val) (receiver : Ref) : Val :=
+  .clos boundFunctionName [("<bound:function>", function), ("<bound:self>", .ref receiver)]
+
 /-- Resolve the reserved adapter name, without making its short name a source callable. -/
 def resolveBoundMethod (name : String) : Option Func :=
+  if name == boundFunctionName then some boundFunctionAdapter else
   if strStartsWith name "<bound-method>." then
     let method := String.ofList (name.toList.drop 15)
     if Stdlib.knowsMethod .python method || method == "__iter__" || method == "__next__" then
@@ -1325,6 +1348,62 @@ def Ctx.classStorageKey (ctx : Ctx) (cls attr : String) : String :=
     | _ => "<absent-class-storage>"
   else classAttrKey cls attr
 
+/-- May this stored class-attribute value implement the descriptor protocol?
+
+Language Reference §3.3.2.4 ("Invoking Descriptors"): a class attribute whose type defines
+`__get__`, `__set__` or `__delete__` is a descriptor, and attribute access on an instance
+calls those hooks. Core does not execute them. An instance of a recovered source class is
+therefore a possible descriptor unless its complete namespace proves all three hooks
+absent (an unresolved hierarchy answers "possible"), and an external value
+(`<absent:...>`) is unknown. Functions, closures, builtins, containers and the
+exporter's private boxes are not source classes and answer `false`; functions bind as
+methods instead (`Ctx.storedAttributeValue`). -/
+def Ctx.descriptorObject (ctx : Ctx) (heap : Heap) : Val → Bool
+  | .ref addr =>
+      match heap.get addr with
+      | some object => ctx.usesClassMetadata object.cls &&
+          ["__get__", "__set__", "__delete__"].any fun hook =>
+            match ctx.classLookup object.cls hook with
+            | .absent => false
+            | _ => true
+      | none => false
+  | .fn owner => strStartsWith owner "<absent:"
+  | _ => false
+
+/-- The gap an instance write must report instead of shadowing a stored descriptor. -/
+def Ctx.storedDescriptorGap (ctx : Ctx) (heap : Heap) (key attr : String) : Option String :=
+  match (heap.get ctx.globals).bind (fun globals => globals.fields.find? (·.1 == key)) with
+  | some (_, value) =>
+      if ctx.descriptorObject heap value then some s!"class-attribute:{attr}:descriptor-object"
+      else none
+  | none => none
+
+/-- Is this stored value a Python FUNCTION, i.e. a non-data descriptor whose `__get__`
+returns a bound method? A translated function (`.fn`/`.clos` naming a table entry) or a
+boxed function object is; a class value, builtin, bound method (the reserved `<...>`
+closures) or any other value is not, and reads back unchanged. -/
+def Ctx.bindsAsFunction (ctx : Ctx) (heap : Heap) : Val → Bool
+  | .fn owner => (ctx.table.find? (·.1 == owner)).isSome
+  | .clos owner _ => !strStartsWith owner "<" && (ctx.table.find? (·.1 == owner)).isSome
+  | .ref addr =>
+      match heap.get addr with
+      | some object => object.cls == "<function>"
+      | none => false
+  | _ => false
+
+/-- A stored class attribute read through an instance whose own dictionary missed.
+
+This is where a decorated method (`@deco def m(self)` in a class body, bound at
+definition time to `deco(m)`) is read. A function is a non-data descriptor (Language
+Reference §3.3.2.4; "Instance methods", §3.2.8.4), so the instance gets a bound method;
+a possible descriptor object is a named gap; anything else (the `object()` sentinels) is
+the stored value itself. -/
+def Ctx.storedAttributeValue (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String)
+    (value : Val) : EResult :=
+  if ctx.descriptorObject heap value then .hole s!"class-attribute:{attr}:descriptor-object"
+  else if ctx.bindsAsFunction heap value then .val (boundFunctionValue value receiver)
+  else .val value
+
 def classMethodValue (fn : Func) (receiver : Val) (captured : List (String × Val)) : EResult :=
   match fn.bindClassReceiver with
   | some (_, parameter) =>
@@ -1407,6 +1486,11 @@ def Ctx.fieldWriteCheck (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : Strin
         | .blocked reason | .found _ (.opaque reason) => .hole reason
         | .found _ (.property _) => .exn (.str "AttributeError")
         | .found _ (.slot _) => .val .unit
+        | .found _ (.stored key) =>
+            match ctx.storedDescriptorGap heap key attr with
+            | some reason => .hole reason
+            | none => if ClassHierarchy.allowsDict ctx.classDecls object.cls then .val .unit
+                      else .exn (.str "AttributeError")
         | _ => if ClassHierarchy.allowsDict ctx.classDecls object.cls then .val .unit
                else .exn (.str "AttributeError")
       | .blocked reason => .hole reason
@@ -1445,7 +1529,12 @@ def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
       | .found _ (.slot _) => .hole s!"class-attribute:{attr}:slot-descriptor"
       | .found _ (.stored key) =>
           match (heap.get ctx.globals).bind (fun globals => globals.fields.find? (·.1 == key)) with
-          | some (_, value) => .val value
+          | some (_, value) =>
+              -- Through the CLASS a function is the plain function (no binding); a
+              -- possible descriptor object would run `__get__(None, cls)`.
+              if ctx.descriptorObject heap value then
+                .hole s!"class-attribute:{attr}:descriptor-object"
+              else .val value
           | none => .hole s!"class-attribute:{attr}:uninitialized-storage"
       | .found _ (.method name) =>
           match ctx.table.find? (·.1 == name) with
@@ -2325,7 +2414,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                  else if ctx.dialect == .python then
                                    match (h₁.get ctx.globals).bind
                                            (fun g => g.fields.find? (·.1 == ctx.classStorageKey o.cls f)) with
-                                   | some (_, v) => (h₁, .val v)
+                                   | some (_, v) => (h₁, ctx.storedAttributeValue h₁ r f v)
                                    | none =>
                                        if ctx.usesClassMetadata o.cls &&
                                            (match ctx.classLookup o.cls f with
@@ -5160,5 +5249,90 @@ private def jsMissProg : Program :=
       , body := .seq (.assign "o" (.alloc "K" []))
                      (.ret (.field (.name "o") "x")) } ] }
 #guard match runFunc jsMissProg 200 "missing" [] with | .val .unit => true | _ => false
+
+/-! ## Decorated methods: a function stored as a class attribute binds
+
+`class Box: @add1 def bump(self, n): return self.v + n` binds the class attribute `bump`
+to `add1(<function bump>)` when the class body runs (Language Reference §8.7). A function
+is a non-data descriptor, so `Box().bump` is a bound method and `Box.bump` the plain
+function (§3.3.2.4, §3.2.8.4). A stored instance of a class with `__get__` is a
+descriptor Core does not run: reading or writing it through an instance is a named gap. -/
+private def plainSig : Option PythonSignature := some { isMethod := some false }
+private def decoratedMethodProg : Program :=
+  { dialect := .python
+  , funcs :=
+    [ { name := "m.py:<module>.add1", params := ["f"], pythonSignature := plainSig
+      , body := .seq (.assign "wrapper" (.closure "m.py:<module>.add1.wrapper"))
+                     (.ret (.name "wrapper")) }
+    , { name := "m.py:<module>.add1.wrapper", params := ["self", "n"], pythonSignature := plainSig
+      , body := .ret (.binop "+" (.callValue (.name "f") [.name "self", .name "n"])
+                                 (.lit (.int 1))) }
+    , { name := "m.py:<module>.Box.bump<undecorated>", params := ["self", "n"]
+      , pythonSignature := plainSig
+      , body := .ret (.binop "+" (.field (.name "self") "v") (.name "n")) }
+    , { name := "m.py:<module>.D.__get__", params := ["obj", "owner"]
+      , body := .ret (.lit (.int 0)) }
+    , { name := "m.py:<module>.viaInstance", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.mcall (.name "c") "bump" [.lit (.int 5)]))) }
+    , { name := "m.py:<module>.boundValue", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                (.seq (.assign "b" (.field (.name "c") "bump"))
+                      (.ret (.callValue (.name "b") [.lit (.int 1)])))) }
+    , { name := "m.py:<module>.viaClass", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.callValue (.field (.fnref "m.py:<module>.Box<meta>") "bump")
+                              [.name "c", .lit (.int 2)]))) }
+    , { name := "m.py:<module>.unchanged", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "v" (.lit (.int 10)))
+                      (.ret (.mcall (.name "c") "same" [.lit (.int 3)]))) }
+    , { name := "m.py:<module>.readDescriptor", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                     (.ret (.field (.name "c") "desc")) }
+    , { name := "m.py:<module>.writeDescriptor", params := [], pythonSignature := plainSig
+      , body := .seq (.assign "c" (.alloc "m.py:<module>.Box" []))
+                (.seq (.setField (.name "c") "desc" (.lit (.int 1)))
+                      (.ret (.lit (.int 1)))) }
+    , { name := "m.py:<module>", params := []
+      , body := .seq (.setGlobal "<classattr>m.py:<module>.Box.bump"
+                        (.call "m.py:<module>.add1" [.fnref "m.py:<module>.Box.bump<undecorated>"]))
+                (.seq (.setGlobal "<classattr>m.py:<module>.Box.same"
+                        (.fnref "m.py:<module>.Box.bump<undecorated>"))
+                      (.setGlobal "<classattr>m.py:<module>.Box.desc"
+                        (.alloc "m.py:<module>.D" []))) } ]
+  , classDecls :=
+      [ { name := "m.py:<module>.Box", shortName := "Box", bases := ["__builtin.object"]
+        , attributes := [("bump", .stored "<classattr>m.py:<module>.Box.bump"),
+                         ("same", .stored "<classattr>m.py:<module>.Box.same"),
+                         ("desc", .stored "<classattr>m.py:<module>.Box.desc")] }
+      , { name := "m.py:<module>.D", shortName := "D", bases := ["__builtin.object"]
+        , attributes := [("__get__", .method "m.py:<module>.D.__get__")] } ] }
+
+private def decoratedInits : List Func :=
+  decoratedMethodProg.funcs.filter (·.name == "m.py:<module>")
+
+-- `Box().bump(5)`: the receiver goes in front of the arguments, `wrapper(self, 5)` runs.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.viaInstance" [] with
+       | .val (.int 16) => true | _ => false
+-- `b = Box().bump; b(1)`: the bound method carries its receiver.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.boundValue" [] with
+       | .val (.int 12) => true | _ => false
+-- `Box.bump(c, 2)`: through the class the function is unbound.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.viaClass" [] with
+       | .val (.int 13) => true | _ => false
+-- A decorator returning the original function: the raw body binds like any method.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.unchanged" [] with
+       | .val (.int 13) => true | _ => false
+-- An instance of a class defining `__get__` is a descriptor Core does not run.
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.readDescriptor" [] with
+       | .hole "class-attribute:desc:descriptor-object" => true | _ => false
+#guard match runMain decoratedMethodProg 200 decoratedInits "m.py:<module>.writeDescriptor" [] with
+       | .hole "class-attribute:desc:descriptor-object" => true | _ => false
+#guard funcObjCls == "<function>"
+#guard (resolveBoundMethod boundFunctionName).map (·.name) == some boundFunctionName
 
 end Autoform.Core

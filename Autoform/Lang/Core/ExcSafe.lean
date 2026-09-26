@@ -388,6 +388,16 @@ theorem readClassAttribute_excSafe (ctx : Ctx) (heap : Heap) (owner : String)
     | (cases h; exact Stdlib.excSafe_str (by decide))
     | cases h
 
+/-- Reading a stored class attribute through an instance never raises: it is the value,
+a bound method, or the descriptor gap. -/
+theorem storedAttributeValue_ne_exn (ctx : Ctx) (heap : Heap) (receiver : Ref)
+    (attr : String) (value : Val) {v : Val} :
+    ctx.storedAttributeValue heap receiver attr value = .exn v → False := by
+  intro h
+  unfold Ctx.storedAttributeValue at h
+  repeat' split at h
+  all_goals cases h
+
 theorem defaultConstructor_excSafe (ctx : Ctx) (cls : String) (receiver : Ref)
     (args : List Val) (keywords : List (String × Val)) {v : Val} :
     ctx.defaultConstructor cls receiver args keywords = .exn v → ExcSafe v := by
@@ -520,6 +530,7 @@ macro "exc_close" : tactic => `(tactic| first
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (classMethodValue_ne_exn _ _ _ (Prod.mk.inj hy).2).elim
+  | exact (storedAttributeValue_ne_exn _ _ _ _ _ (Prod.mk.inj hy).2).elim
   | exact (readClassAttribute_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
   | exact (defaultConstructor_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
   | (cases hy; exact (fieldWriteCheck_excSafe _ _ _ _ (by assumption)).weaken)

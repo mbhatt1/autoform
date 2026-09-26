@@ -863,9 +863,13 @@ class TestSliceJDefinitionTimeSemantics:
 
     def test_an_external_decorator_is_named(self):
         src = exporter_source()
-        assert 'externalDecorator.map(d => "decorator:external:" + d).getOrElse("call:python-decorator-binding")' in src
+        assert 'pythonExternalDecorator(signature).map(d => "decorator:external:" + d)' in src
         # a decorated method is a decorator gap, not a receiver gap
-        assert 'else if (signature("decorated").bool) Some(decoratorGap)' in src
+        assert 'else if (signature("decorated").bool && decoratorGap.nonEmpty) decoratorGap' in src
+        # an in-program decorator is applied at definition time (§8.7): its raw body is
+        # translated under `<undecorated>`, the definition is no gap at all
+        assert 'if (rawDecorated) None' in src
+        assert 'def rawBodyName(full: String): String = mangledFullName(full) + "<undecorated>"' in src
 
     def test_kotlin_local_functions_close_over_an_unmutated_scope_only(self):
         src = exporter_source()

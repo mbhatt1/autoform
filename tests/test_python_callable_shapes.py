@@ -46,13 +46,20 @@ def test_source_python_callable_shapes(tmp_path, numeric_env):
          '--param', 'cpgPath=cpg.bin', '--param', 'out=ast.json'], tmp_path, numeric_env, timeout=600)
     functions = {row['name']: row for row in json.loads((tmp_path / 'ast.json').read_text())}
     prefix = SOURCE.name + ':<module>.'
-    guarded = {'decorated': 'call:python-decorator-binding',
-               'Private.f': 'call:python-private-parameters',
+    guarded = {'Private.f': 'call:python-private-parameters',
                'LexicalPrivate.outer.local': 'call:python-private-parameters'}
     for name, gap in guarded.items():
         row = functions[prefix + name]
         assert row['body'] == {'k': 'holeS', 'label': gap}
         assert row.get('vararg') and row.get('kwarg') and 'pythonSignature' not in row
+    # CHANGED (decorators applied at definition time): `@replacement def decorated` is no
+    # longer a `call:python-decorator-binding` gap. The raw body is exported under its own
+    # name and the source name is an auxiliary entry reading the rebound module binding.
+    raw = functions[prefix + 'decorated<undecorated>']
+    assert raw['body'] == {'k': 'ret', 'e': {'k': 'name', 'v': 'a'}}
+    assert raw['undecoratedOf'] == prefix + 'decorated'
+    assert [entry['name'] for entry in raw['decoratedEntries']] == [prefix + 'decorated']
+    assert prefix + 'decorated' not in functions
     for name in ('Outer.inner', 'Collision.inner', 'nested_extra.inner'):
         assert functions[prefix + name]['pythonSignature']['isMethod'] is False
     assert functions[prefix + 'Collision.inner']['params'] == ['self']
@@ -63,9 +70,9 @@ def test_source_python_callable_shapes(tmp_path, numeric_env):
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
     requests = [
-        ('decorated', [], None, 'call:python-decorator-binding'),
-        # CHANGED: the call reads the decorated module binding and returns the
-        # wrapper's result. Direct entry to the raw decorated body remains a gap.
+        # CHANGED: the source entry `decorated` is the decorated binding (`inner`, 9),
+        # compared with CPython; the raw body is reached only as `decorated<undecorated>`.
+        ('decorated', [], None, None),
         ('call_decorated', [], None, None),
         ('Outer', [23], None, None),
         ('private_positional', [], None, 'call:python-private-parameters'),

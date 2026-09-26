@@ -256,6 +256,9 @@ property_pairs, properties_unmodelled = [], set()
 # the module-objects initialiser under `<classattr>Class.attr`.
 class_attr_sentinels = []
 class_declarations = []
+# `lineno:col` of a decorated `def` in a class body -> why its decorators cannot be
+# applied when the class body runs (Language Reference §8.7). Absent: they can.
+decorator_refusals = {}
 scope_nodes = {id(symbols): tree}
 binding_counts = {}
 
@@ -722,7 +725,10 @@ def class_metadata(node, scopes):
                   and builtin_name(decorators[0].id, nested)):
                 kind = 'property' if decorators[0].id == 'property' else 'method'
             else:
-                kind = 'opaque'
+                # Bound when the class body runs to the decorators' result (Language
+                # Reference §8.7). The exporter decides whether every decorator is the
+                # program's own; `decorator_refusals` names the shapes it cannot apply.
+                kind = 'decorated'
             attribute(statement.name, kind, path + '.' + statement.name
                       if kind != 'opaque' else 'class-attribute:decorator')
             if (statement.name.startswith('__') and statement.name.endswith('__')
@@ -774,6 +780,37 @@ def class_metadata(node, scopes):
             continue
         else:
             barrier = 'class-definition:dynamic-body'
+    # Decorators in a class body are applied when the body runs. The exporter lowers
+    # that application at the class statement of a MODULE-level class, reading the
+    # decorator expressions in the module's scope; so a decorator that reads a name the
+    # class body itself binds (or the class's own name, which is bound only after the
+    # body), a nested class, a scoped or suspending expression, or a member bound twice
+    # is refused by name rather than evaluated in the wrong scope.
+    shaped = (ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
+              ast.NamedExpr, ast.Await, ast.Yield, ast.YieldFrom)
+    for statement in node.body:
+        if (not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+                or attrs.get(mangle(statement.name, node.name), {}).get('kind') != 'decorated'):
+            continue
+        reason = None
+        if len(scopes) != 1:
+            reason = 'decorator:class-body:nested-class'
+        elif counts.get(mangle(statement.name, node.name), 0) > 1:
+            reason = 'decorator:class-body:redefined-member'
+        else:
+            for decorator in statement.decorator_list:
+                for part in ast.walk(decorator):
+                    if isinstance(part, shaped):
+                        reason = 'decorator:class-body:expression-shape'
+                    elif isinstance(part, ast.Name):
+                        try:
+                            local = nested[-1].lookup(mangle(part.id, node.name)).is_local()
+                        except KeyError:
+                            local = False
+                        if local or part.id == node.name:
+                            reason = reason or 'decorator:class-body:class-local-name'
+        if reason is not None:
+            decorator_refusals[f'{statement.lineno}:{statement.col_offset + 1}'] = reason
     if slot_names is not None:
         for name in dict.fromkeys(slot_names):
             if name in attrs:
@@ -901,6 +938,7 @@ def visit(node, scopes):
             'property': sole_property,
             'classMethod': class_method,
             'decoratorNames': decorator_names,
+            'decoratorRefusal': decorator_refusals.get(f'{node.lineno}:{node.col_offset + 1}'),
             'generator': generator_metadata(node, scopes),
             'overloadStub': overload_stub,
             # An instance method whose only parameters after `self` are collectors:
@@ -1693,7 +1731,9 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
   /** `target` is the *unmangled* CPG fullName: capture analysis is keyed on it, and the
     * emitted name is mangled on the way out so it matches the exported definition. */
   def fnValue(target: String): ujson.Obj = {
-    val out = mangledFullName(target)
+    // The function object a definition creates is its RAW body; an applied decorator
+    // receives it, and the source name is rebound to the decorators' result.
+    val out = if (decoratedApplied.contains(target)) rawBodyName(target) else mangledFullName(target)
     if (capturesEnv.getOrElse(target, false)) ujson.Obj("k" -> "closure", "f" -> out)
     else ujson.Obj("k" -> "fnref", "v" -> out)
   }
@@ -1809,6 +1849,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           .filter { case (k, v) =>
             k != v &&
             (methodByName.contains(mod + "." + v) || classByFullName.contains(mod + "." + v)) &&
+            !decoratedApplied.contains(mod + "." + v) &&
             !methodByName.contains(mod + "." + k) && !classByFullName.contains(mod + "." + k)
           }.sortBy(_._1)
     })
@@ -1844,7 +1885,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       if (k.startsWith(mod + ".") && !n.contains('.') && !n.contains('<') && n.nonEmpty)
         Some(n) else None
     }
-    val fns = methodByName.keys.toList.flatMap(k => simple(k).map(n => n -> (fnValue(k): ujson.Value)))
+    // A decorated definition's value is the decorators' result, fixed only when the
+    // module body runs (Language Reference §8.7), so it is not a member here; the body
+    // binds it, and a read before that is the module's `module-attr:` gap.
+    val fns = methodByName.keys.toList.filterNot(decoratedApplied.contains)
+      .flatMap(k => simple(k).map(n => n -> (fnValue(k): ujson.Value)))
     val cls = classByFullName.keys.toList.flatMap(k =>
       simple(k).map(n => n -> (typeValue(k + "<meta>"): ujson.Value)))
     val als = moduleAliasesOf(mod).map { case (n, t) => n -> (aliasValue(mod, t): ujson.Value) }
@@ -2082,6 +2127,134 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       case "call:python-signature-metadata" => Some("function:python-signature-metadata")
       case _ => None
     }
+
+  // ---- decorators applied at definition time --------------------------------
+  //
+  // Language Reference §8.7 (Function definitions): "The evaluation of this decorator
+  // expression happens when the function is defined, in the scope that contains the
+  // function definition. The result must be a callable, which is invoked with the
+  // function object as the only argument. The returned value is bound to the function
+  // name instead of the function object. Multiple decorators are applied in nested
+  // fashion": `@f1(arg) @f2 def func(): pass` is roughly `func = f1(arg)(f2(func))`.
+  // Joern already emits exactly that nesting in the defining scope (`inc = twice(def
+  // inc)`), and `Expr.callValue` evaluates the callee before its argument -- so the
+  // decorator expressions evaluate top-down, the function object is created, and the
+  // applications run bottom-up, which is CPython's order.
+  //
+  // What this adds is the separation of two things the source spells with one name:
+  //
+  //  * the RAW body, the function object the decorators receive, exported under
+  //    `<name><undecorated>` so no static or suffix resolution of `<name>` can reach it
+  //    and bypass the decorators; it is a plain function (a decorated method's `self`
+  //    is an ordinary first parameter, as it is for the function object in CPython);
+  //  * the SOURCE ENTRY `<name>`, whose value is whatever the decorators returned. For a
+  //    module-level function or a method of a module-level class it is an auxiliary
+  //    forwarding function (`decoratedEntries`) that reads the rebound binding at call
+  //    time -- the module attribute, or the instance attribute -- so oracle entry
+  //    points and specs that address `<name>` see the decorated behaviour.
+  //
+  // A decorator from outside the program is NOT applied: its meaning is unknown, and
+  // the definition keeps `decorator:external:<name>` (Milestone 3: contracts).
+
+  /** The first decorator of `signature` that is not the program's own, or `<expr>`. */
+  def pythonExternalDecorator(signature: ujson.Value): Option[String] =
+    signature.obj.get("decoratorNames").map(_.arr.map(_.str).toList).getOrElse(Nil).find { d =>
+      val root = d.split('.').last
+      d == "<expr>" ||
+        !(methodByName.keys.exists(_.endsWith("." + root)) || classByFullName.keys.exists(_.endsWith("." + root)))
+    }
+
+  /** CPG full names of the definitions whose (in-program) decorators are applied at
+    * definition time, and whose raw body is therefore exported under its own name. */
+  lazy val decoratedApplied: Set[String] = allMethods.filter { m =>
+    m.filename.toLowerCase.endsWith(".py") && !m.name.startsWith("<") &&
+      pythonSignatureInfo(m).exists { signature =>
+        signature("decorated").bool &&
+          !signature.obj.get("overloadStub").exists(_.bool) &&
+          pythonExternalDecorator(signature).isEmpty &&
+          signature.obj.get("decoratorRefusal").forall(_ == ujson.Null)
+      }
+  }.map(_.fullName).toSet
+
+  /** The raw body's exported name: never a source spelling, and `differential.py`'s
+    * `classify` skips `<`-names, so it is reached only through `undecoratedOf`. */
+  def rawBodyName(full: String): String = mangledFullName(full) + "<undecorated>"
+
+  /** The binding a decorated definition's source entry forwards to, when there is one:
+    * `Left(attribute)` of its module, or `Right(attribute)` of a module-level class. A
+    * definition nested in a function has no stable binding to forward to. */
+  def decoratedBinding(m: Method): Option[Either[String, String]] = {
+    val mod = m.filename + ":<module>"
+    val rest = m.fullName.stripPrefix(mod + ".")
+    if (!m.fullName.startsWith(mod + ".") || rest.contains('<')) None
+    else rest.split('.').toList match {
+      case name :: Nil => Some(Left(name))
+      case cls :: name :: Nil if classByFullName.contains(mod + "." + cls) =>
+        Some(Right(mangleName(name, Some(cls))))
+      case _ => None
+    }
+  }
+
+  /** The forwarding source entry of a decorated definition: `(*a, **k)` passed through
+    * to the value the decorators bound, read when the entry is called. */
+  def decoratedEntry(m: Method, binding: Either[String, String]): ujson.Obj = {
+    val args = "<decorated:args>"
+    val kwargs = "<decorated:kwargs>"
+    val (callee, isMethod) = binding match {
+      case Left(name) =>
+        (ujson.Obj("k" -> "field", "a" -> moduleRef(m.filename + ":<module>"), "f" -> name), false)
+      case Right(name) =>
+        (ujson.Obj("k" -> "field", "a" -> ujson.Obj("k" -> "name", "v" -> "self"), "f" -> name), true)
+    }
+    ujson.Obj(
+      "name" -> mangledFullName(m.fullName), "file" -> m.filename, "sourceName" -> m.name,
+      "params" -> ujson.Arr(args, kwargs), "vararg" -> args, "kwarg" -> kwargs,
+      "pythonSignature" -> ujson.Obj("positionalOnly" -> ujson.Arr(), "keywordOnly" -> ujson.Arr(),
+        "required" -> ujson.Arr(), "isMethod" -> isMethod),
+      "decoratedEntryOf" -> rawBodyName(m.fullName),
+      "body" -> ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "callV", "f" -> callee,
+        "args" -> ujson.Arr(ujson.Obj("k" -> "starred", "a" -> ujson.Obj("k" -> "name", "v" -> args)),
+                            ujson.Obj("k" -> "dstarred", "a" -> ujson.Obj("k" -> "name", "v" -> kwargs))))))
+  }
+
+  /** Is `n` the function object handed to an applied decorator -- the raw definition,
+    * or an inner decorator's application of it? */
+  def isAppliedDecoratorOperand(n: AstNode): Boolean = n match {
+    case r: MethodRef => decoratedApplied.contains(r.methodFullName)
+    case c: Call =>
+      val ks = kidsOf(c)
+      !callName(c).startsWith("<operator>") && ks.exists(aidx(_) == -1) &&
+        ks.count(k => aidx(k) >= 1) == 1 && !ks.exists(isKeywordArg) &&
+        ks.find(aidx(_) == 1).exists(isAppliedDecoratorOperand)
+    case _ => false
+  }
+
+  /** The decorator applications a class body performs, as writes of the class
+    * attributes they bind (`ClassAttribute.stored`, key `<classattr><method>`), for the
+    * `Cls.<body>()` call that evaluates a module-level class body. Only direct
+    * `name = d(...(def name))` statements of the body, whose raw definition is an
+    * applied decorator's operand (`decoratedApplied`: every decorator is the program's
+    * own and the extractor found no class-local name in any decorator expression, so
+    * reading them in the module scope reads what the class body would). */
+  def classBodyDecorations(c: Call): List[ujson.Obj] =
+    kidsOf(c).collectFirst { case r: MethodRef if r.methodFullName.endsWith(".<body>") => r.methodFullName }
+      .flatMap(methodByName.get).toList.flatMap { body =>
+        val owner = body.fullName.stripSuffix(".<body>")
+        def raw(n: AstNode): Option[MethodRef] = n match {
+          case r: MethodRef => Some(r)
+          case d: Call => kidsOf(d).find(aidx(_) == 1).flatMap(raw)
+          case _ => None
+        }
+        kidsOf(body.body).collect {
+          case a: Call if callName(a) == "<operator>.assignment" => kidsOf(a)
+        }.collect {
+          case (_: Identifier) :: (rhs: Call) :: Nil if isAppliedDecoratorOperand(rhs) &&
+              raw(rhs).exists(r => r.methodFullName.startsWith(owner + ".") &&
+                                   !r.methodFullName.drop(owner.length + 1).contains('.')) =>
+            ujson.Obj("k" -> "setGlobal", "x" -> ("<classattr>" + raw(rhs).get.methodFullName),
+                      "e" -> expr(rhs))
+        }
+      }
 
   var currentReturnType = ""
   /** `t -> (receiver, method)` for every `t = r.m` in the method being translated, where
@@ -8278,7 +8451,16 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       val kwArgs = kids.filter(isKeywordArg)
       val args   = kids.filter(k => aidx(k) >= 1 && !isKeywordArg(k))
       val callee = kids.filterNot(isKeywordArg).find(aidx(_) == -1).orElse(kids.headOption)
-      val valueCallee = pythonValueCallee(c)
+      // `@d def f` is `f = d(<function f>)` where `d` is the decorator expression's
+      // VALUE in the defining scope (Language Reference §8.7). Joern names the call
+      // after `d` and often resolves it to a definition; a static call would bypass a
+      // rebound or decorated `d`. So the callee is read as a value, exactly as written.
+      val decoratorCallee: Option[ujson.Obj] =
+        if (pyFile && kwArgs.isEmpty && args.size == 1 && c.name.nonEmpty &&
+            isAppliedDecoratorOperand(args.head))
+          callee.collect { case i: Identifier => expr(i) }
+        else None
+      val valueCallee = decoratorCallee.orElse(pythonValueCallee(c))
       // Construction: Joern resolves `Cls(...)` to `...Cls.__init__` while keeping the
       // call's name as the class. An explicit `super().__init__(...)` keeps name
       // `__init__` and is a method call, not an allocation.
@@ -10208,6 +10390,10 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
       else forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case td: TypeDecl => skip   // a struct/union/typedef/class decl carries no behaviour either
+    // A module-level `class` statement whose body applies the program's decorators:
+    // the class body runs them (§8.7), in source order, before the class exists.
+    case c: Call if pyFile && moduleScope && classBodyDecorations(c).nonEmpty =>
+      seqOf(classBodyDecorations(c) :+ ujson.Obj("k" -> "exprS", "e" -> expr(c)))
     // `009-reduce-remaining-holes-4`: `UNUSED_PARAMETER(x)`/`UNUSED_PARAMETER2(x,y)`,
     // SQLite's own unused-parameter-warning suppressors (`sqliteInt.h`: `#define
     // UNUSED_PARAMETER(x) (void)(x)`). No preprocessor runs here, so the macro
@@ -10743,7 +10929,8 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
     * differ), which is deliberate — they have their own conventions and no evidence here. */
   def exportName(m: Method): String = {
     val fn = mangledFullName(m.fullName)
-    if (!cppFile) fn
+    if (decoratedApplied.contains(m.fullName)) rawBodyName(m.fullName)
+    else if (!cppFile) fn
     else {
       val base = fn.takeWhile(_ != ':')
       val segs = base.split('.').filter(_.nonEmpty).toList
@@ -11078,6 +11265,12 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
               case Some(name) => (kind, name)
               case None => ("opaque", "class-attribute:unresolved-function:" + target)
             }
+            // A decorated method: the class attribute holds the decorators' result,
+            // written when the class statement runs (`classBodyDecorations`) under
+            // the key below. An external or refused decorator stays opaque.
+            else if (kind == "decorated")
+              (if (decoratedApplied.contains(target)) ("stored", "<classattr>" + target)
+               else ("opaque", "class-attribute:decorator"))
             else if (kind == "stored") (kind, "<classattr>" + target)
             else if (kind == "slot") (kind, "<slot>" + target)
             else (kind, value)
@@ -12074,7 +12267,11 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
                      .map(_.split('.').toList).getOrElse(Nil)
     val legacyMethodDecl =
       qualSegs.length >= 2 && classNames.contains(qualSegs(qualSegs.length - 2))
-    val isMethodDecl = if (pyFile) pythonSignatureInfo(m)
+    // The raw body of a decorated method is the FUNCTION OBJECT the decorators receive:
+    // its `self` is an ordinary first parameter, bound by whoever calls it (the wrapper,
+    // or the bound method a stored function yields), never injected by Core.
+    val rawDecorated = pyFile && decoratedApplied.contains(m.fullName)
+    val isMethodDecl = if (rawDecorated) false else if (pyFile) pythonSignatureInfo(m)
       .map(_("isMethod").bool).getOrElse(legacyMethodDecl) else legacyMethodDecl
     // A `@classmethod` receives the CLASS as its first positional. Core passes it that
     // way (`Func.isClassMethod` at every `.mcall` site), so the receiving parameter --
@@ -12181,18 +12378,17 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
         // ordinary method with `self` stripped, which is exactly how `evalExpr` applies
         // it when a field read dispatches to it.
         // A decorator the PROGRAM defines is applied at definition time -- Language
-        // Reference §8.7: `@f def g` is `g = f(g)` -- and lowering that is still open
-        // (`call:python-decorator-binding`). A decorator from outside the program
-        // (`contextlib.contextmanager`, `functools.wraps(f)`) cannot be applied here at
-        // all; it is a different gap and carries the decorator's name.
-        val decoratorNames = signature.obj.get("decoratorNames").map(_.arr.map(_.str).toList).getOrElse(Nil)
-        val externalDecorator = decoratorNames.find { d =>
-          val root = d.split('.').last
-          d == "<expr>" ||
-            !(methodByName.keys.exists(_.endsWith("." + root)) || classByFullName.keys.exists(_.endsWith("." + root)))
-        }
-        val decoratorGap =
-          externalDecorator.map(d => "decorator:external:" + d).getOrElse("call:python-decorator-binding")
+        // Reference §8.7: `@f def g` is `g = f(g)` -- in the defining scope, and this
+        // body is the raw function object it receives (`decoratedApplied`). A decorator
+        // from outside the program (`contextlib.contextmanager`, `functools.wraps(f)`)
+        // cannot be applied here at all; it is a different gap and carries the
+        // decorator's name. A class-body shape the exporter cannot apply is refused
+        // under its own `decorator:class-body:*` name.
+        val decoratorGap: Option[String] =
+          if (rawDecorated) None
+          else pythonExternalDecorator(signature).map(d => "decorator:external:" + d)
+            .orElse(signature.obj.get("decoratorRefusal").filter(_ != ujson.Null).map(_.str))
+            .orElse(Some("call:python-decorator-binding"))
         val overloadStub = signature.obj.get("overloadStub").exists(_.bool)
         val bindingGap =
           // The receiver-shape checks are about an INSTANCE receiver that Core injects
@@ -12200,7 +12396,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           // first positional -- so `firstPositional` being `cls` is the expected shape,
           // not a gap, and the keyword-collector collision cannot arise.
           if (overloadStub) None
-          else if (signature("decorated").bool) Some(decoratorGap)
+          else if (signature("decorated").bool && decoratorGap.nonEmpty) decoratorGap
           else if (isMethodDecl && !isClassMethodDecl &&
               signature("firstPositional") != ujson.Str("self"))
             Some("call:python-receiver-signature")
@@ -12286,7 +12482,7 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           else obj("pythonSignature") = ujson.Obj.from(
             List("positionalOnly", "keywordOnly", "required").map { key =>
               key -> ujson.Arr.from(signature(key).arr.filter(v => exportedParams.contains(v.str)))
-            } ++ List("isMethod" -> signature("isMethod")) ++
+            } ++ List("isMethod" -> (if (rawDecorated) ujson.False else signature("isMethod"))) ++
               (if (isClassMethodDecl) List("receiverKind" -> ujson.Str("class")) else Nil) ++
               (if (receiverKeywordShadow) List("receiverName" -> ujson.Str("self")) else Nil) ++
               (if (valueDefaults.arr.nonEmpty) List("defaults" -> valueDefaults) else Nil) ++
@@ -12331,6 +12527,13 @@ print(json.dumps({'tries': tries, 'raises': raises, 'class_refs': class_refs,
           }
         }
       }
+    }
+    // The raw body of an applied decorator, and the source entry that forwards to the
+    // decorated binding (see `decoratedApplied`). The entry is auxiliary: it is not a
+    // second source function in the coverage population.
+    if (pyFile && !isModule && decoratedApplied.contains(m.fullName)) {
+      obj("undecoratedOf") = mangledFullName(m.fullName)
+      decoratedBinding(m).foreach(b => obj("decoratedEntries") = ujson.Arr(decoratedEntry(m, b)))
     }
     obj
   }

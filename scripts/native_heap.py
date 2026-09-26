@@ -68,6 +68,9 @@ def function_identities(funcs, root):
     wrappers and closures without a unique exported location stay unencodable.
     """
     exported = {f['name'] for f in funcs}
+    # A decorated definition's code object is the RAW function the decorators received;
+    # the exporter keeps it under `<name><undecorated>` (`undecoratedOf` = source name).
+    raw_bodies = {f['undecoratedOf']: f['name'] for f in funcs if f.get('undecoratedOf')}
     result = {}
     for rel in {f.get('file', '') for f in funcs} - {''}:
         path = os.path.realpath(os.path.join(root, rel))
@@ -96,6 +99,7 @@ def function_identities(funcs, root):
         walk(tree)
         for qual, lines in definitions.items():
             target = rel + ':<module>.' + qual
+            target = raw_bodies.get(target, target)
             # A local def or a def inside a loop can produce distinct function
             # objects, even without captures. A Core name cannot represent that
             # identity distinction. Use lexical source nesting, not the mutable
