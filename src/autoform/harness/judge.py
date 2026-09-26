@@ -10,8 +10,15 @@ counterexample*. They never set a proof status: every verdict comes from the Lea
 kernel or the deterministic structural checker.
 
 Deterministic facts constrain the judge rather than the other way around. If the
-witness evaluates to a hole, the counterexample is MODEL_INCOMPLETE and no model
+witness evaluates to a hole, the counterexample is INCOMPLETE_MODEL and no model
 is consulted; if only one backend can express a claim, routing is forced.
+
+Vocabulary: COUNTEREXAMPLE_CLASSES are the judge's *readings* of a witness. They are
+not statuses. The verifier status MODEL_INCOMPLETE (verifier.STATUSES) is set by
+deterministic code: a hole/out-of-fuel witness, or a counterexample the gates and the
+judge attribute to the model (class INCOMPLETE_MODEL). MODEL_DEFECTS then says *what
+kind* of model defect it is; PROOF_VALUES says what an established proof is worth.
+Neither changes a status.
 
 Backends
   semif      SemIf/OpenJev typed-logit scoring (MLX on Apple silicon, Torch elsewhere)
@@ -45,11 +52,31 @@ CLAIM_JUDGMENTS = {
 }
 COUNTEREXAMPLE_CLASSES = {
     'REAL_BUG': 'The implementation violates what it is meant to do; the witness is a genuine defect.',
-    'PROPERTY_TOO_STRONG': 'The code behaves as intended; the claimed property demands more than intended.',
+    'BAD_SPEC': 'The code behaves as intended; the claimed property is wrong (too strong or misstated).',
     'MISSING_PRECONDITION': 'The witness uses an input that callers are not meant to supply.',
-    'MODEL_INCOMPLETE': 'The formal model does not capture the relevant behavior (unmodeled construct).',
-    'ENVIRONMENT_ASSUMPTION': 'The violation depends on the environment/external behavior, not this code.',
-    'SOLVER_ARTIFACT': 'The witness is an artifact of the chosen bounds or encoding, not reachable behavior.',
+    'INCOMPLETE_MODEL': 'The formal model does not capture the relevant behavior (unmodeled construct, '
+                        'fuel bound, or a semantics gap).',
+    'ENVIRONMENT_MISMATCH': 'The violation depends on external/environment behavior that differs from what '
+                            'the claim takes for granted, not on this code.',
+    'ABSTRACTION_ARTIFACT': 'The witness is an artifact of the chosen bounds, domain or encoding, not '
+                            'reachable behavior.',
+}
+MODEL_DEFECTS = {
+    'UNMODELED_CONSTRUCT': 'The interpreter has no semantics for a construct the code uses (a named hole).',
+    'FUEL_BOUND': 'Evaluation ran out of fuel: a bound of the check, not necessarily a defect of the code.',
+    'SEMANTICS_MISMATCH': 'The model evaluates the construct differently from the real runtime.',
+    'EXTERNAL_UNMODELED': 'The behavior depends on a callee the program does not define and the environment '
+                          'does not summarize.',
+    'FRONTEND_MISTRANSLATION': 'The front end translated the source into Core incorrectly or incompletely.',
+    'EVALUATOR_KERNEL_DISAGREEMENT': 'Compiled evaluation and kernel evaluation of the same model disagree.',
+}
+PROOF_VALUES = {
+    'HIGH_VALUE': 'Establishes an essential, non-obvious part of the intended contract (e.g. a security '
+                  'requirement).',
+    'ROUTINE': 'Correct and useful, but a standard property one would expect to hold.',
+    'TRIVIAL_IN_HINDSIGHT': 'Holds for almost any implementation with this interface; the proof says little.',
+    'WEAKER_THAN_INTENDED': 'Holds, but only because it states less than the intended contract (weakened, '
+                            'bounded, or assumption-dependent).',
 }
 ASSUMPTION_VERDICTS = {
     'ACCEPTABLE': 'A reasonable, standard assumption for this code and its callers.',
@@ -112,6 +139,10 @@ class ReplayScorer:
         for line in Path(path).read_text().splitlines():
             if line.strip():
                 entry = json.loads(line)
+                if not entry.get('option_logits'):
+                    continue   # forced decisions carry no scores
+                # decisions.jsonl names the option list `options`; a bare score file `option_ids`.
+                entry['option_ids'] = entry.get('option_ids') or entry.get('options')
                 self.table[entry['key']] = entry
         self.fallback = HeuristicScorer()
 
@@ -310,6 +341,36 @@ class Judge:
                    prior=prior, context=context)
         return self._decide('COUNTEREXAMPLE_CLASSIFICATION', [row])[0]
 
+    # 3b. which precondition (listwise, precondition candidates only) -----------------
+    def select_precondition(self, state, candidates: list, prior: dict, context):
+        """MISSING_PRECONDITION with several candidate preconditions: pick the one callers are
+        meant to respect. REPAIR_SELECTION then weighs only the winner against other repair kinds."""
+        if len(candidates) == 1:
+            return self._decide('PRECONDITION_SELECTION', [dict(id='precondition', state=state, question='',
+                                options=[dict(id=candidates[0]['id'], description=candidates[0]['text'])],
+                                context=context)], forced=candidates[0]['id'])[0]
+        row = dict(id='precondition', state=state,
+                   question='The counterexample uses an input callers are not meant to supply. Which '
+                            'precondition states the input contract callers are actually expected to respect '
+                            '(not merely one that excludes the witness)?',
+                   options=[dict(id=c['id'], description=c['text']) for c in candidates[:MAX_OPTIONS]],
+                   prior=prior, context=context)
+        return self._decide('PRECONDITION_SELECTION', [row])[0]
+
+    # 3c. model-defect diagnosis ---------------------------------------------------
+    def classify_model_defect(self, state, allowed: list, prior: dict, context):
+        if len(allowed) == 1:
+            return self._decide('MODEL_DEFECT_CLASSIFICATION',
+                                [dict(id='defect', state=state, question='', options=[dict(
+                                    id=allowed[0], description=MODEL_DEFECTS[allowed[0]])], context=context)],
+                                forced=allowed[0])[0]
+        row = dict(id='defect', state=state,
+                   question='Verification attributes this result to the formal model, not to the code. '
+                            'What kind of model defect is it?',
+                   options=[dict(id=k, description=MODEL_DEFECTS[k]) for k in allowed],
+                   prior=prior, context=context)
+        return self._decide('MODEL_DEFECT_CLASSIFICATION', [row])[0]
+
     # 4. repair ranking ------------------------------------------------------------
     def rank_repairs(self, state, repairs: list, prior: dict, context):
         if len(repairs) == 1:
@@ -342,3 +403,13 @@ class Judge:
                    options=[dict(id=k, description=v) for k, v in ASSUMPTION_VERDICTS.items()],
                    prior=prior, context=context)
         return self._decide('ASSUMPTION_ACCEPTABILITY', [row])[0]
+
+    # 7. proof value (interface view; never a status) -----------------------------------
+    def proof_value(self, state, rendered: list, priors: list, contexts: list):
+        rows = [dict(id=f'value-{i}', state=state,
+                     question=('The verifier established this claim about the function:\n' + text +
+                               '\nJudged against what the function is meant to do, what is this proof worth?'),
+                     options=[dict(id=k, description=v) for k, v in PROOF_VALUES.items()],
+                     prior=prior, context=ctx)
+                for i, (text, prior, ctx) in enumerate(zip(rendered, priors, contexts))]
+        return self._decide('PROOF_VALUE_JUDGMENT', rows, shared=True) if rows else []

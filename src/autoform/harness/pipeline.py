@@ -2,7 +2,8 @@
 
     ingest → CPIR → evidence → generators → critic → judge (typed judgment, listwise
     selection, routing) → verifier (Lean kernel / structural) → judge (counterexample
-    classification) → repairs → judge (repair ranking) → reverify … → ledger, report
+    classification) → repairs → judge (precondition selection, repair ranking) → reverify …
+    → judge (model-defect diagnosis, proof value) → ledger, report
 
 Invariant: generators and the judge decide *what to try* and *how to read a witness*;
 statuses come only from the verifier.
@@ -21,6 +22,8 @@ from .generator import generators
 from .judge import CLAIM_JUDGMENTS, DecisionLog, Judge, make_scorer
 
 INTENT_THRESHOLD = 0.8
+HELD = ('PROVED', 'BOUNDED_PROVED', 'ASSUMPTION_DEPENDENT')
+MODEL_STATUSES = ('MODEL_INCOMPLETE', 'INCONSISTENT_MODEL')
 
 
 @dataclass
@@ -85,6 +88,11 @@ def _state(ctx, implementation=True) -> dict:
     return view
 
 
+def _core(claim) -> dict:
+    """What a claim states, without its prose assumptions or bookkeeping."""
+    return {k: claim.get(k) for k in ('scope', 'forall', 'preconditions', 'property', 'on_exception')}
+
+
 def _judgment_prior(claim, ctx) -> dict:
     p = {k: 0.1 for k in CLAIM_JUDGMENTS}
     ev = C.evidence_score(claim)
@@ -102,6 +110,27 @@ def _judgment_prior(claim, ctx) -> dict:
         p['UNSUPPORTED_BY_EVIDENCE'] += 0.2
     if any(f['severity'] == 'warn' for f in claim.get('critic', [])):
         p['LIKELY_VACUOUS'] += 0.2
+    return p
+
+
+def _proof_value_prior(claim, status) -> dict:
+    """Deterministic prior for PROOF_VALUE_JUDGMENT (the heuristic judge's answer)."""
+    p = {'HIGH_VALUE': 0.1, 'ROUTINE': 0.3, 'TRIVIAL_IN_HINDSIGHT': 0.1, 'WEAKER_THAN_INTENDED': 0.1}
+    j = claim.get('judgment') or {}
+    probs = j.get('probabilities') or {}
+    if claim['category'] == 'security':
+        p['HIGH_VALUE'] += 0.2 + 0.3 * (probs.get('SECURITY_RELEVANT', 0) + probs.get('USEFUL_PROPERTY', 0))
+    if (claim.get('intent') or {}).get('chosen'):
+        p['HIGH_VALUE'] += 0.3
+    if C.complexity(claim) <= 1 or j.get('label') in ('TRIVIAL', 'LIKELY_VACUOUS') \
+            or claim['property'].get('op') in C.OUTCOME:
+        p['TRIVIAL_IN_HINDSIGHT'] += 0.3
+    if claim.get('parent') or claim.get('dominated_by'):
+        p['WEAKER_THAN_INTENDED'] += 0.3
+    if status == 'ASSUMPTION_DEPENDENT':
+        p['WEAKER_THAN_INTENDED'] += 0.2
+    elif status == 'BOUNDED_PROVED':
+        p['WEAKER_THAN_INTENDED'] += 0.05
     return p
 
 
@@ -158,6 +187,7 @@ class Harness:
             selected += self.propose(fn)
         self.verify(selected)
         self.refine([c for c in selected if self.claims[c]['result']['status'] == 'REFUTED'])
+        self.diagnose()
         return self.finish(time.time() - started)
 
     # --- stages 5–8: evidence, generation, critic, judgment, selection, routing --------
@@ -327,21 +357,38 @@ class Harness:
                                         detail='counterexample judged a real bug, but the claimed intent has no '
                                                'independent support: ' + C.render_claim(claim, self.program)))
             return []
-        if d['chosen'] == 'MODEL_INCOMPLETE':
+        if d['chosen'] == 'INCOMPLETE_MODEL':
+            # The class is the judge's reading; the status is set here, by rule, and the
+            # defect itself is diagnosed in `diagnose` (MODEL_DEFECT_CLASSIFICATION).
             r['status'] = 'MODEL_INCOMPLETE'
+            r['reason'] = 'the counterexample is attributed to the model, not the code'
             rec['disposition'] = 'model_gap'
-            self.review.append(dict(kind='missing environment model', claim=cid,
-                                    detail='the counterexample is attributed to the model, not the code'))
             return []
         if rec['depth'] >= self.o.max_refinements:
             rec['disposition'] = 'refinement_limit'
             return []
         options = cegis.repairs(claim, r, fn, ctx)
         prior = {o['id']: cegis.repair_prior(o, claim, d['chosen']) for o in options}
-        pick = self.judge.rank_repairs(state, options, prior, dict(claim=cid, classification=d['chosen']))
+        offered = [o['id'] for o in options]
+        pre_pick = None
+        preconditions = [o for o in options if o['kind'] == 'precondition']
+        if d['chosen'] == 'MISSING_PRECONDITION' and len(preconditions) >= 2:
+            # Which precondition is a separate question from which *kind* of repair: choose
+            # among preconditions first, then weigh the winner against reject/weaken/….
+            pre_pick = self.judge.select_precondition(state, preconditions,
+                                                      {o['id']: prior[o['id']] for o in preconditions},
+                                                      dict(claim=cid, classification=d['chosen']))
+            options = [o for o in options if o['kind'] != 'precondition' or o['id'] == pre_pick['chosen']]
+        pick = self.judge.rank_repairs(state, options, {o['id']: prior[o['id']] for o in options},
+                                       dict(claim=cid, classification=d['chosen']))
         chosen = next(o for o in options if o['id'] == pick['chosen'])
-        rec['repair'] = dict(chosen=chosen['id'], text=chosen['text'], decision=pick['decision_id'],
-                             options=[o['id'] for o in options])
+        rec['repair'] = dict(chosen=chosen['id'], kind=chosen['kind'], text=chosen['text'],
+                             decision=pick['decision_id'], options=[o['id'] for o in options], offered=offered,
+                             core=_core(chosen['claim']) if chosen['claim'] else None)
+        if pre_pick:
+            rec['repair']['precondition'] = dict(chosen=pre_pick['chosen'], decision=pre_pick['decision_id'],
+                                                 options=[o['id'] for o in preconditions],
+                                                 probabilities=pre_pick['probabilities'])
         if chosen['claim'] is None:
             rec['disposition'] = 'rejected_by_repair'
             return []
@@ -349,6 +396,7 @@ class Harness:
             verdict = self.judge.assumption(state, chosen['claim']['assumptions'][-1],
                                             {'ACCEPTABLE': 0.2, 'UNACCEPTABLE': 0.3, 'NEEDS_HUMAN_REVIEW': 0.5},
                                             dict(claim=cid))
+            rec['repair']['assumption'] = dict(verdict=verdict['chosen'], decision=verdict['decision_id'])
             if verdict['chosen'] != 'ACCEPTABLE':
                 self.review.append(dict(kind='high-impact assumption', claim=cid,
                                         detail=chosen['claim']['assumptions'][-1], judgment=verdict['chosen']))
@@ -372,15 +420,79 @@ class Harness:
         self.route(new, fn, _state(ctx))
         return [new['id']] if self.claims[new['id']]['result']['status'] == 'PENDING' else []
 
+    # --- stage 11: model-defect diagnosis ------------------------------------------------
+    def diagnose(self):
+        """For every selected claim whose result the verifier or the gates attribute to the
+        model, classify the defect. Gates first; the judge only chooses among what the facts
+        allow. The status (MODEL_INCOMPLETE / INCONSISTENT_MODEL) is never changed here."""
+        for cid, rec in list(self.claims.items()):
+            r = rec['result']
+            if not rec['selected'] or r.get('status') not in MODEL_STATUSES or rec.get('model_defect'):
+                continue
+            fn = self.program.by_id[rec['function']]
+            ctx = self.contexts[fn.id]
+            ce = rec.get('counterexample') or {}
+            match = ce.get('native_agrees')
+            unsupported = self.env.unsupported_reach(self.program, fn)
+            allowed = cegis.allowed_defects(r['status'], r, fn, match, unsupported)
+            witness = r.get('witness') or {}
+            label = cegis.hole_label(witness.get('model_outcome'))
+            state = dict(_state(ctx), claim=C.render_claim(rec['claim'], self.program), status=r['status'],
+                         reason=r.get('reason'),
+                         witness=dict(inputs=witness.get('inputs') or r.get('witness_candidate'),
+                                      model_outcome=witness.get('model_outcome'),
+                                      outcome_kind=witness.get('outcome_kind'), hole_label=label,
+                                      native_outcome=(ce.get('native') or {}).get('result'),
+                                      native_agrees=match),
+                         untranslated_blocks=len(fn.holes), unsupported_externals=unsupported)
+            d = self.judge.classify_model_defect(state, allowed, cegis.defect_prior(allowed, r, match, unsupported),
+                                                 dict(claim=cid))
+            rec['model_defect'] = dict(classification=d['chosen'], probabilities=d['probabilities'],
+                                       allowed=allowed, forced=bool(d.get('forced')), hole_label=label,
+                                       decision=d['decision_id'])
+            self.review.append(dict(kind='model defect', claim=cid, classification=d['chosen'],
+                                    detail=f"{r['status']}: {d['chosen']}"
+                                           + (f" (hole `{label}`)" if label else '')
+                                           + (' [forced by the verifier facts]' if d.get('forced') else
+                                              f" (judge, among {', '.join(allowed)})")))
+
+    # --- stage 12: proof value (never a status) -------------------------------------------
+    def judge_proof_values(self):
+        """PROOF_VALUE_JUDGMENT for each selected, established claim. Asked with the interface
+        view only: shown the body, a judge rates a proof of what the body does as intended."""
+        by_fn = {}
+        for cid, rec in self.claims.items():
+            if rec['selected'] and rec['result'].get('status') in HELD:
+                by_fn.setdefault(rec['function'], []).append((cid, rec))
+        for fid, items in by_fn.items():
+            state = _state(self.contexts[fid], implementation=False)
+            texts = [C.render_claim(rec['claim'], self.program)
+                     + (f"\n({rec['claim']['description']})" if rec['claim'].get('description') else '')
+                     + f"\nVerifier status: {rec['result']['status']}"
+                     + (f" over a finite domain of {rec['result'].get('domain_size')} points"
+                        if rec['result']['status'] == 'BOUNDED_PROVED' else '')
+                     + (f"; assumes: {'; '.join(rec['claim']['assumptions'])}" if rec['claim']['assumptions'] else '')
+                     for _, rec in items]
+            decisions = self.judge.proof_value(state, texts,
+                                               [_proof_value_prior(rec['claim'], rec['result']['status'])
+                                                for _, rec in items],
+                                               [dict(claim=cid) for cid, _ in items])
+            for (cid, rec), d in zip(items, decisions):
+                rec['proof_value'] = dict(label=d['chosen'], probabilities=d['probabilities'],
+                                          decision=d['decision_id'])
+
     # --- ledger, certificates, confidence, report ------------------------------------
     def finish(self, seconds) -> dict:
         self.cache.save()
         records = []
-        for cid, rec in self.claims.items():
-            claim, fn, r = rec['claim'], self.program.by_id[rec['function']], rec['result']
+        for rec in self.claims.values():
+            claim, r = rec['claim'], rec['result']
             if r.get('status') in ('PROVED', 'BOUNDED_PROVED') and claim['assumptions']:
                 r['status_before_assumptions'] = r['status']
                 r['status'] = 'ASSUMPTION_DEPENDENT'
+        self.judge_proof_values()
+        for cid, rec in self.claims.items():
+            claim, fn, r = rec['claim'], self.program.by_id[rec['function']], rec['result']
             if r.get('status') in ('PROVED', 'BOUNDED_PROVED') and rec.get('unsupported_externals'):
                 r['note'] = 'reaches unsupported externals: ' + ', '.join(rec['unsupported_externals'])
             coverage = self.contexts[fn.id]['coverage']
@@ -421,7 +533,8 @@ class Harness:
                     assumptions=rec['assumptions'], counterexample=rec.get('counterexample'),
                     repair=rec.get('repair'), disposition=rec.get('disposition'), parent=claim.get('parent'),
                     repaired_by=rec.get('repaired_by'), depth=rec['depth'], confidence=rec['confidence'],
-                    intent=claim.get('intent'),
+                    intent=claim.get('intent'), model_defect=rec.get('model_defect'),
+                    proof_value=rec.get('proof_value'),
                     certificate=rec['certificate'], utility=claim.get('utility'),
                     judgment=claim.get('judgment'), evidence=claim['evidence'], provenance=claim['provenance'],
                     coverage=self.contexts[fn.id]['coverage'])
@@ -434,9 +547,26 @@ class Harness:
             rec = self.claims.get(ctx.get('claim')) if isinstance(ctx, dict) else None
             if rec:
                 repaired = self.claims.get(rec.get('repaired_by') or '', {})
+                repair = rec.get('repair') or {}
                 e['outcome'] = dict(status=rec['result'].get('status'), disposition=rec.get('disposition'),
                                     repair_status=(repaired.get('result') or {}).get('status'),
+                                    repair_chosen=repair.get('chosen'), repair_kind=repair.get('kind'),
                                     classification=(rec.get('counterexample') or {}).get('classification'),
-                                    native_agrees=(rec.get('counterexample') or {}).get('native_agrees'))
+                                    native_agrees=(rec.get('counterexample') or {}).get('native_agrees'),
+                                    model_defect=(rec.get('model_defect') or {}).get('classification'))
+                if e['task'] == 'ASSUMPTION_ACCEPTABILITY':
+                    e['outcome']['assumption_free_sibling'] = self.assumption_free_sibling(ctx['claim'], rec)
             entries.append(e)
         self.log.path.write_text(''.join(json.dumps(e, default=str) + '\n' for e in entries))
+
+    def assumption_free_sibling(self, cid, rec):
+        """An established claim without prose assumptions that states what the assumption
+        repair of `cid` states: another repair of the same parent, or the same claim core."""
+        core = (rec.get('repair') or {}).get('core')
+        for oid, other in self.claims.items():
+            c = other['claim']
+            if oid == rec.get('repaired_by') or c['assumptions'] or other['result'].get('status') not in HELD:
+                continue
+            if c.get('parent') == cid or (core and other['function'] == rec['function'] and _core(c) == core):
+                return oid
+        return None

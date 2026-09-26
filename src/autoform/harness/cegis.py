@@ -1,6 +1,10 @@
 """Counterexample-guided refinement with bounded, penalized repair.
 
     C_0 → Verify(C_0) → witness → Judge.classify → [REAL_BUG: stop, report]
+                                               → [INCOMPLETE_MODEL: status MODEL_INCOMPLETE,
+                                                  Judge.classify_model_defect]
+                                               → [MISSING_PRECONDITION, ≥2 preconditions:
+                                                  Judge.select_precondition, then …]
                                                → [else: repairs r_1..r_k → Judge.rank → C_1 → Verify …]
 
 Anti-overfitting rules (design §29–30):
@@ -16,9 +20,10 @@ Anti-overfitting rules (design §29–30):
 from __future__ import annotations
 
 import copy
+import re
 
 from . import claims as C
-from .judge import COUNTEREXAMPLE_CLASSES
+from .judge import COUNTEREXAMPLE_CLASSES, MODEL_DEFECTS
 
 DELTA = 12
 MAX_REFINEMENTS = 5
@@ -48,20 +53,20 @@ def allowed_classes(result: dict, fn, native_match, claim=None) -> list:
     kind = (result.get('witness') or {}).get('outcome_kind')
     got = value_sort((result.get('witness') or {}).get('model_outcome'))
     if claim and kind == 'value' and claim.get('result_sort') and got and got != claim['result_sort']:
-        return ['PROPERTY_TOO_STRONG']  # the claim assumed a result of another sort
+        return ['BAD_SPEC']  # the claim assumed a result of another sort
     if kind == 'undefined_behavior':
         # The model states the behavior is undefined: either the code has a defect or
         # callers must never supply such inputs. Neither reading blames the model.
         return ['REAL_BUG', 'MISSING_PRECONDITION']
     if kind in ('hole', 'out_of_fuel'):
-        return ['MODEL_INCOMPLETE']
+        return ['INCOMPLETE_MODEL']
     if native_match is False:
-        return ['MODEL_INCOMPLETE']  # the model and the real runtime disagree at the witness
-    classes = ['REAL_BUG', 'PROPERTY_TOO_STRONG', 'MISSING_PRECONDITION']
+        return ['INCOMPLETE_MODEL']  # the model and the real runtime disagree at the witness
+    classes = ['REAL_BUG', 'BAD_SPEC', 'MISSING_PRECONDITION']
     if fn.calls and any(not c.resolved for c in fn.calls):
-        classes.append('ENVIRONMENT_ASSUMPTION')
+        classes.append('ENVIRONMENT_MISMATCH')
     if result.get('domain_size', 0) and native_match is None:
-        classes.append('SOLVER_ARTIFACT')
+        classes.append('ABSTRACTION_ARTIFACT')
     return classes
 
 
@@ -70,11 +75,11 @@ def classification_prior(claim, result, ctx, native_match) -> dict:
     judged = ((claim.get('judgment') or {}).get('probabilities') or {})
     intended = judged.get('USEFUL_PROPERTY', 0) + judged.get('SECURITY_RELEVANT', 0)
     prior['REAL_BUG'] += 0.5 * intended
-    prior['PROPERTY_TOO_STRONG'] += 0.5 * (judged.get('TOO_STRONG', 0) + judged.get('UNSUPPORTED_BY_EVIDENCE', 0))
+    prior['BAD_SPEC'] += 0.5 * (judged.get('TOO_STRONG', 0) + judged.get('UNSUPPORTED_BY_EVIDENCE', 0))
     if claim['category'] == 'security' and ctx['security_relevant']:
         prior['REAL_BUG'] += 0.1
     if claim['provenance'].get('generator') == 'template' and not ctx['security_relevant']:
-        prior['PROPERTY_TOO_STRONG'] += 0.4
+        prior['BAD_SPEC'] += 0.4
     if any(e['type'] == 'guard' for e in ctx['evidence']):
         prior['MISSING_PRECONDITION'] += 0.2
     if C.independent_sources(claim) >= 2:
@@ -83,8 +88,63 @@ def classification_prior(claim, result, ctx, native_match) -> dict:
         prior['MISSING_PRECONDITION'] += 0.3
     if native_match is True:
         prior['REAL_BUG'] += 0.1
-        prior['SOLVER_ARTIFACT'] = 0.02
+        prior['ABSTRACTION_ARTIFACT'] = 0.02
     return prior
+
+
+def hole_label(model_outcome: str | None):
+    """The label of an `EResult.hole "…"` outcome ('' for an unnamed hole, None if not a hole)."""
+    text = model_outcome or ''
+    if 'EResult.hole' not in text:
+        return None
+    m = re.search(r'EResult\.hole\s+"((?:[^"\\]|\\.)*)"', text)
+    return m.group(1) if m else ''
+
+
+def allowed_defects(status: str, result: dict, fn, native_match, unsupported=()) -> list:
+    """Deterministic facts first: which model defects are consistent with what the verifier saw.
+
+    `unsupported` lists the externals the function's call closure reaches that the environment
+    classifies UNSUPPORTED or NONDETERMINISTIC."""
+    if status == 'INCONSISTENT_MODEL':
+        return ['EVALUATOR_KERNEL_DISAGREEMENT']   # the same model, evaluated two ways, disagrees
+    witness = result.get('witness') or {}
+    kind = witness.get('outcome_kind')
+    if kind == 'out_of_fuel':
+        return ['FUEL_BOUND']
+    if kind == 'hole':
+        label = hole_label(witness.get('model_outcome')) or ''
+        if label.startswith('call:') and label[len('call:'):] in set(unsupported):
+            # The hole names a callee the environment does not model: the unmodeled construct
+            # is that external.
+            return ['EXTERNAL_UNMODELED', 'FRONTEND_MISTRANSLATION']
+        return ['UNMODELED_CONSTRUCT', 'FRONTEND_MISTRANSLATION']
+    if native_match is False:
+        out = ['SEMANTICS_MISMATCH', 'FRONTEND_MISTRANSLATION']
+        return out + (['EXTERNAL_UNMODELED'] if unsupported else [])
+    if not witness and fn.holes:
+        # Structural check over a body with untranslated statements.
+        return ['UNMODELED_CONSTRUCT', 'FRONTEND_MISTRANSLATION']
+    out = []
+    if fn.holes:
+        out.append('UNMODELED_CONSTRUCT')
+    if unsupported:
+        out.append('EXTERNAL_UNMODELED')
+    if native_match is not True:
+        out.append('SEMANTICS_MISMATCH')   # native agreement at the witness rules this out
+    return out + ['FRONTEND_MISTRANSLATION']
+
+
+def defect_prior(allowed, result, native_match, unsupported=()) -> dict:
+    prior = {k: 0.1 for k in MODEL_DEFECTS}
+    if native_match is False:
+        prior['SEMANTICS_MISMATCH'] += 0.4
+    if unsupported:
+        prior['EXTERNAL_UNMODELED'] += 0.4
+    if (result.get('witness') or {}).get('outcome_kind') == 'hole':
+        prior['UNMODELED_CONSTRUCT'] += 0.4
+        prior['EXTERNAL_UNMODELED'] += 0.2
+    return {k: v for k, v in prior.items() if k in allowed}
 
 
 def _guard_atoms(fn, params_by_name):
@@ -128,6 +188,10 @@ def repairs(claim, result, fn, ctx) -> list:
         new['evidence'] = claim['evidence'] + [{'type': 'counterexample', 'location': claim['id']}]
         if kind != 'reject' and C.complexity(new) > base + DELTA:
             return
+        if kind == 'precondition':
+            canon = [C.canonical(p) for p in new['preconditions']]
+            if canon[-1] in canon[:-1]:
+                return   # already assumed: re-adding it changes nothing the verifier checks
         out.append(dict(id=rid, text=text, claim=new, kind=kind, new_assumptions=new_assumptions,
                         evidence=evidence))
 
@@ -223,11 +287,11 @@ def repairs(claim, result, fn, ctx) -> list:
 
 def repair_prior(repair, claim, ce_class) -> dict:
     """RepairScore = Fit − λ·Complexity − μ·NewAssumptions (fit comes from the class)."""
-    fit = {'reject': {'PROPERTY_TOO_STRONG': 0.5, 'REAL_BUG': 0.2},
-           'weaken': {'PROPERTY_TOO_STRONG': 0.6},
-           'precondition': {'MISSING_PRECONDITION': 0.7, 'PROPERTY_TOO_STRONG': 0.2},
-           'exceptions': {'MISSING_PRECONDITION': 0.5, 'PROPERTY_TOO_STRONG': 0.3},
-           'assumption': {'ENVIRONMENT_ASSUMPTION': 0.6}}.get(repair['kind'], {}).get(ce_class, 0.05)
+    fit = {'reject': {'BAD_SPEC': 0.5, 'REAL_BUG': 0.2},
+           'weaken': {'BAD_SPEC': 0.6},
+           'precondition': {'MISSING_PRECONDITION': 0.7, 'BAD_SPEC': 0.2},
+           'exceptions': {'MISSING_PRECONDITION': 0.5, 'BAD_SPEC': 0.3},
+           'assumption': {'ENVIRONMENT_MISMATCH': 0.6}}.get(repair['kind'], {}).get(ce_class, 0.05)
     growth = (C.complexity(repair['claim']) - C.complexity(claim)) if repair['claim'] else 0
     support = 0.25 if repair.get('evidence', 'none') != 'none' else -0.2 if repair['kind'] == 'precondition' else 0
     return max(0.01, fit + support - 0.02 * max(growth, 0) - 0.25 * repair['new_assumptions'])

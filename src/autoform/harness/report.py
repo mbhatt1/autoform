@@ -29,6 +29,8 @@ def build(h, records, seconds) -> dict:
     assumptions = h.ledger.to_json()['assumptions']
     critical = [a for a in assumptions if a['kind'] in ('external', 'claim', 'input_domain')]
     findings = [r for r in records if r.get('disposition') == 'finding']
+    defects = [r for r in selected if r.get('model_defect')]
+    values = Counter(r['proof_value']['label'] for r in selected if r.get('proof_value'))
     suspected = [r for r in records if r.get('disposition') == 'suspected_bug']
     return dict(
         schema_version=1, module=h.o.module, generated_in_seconds=round(seconds, 1),
@@ -50,6 +52,11 @@ def build(h, records, seconds) -> dict:
                                      for r in findings],
         suspected_bugs=[dict(id=r['id'], function=r['function'], text=r['text'],
                              witness=(r.get('counterexample') or {}).get('inputs')) for r in suspected],
+        model_defects=[dict(id=r['id'], function=r['function'], status=r['status'],
+                            classification=r['model_defect']['classification'],
+                            forced=r['model_defect']['forced'], hole_label=r['model_defect'].get('hole_label'),
+                            allowed=r['model_defect']['allowed']) for r in defects],
+        proof_values=dict(values),
         unmodeled_externals=externals, critical_assumptions=critical, cache_hits=h.cache.hits,
         human_review=h.review,
         functions=[dict(id=f.id, name=f.name, coverage=h.contexts.get(f.id, {}).get('coverage'),
@@ -75,6 +82,10 @@ def card(r) -> list:
               f"- Category: {r['category']} / {r['subtype']} · backend: {r.get('backend')}",
               f"- Confidence — intent {c['intent_confidence']} · model {c['model_confidence']} · "
               f"proof {c['proof_confidence']}"]
+    if r.get('proof_value'):
+        v = r['proof_value']
+        lines.append(f"- Proof value (judge; not a status): {v['label']} "
+                     f"(p={v['probabilities'].get(v['label'], 0):.2f})")
     if r.get('reason'):
         lines.append(f"- Reason: {r['reason']}")
     if r.get('judgment') and r['judgment'].get('label'):
@@ -90,7 +101,15 @@ def card(r) -> list:
     elif (r['result'].get('witness') or {}).get('inputs') is not None:
         w = r['result']['witness']
         lines.append(f"- Counterexample: inputs {w['inputs']} → model `{w.get('model_outcome')}`")
+    if r.get('model_defect'):
+        m = r['model_defect']
+        lines.append(f"- Model defect: **{m['classification']}**"
+                     + (f" (hole `{m['hole_label']}`)" if m.get('hole_label') else '')
+                     + (' — forced by verifier facts' if m['forced'] else f" — judged among {', '.join(m['allowed'])}"))
     if r.get('repair'):
+        pre = r['repair'].get('precondition')
+        if pre:
+            lines.append(f"- Precondition chosen: {pre['chosen']} (of {', '.join(pre['options'])})")
         lines.append(f"- Repair: {r['repair']['text']} → {r.get('repaired_by') or r.get('disposition')}")
     if r.get('parent'):
         lines.append(f"- Refines: {r['parent']}")
@@ -116,9 +135,13 @@ def markdown(d) -> str:
         L += [f"  {'✓' if v['held'] == v['total'] else '✗'} {k}: {v['held']}/{v['total']}" for k, v in d['security'].items()]
     L += ['', f"Findings (REAL_BUG, intent supported): {len(d['findings'])}",
           f"Suspected bugs (needs review): {len(d['suspected_bugs'])}",
+          f"Model defects:            {len(d['model_defects'])}",
           f"Unmodeled externals:      {len(d['unmodeled_externals'])}",
           f"Critical assumptions:     {len(d['critical_assumptions'])}",
-          f"Proof cache hits:         {d['cache_hits']}", '```', '']
+          f"Proof cache hits:         {d['cache_hits']}"]
+    if d['proof_values']:
+        L.append('Proof value (judge):      ' + ', '.join(f'{k} {v}' for k, v in sorted(d['proof_values'].items())))
+    L += ['```', '']
     if d['findings']:
         L += ['## Findings', '']
         L += [f"- **{f['function']}** — `{f['text']}` fails at {f['witness']}"

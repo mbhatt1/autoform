@@ -75,17 +75,30 @@ cd ~/semif && python3.11 -m venv .venv && .venv/bin/pip install -e '.[mlx]'   # 
 | `AUTOFORM_SEMIF_MODEL` / `AUTOFORM_SEMIF_REVISION` | `Qwen/Qwen3.5-4B` @ `851bf6e8…` (SemIf's pinned baseline, about 9 GB) |
 | `AUTOFORM_SEMIF_BITS` | unset (bf16); `8` or `4` quantize in memory |
 
-The typed decisions are:
+The typed decisions are listed below. "Gate" means deterministic facts narrow the options
+before the judge sees them. When one option is left, the decision is *forced*: it is
+logged with `backend: forced` and the model is not consulted.
 
-| Task | Options | Deterministic gate before the judge sees it |
-|---|---|---|
-| `PROPERTY_JUDGMENT` | USEFUL_PROPERTY, SECURITY_RELEVANT, TRIVIAL, UNSUPPORTED_BY_EVIDENCE, TOO_STRONG, TOO_WEAK, LIKELY_VACUOUS | The critic has already removed invalid, tautological, contradictory, vacuous and duplicate claims |
-| `PROPERTY_SELECTION` | the candidates (listwise; chunks of 16, renormalized) | — |
-| `INTENT_SELECTION` | mutually exclusive candidates | Rivalry is computed, not guessed: two claims are rivals when no function satisfies both |
-| `BACKEND_SELECTION` | backends able to express the claim | Forced when only one is feasible |
-| `COUNTEREXAMPLE_CLASSIFICATION` | REAL_BUG, PROPERTY_TOO_STRONG, MISSING_PRECONDITION, MODEL_INCOMPLETE, ENVIRONMENT_ASSUMPTION, SOLVER_ARTIFACT | hole or out-of-fuel ⇒ MODEL_INCOMPLETE; native run disagrees with model ⇒ MODEL_INCOMPLETE; `ub:` hole ⇒ {REAL_BUG, MISSING_PRECONDITION}; result of another sort ⇒ PROPERTY_TOO_STRONG; a rival of the chosen intent cannot be REAL_BUG |
-| `REPAIR_SELECTION` | REJECT plus candidate repairs | Repairs come from the code (guards, divisors, operand widths), never from witness constants; complexity may grow by at most δ = 12 |
-| `ASSUMPTION_ACCEPTABILITY` | ACCEPTABLE, UNACCEPTABLE, NEEDS_HUMAN_REVIEW | — |
+| Task | When | Options | Deterministic gate before the judge sees it |
+|---|---|---|---|
+| `PROPERTY_JUDGMENT` | every accepted candidate | USEFUL_PROPERTY, SECURITY_RELEVANT, TRIVIAL, UNSUPPORTED_BY_EVIDENCE, TOO_STRONG, TOO_WEAK, LIKELY_VACUOUS | The critic has already removed invalid, tautological, contradictory, vacuous and duplicate claims |
+| `PROPERTY_SELECTION` | per function | the candidates (listwise; chunks of 16, renormalized) | — |
+| `INTENT_SELECTION` | per group of rival claims | mutually exclusive candidates | Rivalry is computed, not guessed: two claims are rivals when no function satisfies both |
+| `BACKEND_SELECTION` | per selected claim | backends able to express the claim | Forced when only one is feasible |
+| `COUNTEREXAMPLE_CLASSIFICATION` | per REFUTED claim | REAL_BUG, BAD_SPEC, MISSING_PRECONDITION, INCOMPLETE_MODEL, ENVIRONMENT_MISMATCH, ABSTRACTION_ARTIFACT | hole or out-of-fuel ⇒ INCOMPLETE_MODEL; native run disagrees with model ⇒ INCOMPLETE_MODEL; `ub:` hole ⇒ {REAL_BUG, MISSING_PRECONDITION}; result of another sort ⇒ BAD_SPEC; ENVIRONMENT_MISMATCH only if the function has an unresolved callee; ABSTRACTION_ARTIFACT only if native replay did not run; a rival of the chosen intent cannot be REAL_BUG |
+| `PRECONDITION_SELECTION` | class MISSING_PRECONDITION and ≥ 2 precondition repairs | the precondition repairs only (listwise) | Preconditions come from code guards, divisors and operand widths, never from witness constants |
+| `REPAIR_SELECTION` | per classified counterexample that is not REAL_BUG or INCOMPLETE_MODEL | REJECT, weakenings, *the* selected precondition (or every precondition, if PRECONDITION_SELECTION did not run), ALLOW_EXCEPTIONS, environment assumptions | Complexity may grow by at most δ = 12 |
+| `ASSUMPTION_ACCEPTABILITY` | the chosen repair adds a prose assumption | ACCEPTABLE, UNACCEPTABLE, NEEDS_HUMAN_REVIEW | — |
+| `MODEL_DEFECT_CLASSIFICATION` | status MODEL_INCOMPLETE or INCONSISTENT_MODEL (a hole/out-of-fuel witness, a counterexample classified INCOMPLETE_MODEL, a structural check over untranslated code, or evaluator/kernel disagreement) | UNMODELED_CONSTRUCT, FUEL_BOUND, SEMANTICS_MISMATCH, EXTERNAL_UNMODELED, FRONTEND_MISTRANSLATION, EVALUATOR_KERNEL_DISAGREEMENT | INCONSISTENT_MODEL ⇒ EVALUATOR_KERNEL_DISAGREEMENT (forced); out-of-fuel ⇒ FUEL_BOUND (forced); a named hole ⇒ {UNMODELED_CONSTRUCT, FRONTEND_MISTRANSLATION}, except a `call:<g>` hole naming an external the environment does not model ⇒ {EXTERNAL_UNMODELED, FRONTEND_MISTRANSLATION}; native disagreement ⇒ {SEMANTICS_MISMATCH, FRONTEND_MISTRANSLATION} (+ EXTERNAL_UNMODELED if one is reached); otherwise SEMANTICS_MISMATCH is offered only if native replay did not agree |
+| `PROOF_VALUE_JUDGMENT` | every selected PROVED / BOUNDED_PROVED / ASSUMPTION_DEPENDENT claim | HIGH_VALUE, ROUTINE, TRIVIAL_IN_HINDSIGHT, WEAKER_THAN_INTENDED | Asked with the interface view (no body), like intent questions. Reported next to the three confidence scores; never changes a status |
+
+**Classes are not statuses.** COUNTEREXAMPLE_CLASSIFICATION and
+MODEL_DEFECT_CLASSIFICATION are the judge's *readings*. The verifier status
+`MODEL_INCOMPLETE` is set by deterministic code only: a witness whose model outcome is a
+hole or out-of-fuel, or a counterexample classified INCOMPLETE_MODEL (usually forced by
+the gates). The judge class INCOMPLETE_MODEL is the reading; `MODEL_INCOMPLETE` is the
+resulting status. Every model defect goes to the human-review queue (`kind: model
+defect`) with its class and whether the verifier facts forced it.
 
 Two design points came from running it:
 
@@ -93,12 +106,25 @@ Two design points came from running it:
   judge rates "result is always true" as the intended contract (it matches the code).
   Claim judgment, selection and intent therefore see the name, signature, documentation,
   tests and callers. Counterexample classification, which must weigh the code against
-  the claim, sees the body.
+  the claim, sees the body. PROOF_VALUE_JUDGMENT is asked the same way: shown the
+  body, "result is always true" looks like a valuable proof of `return True`.
 * **A finding needs support for the intent** (§31 cross-validation). A counterexample
   judged REAL_BUG is reported as a finding only if the claim has an independent evidence
   source (test, documentation, assertion, guard, caller), or if it is, or is implied by,
   the judge's chosen intent with probability at least 0.8. Otherwise it is a *suspected
   bug* in the human-review queue.
+
+`jevbench.jsonl` labels a decision only where verification settles it (label kinds:
+`single`, `acceptable`, `negative`; everything else is `unlabeled` with a reason):
+
+| Task | Verifier-derived label |
+|---|---|
+| `PROPERTY_JUDGMENT` | established ⇒ {USEFUL_PROPERTY, SECURITY_RELEVANT}; refuted ⇒ by counterexample class |
+| `COUNTEREXAMPLE_CLASSIFICATION`, `REPAIR_SELECTION` | the implied repair was established (right) or refuted again (wrong) |
+| `PRECONDITION_SELECTION` | the same, but only if REPAIR_SELECTION then chose that precondition; otherwise it was never verified |
+| `BACKEND_SELECTION` | the backend reached PROVED/BOUNDED_PROVED/REFUTED |
+| `ASSUMPTION_ACCEPTABILITY` | repaired claim refuted again ⇒ ACCEPTABLE was wrong; repaired claim established while an assumption-free sibling (another repair of the same claim, or the same claim without the assumption) is also established ⇒ UNACCEPTABLE (unnecessary) |
+| `PROPERTY_SELECTION`, `INTENT_SELECTION`, `MODEL_DEFECT_CLASSIFICATION`, `PROOF_VALUE_JUDGMENT` | unlabeled: intent, value, and interpreter-vs-front-end blame are not settled by a verification run |
 
 `--judge heuristic` uses the deterministic priors each task computes anyway. It is
 reproducible and needs no model, and it is noticeably worse at intent.
@@ -138,7 +164,8 @@ For each module, claims are compiled to Lean in chunks of 24. Each chunk runs tw
    disagree, the result is **INCONSISTENT_MODEL**.
 
 Every accepted theorem uses only `propext`, `Classical.choice` and `Quot.sound`.
-Witnesses whose model outcome is `hole` or `outOfFuel` are **MODEL_INCOMPLETE**.
+Witnesses whose model outcome is `hole` or `outOfFuel` get the status
+**MODEL_INCOMPLETE** (and a MODEL_DEFECT_CLASSIFICATION).
 Holes labeled `ub:` are the C interpreter's explicit undefined behavior, such as signed
 overflow or an out-of-range shift count. They stay **REFUTED** and are classified like
 any other defect. For top-level Python functions, the witness is replayed natively, and
@@ -154,7 +181,8 @@ Three scores are kept apart on every claim: `intent_confidence` (judge and evide
 `model_confidence` (block coverage × external-summary coverage × native agreement), and
 `proof_confidence` (from the kernel status). A kernel proof of a claim nobody
 intended shows high proof confidence next to low intent confidence, and the report
-prints both.
+prints both. Next to them, the card shows the judge's PROOF_VALUE_JUDGMENT for
+established claims. It is a ranking, not a score, and it never feeds a status.
 
 ## Limits
 

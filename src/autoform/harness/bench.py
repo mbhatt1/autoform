@@ -6,8 +6,13 @@ Labels are derived from the verifier, so they are only as strong as the downstre
 evidence. Where the outcome cannot separate the options (a REAL_BUG verdict needs the
 authors' intent), the row is exported unlabeled rather than guessed.
 
-Tasks: PROPERTY_JUDGMENT, PROPERTY_SELECTION, COUNTEREXAMPLE_CLASSIFICATION,
-REPAIR_SELECTION, BACKEND_SELECTION, ASSUMPTION_ACCEPTABILITY.
+Tasks: PROPERTY_JUDGMENT, PROPERTY_SELECTION, INTENT_SELECTION, PRECONDITION_SELECTION,
+COUNTEREXAMPLE_CLASSIFICATION, MODEL_DEFECT_CLASSIFICATION, REPAIR_SELECTION,
+BACKEND_SELECTION, ASSUMPTION_ACCEPTABILITY, PROOF_VALUE_JUDGMENT.
+
+Label kinds: `single` (this option is right), `acceptable` (any of these), `negative`
+(this option was wrong), `unlabeled` (with the reason no verifier outcome settles it),
+`forced` (a deterministic gate left one option; not exported).
 """
 from __future__ import annotations
 
@@ -17,6 +22,11 @@ import math
 from pathlib import Path
 
 HELD = {'PROVED', 'BOUNDED_PROVED', 'ASSUMPTION_DEPENDENT'}
+
+
+TASKS = ('PROPERTY_JUDGMENT', 'PROPERTY_SELECTION', 'INTENT_SELECTION', 'PRECONDITION_SELECTION',
+         'COUNTEREXAMPLE_CLASSIFICATION', 'MODEL_DEFECT_CLASSIFICATION', 'REPAIR_SELECTION',
+         'BACKEND_SELECTION', 'ASSUMPTION_ACCEPTABILITY', 'PROOF_VALUE_JUDGMENT')
 
 
 def label(entry) -> dict:
@@ -29,7 +39,7 @@ def label(entry) -> dict:
             return dict(kind='acceptable', labels=['USEFUL_PROPERTY', 'SECURITY_RELEVANT'])
         if status == 'REFUTED':
             cls = out.get('classification')
-            if cls in ('PROPERTY_TOO_STRONG', 'MISSING_PRECONDITION'):
+            if cls in ('BAD_SPEC', 'MISSING_PRECONDITION'):
                 return dict(kind='acceptable', labels=['TOO_STRONG'])
             if cls == 'REAL_BUG':
                 return dict(kind='acceptable', labels=['SECURITY_RELEVANT', 'USEFUL_PROPERTY'])
@@ -41,6 +51,15 @@ def label(entry) -> dict:
         if out.get('repair_status') == 'REFUTED':
             return dict(kind='negative', label=chosen, reason='the implied repair was refuted again')
         return dict(kind='unlabeled', reason='intent-dependent; needs a human label')
+    if task == 'PRECONDITION_SELECTION':
+        if out.get('repair_chosen') != chosen:
+            return dict(kind='unlabeled', reason=f"REPAIR_SELECTION chose {out.get('repair_chosen')}; "
+                                                 'this precondition was never verified')
+        if out.get('repair_status') in HELD:
+            return dict(kind='single', label=chosen, reason='the claim under this precondition was established')
+        if out.get('repair_status') == 'REFUTED':
+            return dict(kind='negative', label=chosen, reason='refuted again under this precondition')
+        return dict(kind='unlabeled', reason=out.get('disposition') or 'the repaired claim was not verified')
     if task == 'REPAIR_SELECTION':
         if out.get('repair_status') in HELD:
             return dict(kind='single', label=chosen)
@@ -51,6 +70,24 @@ def label(entry) -> dict:
         if status in HELD | {'REFUTED'}:
             return dict(kind='single', label=chosen)
         return dict(kind='unlabeled', reason=f'outcome {status}')
+    if task == 'ASSUMPTION_ACCEPTABILITY':
+        repaired = out.get('repair_status')
+        if repaired == 'REFUTED':
+            # The claim still fails with the assumption: accepting it bought nothing.
+            return dict(kind='negative', label='ACCEPTABLE',
+                        reason='the claim repaired by this assumption was refuted again')
+        if repaired in HELD and out.get('assumption_free_sibling'):
+            return dict(kind='single', label='UNACCEPTABLE',
+                        reason=f"unnecessary: {out['assumption_free_sibling']} establishes the claim without it")
+        return dict(kind='unlabeled', reason='acceptability of an assumption the verifier did not refute or '
+                                             'make redundant is a judgment about callers; needs a human label')
+    if task == 'MODEL_DEFECT_CLASSIFICATION':
+        return dict(kind='unlabeled', reason='only a fix to the interpreter or the front end (or a person) '
+                                             'separates the admissible defect classes; this run cannot')
+    if task == 'PROOF_VALUE_JUDGMENT':
+        return dict(kind='unlabeled', reason='the kernel settles truth, not value; value is intent-dependent')
+    if task in ('PROPERTY_SELECTION', 'INTENT_SELECTION'):
+        return dict(kind='unlabeled', reason='which claim is intended is not settled by verification')
     return dict(kind='unlabeled', reason='no verifier-derived label for this task')
 
 
