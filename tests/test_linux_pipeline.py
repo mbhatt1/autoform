@@ -98,6 +98,72 @@ def test_linux_profile_is_explicit_and_respects_user_defines(tmp_path, different
     assert ctx['limitations']
 
 
+def test_kernel_units_compile_where_the_host_lacks_glibc_endian_headers(tmp_path, differential):
+    """`tools/include/linux/kernel.h` includes glibc's <endian.h> and <byteswap.h>.
+    On a host without them (macOS) every unit reaching kernel.h failed to compile, so
+    the oracle saw nothing of lib/math but int_pow.c. The generated kernel-include
+    directory now shims both, deferring to the host's own headers when they exist."""
+    if shutil.which('cc') is None:
+        pytest.skip('C compiler unavailable')
+    source = make_kernel(tmp_path)
+    (tmp_path / 'tools/include/linux').mkdir(parents=True)
+    (tmp_path / 'tools/include/linux/kernel.h').write_text(
+        '#include <endian.h>\n#include <byteswap.h>\n'
+        '#if __BYTE_ORDER == __LITTLE_ENDIAN\n#define ORDER 1\n#else\n#define ORDER 2\n#endif\n')
+    (source / 'f.c').write_text('#include <linux/kernel.h>\n'
+                                'int f(int x) { return ORDER * 100 + (int)(bswap_16(x) & 0xff); }\n')
+    f = scalar('f', 'f.c', ['x'])
+    result = differential.c_runtime(str(source), [f])
+    assert result.info['files_compiled'] == 1, result.info
+    little = differential.sys.byteorder == 'little'
+    assert result(f)(0x1234) == (100 if little else 200) + (0x12 if little else 0x34)
+
+
+def test_kernel_unit_calling_a_sibling_file_links_against_it(tmp_path, differential):
+    """Kernel units are compiled one at a time, so `lcm` calling `gcd` from gcd.c
+    failed at link time and the oracle never observed it. A unit that compiled but
+    did not link is retried with the siblings that built on their own."""
+    if shutil.which('cc') is None:
+        pytest.skip('C compiler unavailable')
+    source = make_kernel(tmp_path)
+    (source / 'gcd.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b)\n'
+        '{ while (b) { unsigned long t = a % b; a = b; b = t; } return a; }\n')
+    (source / 'lcm.c').write_text(
+        'unsigned long gcd(unsigned long a, unsigned long b);\n'
+        'unsigned long lcm(unsigned long a, unsigned long b)\n'
+        '{ return a && b ? (a * b) / gcd(a, b) : a | b; }\n')
+    fs = [dict(scalar(n, n + '.c', ['a', 'b']), paramIntegerTypes=['u64', 'u64'],
+               returnIntegerType='u64') for n in ('gcd', 'lcm')]
+    result = differential.c_runtime(str(source), fs)
+    assert result.info['files_compiled'] == 2, result.info
+    assert any(u.get('link_partners') == ['gcd.c'] for u in result.info['units'])
+    # The pre-74a5fef7cb08 overflow is observable: 2^32 * 2^32 wraps to 0.
+    assert result(fs[1])(1 << 32, 1 << 32) == 0
+    assert result(fs[1])(4, 6) == 12
+
+
+def test_typed_boundary_cases_reach_64_bit_overflow(differential):
+    """`randint(-20, 20)` can never overflow a 64-bit multiply, so `lcm(a, b) =
+    a * b / gcd(a, b)` agreed with the runtime on every input the oracle tried and the
+    overflow the kernel fixed in 74a5fef7cb08 was invisible at both commits."""
+    import ctypes
+    pool = differential.typed_boundary_pool(ctypes.c_uint64)
+    assert (1 << 63) in pool and (1 << 64) - 1 in pool and (1 << 32) in pool
+    assert all(0 <= v < (1 << 64) for v in pool)
+    signed = differential.typed_boundary_pool(ctypes.c_int8)
+    assert min(signed) == -128 and max(signed) == 127 and -1 in signed
+    differential.random.seed(7)
+    cases = list(differential.c_argument_cases([ctypes.c_uint64, ctypes.c_uint64], 6,
+                                               lambda: 3, boundaries=True))
+    assert [origin for _, origin in cases] == ['boundary-zero', 'random', 'boundary-typed',
+                                               'random', 'boundary-typed', 'random']
+    assert all(v in pool for args, origin in cases if origin == 'boundary-typed' for v in args)
+    # Without the flag the generator is unchanged for existing callers.
+    plain = list(differential.c_argument_cases([ctypes.c_uint64], 3, lambda: 3))
+    assert [origin for _, origin in plain] == ['boundary-zero', 'random', 'random']
+
+
 def test_target_database_does_not_use_host_portability_oracle(tmp_path, differential, monkeypatch):
     source = make_kernel(tmp_path)
     database = tmp_path / 'compile_commands.json'

@@ -153,7 +153,7 @@ python3.11 scripts/differential.py ast-Cachetools.json ~/src/cachetools Cachetoo
 
 A C compiler (`cc`) is needed only for the C conformance corpus.
 
-## 2. The two entry points
+## 2. The entry points
 
 ### `./autoform.sh <source-dir> [ModuleName]` — translate
 
@@ -215,6 +215,82 @@ by native observations are hashed and rechecked before proof synthesis.
 unparsed nonempty bodies remain visible as holes. The CPG population is not an
 independent source census. Kernel synchronization is explicitly represented by
 `effect:kernel-sync:<operation>` holes.
+
+### `autoform regress <repo> [Module] --base REF [--head REF]` — compare two commits
+
+Runs `autoform.sh` at two commits of one repository and compares what each run could
+prove, never the source text. `<repo>` is a Git URL or a local checkout with a `.git`
+directory; `--head` defaults to the repository's `HEAD`; `--subdir` selects the same
+directory inside both checkouts; `--timeout` bounds each of the two runs. The same
+module name is used at both commits on purpose, because theorem identifiers are per
+function and must line up across the runs.
+
+Each run's report is copied from `artifacts/pipeline/<Module>/` to
+`artifacts/regression/<Module>/{base,head}/` before the next run overwrites it, and
+`scripts/regression.py compare` writes `regression.json` and `regression.md` next to
+them (`runs.json` records the resolved commits and exit codes). The comparison is over
+the facts a run records:
+
+| Fact at `--base` | Lost at `--head` | Reported as |
+|---|---|---|
+| a function translated without holes | it holes (`hole` / `holeS` in `ast-<Module>.json`) | regression `translation`, with the labels |
+| a theorem in `specs.json` was proved | refuted, open, or no longer emitted while the function still exists | regression `proof` |
+| every recorded runtime case of a function agreed with the runtime | a recorded case diverges | regression `conformance` |
+| the pipeline passed | it stops at an earlier stage | regression `pipeline` |
+| a recorded case `(function, self, args)` had outcome `x` | the same inputs have outcome `y` | **behavior change**; `proven_both` when the function's theorem holds at both commits |
+
+The reverse of each row is an improvement; functions present at only one commit are
+listed as added or removed and are never regressions by themselves (a removed
+function's proved theorems are named). Exit `0` when nothing regressed and no outcome
+changed, `1` otherwise, `2` when a run never reached translation or the source is not a
+Git repository. A behavior change is reported under its own heading and still exits `1`:
+the tool can show that the two commits provably compute different things on the same
+inputs, not whether that was intended.
+
+Scope: a function the runtime never reached has no cases to compare, and an outcome
+that changed on inputs recorded at only one commit is not visible. Random cases are
+drawn with a fixed seed so the two runs see the same inputs; test-suite cases follow
+the repository's own tests at each commit. `scripts/regression.py profile <report>`
+prints the facts one run recorded; `compare <base> <head>` diffs any two report
+directories, including ones produced by hand or by CI at different times.
+
+### `autoform regress <repo> [Module] --base REF [--head REF] --machine --files FILE...` — compare compiled code
+
+Instead of running the source pipeline, `--machine` compiles the listed files at both
+commits for a Linux target (`--target aarch64`, the default, or `x86_64` or `i386`),
+links each commit's objects with `ld.lld` so calls between files resolve, and lifts
+each compared function through Ghidra's SLEIGH descriptions into the p-code Lean model.
+`--functions` names the functions to compare; by default every function whose compiled
+bytes changed is compared. It works for any language `clang` compiles to these
+targets; kernel headers are replaced by the declaration-only shim in
+`scripts/kernel_shim/`.
+
+For each function:
+
+1. **Search.** Candidate inputs are each parameter type's width boundaries (powers of
+   two straddling 32 and 64 bits, the type's extremes, their neighbours) and seeded
+   random values; parameter and return shapes come from DWARF. If this host can execute
+   the target's calling convention (an arm64 host for AArch64 integer functions), both
+   commits are also built for the host and run natively. Otherwise the lifted Lean
+   models are executed on the candidates. `scripts/machine_regress.py --input a,b,c`
+   supplies known reproducers, which are tried first and always reported.
+2. **Confirmation.** Each diverging input is re-run on both lifted models, which must
+   agree with native execution, and then **kernel-checked**: one Lean theorem per
+   commit states the exact return value its machine code produces on that input, proved
+   by `rfl` against the SLEIGH-lifted program.
+
+`artifacts/regression/<Module>/machine/` holds `regression.json`, `regression.md`,
+both commits' linked images, and the Lean check files. Exit `0` when no divergence was
+found, `1` when at least one was found and kernel-checked, `2` on a build or usage
+failure.
+
+What it proves and what it does not: a reported divergence is a machine-checked fact
+that the two commits' compiled code returns different values on that input. Which
+result is correct needs a specification or a reference; a divergence on an input
+outside the function's contract (for example a result that cannot fit its type) is
+reported like any other. "No divergence found" means none among the inputs tried,
+never equivalence. SLEIGH descriptions are trusted, and arguments are limited to
+integer registers (no stack-passed arguments, floats or aggregates).
 
 ## 3. Reading the ledger
 
@@ -464,6 +540,8 @@ authority when they disagree, and a disagreement is a bug to file.
 | `autoform init` | workspace extracted or already matching this package | — | workspace not empty, from a different package, or an init already in progress | — |
 | `autoform source` / `./autoform.sh` | every stage ran and the differential oracle agreed | a stage failed (parse, graph, export, render, build, ledger, proofs) or the oracle reported divergences — the stage's log is under `artifacts/pipeline/<Module>/` | usage error, module name not a Lean identifier, Joern not installed, busy workspace, or the run was **refused** because the tree holds a live `.mutate-backup` or modified tracked artifacts (§5, `docs/integrity.md`) | `128+N` interrupted by signal N; `--timeout` expiry is `143` |
 | `autoform assure` / `./assure.sh` / a Git URL | every required check completed | the workflow finished with unresolved verification gaps — `completed_with_gaps` in `run.json`; a scoped certificate in `guarantee.json` can coexist with this | invocation, setup or orchestration failure; source acquisition failed; property input invalid; refused tree as above | `128+N` |
+| `autoform regress --machine` | no divergence found among the inputs tried | at least one kernel-checked diverging input (`machine/regression.json`) | usage error, a build, link or lift failure, or a source that is not a Git repository | `128+N` |
+| `autoform regress` | both runs translated and nothing that held at `--base` is lost at `--head`, and no recorded case changed outcome | a regression or a proven behavior change (`regression.json` says which), or a run that never produced an AST | usage error, the source is not a Git repository, a ref could not be fetched, busy workspace, or a refused tree as above | `128+N` from either run; `--timeout` expiry is `143` |
 | `autoform machine` | as `scripts/formalize_machine.py` | as `formalize_machine.py` | CLI-level failure (workspace, lock, extraction) | — |
 
 Two things worth stating plainly. A `1` from `assure` is **not** a crash: it is the

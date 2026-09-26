@@ -42,15 +42,19 @@ random.seed(20260819)   # deterministic: workflows/proofs must be reproducible
 
 
 def _corpus_commit(src_root):
-    """The corpus checkout's commit, or why it could not be determined. Never raises:
-    provenance that fails the run is worse than provenance that reports its own absence."""
-    import subprocess
+    """Identify the actual corpus tree; a surrounding checkout is not its revision."""
+    from pathlib import Path
     try:
-        out = subprocess.run(["git", "-C", src_root, "rev-parse", "HEAD"],
-                             capture_output=True, text=True, timeout=10)
-        if out.returncode == 0:
-            return out.stdout.strip()
-        return "not-a-git-checkout"
+        # The corpus may itself import a module named provenance. Load our helper
+        # by its exact file without replacing that module in the native program.
+        spec = importlib.util.spec_from_file_location(
+            '_autoform_source_provenance', Path(__file__).with_name('provenance.py'))
+        if spec is None or spec.loader is None:
+            raise ImportError('source provenance helper is unavailable')
+        provenance = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(provenance)
+        revision = provenance.source_revision(Path(src_root))
+        return revision[4:] if revision.startswith("git:") else revision
     except Exception as e:                                          # noqa: BLE001
         return "unavailable: %s" % type(e).__name__
 
@@ -166,20 +170,42 @@ class Encoder:
       surface as a confident divergence the harness itself manufactured.
     """
 
-    def __init__(self):
+    def __init__(self, class_identities=None):
         self.heap = []          # list of (cls, [(field, Val)])
         self.byid = {}          # id(obj) -> ref index
         self.objs = {}          # ref index -> the live object (keeps ids alive)
         self.pin = set()        # ids present before the result was encoded
+        self.class_identities = class_identities
+
+    def class_identity(self, cls):
+        if self.class_identities is None:
+            return cls.__name__
+        name = type.__getattribute__(cls, '__qualname__')
+        if '<locals>' in name:
+            raise Unencodable('local-class-captures')
+        try:
+            source = inspect.getsourcefile(cls)
+        except (TypeError, OSError):
+            source = None
+        key = (os.path.realpath(source), name) if source else None
+        identity = self.class_identities.get(key)
+        if identity is None:
+            raise Unencodable('class-identity-unresolved:' + name)
+        return identity
 
     def enc(self, v, depth=0, in_key=False):
         if depth > MAX_DEPTH: raise Unencodable("depth")
         if v is None: return ("unit",)
+        if (self.class_identities is not None and isinstance(v, (int, float, str))
+                and type(v) not in (bool, int, float, str)):
+            raise Unencodable('primitive-subclass-state')
         if isinstance(v, bool): return ("bool", v)
         if isinstance(v, int): return ("int", v)
         if isinstance(v, float): return ("float", struct.unpack(">Q", struct.pack(">d", v))[0])
         if isinstance(v, str): return ("str", v)
         if isinstance(v, (list, tuple)):
+            if self.class_identities is not None and type(v) not in (list, tuple):
+                raise Unencodable('container-subclass-state')
             # Subclasses (`_HashedTuple`, `OrderedDict`) encode structurally: that is
             # faithful for every operation Core can perform on data it was *handed*
             # (index, len, membership, iteration order). Where Core instead *allocates*
@@ -190,6 +216,8 @@ class Encoder:
             k = "tuple" if isinstance(v, tuple) else "list"
             return (k, [self.enc(x, depth + 1, in_key) for x in v])
         if isinstance(v, dict):
+            if self.class_identities is not None and type(v) is not dict:
+                raise Unencodable('container-subclass-state')
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             # Keys are the subtle case: CPython looks them up by `__hash__`/`__eq__`,
             # which user classes override (cachetools' own tests define a
@@ -201,8 +229,19 @@ class Encoder:
                               self.enc(x, depth + 1, in_key)) for k, x in v.items()])
         if isinstance(v, type) or inspect.isroutine(v) or isinstance(v, (
                 staticmethod, classmethod, property, functools.partial)):
+            if self.class_identities is not None:
+                if isinstance(v, type):
+                    return ('fn', self.class_identity(v) + '<meta>')
+                if getattr(v, '__self__', None) is not None:
+                    raise Unencodable('bound-callable-state')
+                if getattr(v, '__closure__', None):
+                    raise Unencodable('callable-captures')
             # `METHOD_REF`/`TYPE_REF` values: Core models them by name only.
             n = getattr(v, "__qualname__", None) or getattr(v, "__name__", None)
+            if n and n.endswith('<meta>'):
+                # Only the class-identity branch above may create this marker.
+                # A user-reassigned function __qualname__ is not a class value.
+                raise Unencodable('callable-class-identity-collision')
             if n: return ("fn", n)
             raise Unencodable("callable")
         # a callable *instance* is still an object with fields — encode it as one
@@ -218,8 +257,52 @@ class Encoder:
         if id(obj) in self.byid: return self.byid[id(obj)]
         if isinstance(obj, type) or inspect.isroutine(obj):
             raise Unencodable("callable")
+        identity, fields = self.object_fields(obj)
+        idx = len(self.heap)
+        self.heap.append(None)
+        self.byid[id(obj)] = idx
+        self.objs[idx] = obj
+        self.heap[idx] = (identity, [(str(k), self.enc(v, depth + 1))
+                                     for k, v in fields.items()])
+        return idx
+
+    def object_fields(self, obj):
+        identity = self.class_identity(type(obj))
         fields = {}
-        if hasattr(obj, "__dict__"):
+        has_dict, slotted = False, False
+        if self.class_identities is not None:
+            # Read builtin storage descriptors directly, without invoking user
+            # attribute hooks or a derived member that shadows an inherited slot.
+            import types
+            namespaces = [(cls, type.__getattribute__(cls, '__dict__'))
+                          for cls in type.__getattribute__(type(obj), '__mro__')]
+            for cls, namespace in namespaces:
+                if cls is not object:
+                    self.class_identity(cls)  # external base storage is not guessed
+                slotted = slotted or '__slots__' in namespace
+            for cls, namespace in namespaces:
+                descriptor = namespace.get('__dict__')
+                if isinstance(descriptor, types.GetSetDescriptorType):
+                    state = descriptor.__get__(obj, type(obj))
+                    if (not isinstance(state, dict)
+                            or any(not isinstance(key, str) or key.startswith('<slot>')
+                                   for key in state)):
+                        raise Unencodable('non-ordinary-instance-dictionary')
+                    fields.update(state)
+                    has_dict = True
+                    break
+            for cls, namespace in namespaces:
+                for name, descriptor in namespace.items():
+                    if not isinstance(descriptor, types.MemberDescriptorType):
+                        continue
+                    owner = self.class_identity(cls)
+                    try:
+                        value = descriptor.__get__(obj, type(obj))
+                    except AttributeError:
+                        continue  # an uninitialized slot has no storage entry
+                    fields['<slot>' + owner + '.' + name] = value
+        elif hasattr(obj, "__dict__"):
+            has_dict = True
             # `vars` can hand back something that is not a dict -- click's objects with a
             # `__dict__` descriptor returning None did -- and that is an object we cannot
             # snapshot faithfully, not a dict with no entries.
@@ -227,25 +310,21 @@ class Encoder:
             if not isinstance(d, dict):
                 raise Unencodable("non-dict-__dict__")
             fields.update(d)
-        for cls in type(obj).__mro__:
-            for s in getattr(cls, "__slots__", ()) or ():
-                if hasattr(obj, s): fields[s] = getattr(obj, s)
-        slotted = any(getattr(c, "__slots__", None) is not None
-                      for c in type(obj).__mro__)
-        if not fields and not hasattr(obj, "__dict__") and not slotted:
+        if self.class_identities is None:
+            for cls in type(obj).__mro__:
+                for s in getattr(cls, "__slots__", ()) or ():
+                    if hasattr(obj, s): fields[s] = getattr(obj, s)
+            slotted = any(getattr(c, "__slots__", None) is not None
+                          for c in type(obj).__mro__)
+        if not fields and not has_dict and not slotted:
             raise Unencodable("opaque")     # C-level object with no inspectable state
         if len(fields) > MAX_ELEMS: raise Unencodable("wide-object")
-        idx = len(self.heap)
-        self.heap.append(None)                  # reserve the slot before recursing
-        self.byid[id(obj)] = idx
-        self.objs[idx] = obj
-        out = [(str(k), self.enc(val, depth + 1)) for k, val in fields.items()]
-        self.heap[idx] = (type(obj).__name__, out)
-        return idx
+        return identity, fields
 
     def freeze(self):
         """Mark the objects that existed before the call returned."""
         self.pin = set(self.byid)
+        self.input_heap = self.heap
 
     def enc_result(self, v):
         """Encode a returned value in the *same* namespace as the arguments.
@@ -276,14 +355,58 @@ def lean_val(v):
     raise Unencodable(t)
 
 
-def lean_heap(heap):
-    # named fields, not `⟨…⟩`: `Obj` has grown a field before (`captured`) and
-    # anonymous-constructor literals fail the whole run when it happens again
-    return "[%s]" % ", ".join(
-        "{ cls := %s, fields := [%s] }"
-        % (json.dumps(cls), ", ".join("(%s, %s)" % (json.dumps(k), lean_val(val))
-                                      for k, val in fields))
-        for cls, fields in heap)
+from native_heap import graph_encoder
+GraphEncoder = graph_encoder(Encoder, Unencodable, MAX_DEPTH, MAX_ELEMS)
+
+
+def heap_cell(cell):
+    """Legacy cells have two fields; graph observations add a container payload."""
+    return cell[0], cell[1], cell[2] if len(cell) == 3 else None
+
+
+def lean_heap(heap, value=lean_val, string=json.dumps):
+    cells = []
+    for cell in heap:
+        cls, fields, payload = heap_cell(cell)
+        text = "{ cls := %s, fields := [%s]" % (
+            string(cls), ", ".join("(%s, %s)" % (string(k), value(v)) for k, v in fields))
+        if payload is not None:
+            tag, items = payload
+            vals = (", ".join("(%s, %s)" % (value(k), value(v)) for k, v in items)
+                    if tag == 'dict' else ", ".join(value(v) for v in items))
+            text += ", payload := .%s [%s]" % (tag, vals)
+        cells.append(text + " }")
+    return "[" + ", ".join(cells) + "]"
+
+
+def graph_lit(case, value=lean_val, string=json.dumps):
+    post = case.get('post_heap')
+    if post is None:
+        return 'none'
+    # Each atom/edge costs at most two checker steps. JSON size deliberately
+    # overestimates that count, keeping exhaustion an explicit comparison gap.
+    budget = 16 + 2 * len(json.dumps([post, case['outcome']]))
+    roots = ', '.join('(base + %d)' % i for i in range(len(case['heap'])))
+    return '(some { heap := h0 ++ %s, roots := [%s], budget := %d })' % (
+        lean_heap(post, value, string), roots, budget)
+
+
+def outcome_lit(outcome, value=lean_val, string=json.dumps):
+    kind, result = outcome
+    return ('EResult.val (%s)' % value(result) if kind == 'val' else
+            'EResult.exn (Val.str %s)' % string(result))
+
+
+def finish_record(enc, record):
+    """Complete a record atomically; failure must never fall back to result-only."""
+    record['heap'] = enc.input_heap
+    # A final-graph observation needs exact identities on both sides. A legacy AST
+    # (no `classDeclarations`) has short class names and short function qualnames on
+    # the native side against Core's qualified function names, so its comparison is
+    # result-only, exactly as before graph observations existed.
+    if isinstance(enc, GraphEncoder) and enc.class_identities is not None:
+        record['post_heap'] = enc.post_state()
+    return record
 
 
 # ------------------------------------------------------------------- repr parsing
@@ -438,6 +561,10 @@ def same(py, ln, base):
     if t in ("unit",): return True
     if t in ("int", "bool", "str"): return py[1] == ln[1]
     if t == "fn":
+        if py[1].endswith('<meta>') or ln[1].endswith('<meta>'):
+            # Recovered class values already share an exact source identity.
+            # Dropping module qualification would conflate unrelated classes.
+            return py[1] == ln[1]
         # `Val.fn` names are spelled differently on the two sides: CPython reports a
         # `__qualname__` (`TTLCache._Link`), Joern a fully-qualified one
         # (`pkg/mod.py:<module>.TTLCache._Link`). Core's own `Ctx.resolve` matches
@@ -543,6 +670,26 @@ def resolve_src_root(src_root, rel_files):
         print("source root corrected: %s -> %s (%d/%d AST paths resolve there)"
               % (src_root, best, n, len(rels)))
     return best
+
+
+def class_identity_index(funcs, src_root):
+    """Use exact source file and class path; duplicate identities stay unresolved.
+
+    None selects the historical encoding for ASTs without recovered class metadata.
+    An empty mapping selects strict refusal when metadata exists but cannot resolve.
+    """
+    rows = [row for function in funcs for row in function.get('classDeclarations', [])]
+    if not rows:
+        return None
+    identities = {}
+    for row in rows:
+        name = row['name']
+        source, separator, qualified = name.partition(':<module>.')
+        if not separator or not source or not qualified:
+            continue
+        key = (os.path.realpath(os.path.join(src_root, source)), qualified)
+        identities[key] = None if key in identities else name
+    return identities
 
 
 def build_lineno_index(src_root, wanted_files):
@@ -669,8 +816,29 @@ class ParamMismatch(Exception):
     pass
 
 
+def trace_return_is_normal(frame):
+    """A trace return's None argument does not distinguish return from unwind.
+
+    CPython's actual return instruction does. Other interpreters or unknown
+    instructions are refused instead of turning a handled exception into an outcome.
+    Suspended generator/coroutine frames are excluded by the call-event handler.
+    """
+    import dis
+    if sys.implementation.name != 'cpython' or frame.f_lasti < 0:
+        return None
+    try:
+        name = dis.opname[frame.f_code.co_code[frame.f_lasti]]
+    except (IndexError, TypeError):
+        return None
+    if name.startswith('<') or name.startswith('YIELD'):
+        return None
+    if name in ('RETURN_VALUE', 'RETURN_CONST'):
+        return True
+    return None if 'RETURN' in name else False
+
+
 def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
-                params_by_name=None, live=None, pool=None):
+                params_by_name=None, live=None, pool=None, encoder_factory=Encoder):
     """Run the project's test suite under `sys.settrace`, recording calls into `wanted`.
 
     Each record is a fully-encoded snapshot taken *at call time*, so later mutation of
@@ -688,7 +856,7 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         order = frame_param_order(code)
         loc = frame.f_locals
         self_name = order[0][0] if order and order[0][0] == "self" else None
-        enc = Encoder()
+        enc = encoder_factory()
         try:
             slf, args = bind_args(order, loc, enc, params_by_name.get(key), self_name)
         except ParamMismatch as e:
@@ -732,12 +900,13 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         st = state_by_frame.get(id(frame))
         if st is None: return None
         if event == "exception":
-            st["exn"] = arg[0].__name__
+            st["exceptions"].add(arg[0].__name__)
         elif event == "return":
             rec = st["rec"]
-            if arg is None and st.get("exn"):
-                rec["outcome"] = ("exn", st["exn"])
-            else:
+            normal = trace_return_is_normal(frame)
+            if normal is False and arg is None and len(st["exceptions"]) == 1:
+                rec["outcome"] = ("exn", next(iter(st["exceptions"])))
+            elif normal is True:
                 try:
                     rec["outcome"] = ("val", st["enc"].enc_result(arg))
                 except Unencodable as e:
@@ -747,8 +916,23 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
                                            e.args[0] if e.args else "?")
                     r[k] = r.get(k, 0) + 1
                     rec = None
+            else:
+                # A finally clause can handle a second exception then resume the
+                # first one. The last exception event is not its escaping type.
+                stats['skip_ambiguous_trace_return'] = stats.get('skip_ambiguous_trace_return', 0) + 1
+                reasons = stats.setdefault('trace_return_gaps', {})
+                reason = rec['name'] + ': unsupported-return-or-ambiguous-unwind'
+                reasons[reason] = reasons.get(reason, 0) + 1
+                rec = None
             state_by_frame.pop(id(frame), None)
-            if rec is not None: records.append(rec)
+            if rec is not None:
+                try:
+                    records.append(finish_record(st['enc'], rec))
+                except Unencodable as e:
+                    stats['skip_unencodable_post'] = stats.get('skip_unencodable_post', 0) + 1
+                    reasons = stats.setdefault('unencodable_reasons', {})
+                    reason = rec['name'] + ': post-state ' + str(e)
+                    reasons[reason] = reasons.get(reason, 0) + 1
         return local2
 
     def tracer2(frame, event, arg):
@@ -759,6 +943,9 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         rel, qual = hit
         key = "%s:<module>.%s" % (rel, qual)
         if key not in wanted or counts.get(key, 0) >= limit_per_fn: return None
+        if code.co_flags & (inspect.CO_GENERATOR | inspect.CO_COROUTINE | inspect.CO_ASYNC_GENERATOR):
+            stats['skip_suspended_frame'] = stats.get('skip_suspended_frame', 0) + 1
+            return None
         snap = snapshot(frame, qual, key)
         if snap is None: return None
         enc, slf, args = snap
@@ -767,10 +954,11 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
         state_by_frame[id(frame)] = {
             "rec": {"name": key, "heap": enc.heap, "self": slf, "args": args,
                     "outcome": None},
-            "enc": enc, "exn": None}
+            "enc": enc, "exceptions": set()}
         return local2
 
     old_path = list(sys.path)
+    old_trace = sys.gettrace()
     sys.path.insert(0, os.path.abspath(src_root))
     for d in test_dirs:
         sys.path.insert(0, os.path.dirname(os.path.abspath(d)))
@@ -786,7 +974,7 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
             except Exception as e:                       # noqa: BLE001
                 ran.append({"dir": d, "error": repr(e)[:200]})
     finally:
-        sys.settrace(None)
+        sys.settrace(old_trace)
         sys.path[:] = old_path
     stats["test_runs"] = ran
     return records
@@ -932,7 +1120,7 @@ def _ctor_fallback(n):
     return 1
 
 
-def _direct_cases(fn, f, pool, ncases, out):
+def _direct_cases(fn, f, pool, ncases, out, encoder_factory=Encoder):
     """Call a plain callable with synthesized arguments and append the cases it yields."""
     try:
         order = frame_param_order(fn.__code__)
@@ -951,7 +1139,7 @@ def _direct_cases(fn, f, pool, ncases, out):
         for n in names:
             cand = pool.get(n) or []
             argv.append(cand[attempt % len(cand)] if cand else random.randint(-8, 8))
-        enc = Encoder()
+        enc = encoder_factory()
         try:
             eargs = [enc.enc(a) for a in argv]
         except Unencodable:
@@ -967,8 +1155,11 @@ def _direct_cases(fn, f, pool, ncases, out):
             continue
         except Exception as e:                              # noqa: BLE001
             outcome = ("exn", type(e).__name__)
-        out.append({"name": f["name"], "heap": enc.heap, "self": None,
-                    "args": eargs, "outcome": outcome, "origin": "constructed"})
+        try:
+            out.append(finish_record(enc, {"name": f["name"], "self": None,
+                       "args": eargs, "outcome": outcome, "origin": "constructed"}))
+        except Unencodable:
+            continue
         made += 1
     return made
 
@@ -1024,7 +1215,7 @@ def resolve_via_factory(mod, clsname, attr, pool):
     return None
 
 
-def constructed_cases(methods, reached, live, pool, stats, ncases):
+def constructed_cases(methods, reached, live, pool, stats, ncases, encoder_factory=Encoder):
     """Exercise hole-free methods the test suite never called.
 
     The suite is the source of *realistic* state, so rather than fabricating an object
@@ -1075,7 +1266,7 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                 if pobj is not None and inspect.isroutine(pobj):
                     tgt = resolve_via_factory(m, clsname, attr, pool)
                     if tgt is not None and inspect.isroutine(tgt):
-                        made = _direct_cases(tgt, f, pool, ncases, out)
+                        made = _direct_cases(tgt, f, pool, ncases, out, encoder_factory)
                         if made:
                             why.pop(qual, None)
                             continue
@@ -1118,7 +1309,7 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                 cand = pool.get(n) or []
                 argv.append(cand[attempt % len(cand)] if cand
                             else random.randint(-8, 8))
-            enc = Encoder()
+            enc = encoder_factory()
             try:
                 slf = enc.enc(inst)
                 if slf[0] != "ref": raise Unencodable("self-not-object")
@@ -1137,8 +1328,12 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
                 why[qual] = "unencodable result: %s" % (e.args[0],); break
             except Exception as e:                       # noqa: BLE001
                 outcome = ("exn", type(e).__name__)
-            out.append({"name": f["name"], "heap": enc.heap, "self": slf,
-                        "args": eargs, "outcome": outcome, "origin": "constructed"})
+            try:
+                out.append(finish_record(enc, {"name": f["name"], "self": slf,
+                           "args": eargs, "outcome": outcome, "origin": "constructed"}))
+            except Unencodable as e:
+                why[qual] = "unencodable post-state: " + str(e)
+                break
             made += 1
         if made: why.pop(qual, None)
     return out
@@ -1279,16 +1474,27 @@ def observe_c_plan(cget, plan, repeat=1):
                               isolation='fresh process per case; repeated calls share one process')
 
 
-def c_argument_cases(argtypes, ncases, random_arg):
+from boundary_values import typed_boundary_pool  # noqa: E402  (shared with machine_regress)
+
+
+def c_argument_cases(argtypes, ncases, random_arg, boundaries=False):
     """Reserve a case for zero/equality boundaries before random exploration.
 
     Small random samples missed both `<` versus `<=` and the zero-base,
     zero-exponent branch in the Linux RAID-6 mutation run. This is one guaranteed
     boundary within the requested budget, not exhaustive boundary coverage.
+
+    With `boundaries`, every other remaining case draws each argument from
+    `typed_boundary_pool` for its ABI type (seeded, so reproducible) instead of
+    `random_arg`, which is where 64-bit overflow behaviour becomes observable.
     """
     for index in range(ncases):
-        yield ([0] * len(argtypes), 'boundary-zero') if index == 0 else (
-            [t(random_arg()).value for t in argtypes], 'random')
+        if index == 0:
+            yield [0] * len(argtypes), 'boundary-zero'
+        elif boundaries and index % 2 == 0:
+            yield [random.choice(typed_boundary_pool(t)) for t in argtypes], 'boundary-typed'
+        else:
+            yield [t(random_arg()).value for t in argtypes], 'random'
 
 
 def load_module(path, root):
@@ -1818,20 +2024,23 @@ def main():
                       "skipped and COUNTED under backend_skipped.")
 
     if is_c:
-        BASIS = "c-native-zero-boundary-v3"
+        BASIS = "c-native-typed-boundary-v4"
         BASIS_NOTE = ("C scalar inputs reserve the first case per function for all-zero "
-                      "arguments, covering a zero/equality boundary. Remaining cases use "
-                      "the seeded small-integer sampler and declared ABI conversions. "
-                      "This is not exhaustive boundary coverage. Inputs differ from the "
-                      "earlier random-only native basis; rates are not directly comparable.")
+                      "arguments, covering a zero/equality boundary. Every other remaining "
+                      "case draws each argument from its ABI type's width boundaries "
+                      "(powers of two straddling 32 and 64 bits, the type's extremes); the "
+                      "rest use the seeded small-integer sampler and declared ABI "
+                      "conversions. This is not exhaustive boundary coverage. Inputs differ "
+                      "from the earlier zero-boundary basis (v3); rates are not directly "
+                      "comparable.")
     if wasm_mode and is_c:
         # The denominator moves under `--wasm`: calls where native and wasm-clang
         # disagree are withheld from the Lean comparison and counted as `ub-suspected`
         # instead. That is a DIFFERENT measurement from the native-only C basis, and it
         # says so rather than letting a reader assume the rates line up.
-        BASIS = "c-dual-oracle-zero-boundary-v4"
+        BASIS = "c-dual-oracle-typed-boundary-v5"
         BASIS_NOTE = (
-            "Basis c-dual-oracle-zero-boundary-v4: C is executed under BOTH native `cc` and a "
+            "Basis c-dual-oracle-typed-boundary-v5: C is executed under BOTH native `cc` and a "
             "freestanding wasm32 build, on identical inputs. Calls where the two "
             "conforming implementations return different values are recorded as "
             "`ub-suspected` and WITHHELD from the Lean comparison -- Core maps UB to "
@@ -1908,10 +2117,11 @@ def main():
             if fn is None:
                 backend_skipped.setdefault(f["name"], "native compile failed or ABI types unavailable")
                 continue
-            for args, origin in c_argument_cases(fn.argtypes, ncases, c_arg):
+            for args, origin in c_argument_cases(fn.argtypes, ncases, c_arg, boundaries=True):
                 plan.append((f, args))
                 origins.append(origin)
-        backend_info['input_strategy'] = 'first case all-zero; remaining cases seeded random'
+        backend_info['input_strategy'] = ('first case all-zero; every other remaining case '
+                                          'per-type width boundaries; the rest seeded random')
 
         # Bound execution itself, not only the later Lean harness.
         if len(plan) > MAX_TOTAL_CASES:
@@ -2047,6 +2257,28 @@ def main():
         rel_files = sorted(set(f.get("file", "") for f in funcs))
         test_dirs = [tests_override] if tests_override else find_tests(src_root)
         src_root = resolve_src_root(src_root, rel_files)
+        identities = class_identity_index(funcs, src_root)
+        from native_heap import function_identities
+        callable_ids = function_identities(funcs, src_root)
+        encoder_factory = lambda: GraphEncoder(identities, callable_ids)
+        if identities is not None:
+            BASIS = 'python-class-slots-v6+class-values-v1'
+            BASIS_NOTE += (' Recovered class metadata selects exact source-file and class-path '
+                           'identities for native object snapshots. Unresolved identities, '
+                           'local-class captures, bound callable state and container subclass '
+                           'state are refused and counted. This changes the sampled population '
+                           'relative to python-deadlines-v4.')
+            BASIS_NOTE += ' Class-valued outcomes compare exact qualified identities.'
+            stats['class_identity_encoding'] = 'qualified-source-declarations'
+        else:
+            # A legacy AST carries no `classDeclarations`; plain instances are
+            # identified by short class name, which is also what Core's legacy
+            # semantics stores in `Obj.cls`, and inherited attributes are named gaps on
+            # the Lean side rather than exceptions. Say so in the basis.
+            BASIS_NOTE += (' No recovered class metadata: plain instances are identified '
+                           'by short class name on both sides, and attribute reads that '
+                           'would need the class hierarchy are inconclusive gaps.')
+            stats['class_identity_encoding'] = 'legacy-short-class-names'
         index = build_lineno_index(src_root, rel_files)
         traced = []
         params_by_name = {f["name"]: f["params"] for f in candidates}
@@ -2054,7 +2286,7 @@ def main():
         if test_dirs and index:
             print("test suite: %s" % ", ".join(test_dirs))
             traced = trace_tests(src_root, test_dirs, index, wanted, ncases, stats,
-                                 params_by_name, live, pool)
+                                 params_by_name, live, pool, encoder_factory)
         elif not test_dirs:
             print("test suite: none discovered under %s (pass --tests DIR)" % src_root)
         else:
@@ -2076,7 +2308,7 @@ def main():
             fn = getattr(mod, qual)
             for _ in range(ncases):
                 args = [random.randint(-20, 20) for _ in f["params"]]
-                enc = Encoder()
+                enc = encoder_factory()
                 enc.freeze()
                 try:
                     with time_limit(2.0):
@@ -2093,9 +2325,15 @@ def main():
                     stats["skip_unencodable_ret"] += 1; continue
                 except Exception as e:                      # noqa: BLE001
                     out = ("exn", type(e).__name__)
-                cases.append({"name": f["name"], "heap": enc.heap, "self": None,
-                              "args": [("int", a) for a in args], "outcome": out,
-                              "origin": "random"})
+                try:
+                    cases.append(finish_record(enc, {"name": f["name"], "self": None,
+                                 "args": [("int", a) for a in args], "outcome": out,
+                                 "origin": "random"}))
+                except Unencodable as e:
+                    stats['skip_unencodable_post'] = stats.get('skip_unencodable_post', 0) + 1
+                    reasons = stats.setdefault('unencodable_reasons', {})
+                    reason = f['name'] + ': post-state ' + str(e)
+                    reasons[reason] = reasons.get(reason, 0) + 1
 
         # (3) methods the suite never called: reuse an instance it built for a
         # sibling method, or build one, and synthesize arguments from observed values
@@ -2104,7 +2342,7 @@ def main():
         for rel in sorted({rel for _, rel, _ in methods}):
             load_module(os.path.join(src_root, rel), src_root)
         reached = set(c["name"] for c in cases)
-        built = constructed_cases(methods, reached, live, pool, stats, ncases)
+        built = constructed_cases(methods, reached, live, pool, stats, ncases, encoder_factory)
         cases += built
         print("cases constructed for methods the suite never called: %d (%d functions)"
               % (len(built), len(set(c["name"] for c in built))))
@@ -2115,6 +2353,24 @@ def main():
     if len(cases) > MAX_TOTAL_CASES:
         random.shuffle(cases)
         cases = cases[:MAX_TOTAL_CASES]
+
+    if lang == 'python':
+        BASIS += '+trace-returns-v1'
+        BASIS_NOTE += (' Traced outcomes distinguish an executed return instruction from '
+                       'exception unwinding, including returns of None after handled exceptions. '
+                       'Ambiguous unwind types and suspended generator/coroutine frames are '
+                       'counted as trace gaps, not fabricated call outcomes.')
+
+    if lang == 'python' and identities is None:
+        BASIS_NOTE += (' No final heap graph is recorded for a legacy AST: outcomes are '
+                       'compared by result only, as before graph observations existed.')
+    if lang == 'python' and identities is not None:
+        BASIS += '+heap-graph-v1'
+        BASIS_NOTE += (' Heap graphs preserve mutable list/dict/object identity, cycles, '
+                       'detached input objects and fresh reachable objects. Scalar tags and '
+                       'float bits, object fields and ordered dictionary payloads are compared. '
+                       'Globals outside those roots, immutable-value identity, instance-dictionary '
+                       'insertion order and internal mutation versions are outside this claim.')
 
     result = {"module": module_tag, "source_root": os.path.abspath(src_root),
               "interpreter_fuel": FUEL, "initializer_fuel": FUEL,
@@ -2202,7 +2458,8 @@ def main():
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # A stale `.olean` silently answers with the *previous* semantics — which shows up
     # as fictitious divergences. Rebuild the module before trusting anything it says.
-    b = subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod],
+    b = subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod,
+                            "Autoform.Lang.Core.Observation"],
                        capture_output=True, text=True, env=env, cwd=repo)
     if b.returncode != 0:
         result["status"] = "FAILED: Lean build"
@@ -2260,6 +2517,7 @@ def main():
         isolated = False
 
     header = ["import Autoform.Generated.%s" % lean_mod,
+              "import Autoform.Lang.Core.Observation",
               # Each corpus owns its namespace (`Autoform.Generated.Cachetools.program`,
               # ...) so that proofs about two codebases can share an import graph. Opening
               # the parent only was silently fatal here: `program` did not resolve, the
@@ -2281,7 +2539,7 @@ def main():
               "private def dctx : Ctx := "
               "{ dialect := program.dialect, table := program.table, globals := gref, "
               "builtinBases := program.builtinBases, properties := program.properties, "
-              "excClasses := program.excClasses }",
+              "excClasses := program.excClasses, classDecls := program.classDecls }",
               "",
               "private structure DCase where",
               "  idx  : Nat",
@@ -2289,7 +2547,9 @@ def main():
               "  fn   : String",
               "  slf  : Option Val",
               "  args : List Val",
-              "  chk  : List (Nat × String)", "",
+              "  chk  : List (Nat × String)",
+              "  expected : EResult",
+              "  post : Option HeapObservation", "",
               # A boxed function object (Core section 47) is REPORTED AS THE FUNCTION IT
               # CARRIES. `wrapper.cache_clear = f` makes `wrapper` a heap object, and Core
               # returns a `Val.ref` to it where CPython returns the function -- a shape
@@ -2303,18 +2563,18 @@ def main():
               "                     | some fv => .val fv",
               "                     | none    => r",
               "  | _ => r", "",
-              "private def drun (c : DCase) : EResult :=",
+              "private def drun (c : DCase) : Heap × EResult :=",
               "  let h := h0 ++ c.objs",
               "  -- the globals frame must survive, and each receiver must land where",
               "  -- the harness said it would",
               "  if (h.get gref).map (·.cls) != some \"<globals>\" then",
-              "    .hole \"harness:globals-frame-clobbered\"",
+              "    (h, .hole \"harness:globals-frame-clobbered\")",
               "  else if c.chk.any (fun p => (h.get (base + p.1)).map (·.cls) "
               "!= some p.2) then",
-              "    .hole \"harness:receiver-alias\"",
+              "    (h, .hole \"harness:receiver-alias\")",
               "  else",
               "    match dctx.resolve c.fn with",
-              '    | none    => .hole s!"entry:{c.fn}"',
+              '    | none    => (h, .hole s!"entry:{c.fn}")',
               # `applyFunc` gained a `kws` parameter when Python's calling convention was
               # modelled. This call site kept five arguments, so `drun` failed to elaborate
               # -- but the `@@meta@@` line above it only mentions `base`/`gref` and still
@@ -2322,21 +2582,27 @@ def main():
               # `lean-no-answer`. An arity change silently disabled the only oracle that
               # compares the semantics to a real runtime.
               "    | some fn => let r := applyFunc dctx %d h fn c.slf c.args []" % FUEL,
-              "                 unboxRes r.1 r.2", ""]
+              "                 (r.1, if c.post.isSome then r.2 else unboxRes r.1 r.2)", ""]
     footer = ["]", "",
               '#eval IO.println ("@@meta@@" ++ toString base ++ " " ++ toString gref)',
-              '#eval cases.forM (fun c => IO.println ("@@" ++ toString c.idx ++ "@@" '
-              '++ (repr (drun c)).pretty (width := 1000000)))']
+              '#eval cases.forM (fun c => do let r := drun c; '
+              'IO.println ("@@" ++ toString c.idx ++ "@@" '
+              '++ (repr r.2).pretty (width := 1000000)); '
+              'match c.post with | none => pure () | some graph => '
+              'IO.println ("@@heap@@" ++ toString c.idx ++ "@@" ++ '
+              '(repr (graph.compare r.1 c.expected r.2)).pretty (width := 1000000)))']
 
     def case_lit(i, c):
         slf = "none" if c["self"] is None else "(some (%s))" % lean_val(c["self"])
         chk = ", ".join('(%d, %s)' % (k, json.dumps(cls))
-                        for k, (cls, _) in enumerate(c["heap"]))
+                        for k, cell in enumerate(c["heap"]) for cls in [cell[0]])
         return ("  { idx := %d, objs := %s, fn := %s, slf := %s, args := [%s], "
-                "chk := [%s] }"
+                "chk := [%s], expected := %s, post := %s }"
                 % (i, lean_heap(c["heap"]), json.dumps(c["name"]), slf,
-                   ", ".join(lean_val(a) for a in c["args"]), chk))
+                   ", ".join(lean_val(a) for a in c["args"]), chk,
+                   outcome_lit(c['outcome']), graph_lit(c)))
 
+    graph_answers = {}
     meta = {"base": 0, "gref": 0}
     # per-process scratch file: two harness runs (or two agents) sharing /tmp would
     # otherwise clobber each other's generated file mid-bisection
@@ -2362,6 +2628,9 @@ def main():
                 meta["base"], meta["gref"] = int(m.group(1)), int(m.group(2))
                 saw_meta = True
                 continue
+            gm = re.match(r'@@heap@@(\d+)@@(.*)', l)
+            if gm and int(gm.group(1)) in idxs:
+                graph_answers[int(gm.group(1))] = gm.group(2).strip('() ')
             m = re.match(r'@@(\d+)@@(.*)', l)
             if m and int(m.group(1)) in idxs: got[int(m.group(1))] = m.group(2)
         if not saw_meta:
@@ -2379,7 +2648,8 @@ def main():
             # compile or environment failure, not a bad case. That happens for real —
             # another process rebuilding `Semantics.olean` removes it mid-run — so
             # rebuild and try once more before giving up on the whole chunk.
-            subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod],
+            subprocess.run(["lake", "build", "Autoform.Generated.%s" % lean_mod,
+                            "Autoform.Lang.Core.Observation"],
                            capture_output=True, text=True, env=env, cwd=repo)
             if isolated:
                 import shutil
@@ -2430,6 +2700,7 @@ def main():
         h = hashlib.sha256()
         root = snap_dir if isolated else os.path.join(repo, ".lake/build/lib/lean")
         for p in (os.path.join(root, "Autoform/Lang/Core/Semantics.olean"),
+                  os.path.join(root, "Autoform/Lang/Core/Observation.olean"),
                   os.path.join(root, "Autoform/Generated", lean_mod + ".olean")):
             try:
                 h.update(open(p, "rb").read())
@@ -2443,6 +2714,7 @@ def main():
     for attempt in range(3):
         before = olean_fingerprint()
         got = {}
+        graph_answers.clear()
         for i in range(0, len(order), CHUNK):
             got.update(lean_eval(order[i:i + CHUNK]))
         if olean_fingerprint() == before:
@@ -2525,6 +2797,21 @@ def main():
         else:
             lname = lr[1][1] if lr[1][0] == "str" else show(lr[1])
             desc = "%s=%s, lean raised %s" % (runtime, show(py[1]), lname)
+        if 'post_heap' in c:
+            answer = graph_answers.get(i)
+            desc += '; heap graph=' + str(answer)
+            if undecidable is None:
+                # The graph verdict refines an adjudicable result comparison. A case
+                # the result comparison already declined to call (a value-vs-object
+                # representation clash, an unmodelled exception payload) stays
+                # inconclusive: `HeapObservation.compare` answers `some false` for a
+                # `.ref` against a container cell too, and that is the same
+                # representation choice, not a second disagreement.
+                ok = answer == 'some true'
+                undecidable = ('heap-comparison-budget-or-no-answer'
+                               if answer not in ('some true', 'some false') else None)
+            else:
+                ok = False
         if undecidable is not None:
             incon += 1; bucket["incon"] += 1
             k = "%s: %s" % (c["name"], undecidable)
@@ -2534,6 +2821,8 @@ def main():
         if ok:
             agree += 1; bucket["agree"] += 1
             observation = {k: c[k] for k in ("name", "heap", "self", "args", "outcome")}
+            if 'post_heap' in c:
+                observation['post_heap'] = c['post_heap']
             observation.update(origin=origin, runtime=runtime, comparison="agree")
             result["runtime_cases"].append(observation)
         else:
@@ -2547,6 +2836,9 @@ def main():
                  # than a line of prose
                  "case": {"self": c["self"], "args": c["args"],
                           "heap": json.loads(json.dumps(c["heap"]))[:6]},
+                 # The compact legacy case above is a display preview. Preserve
+                 # the complete graph and native expectation for exact replay.
+                 "observation": json.loads(json.dumps(c)),
                  "lean_repr": line[:400]})
 
     total = agree + diverge

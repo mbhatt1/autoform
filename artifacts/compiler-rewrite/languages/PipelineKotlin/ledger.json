@@ -1,0 +1,12 @@
+{"verifiableCore": 4,
+ "nodes": 15,
+ "module": "PipelineKotlin",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 4,
+ "functions": 4,
+ "dynamicHoleRisk": 3,
+ "dialect": "java",
+ "contractsUsed": [],
+ "closedByTranslation": 4,
+ "closedByContract": 0}

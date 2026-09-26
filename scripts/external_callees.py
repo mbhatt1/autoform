@@ -35,7 +35,7 @@ ITERATION = os.path.join(ROOT, "Autoform", "Lang", "Core", "Iteration.lean")
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 sys.path.insert(0, os.path.join(ROOT, "cartographer"))
 import deep_json
-from generator_lowering import lower_generators
+from generator_lowering import analysis_functions
 
 
 def _lean_string_list(src: str, name: str, path: str) -> list[str]:
@@ -104,7 +104,7 @@ def walk(node, out: list, holes: list):
 
 
 def analyse(path: str) -> dict:
-    ast = lower_generators(deep_json.load(path))
+    ast = analysis_functions(deep_json.load(path))
     dialect = dialect_of(ast)
     # Program.table includes auxiliary frame functions; Program.funcs does not.
     helpers = [helper for f in ast for helper in f.get("generatorHelpers", [])]
@@ -116,7 +116,7 @@ def analyse(path: str) -> dict:
     hole_free_blocked = 0
     for f in ast:
         calls, holes = [], []
-        walk(f.get("analysisBody", f.get("body")), calls, holes)
+        walk(f["body"], calls, holes)
         ext = []
         for kind, key in calls:
             if kind == "call":

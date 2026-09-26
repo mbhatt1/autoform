@@ -30,6 +30,7 @@ from packaging.utils import canonicalize_name
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from build_support import runtime_files, source_files
+from scripts.compiler_sources import source_files as compiler_sources
 
 
 def require(condition, message):
@@ -144,9 +145,19 @@ def check_egg_dependencies(content, project):
     require(sections == expected, 'requires.txt differs from pyproject.toml')
 
 
+def check_compiler_sources(root, resources):
+    """Check compile units independently of the builder's filename selection."""
+    root = Path(root).resolve()
+    for entry in sorted((root / 'cartographer').rglob('*.sc')):
+        for source in compiler_sources(entry):
+            name = source.resolve().relative_to(root).as_posix()
+            require(name in resources, 'compiler source missing from runtime: ' + name)
+
+
 def check(wheel, sdist, root=ROOT):
     wheel, sdist, root = Path(wheel), Path(sdist), Path(root)
     expected = runtime_files(root)
+    check_compiler_sources(root, expected)
     project = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']
     with zipfile.ZipFile(wheel) as archive:
         names = zip_files(archive, 'wheel')

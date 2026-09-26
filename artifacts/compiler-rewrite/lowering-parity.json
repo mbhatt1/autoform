@@ -1,0 +1,385 @@
+{
+  "baseline": "5a1305b",
+  "records": [
+    {
+      "input": "ast-CMath.json",
+      "functions": 6,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 2156,
+          "sha256": "f37df0545a0289e70f234df314a16b50fa5e237c01af1228d2511962b1714862"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 2156,
+          "sha256": "f37df0545a0289e70f234df314a16b50fa5e237c01af1228d2511962b1714862"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 2156,
+          "sha256": "f37df0545a0289e70f234df314a16b50fa5e237c01af1228d2511962b1714862"
+        }
+      ]
+    },
+    {
+      "input": "ast-Cachetools.json",
+      "functions": 209,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 287612,
+          "sha256": "b41b8ea8f8d636e29b6928e099956bad40afb32c27499a4089bc52712051fb34"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 287612,
+          "sha256": "b41b8ea8f8d636e29b6928e099956bad40afb32c27499a4089bc52712051fb34"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 288299,
+          "sha256": "659164953a27aa97641711592cafaad9f3f23a742f03c97a57a518c5ddbf65fc"
+        }
+      ]
+    },
+    {
+      "input": "ast-Click.json",
+      "functions": 549,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1042345,
+          "sha256": "a94f411973647b461cb9bc2d6d6a1a55eec0b0ea63151e215d4fd5c6fbc783e0"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1061491,
+          "sha256": "8d0e4adf582cdb63469e98cf2ac28f5c0cedaa1ea9e8387668b3d7b1ddb7cd75"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1071190,
+          "sha256": "1cf52a46e3bec3bfd12f8d2de29302ebc74eb75c5caddf252c1b65b3062ca808"
+        }
+      ]
+    },
+    {
+      "input": "ast-Jinja2.json",
+      "functions": 817,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1419178,
+          "sha256": "3ed4684d864ffa385cdc2746cb205cc7cbacb6b0eb30549c58b1cd6f5e3fbd10"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1419178,
+          "sha256": "3ed4684d864ffa385cdc2746cb205cc7cbacb6b0eb30549c58b1cd6f5e3fbd10"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1425091,
+          "sha256": "a8ad01e2308d024ed0e7f1b118830774581ee61f44c284a815e06a5155185f2e"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangC.json",
+      "functions": 59,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 51080,
+          "sha256": "27dca7b5d17802bb0fa258119dd47ac4cff050f8ba01336579189a0e2bd0e1d2"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 76008,
+          "sha256": "45b20366a9d9372a1f2585e4e8afff7ebccab34cf10fd1bc7919e6ab18a821fd"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 77038,
+          "sha256": "8284ddab508c93c202a38aa23cfc403e5a4cf5304c8e2f1be53ccb62bb010405"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangGo.json",
+      "functions": 83,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 109487,
+          "sha256": "ac835247e90f911708e9706e1c283f3a9fee16116379c750439bc6c5745058f0"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 150677,
+          "sha256": "eef23e3f32b076e32b4acba20048e778eef3e8fb6ac9de1863359fb1fb892ad2"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 150763,
+          "sha256": "f2a4340891e57c24c3a9fb6cab4038f003d6b1757372fc7fd5172cb248d09b72"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangJS.json",
+      "functions": 14,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 26006,
+          "sha256": "36c17abe5c6c2912ef6463311fad19b96ebd0ae3c2e71fa5ba25f8292f54b0f4"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 47325,
+          "sha256": "d047ecd134c85d9e80828e2b72e97021f22a0aaf202c27259ddf58b1a6759939"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 47840,
+          "sha256": "f1fde2c55a2fae7ddb618b7257866b307e9b83a4a943e72e2a96435705d3b2b0"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangJava.json",
+      "functions": 669,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 498273,
+          "sha256": "89c6e6b5330a773a76e12749426e37f4c5e21beeafa1914981acaa2019f52c05"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 625722,
+          "sha256": "c43becb708dc467311e28771bdb39c0ac80cadce4e343689be40692e5d35e6f2"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 630685,
+          "sha256": "832057867ee4c4ab2a5a87f8ab6ca35384f304d69d1c9fe15b06a3f62a25fd62"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangKt.json",
+      "functions": 3,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1479,
+          "sha256": "98e6392a6efd05eab6e0345c713ec80e6e1e12a604605be6e2fac0bc6b0d94b1"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1479,
+          "sha256": "98e6392a6efd05eab6e0345c713ec80e6e1e12a604605be6e2fac0bc6b0d94b1"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1479,
+          "sha256": "98e6392a6efd05eab6e0345c713ec80e6e1e12a604605be6e2fac0bc6b0d94b1"
+        }
+      ]
+    },
+    {
+      "input": "ast-LangTS.json",
+      "functions": 86,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 73904,
+          "sha256": "ced91df275dde7695a92e1df035279da0df7988a7e253a3c0791f45f7e373876"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 111722,
+          "sha256": "9851941e5d32b05403732b456a450ed3191320cbd6465abd5574dbf568106855"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 113523,
+          "sha256": "75867bc0ff4f7422276ff68435bfb9de635c316d7161940bb901d223e95ec019"
+        }
+      ]
+    },
+    {
+      "input": "ast-LinuxLibSample.json",
+      "functions": 7,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1167,
+          "sha256": "5d90c0e7f008a2943db51ce5b7337a279ee8a923372c6638da35d6a3b70c472a"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1167,
+          "sha256": "5d90c0e7f008a2943db51ce5b7337a279ee8a923372c6638da35d6a3b70c472a"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1167,
+          "sha256": "5d90c0e7f008a2943db51ce5b7337a279ee8a923372c6638da35d6a3b70c472a"
+        }
+      ]
+    },
+    {
+      "input": "ast-Requests.json",
+      "functions": 260,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 581889,
+          "sha256": "92c9eaa728dbbfbd8ef12b6f2931113c59e8490319317e0e1fa0f1b416fa3017"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 589360,
+          "sha256": "7767af5510e3dbe4fd0541520be76125a900a5645736f372c7b523904113d349"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 593812,
+          "sha256": "37e9f4b4c0304ac581a8e707f3e5cd8ba4df0aec216203255aecd1c339d684c4"
+        }
+      ]
+    },
+    {
+      "input": "ast-Sample.json",
+      "functions": 5,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 2839,
+          "sha256": "1c4df70e3950993141a786f5c8bd95847066401ddad150ee8a07337742a478b0"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 2839,
+          "sha256": "1c4df70e3950993141a786f5c8bd95847066401ddad150ee8a07337742a478b0"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 2839,
+          "sha256": "1c4df70e3950993141a786f5c8bd95847066401ddad150ee8a07337742a478b0"
+        }
+      ]
+    },
+    {
+      "input": "ast-Stress.json",
+      "functions": 6,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 2189,
+          "sha256": "5fe5f664408e5dcd23653755a6e0f9a89de0d30eabd411b708752f611dc2c23c"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 2189,
+          "sha256": "5fe5f664408e5dcd23653755a6e0f9a89de0d30eabd411b708752f611dc2c23c"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 2189,
+          "sha256": "5fe5f664408e5dcd23653755a6e0f9a89de0d30eabd411b708752f611dc2c23c"
+        }
+      ]
+    },
+    {
+      "input": "ast-V8Base.json",
+      "functions": 1920,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1110321,
+          "sha256": "0f462b6aca6b572149d1f0b1e63f1fa04e02ca624a808c4d955b69948f681a29"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1298201,
+          "sha256": "980c30e08e2f903274e29bf4ade9c8aaf8b3ffb8f97df9739e8ee5165ad071ac"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1306170,
+          "sha256": "919c400eb43b565dfce50019f75d5c314216ad0c517be591047f04e9c49351a3"
+        }
+      ]
+    },
+    {
+      "input": "ast-V8BaseSample.json",
+      "functions": 4,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1348,
+          "sha256": "bc1d20f6aa47f85339cd327cde534a1653986974817d62b219e166a5952720a9"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 1348,
+          "sha256": "bc1d20f6aa47f85339cd327cde534a1653986974817d62b219e166a5952720a9"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 1518,
+          "sha256": "afa47cc7add4bd7ed7cc1d20c58948b70c924d4f2a505ded8df42deadc2d08cb"
+        }
+      ]
+    },
+    {
+      "input": "ast-V8Numbers.json",
+      "functions": 157,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 132397,
+          "sha256": "9157f5e28ee4d5751f012a441be6b581b8ef52fab522d0518fa621786c13fd1a"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 183357,
+          "sha256": "245944bb89cf7bf05ca5462396c01790034571351735c9d473a5dcc4a0a79146"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 185410,
+          "sha256": "8fef7cc3d0eb1f34d65843d12de1a0722126bb75eaadcd07f7e17a0cb8121925"
+        }
+      ]
+    },
+    {
+      "input": "synthetic:truth-generator-alias-refusal",
+      "functions": 113,
+      "stages": [
+        {
+          "stage": "lower_generators",
+          "bytes": 1126645,
+          "sha256": "e24d9b15926cbef8f64dff661337eaa8c57097ef178d19696b4930ceda97b1ee"
+        },
+        {
+          "stage": "lower_truth_values",
+          "bytes": 2252907,
+          "sha256": "69db1a9f6ba7534ce9c3abe2bfccbd1644fb70cbd5d38686326cd461c7753b6c"
+        },
+        {
+          "stage": "lower_truth_conditions",
+          "bytes": 2291968,
+          "sha256": "c55a0e42e0019d7fa7dc90fa4383ee1804487244078957beb340b85a58a52463"
+        }
+      ]
+    }
+  ],
+  "total_functions": 4967,
+  "byte_identical_stages": 54
+}

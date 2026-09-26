@@ -5,6 +5,7 @@ import Autoform.Lang.PCode.Properties
 import Autoform.Harness.Audit
 import Autoform.Lang.Core.Syntax
 import Autoform.Lang.Core.Semantics
+import Autoform.Lang.Core.Observation
 import Autoform.Lang.Core.ExcSafe
 import Autoform.Ledger
 import Autoform.Harness.Conformance

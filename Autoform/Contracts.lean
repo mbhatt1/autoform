@@ -588,6 +588,17 @@ def keysProgram : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey
   , f_cachetools_keys_py__module__methodkey ] }
 
+@[simp] theorem constructionGap_keysProgram (cls : String) :
+    (ctxOf keysProgram).constructionGap cls = none := rfl
+
+@[simp] theorem allocationCaptures_keysProgram (environment : Env) (cls : String) :
+    (ctxOf keysProgram).allocationCaptures environment cls =
+      some (match environment.get cls with | .clsClos _ cap => cap | _ => []) := rfl
+
+@[simp] theorem defaultConstructor_keysProgram (cls : String) (receiver : Ref)
+    (values : List Val) (keywords : List (String × Val)) :
+    (ctxOf keysProgram).defaultConstructor cls receiver values keywords = .val (.ref receiver) := rfl
+
 /-- `keys.py` records no class with a builtin base, so `Expr.alloc "_HashedTuple"` takes
 the ordinary heap-allocation branch. Stated as a lemma so the evaluation `simp`s below can
 step past `Ctx.builtinBase` without unfolding the program. -/
@@ -613,6 +624,17 @@ def methodkeyWith (e : Expr) : Func :=
 /-- The instantiated program. -/
 def keysProgramWith (e : Expr) : Program := { dialect := .python, funcs :=
   [ f_cachetools_keys_py__module__hashkey, methodkeyWith e ] }
+
+@[simp] theorem constructionGap_keysProgramWith (e : Expr) (cls : String) :
+    (ctxOf (keysProgramWith e)).constructionGap cls = none := rfl
+
+@[simp] theorem allocationCaptures_keysProgramWith (e : Expr) (environment : Env) (cls : String) :
+    (ctxOf (keysProgramWith e)).allocationCaptures environment cls =
+      some (match environment.get cls with | .clsClos _ cap => cap | _ => []) := rfl
+
+@[simp] theorem defaultConstructor_keysProgramWith (e : Expr) (cls : String) (receiver : Ref)
+    (values : List Val) (keywords : List (String × Val)) :
+    (ctxOf (keysProgramWith e)).defaultConstructor cls receiver values keywords = .val (.ref receiver) := rfl
 
 /-- The `keys.py` fragment records no class with a builtin base, so `Expr.alloc
 "_HashedTuple"` takes the ordinary heap-allocation branch. Stated as a lemma so the
@@ -690,7 +712,8 @@ theorem resolveMethod_hashedTuple_init (e : Expr) :
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
   simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
-    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass]
+    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass,
+    Ctx.usesClassMetadata, keysProgramWith]
 
 /-- Nor a `<init>` (the JavaScript/Java constructor name `Ctx.resolveCtor` tries second). -/
 theorem resolveMethod_hashedTuple_initJs (e : Expr) :
@@ -704,7 +727,8 @@ theorem resolveMethod_hashedTuple_initJs (e : Expr) :
   simp +decide [Ctx.resolve.go, String.endsWith, methodkeyWith,
     f_cachetools_keys_py__module__methodkey, f_cachetools_keys_py__module__hashkey]
   simp [Iteration.resolveMethod, Iteration.iteratorClass, Iteration.factoryClass, Iteration.consumerClass,
-    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass]
+    Iteration.dataClass, Iteration.sequenceClass, Iteration.callableClass,
+    Ctx.usesClassMetadata, keysProgramWith]
 
 /-- So `Expr.alloc "_HashedTuple"` runs no constructor at all. -/
 theorem resolveCtor_hashedTuple (e : Expr) :
@@ -715,7 +739,7 @@ theorem resolveCtor_hashedTuple (e : Expr) :
 resolution lemmas above apply. -/
 private theorem ctx_fold (p : Program) :
     ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
-       properties := p.properties, excClasses := p.excClasses } : Ctx) = ctxOf p := rfl
+       properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls } : Ctx) = ctxOf p := rfl
 
 /-! ### Satisfiability first
 

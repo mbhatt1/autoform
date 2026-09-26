@@ -1,0 +1,24 @@
+warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/.lake/packages/batteries' has local changes
+call-closure index agrees with Ctx.resolvable on CompilerRewrite (5 functions)
+
+╭─ autoform trust ledger ─ CompilerRewrite
+│ functions translated : 5
+│ AST nodes            : 36
+│ holes                : 0  (0% of nodes)
+│ hole-free (upper bd) : 5 / 5 functions  (100%)
+│ VERIFIABLE CORE      : 5 / 5 functions  (100%) — hole-free AND call-closed
+│ closed by contract   : +0 functions — hole-free, open only on contracted callees (0 names used); NOT in the core above
+│ dynamic-hole risk    : 10 constructs may hole at runtime (input-dependent)
+│ semantics            : Autoform.Core (fuel-indexed, total, no sorry)
+│ transpiler           : Joern CPG → Core, deterministic
+│ NOT PROVED           : transpiler faithfulness — see conformance.json
+├─ holes by cause ─────────────────────────────────────────────
+╰───────────────────────────────────────────────────────────────
+
+verifiable core (5) — first 15:
+  numbers.py:<module>.add
+  numbers.py:<module>.quotient
+  numbers.py:<module>.fraction
+  <module-objects>:<module>
+  numbers.py:<module>
+wrote ledger-CompilerRewrite.json

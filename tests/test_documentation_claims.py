@@ -13,11 +13,14 @@ import re
 from pathlib import Path
 
 import pytest
+from conftest import exporter_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def read(rel: str) -> str:
+    if rel == "cartographer/export_ast.sc":
+        return exporter_source()
     return (ROOT / rel).read_text(encoding="utf-8")
 
 

@@ -1,0 +1,29 @@
+file      : /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/Autoform/Generated/CompilerRewrite.lean
+module    : Autoform.Generated.CompilerRewrite
+operators : translated-module (AST literal)
+spec file : /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/Autoform/SpecsGen/CompilerRewrite.lean
+built     : Autoform.SpecsGen.CompilerRewrite
+theorems  : conform_numbers_py__module__add, conform_numbers_py__module__fraction, conform_numbers_py__module__quotient
+mutants   : 11 of 11 generated
+
+baseline build ...
+baseline ok
+
+[1/11] SURVIVED ast-name:a->b          L64 (f_numbers_py__module__fraction) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=killed,conform_numbers_py__module__quotient=survived
+[2/11] SURVIVED ast-binop:+->-         L50 (f_numbers_py__module__add) conform_numbers_py__module__add=killed,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=survived
+[3/11] SURVIVED ast-ret->expr          L57 (f_numbers_py__module__quotient) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=killed
+[4/11] SURVIVED ast-ret->expr          L50 (f_numbers_py__module__add) conform_numbers_py__module__add=killed,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=survived
+[5/11] SURVIVED ast-name:b->a          L50 (f_numbers_py__module__add) conform_numbers_py__module__add=killed,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=survived
+[6/11] SURVIVED ast-name:a->b          L57 (f_numbers_py__module__quotient) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=killed
+[7/11] SURVIVED ast-name:b->a          L64 (f_numbers_py__module__fraction) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=killed,conform_numbers_py__module__quotient=survived
+[8/11] SURVIVED ast-name:a->b          L50 (f_numbers_py__module__add) conform_numbers_py__module__add=killed,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=survived
+[9/11] SURVIVED ast-ret->expr          L64 (f_numbers_py__module__fraction) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=killed,conform_numbers_py__module__quotient=survived
+[10/11] SURVIVED ast-name:b->a          L57 (f_numbers_py__module__quotient) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=survived,conform_numbers_py__module__quotient=killed
+[11/11] SURVIVED ast-binop:py:/->py:*   L64 (f_numbers_py__module__fraction) conform_numbers_py__module__add=survived,conform_numbers_py__module__fraction=killed,conform_numbers_py__module__quotient=survived
+
+=== mutation score ===
+conform_numbers_py__module__add: killed 4, survived 0  score 100.00% (on-subject)  [HAS TEETH]  coverage 36.36%
+conform_numbers_py__module__fraction: killed 4, survived 0  score 100.00% (on-subject)  [HAS TEETH]  coverage 36.36%
+conform_numbers_py__module__quotient: killed 3, survived 0  score 100.00% (on-subject)  [HAS TEETH]  coverage 27.27%
+
+wrote /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/mutation.json

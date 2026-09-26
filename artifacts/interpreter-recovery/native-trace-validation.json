@@ -1,0 +1,69 @@
+{
+  "status": "PASS",
+  "scope": "Faithful CPython trace return classification, explicit suspension and ambiguous-unwind gaps, trace-hook restoration, a measurement-basis suffix, and corpus-name-safe provenance helper loading.",
+  "base_main_revision": "d8aec57",
+  "source_identity_candidate": "f5157f1",
+  "source_sha256": {
+    "scripts/differential.py": "ad5e964b5266290f96b7d33708238d04ee8127935b670eb2e5126db70e3a90c7",
+    "scripts/provenance.py": "57d9c3fd755708d072044515070db24b71ddf31b0fb6da85a926514041454067",
+    "tests/test_native_trace_returns.py": "1c67a8e6c6609ea1ab0550ed99b1aca34550a5f003fbd5585b4740227b42c223",
+    "tests/test_native_deadlines.py": "bf42c8837a9ff2ac2008fb71002e6899acacc5760560c91a689238be2df3a85b",
+    "tests/test_source_revision.py": "3b44909d24422e6c88344227e173dfdd98a5cc199e5275451b69cb158a4c50cd"
+  },
+  "checks": {
+    "focused": {
+      "status": "PASS",
+      "log": ".autoform-work/native-trace-final-focused.log",
+      "summary": "41 passed, 3 skipped in 18.01s",
+      "cases": [
+        "caught exception returns None",
+        "handled exception falls through",
+        "finally suppresses an exception with None",
+        "finally propagates an exception",
+        "ambiguous nested unwind is counted as a gap",
+        "ordinary value return",
+        "generator/coroutine frames are counted as gaps",
+        "previous trace hook is restored"
+      ]
+    },
+    "python": {
+      "status": "PASS",
+      "log": ".autoform-work/native-trace-full-pytest2.log",
+      "summary": "823 passed, 58 skipped, 1 xfailed in 380.89s",
+      "note": "Final source inputs matched isolated candidate efde7e3."
+    },
+    "docs": {
+      "status": "PASS",
+      "log": ".autoform-work/native-trace-docs.log",
+      "summary": "8 documented figures match their artifacts"
+    },
+    "python_previous": {
+      "status": "PASS",
+      "log": ".autoform-work/native-trace-full-pytest.log",
+      "summary": "822 passed, 58 skipped, 1 xfailed in 371.47s",
+      "note": "Predates the final provenance helper-loading fix; the final run below is required."
+    },
+    "candidate_consistency": {
+      "status": "PASS",
+      "files": 6,
+      "differences": []
+    }
+  },
+  "research": [
+    {
+      "url": "https://docs.python.org/3.11/library/sys.html#sys.settrace",
+      "finding": "Return trace events use None for both an ordinary None return and exception unwinding; exception events also occur for exceptions later handled."
+    },
+    {
+      "url": "https://docs.python.org/3.11/library/dis.html#opcode-RETURN_VALUE",
+      "finding": "RETURN_VALUE identifies a completed return; YIELD_VALUE suspends a generator."
+    }
+  ],
+  "remaining": [
+    "Main .git index writes are blocked by current filesystem permissions. Preserve the committed change in the isolated tooling checkout.",
+    "Heap-effect observations, faithful global/closure snapshots and broader generator observations remain separate requirements."
+  ],
+  "candidate_revision": "efde7e3",
+  "candidate_workspace": "/Users/mbhatt/autoform/.autoform-work/source-identity-development",
+  "patch": ".autoform-work/native-oracle-recovery.patch"
+}

@@ -1,0 +1,986 @@
+warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/.lake/packages/batteries' has local changes
+ℹ [48/62] Replayed Autoform.Lang.Core.Float
+info: Autoform/Lang/Core/Float.lean:831:0: (0, 0, 0, 0)
+info: Autoform/Lang/Core/Float.lean:833:0: 0
+info: Autoform/Lang/Core/Float.lean:845:0: true
+info: Autoform/Lang/Core/Float.lean:847:0: false
+info: Autoform/Lang/Core/Float.lean:856:0: true
+info: Autoform/Lang/Core/Float.lean:857:0: true
+info: Autoform/Lang/Core/Float.lean:858:0: "+7074237752028440·2^-51"
+info: Autoform/Lang/Core/Float.lean:860:0: "inf"
+info: Autoform/Lang/Core/Float.lean:861:0: "+0·2^-1074"
+info: Autoform/Lang/Core/Float.lean:864:0: true
+info: Autoform/Lang/Core/Float.lean:865:0: true
+info: Autoform/Lang/Core/Float.lean:866:0: false
+info: Autoform/Lang/Core/Float.lean:867:0: false
+info: Autoform/Lang/Core/Float.lean:868:0: false
+info: Autoform/Lang/Core/Float.lean:869:0: false
+info: Autoform/Lang/Core/Float.lean:872:0: true
+info: Autoform/Lang/Core/Float.lean:873:0: true
+info: Autoform/Lang/Core/Float.lean:874:0: true
+info: Autoform/Lang/Core/Float.lean:877:0: some "inf"
+info: Autoform/Lang/Core/Float.lean:878:0: some "+0·2^-1074"
+info: Autoform/Lang/Core/Float.lean:879:0: some "+2·2^-1074 (subnormal)"
+info: Autoform/Lang/Core/Float.lean:880:0: some "nan"
+info: Autoform/Lang/Core/Float.lean:882:0: some "nan"
+info: Autoform/Lang/Core/Float.lean:889:0: Autoform.Core.FResult.exn "ZeroDivisionError"
+info: Autoform/Lang/Core/Float.lean:890:0: some "inf"
+info: Autoform/Lang/Core/Float.lean:891:0: some "nan"
+info: Autoform/Lang/Core/Float.lean:892:0: Autoform.Core.FResult.exn "ZeroDivisionError"
+info: Autoform/Lang/Core/Float.lean:893:0: some "nan"
+info: Autoform/Lang/Core/Float.lean:897:0: Autoform.Core.FResult.ub "float:excess-precision"
+info: Autoform/Lang/Core/Float.lean:901:0: 1036831949
+info: Autoform/Lang/Core/Float.lean:902:0: Autoform.Core.FResult.unmodelled "float:format-mismatch"
+info: Autoform/Lang/Core/Float.lean:910:0: true
+info: Autoform/Lang/Core/Float.lean:911:0: true
+info: Autoform/Lang/Core/Float.lean:912:0: true
+info: Autoform/Lang/Core/Float.lean:914:0: true
+info: Autoform/Lang/Core/Float.lean:921:0: some (Ordering.gt)
+info: Autoform/Lang/Core/Float.lean:922:0: some (Ordering.eq)
+info: Autoform/Lang/Core/Float.lean:923:0: Autoform.Core.FResult.exn "OverflowError"
+info: Autoform/Lang/Core/Float.lean:924:0: Except.ok 3
+info: Autoform/Lang/Core/Float.lean:925:0: Except.ok (-3)
+info: Autoform/Lang/Core/Float.lean:926:0: Except.error "OverflowError"
+info: Autoform/Lang/Core/Float.lean:927:0: Except.error "ValueError"
+info: Autoform/Lang/Core/Float.lean:930:0: Autoform.Core.FResult.unmodelled "float:repr-shortest-roundtrip"
+info: Autoform/Lang/Core/Float.lean:931:0: Autoform.Core.FResult.unmodelled "float:hash"
+info: Autoform/Lang/Core/Float.lean:932:0: Autoform.Core.FResult.unmodelled "float:exp"
+⚠ [51/62] Replayed Autoform.Lang.Core.Numeric
+warning: Autoform/Lang/Core/Numeric.lean:359:10: try 'simp' instead of 'simpa'
+
+Note: This linter can be disabled with `set_option linter.unnecessarySimpa false`
+info: Autoform/Lang/Core/Numeric.lean:649:0: Autoform.Core.NumResult.ok 1410065408
+info: Autoform/Lang/Core/Numeric.lean:652:0: Autoform.Core.NumResult.ub "signed integer overflow"
+info: Autoform/Lang/Core/Numeric.lean:655:0: Autoform.Core.NumResult.ok 1410065408
+info: Autoform/Lang/Core/Numeric.lean:658:0: Autoform.Core.NumResult.ok 10000000000
+info: Autoform/Lang/Core/Numeric.lean:661:0: Autoform.Core.NumResult.ok 10000000000
+info: Autoform/Lang/Core/Numeric.lean:664:0: Autoform.Core.NumResult.ok 1410065408
+info: Autoform/Lang/Core/Numeric.lean:667:0: Autoform.Core.NumResult.ok (-2147483648)
+info: Autoform/Lang/Core/Numeric.lean:668:0: Autoform.Core.NumResult.ub "signed integer overflow"
+info: Autoform/Lang/Core/Numeric.lean:669:0: Autoform.Core.NumResult.ok 0
+info: Autoform/Lang/Core/Numeric.lean:670:0: Autoform.Core.NumResult.ok (-2147483648)
+info: Autoform/Lang/Core/Numeric.lean:678:0: Autoform.Core.NumResult.ok 2147483648
+info: Autoform/Lang/Core/Numeric.lean:679:0: Autoform.Core.NumResult.ok 10000000000
+info: Autoform/Lang/Core/Numeric.lean:682:0: Autoform.Core.NumResult.ub "signed integer overflow"
+info: Autoform/Lang/Core/Numeric.lean:683:0: Autoform.Core.NumResult.ok (-2147483648)
+info: Autoform/Lang/Core/Numeric.lean:684:0: Autoform.Core.NumResult.ok (-9223372036854775808)
+info: Autoform/Lang/Core/Numeric.lean:685:0: Autoform.Core.NumResult.divZero
+info: Autoform/Lang/Core/Numeric.lean:686:0: Autoform.Core.NumResult.ub "remainder with overflowing quotient (INT_MIN % -1)"
+info: Autoform/Lang/Core/Numeric.lean:687:0: Autoform.Core.NumResult.ok 0
+info: Autoform/Lang/Core/Numeric.lean:690:0: Autoform.Core.NumResult.ok (-1)
+info: Autoform/Lang/Core/Numeric.lean:691:0: Autoform.Core.NumResult.ok 0
+info: Autoform/Lang/Core/Numeric.lean:692:0: Autoform.Core.NumResult.ok (-3)
+info: Autoform/Lang/Core/Numeric.lean:693:0: Autoform.Core.NumResult.ok 6
+info: Autoform/Lang/Core/Numeric.lean:696:0: Autoform.Core.NumResult.ok (-2147483648)
+info: Autoform/Lang/Core/Numeric.lean:697:0: Autoform.Core.NumResult.ub "signed integer overflow"
+info: Autoform/Lang/Core/Numeric.lean:698:0: Autoform.Core.NumResult.ub "shift count out of range"
+info: Autoform/Lang/Core/Numeric.lean:699:0: Autoform.Core.NumResult.ok 1
+info: Autoform/Lang/Core/Numeric.lean:700:0: Autoform.Core.NumResult.ok 1099511627776
+info: Autoform/Lang/Core/Numeric.lean:701:0: Autoform.Core.NumResult.trap "ValueError"
+info: Autoform/Lang/Core/Numeric.lean:702:0: Autoform.Core.NumResult.ok (-4)
+info: Autoform/Lang/Core/Numeric.lean:703:0: Autoform.Core.NumResult.ok 2147483644
+info: Autoform/Lang/Core/Numeric.lean:707:0: Autoform.Core.NumResult.ok 12
+info: Autoform/Lang/Core/Numeric.lean:708:0: Autoform.Core.NumResult.ok (-1)
+info: Autoform/Lang/Core/Numeric.lean:709:0: Autoform.Core.NumResult.ok (-5)
+info: Autoform/Lang/Core/Numeric.lean:710:0: Autoform.Core.NumResult.ok 255
+info: Autoform/Lang/Core/Numeric.lean:711:0: Autoform.Core.NumResult.ok 4294967295
+info: Autoform/Lang/Core/Numeric.lean:712:0: Autoform.Core.NumResult.ok (-1)
+info: Autoform/Lang/Core/Numeric.lean:715:0: 0
+info: Autoform/Lang/Core/Numeric.lean:716:0: -56
+info: Autoform/Lang/Core/Numeric.lean:717:0: 255
+⚠ [53/62] Replayed Autoform.Lang.Core.Stdlib
+warning: Autoform/Lang/Core/Stdlib.lean:281:8: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Stdlib.lean:411:30: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Stdlib.lean:454:16: `String.mk` has been deprecated: Use `String.ofList` instead
+info: Autoform/Lang/Core/Stdlib.lean:1708:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 3))
+info: Autoform/Lang/Core/Stdlib.lean:1709:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 1))
+info: Autoform/Lang/Core/Stdlib.lean:1710:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 5))
+info: Autoform/Lang/Core/Stdlib.lean:1712:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 7))
+info: Autoform/Lang/Core/Stdlib.lean:1713:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 7))
+info: Autoform/Lang/Core/Stdlib.lean:1714:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 11))
+info: Autoform/Lang/Core/Stdlib.lean:1715:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 1))
+info: Autoform/Lang/Core/Stdlib.lean:1716:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 9))
+info: Autoform/Lang/Core/Stdlib.lean:1717:0: some (Autoform.Core.EResult.exn (Autoform.Core.Val.str "ValueError"))
+info: Autoform/Lang/Core/Stdlib.lean:1718:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1720:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool false))
+info: Autoform/Lang/Core/Stdlib.lean:1721:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "-5"))
+info: Autoform/Lang/Core/Stdlib.lean:1722:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "True"))
+info: Autoform/Lang/Core/Stdlib.lean:1723:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "12"))
+info: Autoform/Lang/Core/Stdlib.lean:1724:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "x"))
+info: Autoform/Lang/Core/Stdlib.lean:1725:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 1))
+info: Autoform/Lang/Core/Stdlib.lean:1726:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 65))
+info: Autoform/Lang/Core/Stdlib.lean:1727:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "A"))
+info: Autoform/Lang/Core/Stdlib.lean:1729:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.list [Autoform.Core.Val.str "a", Autoform.Core.Val.str "b"]))
+info: Autoform/Lang/Core/Stdlib.lean:1730:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.tuple [Autoform.Core.Val.int 1, Autoform.Core.Val.int 2]))
+info: Autoform/Lang/Core/Stdlib.lean:1731:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.tuple [Autoform.Core.Val.str "k"]))
+info: Autoform/Lang/Core/Stdlib.lean:1732:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.dict [(Autoform.Core.Val.str "a", Autoform.Core.Val.int 2)]))
+info: Autoform/Lang/Core/Stdlib.lean:1734:0: some (Autoform.Core.EResult.val
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 1, Autoform.Core.Val.int 2, Autoform.Core.Val.int 3]))
+info: Autoform/Lang/Core/Stdlib.lean:1735:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.list [Autoform.Core.Val.str "a", Autoform.Core.Val.str "b"]))
+info: Autoform/Lang/Core/Stdlib.lean:1736:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1738:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool true))
+info: Autoform/Lang/Core/Stdlib.lean:1739:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool false))
+info: Autoform/Lang/Core/Stdlib.lean:1740:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1741:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool true))
+info: Autoform/Lang/Core/Stdlib.lean:1742:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool true))
+info: Autoform/Lang/Core/Stdlib.lean:1743:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.bool false))
+info: Autoform/Lang/Core/Stdlib.lean:1744:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1746:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "KeyError"))
+info: Autoform/Lang/Core/Stdlib.lean:1747:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.str "ValueError"))
+info: Autoform/Lang/Core/Stdlib.lean:1748:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1750:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 4))
+info: Autoform/Lang/Core/Stdlib.lean:1752:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1754:0: some (Autoform.Core.EResult.val (Autoform.Core.Val.int 9))
+info: Autoform/Lang/Core/Stdlib.lean:1757:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1758:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1759:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1760:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1761:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1763:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1766:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.int 1)))
+info: Autoform/Lang/Core/Stdlib.lean:1767:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.unit)))
+info: Autoform/Lang/Core/Stdlib.lean:1768:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.int 0)))
+info: Autoform/Lang/Core/Stdlib.lean:1769:0: some (Autoform.Core.Stdlib.MethodResult.pure
+  (Autoform.Core.EResult.val (Autoform.Core.Val.list [Autoform.Core.Val.str "a"])))
+info: Autoform/Lang/Core/Stdlib.lean:1770:0: some (Autoform.Core.Stdlib.MethodResult.pure
+  (Autoform.Core.EResult.val (Autoform.Core.Val.list [Autoform.Core.Val.int 1])))
+info: Autoform/Lang/Core/Stdlib.lean:1771:0: some (Autoform.Core.Stdlib.MethodResult.pure
+  (Autoform.Core.EResult.val
+    (Autoform.Core.Val.list [Autoform.Core.Val.tuple [Autoform.Core.Val.str "a", Autoform.Core.Val.int 1]])))
+info: Autoform/Lang/Core/Stdlib.lean:1772:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.int 2)))
+info: Autoform/Lang/Core/Stdlib.lean:1773:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.int 1)))
+info: Autoform/Lang/Core/Stdlib.lean:1774:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.exn (Autoform.Core.Val.str "ValueError")))
+info: Autoform/Lang/Core/Stdlib.lean:1776:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 1, Autoform.Core.Val.int 2]))
+info: Autoform/Lang/Core/Stdlib.lean:1777:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.int 2))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 1]))
+info: Autoform/Lang/Core/Stdlib.lean:1778:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.int 1))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 2]))
+info: Autoform/Lang/Core/Stdlib.lean:1779:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.exn (Autoform.Core.Val.str "IndexError")))
+info: Autoform/Lang/Core/Stdlib.lean:1780:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 2]))
+info: Autoform/Lang/Core/Stdlib.lean:1781:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 9, Autoform.Core.Val.int 1]))
+info: Autoform/Lang/Core/Stdlib.lean:1782:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.list [Autoform.Core.Val.int 1, Autoform.Core.Val.int 2]))
+info: Autoform/Lang/Core/Stdlib.lean:1783:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.list []))
+info: Autoform/Lang/Core/Stdlib.lean:1784:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.int 1))
+  (Autoform.Core.Val.dict []))
+info: Autoform/Lang/Core/Stdlib.lean:1785:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.exn (Autoform.Core.Val.str "KeyError")))
+info: Autoform/Lang/Core/Stdlib.lean:1786:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.tuple [Autoform.Core.Val.str "b", Autoform.Core.Val.int 2]))
+  (Autoform.Core.Val.dict [(Autoform.Core.Val.str "a", Autoform.Core.Val.int 1)]))
+info: Autoform/Lang/Core/Stdlib.lean:1788:0: some (Autoform.Core.Stdlib.MethodResult.pure (Autoform.Core.EResult.val (Autoform.Core.Val.int 1)))
+info: Autoform/Lang/Core/Stdlib.lean:1790:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.int 9))
+  (Autoform.Core.Val.dict [(Autoform.Core.Val.str "a", Autoform.Core.Val.int 9)]))
+info: Autoform/Lang/Core/Stdlib.lean:1791:0: some (Autoform.Core.Stdlib.MethodResult.mutating
+  (Autoform.Core.EResult.val (Autoform.Core.Val.unit))
+  (Autoform.Core.Val.dict
+    [(Autoform.Core.Val.str "a", Autoform.Core.Val.int 5), (Autoform.Core.Val.str "b", Autoform.Core.Val.int 6)]))
+info: Autoform/Lang/Core/Stdlib.lean:1794:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1795:0: none
+info: Autoform/Lang/Core/Stdlib.lean:1798:0: true
+info: Autoform/Lang/Core/Stdlib.lean:1799:0: true
+info: Autoform/Lang/Core/Stdlib.lean:1800:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1801:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1802:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1803:0: true
+info: Autoform/Lang/Core/Stdlib.lean:1804:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1805:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1807:0: true
+info: Autoform/Lang/Core/Stdlib.lean:1808:0: true
+info: Autoform/Lang/Core/Stdlib.lean:1809:0: false
+info: Autoform/Lang/Core/Stdlib.lean:1810:0: false
+⚠ [55/62] Replayed Autoform.Lang.Core.Semantics
+warning: Autoform/Lang/Core/Semantics.lean:316:13: `String.trim` has been deprecated: Use `String.trimAscii` instead
+
+Note: The updated constant has a different type:
+  String → String.Slice
+instead of
+  String → String
+warning: Autoform/Lang/Core/Semantics.lean:589:61: This simp argument is unused:
+  IntType.wrap_unbounded
+
+Hint: Omit it from the simp argument list.
+  simp [applyBinop, numToE, Dialect.toNumConfig, NumConfig.div, NumConfig.quot, NumConfig.finish,
+  ̲  ̲ ̲ ̲NumConfig.python, IntType.inRange, I̵n̵t̵T̵y̵p̵e̵.̵w̵r̵a̵p̵_̵u̵n̵b̵o̵u̵n̵d̵e̵d̵,̵ ̵h]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Lang/Core/Semantics.lean:593:23: This simp argument is unused:
+  NumConfig.finish
+
+Hint: Omit it from the simp argument list.
+  simp [applyBinop, numToE, Dialect.toNumConfig, NumConfig.mod, NumConfig.quot,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵NumConfig.rem,
+  ̲ N̵u̵m̵C̵o̵n̵f̵i̵g̵.̵f̵i̵n̵i̵s̵h̵,̵  ̲ ̲NumConfig.python, IntType.inRange, IntType.wrap_unbounded, h]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+info: Autoform/Lang/Core/Semantics.lean:607:0: Autoform.Core.EResult.val (Autoform.Core.Val.int 5)
+info: Autoform/Lang/Core/Semantics.lean:611:0: Autoform.Core.EResult.val (Autoform.Core.Val.int 0)
+info: Autoform/Lang/Core/Semantics.lean:617:0: Autoform.Core.EResult.val (Autoform.Core.Val.int 2147483648)
+warning: Autoform/Lang/Core/Semantics.lean:917:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:918:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:919:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:920:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:921:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:1249:2: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:1263:7: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:1435:23: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:1454:23: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:2173:50: `String.mk` has been deprecated: Use `String.ofList` instead
+warning: Autoform/Lang/Core/Semantics.lean:3384:12: unused variable `ρ`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+⚠ [56/62] Replayed Autoform.Refine
+warning: Autoform/Refine.lean:326:18: This simp argument is unused:
+  execStmt
+
+Hint: Omit it from the simp argument list.
+  simp [evalExpr, e̵x̵e̵c̵S̵t̵m̵t̵,̵ ̵hc, hv, Val.truthy]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:334:18: This simp argument is unused:
+  execStmt
+
+Hint: Omit it from the simp argument list.
+  simp [evalExpr, e̵x̵e̵c̵S̵t̵m̵t̵,̵ ̵hc, hv, Val.truthy]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:409:8: This simp argument is unused:
+  evalExpr
+
+Hint: Omit it from the simp argument list.
+  simp [̵e̵v̵a̵l̵E̵x̵p̵r̵,̵ ̵e̵x̵e̵c̵S̵t̵m̵t̵,̵[̲e̲x̲e̲c̲S̲t̲m̲t̲,̲ hc, hv, Val.truthy]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:417:8: This simp argument is unused:
+  evalExpr
+
+Hint: Omit it from the simp argument list.
+  simp [̵e̵v̵a̵l̵E̵x̵p̵r̵,̵ ̵e̵x̵e̵c̵S̵t̵m̵t̵,̵[̲e̲x̲e̲c̲S̲t̲m̲t̲,̲ hc, hv, Val.truthy]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:430:8: This simp argument is unused:
+  evalExpr
+
+Hint: Omit it from the simp argument list.
+  simp [̵e̵v̵a̵l̵E̵x̵p̵r̵,̵ ̵e̵x̵e̵c̵S̵t̵m̵t̵,̵[̲e̲x̲e̲c̲S̲t̲m̲t̲,̲ hc, hv, Val.truthy]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:948:26: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  simp_all [execStmt, he̵,̵ ̵h̵v]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:948:30: This simp argument is unused:
+  hv
+
+Hint: Omit it from the simp argument list.
+  simp_all [execStmt, he,̵ ̵h̵v̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1220:114: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_poly, ctxOf,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵CMathProgram, Marshal.toVal, applyBinop_c_mul h1,
+  ̲  ̲ ̲ ̲applyBinop_c_add h2,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵applyBinop_c_sub h3]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1238:119: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp only [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_poly, ctxOf, CMathProgram]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1272:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_clamp, ctxOf, CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt,
+  ̲  ̲ ̲ ̲h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1275:118: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_clamp, ctxOf, CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt,
+  ̲  ̲ ̲ ̲ ̲ ̲applyBinop_int_gt, h1, h2]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1278:118: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_clamp, ctxOf, CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_lt,
+  ̲  ̲ ̲ ̲ ̲ ̲applyBinop_int_gt, h1, h2]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1299:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_cdiv, ctxOf,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
+  ̲  ̲ ̲ ̲ ̲ ̲binopNeedsHeap, Val.kind]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1301:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_cdiv, ctxOf,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵CMathProgram, Marshal.toVal, Val.truthy, applyBinop_int_eq,
+  ̲  ̲ ̲ ̲binopNeedsHeap, Val.kind,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵applyBinop_c_div hb hdom, hb]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1318:114: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_lib_py__module__add, ctxOf, SampleProgram, Marshal.toVal]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1332:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵applyUnop_int_neg, f_ops_py__module__absval, ctxOf, StressProgram,
+  ̲  ̲ ̲ ̲Marshal.toVal, Val.truthy, applyBinop_int_lt, h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1332:125: This simp argument is unused:
+  applyUnop_int_neg
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, Env.get, a̵p̵p̵l̵y̵U̵n̵o̵p̵_̵i̵n̵t̵_̵n̵e̵g̵,̵f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal,
+  ̲  ̲ ̲ ̲Val.truthy, applyBinop_int_lt, h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1335:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵
+  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵f_ops_py__module__absval, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
+       ̵ ̵ ̵ ̵ ̵ ̵applyBinop_int_lt, h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1350:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵applyUnop_int_neg, f_ops_py__module__cmpchain, ctxOf, StressProgram,
+  ̲  ̲ ̲ ̲Marshal.toVal, Val.truthy, applyBinop_int_lt, h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1350:125: This simp argument is unused:
+  applyUnop_int_neg
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, Env.get, a̵p̵p̵l̵y̵U̵n̵o̵p̵_̵i̵n̵t̵_̵n̵e̵g̵,̵f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal,
+  ̲  ̲ ̲ ̲Val.truthy, applyBinop_int_lt, h1]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1354:118: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵
+  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal,
+  ̲  ̲ ̲ ̲ ̲ ̲Val.truthy,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵applyBinop_int_lt, applyBinop_int_gt, h1, h2]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1357:118: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵
+  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵f_ops_py__module__cmpchain, ctxOf, StressProgram, Marshal.toVal,
+  ̲  ̲ ̲ ̲ ̲ ̲Val.truthy,
+  ̵  ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵ ̵applyBinop_int_lt, applyBinop_int_gt, h1, h2]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1378:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_ops_py__module__fmod, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
+  ̲  ̲ ̲ ̲ ̲ ̲applyBinop_int_eq, binopNeedsHeap, Val.kind]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1380:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_ops_py__module__fmod, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
+  ̲  ̲ ̲ ̲applyBinop_int_eq, binopNeedsHeap, Val.kind, applyBinop_py_mod a b hb, hb]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1403:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_ops_py__module__fdiv, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
+  ̲  ̲ ̲ ̲ ̲ ̲applyBinop_int_eq, binopNeedsHeap, Val.kind]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1405:116: This simp argument is unused:
+  Env.get
+
+Hint: Omit it from the simp argument list.
+  simp [applyFunc, bindParams, Func.literalDefaults, Func.posParams, kwargsRejected, execStmt,
+  ̲  ̲ ̲ ̲evalExpr, Env.set, E̵n̵v̵.̵g̵e̵t̵,̵ ̵f_ops_py__module__fdiv, ctxOf, StressProgram, Marshal.toVal, Val.truthy,
+  ̲  ̲ ̲ ̲applyBinop_int_eq, binopNeedsHeap, Val.kind, applyBinop_py_div a b hb, hb]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1628:12: This simp argument is unused:
+  triN
+
+Hint: Omit it from the simp argument list.
+  simp ̵[̵t̵r̵i̵N̵]̵
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1678:47: unused variable `hy`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/Refine.lean:1719:12: This simp argument is unused:
+  Val.truthy
+
+Hint: Omit it from the simp argument list.
+  simp [̵V̵a̵l̵.̵t̵r̵u̵t̵h̵y̵]̵ ̵at hv
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:1765:33: This simp argument is unused:
+  Val.truthy
+
+Hint: Omit it from the simp argument list.
+  simp [̵V̵a̵l̵.̵t̵r̵u̵t̵h̵y̵]̵ ̵at hv
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:2004:93: This simp argument is unused:
+  Bool.false_or
+
+Hint: Omit it from the simp argument list.
+  simp only [f_counter_bump, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, ̵B̵o̵o̵l̵.̵f̵a̵l̵s̵e̵_̵o̵r̵,̵ ̵B̵o̵o̵l̵.̵o̵r̵_̵f̵a̵l̵s̵e̵,̵
+        B̲o̲o̲l̲.̲o̲r̲_̲f̲a̲l̲s̲e̲,̲ ̲List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+        Bool.false_eq_true, if_false,
+  ̵  ̵ ̵ ̵ ̵ ̵seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults,
+  ̲  ̲ ̲ ̲ ̲ ̲selfEnv, bindParams_mk,
+  ̵  ̵ ̵ ̵ ̵ ̵List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:2107:93: This simp argument is unused:
+  Bool.false_or
+
+Hint: Omit it from the simp argument list.
+  simp only [f_counter_init, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, ̵B̵o̵o̵l̵.̵f̵a̵l̵s̵e̵_̵o̵r̵,̵ ̵B̵o̵o̵l̵.̵o̵r̵_̵f̵a̵l̵s̵e̵,̵
+        B̲o̲o̲l̲.̲o̲r̲_̲f̲a̲l̲s̲e̲,̲ ̲List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+        Bool.false_eq_true, if_false,
+  ̵  ̵ ̵ ̵ ̵ ̵seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults,
+  ̲  ̲ ̲ ̲ ̲ ̲selfEnv, bindParams_mk,
+  ̵  ̵ ̵ ̵ ̵ ̵List.zip, List.zipWith, List.foldl, Env.set] at hinitbody ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/Refine.lean:2171:92: This simp argument is unused:
+  Bool.false_or
+
+Hint: Omit it from the simp argument list.
+  simp only [f_counter_total, kwargsRejected_nil, posRejected_mk, signatureRejected_legacy, ̵B̵o̵o̵l̵.̵f̵a̵l̵s̵e̵_̵o̵r̵,̵ ̵B̵o̵o̵l̵.̵o̵r̵_̵f̵a̵l̵s̵e̵,̵
+      B̲o̲o̲l̲.̲o̲r̲_̲f̲a̲l̲s̲e̲,̲ ̲List.length_cons, List.length_nil, Nat.lt_irrefl, decide_false,
+      Bool.false_eq_true, if_false,
+  ̵  ̵ ̵ ̵ ̵ ̵seedClassAttrDefaults, seedClassAttrs, Func.classAttrDefaults,
+  ̲  ̲ ̲ ̲selfEnv, bindParams_mk,
+  ̵  ̵ ̵ ̵List.zip, List.zipWith, List.foldl, Env.set] at hbody ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [57/62] Replayed Autoform.FuelMono
+warning: Autoform/FuelMono.lean:132:57: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hs, if_pos,̵ ̵i̵f̵_̵n̵e̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:197:71: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hs, if_pos,̵ ̵i̵f̵_̵n̵e̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:353:77: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hs, if_pos,̵ ̵i̵f̵_̵n̵e̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:396:91: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hs, if_pos,̵ ̵i̵f̵_̵n̵e̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:1613:40: This simp argument is unused:
+  if_false
+
+Hint: Omit it from the simp argument list.
+  simp only [hshared,̵ ̵i̵f̵_̵f̵a̵l̵s̵e̵] at hy ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:1627:71: This simp argument is unused:
+  if_false
+
+Hint: Omit it from the simp argument list.
+  simp only [Ctx.isSharedClassValue, Bool.and_false,̵ ̵i̵f̵_̵f̵a̵l̵s̵e̵] at hy ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:1793:41: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hp,̵ ̵i̵f̵_̵n̵e̵g̵] at hy ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:1857:29: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hv,̵ ̵i̵f̵_̵n̵e̵g̵] at hy ⊢
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/FuelMono.lean:1974:40: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:1981:41: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:1982:17: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:1990:44: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:1991:17: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:1999:40: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:2006:41: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:2014:40: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:2015:27: unused variable `hst`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:2021:39: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/FuelMono.lean:2022:58: unused variable `hb`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+info: Autoform/FuelMono.lean:2275:0: 'Autoform.Core.evalExpr_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2276:0: 'Autoform.Core.applyFunc_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2277:0: 'Autoform.Core.applyClosure_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2278:0: 'Autoform.Core.evalList_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2279:0: 'Autoform.Core.evalPairs_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2280:0: 'Autoform.Core.execStmt_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2281:0: 'Autoform.Core.execFor_fuel_mono' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2282:0: 'Autoform.Core.tfFree_of_table' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2283:0: 'Autoform.Core.tryFinally_preserves_incomplete' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2284:0: 'Autoform.Core.execStmt_fuel_mono_all' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Autoform/FuelMono.lean:2285:0: 'Autoform.Core.applyFunc_fuel_mono_all' depends on axioms: [propext, Classical.choice, Quot.sound]
+⚠ [59/62] Replayed Autoform.SpecsGen.Basis
+warning: Autoform/SpecsGen/Basis.lean:435:24: This simp argument is unused:
+  hp
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, h̵p̵,̵ ̵kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:437:24: This simp argument is unused:
+  Val.unbox
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, V̵a̵l̵.̵u̵n̵b̵o̵x̵,̵ ̵Heap.payload, Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:437:35: This simp argument is unused:
+  Heap.payload
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv, seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs, execStmt, evalExpr, Val.unbox, H̵e̵a̵p̵.̵p̵a̵y̵l̵o̵a̵d̵,̵ ̵Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:437:64: This simp argument is unused:
+  Env.set
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, E̵n̵v̵.̵s̵f̲i̲et̵l̲d̲O̲f̲,
+  ̲ f̵i̵e̵l̵d̵O̵f̵,̵  ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:437:82: This simp argument is unused:
+  List.zip_nil_left
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf,̵ ̵L̵i̵s̵t̵.̵z̵i̵p̵_̵n̵i̵l̵_̵l̵e̵f̵t̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:15: This simp argument is unused:
+  hgr
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr̵,̵ ̵h̵g̵ap, hslot, hpr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:20: This simp argument is unused:
+  hgap
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hg̵a̵p̵,̵ ̵h̵slot, hpr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:26: This simp argument is unused:
+  hslot
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hs̵l̵o̵t̵,̵ ̵h̵pr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:33: This simp argument is unused:
+  hpr
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, h̵p̵r̵,̵ ̵Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:38: This simp argument is unused:
+  Bool.false_eq_true
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, hpr, B̵o̵o̵l̵.̵f̵a̵l̵s̵e̵_̵e̵q̵_̵t̵r̵u̵e̵,̵ ̵if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:462:58: This simp argument is unused:
+  if_false
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true,̵ ̵i̵f̵_̵f̵a̵l̵s̵e̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:476:77: This simp argument is unused:
+  Payload.toVal
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, P̵a̵y̵l̵o̵a̵d̵.̵t̵o̵V̵a̵l̵,̵ ̵hd]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:480:65: This simp argument is unused:
+  hbx
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hb̵x̵,̵ ̵h̵js]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:481:53: This simp argument is unused:
+  hm
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm̵,̵ ̵h̵nop]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:481:57: This simp argument is unused:
+  hnop
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm,̵ ̵h̵n̵o̵p̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:482:39: This simp argument is unused:
+  hnop
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hgr, hf,̵ ̵h̵n̵o̵p̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:534:24: This simp argument is unused:
+  hp
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, h̵p̵,̵ ̵kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:536:24: This simp argument is unused:
+  Val.unbox
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, V̵a̵l̵.̵u̵n̵b̵o̵x̵,̵ ̵Heap.payload, Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:536:35: This simp argument is unused:
+  Heap.payload
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv, seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs, execStmt, evalExpr, Val.unbox, H̵e̵a̵p̵.̵p̵a̵y̵l̵o̵a̵d̵,̵ ̵Payload.toVal, Env.set, fieldOf,
+  ̲  ̲ ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:536:64: This simp argument is unused:
+  Env.set
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, E̵n̵v̵.̵s̵f̲i̲et̵l̲d̲O̲f̲,
+  ̲ f̵i̵e̵l̵d̵O̵f̵,̵  ̲ ̲List.zip_nil_left]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:536:82: This simp argument is unused:
+  List.zip_nil_left
+
+Hint: Omit it from the simp argument list.
+  simp only [hb, hbind, hp, kwargsRejected_nil, hpos, hsig, selfEnv,
+  ̵  ̵ ̵ ̵seedClassAttrDefaults, hcad,
+  ̲  ̲ ̲ ̲seedClassAttrs,
+  ̵  ̵ ̵ ̵execStmt, evalExpr, Val.unbox, Heap.payload, Payload.toVal, Env.set, fieldOf,̵ ̵L̵i̵s̵t̵.̵z̵i̵p̵_̵n̵i̵l̵_̵l̵e̵f̵t̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:15: This simp argument is unused:
+  hgr
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr̵,̵ ̵h̵g̵ap, hslot, hpr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:20: This simp argument is unused:
+  hgap
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hg̵a̵p̵,̵ ̵h̵slot, hpr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:26: This simp argument is unused:
+  hslot
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hs̵l̵o̵t̵,̵ ̵h̵pr, Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:33: This simp argument is unused:
+  hpr
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, h̵p̵r̵,̵ ̵Bool.false_eq_true, if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:38: This simp argument is unused:
+  Bool.false_eq_true
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, hpr, B̵o̵o̵l̵.̵f̵a̵l̵s̵e̵_̵e̵q̵_̵t̵r̵u̵e̵,̵ ̵if_false]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:561:58: This simp argument is unused:
+  if_false
+
+Hint: Omit it from the simp argument list.
+  simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true,̵ ̵i̵f̵_̵f̵a̵l̵s̵e̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:575:77: This simp argument is unused:
+  Payload.toVal
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, P̵a̵y̵l̵o̵a̵d̵.̵t̵o̵V̵a̵l̵,̵ ̵hd]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:579:65: This simp argument is unused:
+  hbx
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hb̵x̵,̵ ̵h̵js]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:580:53: This simp argument is unused:
+  hm
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm̵,̵ ̵h̵nop]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:580:57: This simp argument is unused:
+  hnop
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm,̵ ̵h̵n̵o̵p̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:581:39: This simp argument is unused:
+  hnop
+
+Hint: Omit it from the simp argument list.
+  simp [hgap, hslot, hpr, hgr, hf,̵ ̵h̵n̵o̵p̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: Autoform/SpecsGen/Basis.lean:626:39: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:627:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:805:42: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:806:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:811:39: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:812:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:817:42: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:818:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:823:48: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:824:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:829:40: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:830:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:835:43: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:836:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:841:43: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:842:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:847:41: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:848:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:853:41: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:854:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:859:45: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:860:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:865:45: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:866:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:871:43: unused variable `hctx`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Autoform/SpecsGen/Basis.lean:872:5: unused variable `hfn`
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+ℹ [62/62] Built Autoform.SpecsGen.CompilerRewrite (1.2s)
+info: Autoform/SpecsGen/CompilerRewrite.lean:153:0: ╭─ open obligations ─ CompilerRewrite (0)
+╰──────────────────────────────────────────
+info: Autoform/SpecsGen/CompilerRewrite.lean:159:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__add depends on Autoform.Generated.CompilerRewrite.f_numbers_py__module__add — not dependency-vacuous
+info: Autoform/SpecsGen/CompilerRewrite.lean:160:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__fraction depends on Autoform.Generated.CompilerRewrite.f_numbers_py__module__fraction — not dependency-vacuous
+info: Autoform/SpecsGen/CompilerRewrite.lean:161:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__quotient depends on Autoform.Generated.CompilerRewrite.f_numbers_py__module__quotient — not dependency-vacuous
+info: Autoform/SpecsGen/CompilerRewrite.lean:167:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__add: axioms [propext,
+ Classical.choice,
+ Quot.sound] — clean
+info: Autoform/SpecsGen/CompilerRewrite.lean:168:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__fraction: axioms [propext,
+ Classical.choice,
+ Quot.sound] — clean
+info: Autoform/SpecsGen/CompilerRewrite.lean:169:0: Autoform.SpecsGen.CompilerRewrite.conform_numbers_py__module__quotient: axioms [propext,
+ Classical.choice,
+ Quot.sound] — clean
+Build completed successfully (62 jobs).

@@ -63,6 +63,8 @@ def test_cli_deadline_handles_deep_ast_without_reporting_source_exception(tmp_pa
     assert report['cases'] == 0
     assert report['skipped']['skip_native_timeout'] == 1
     assert report['native_deadline_detail'][0]['function'] == 'probe.py:<module>.blocked'
-    assert report['measurement_basis'] == 'python-deadlines-v4'
+    # A synthetic AST without `classDeclarations` is a legacy model: compared by result
+    # only, so no `heap-graph-v1` basis is claimed for it.
+    assert report['measurement_basis'] == 'python-deadlines-v4+trace-returns-v1'
     assert report['native_call_deadline']['seconds'] == 2.0
     assert report['status'] == 'INCONCLUSIVE: no runtime comparisons'

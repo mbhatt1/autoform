@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "base_revision": "d8aec57",
+  "scope": "Source identities shared by AST provenance and differential reports. A clean tracked subtree uses its commit; changed, ignored, or untracked source trees use their content digest; missing roots are refused.",
+  "source_sha256": {
+    "scripts/provenance.py": "57d9c3fd755708d072044515070db24b71ddf31b0fb6da85a926514041454067",
+    "scripts/differential.py": "796145751c27d7c9965b546032ebc33098294636591593292cc7a6a49854450a",
+    "tests/test_source_revision.py": "3f1d464a7a2b03b50ad961b1e90f98dfe9832d166a99d3827d2c1c371ad0f8e9"
+  },
+  "checks": {
+    "python": {
+      "status": "PASS",
+      "summary": "36 passed, 3 skipped in 13.74s",
+      "command": ".venv/bin/python -m pytest -q tests/test_source_revision.py tests/test_reland_scope.py tests/test_differential_backends.py tests/test_runtime_backends.py",
+      "log": ".autoform-work/source-identity-tests2.log"
+    },
+    "docs": {
+      "status": "PASS",
+      "summary": "8 documented figures match their artifacts",
+      "command": ".venv/bin/python scripts/check_docs.py"
+    },
+    "actual_ignored_fixture": {
+      "path": "/Users/mbhatt/autoform/.autoform-work/inheritance-source",
+      "identity": "tree-sha256:b9b5242a2531de0b543ac50b4578cf79eab3322c718936e8b9a3a488b55cbb31:1files"
+    }
+  },
+  "limitations": [
+    "Existing corpus records were not re-pinned. Previously misattributed or dirty-source records require regeneration.",
+    "Inheritance and slots frozen validation candidates predate this correction. Preserve this fix when promoting their independent patches; their fixture reports are not committed corpus revisions."
+  ],
+  "candidate_revision": "f5157f1"
+}

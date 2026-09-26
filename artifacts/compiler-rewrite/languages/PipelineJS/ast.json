@@ -1,0 +1,494 @@
+[
+ {
+  "name": "numbers.js::program:shift",
+  "file": "numbers.js",
+  "sourceName": "shift",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:<<",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program",
+  "file": "numbers.js",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "skip"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "assign",
+             "x": "shift",
+             "e": {
+              "k": "fnref",
+              "v": "numbers.js::program:shift"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "assign",
+              "x": "unsigned",
+              "e": {
+               "k": "fnref",
+               "v": "numbers.js::program:unsigned"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "assign",
+               "x": "signed",
+               "e": {
+                "k": "fnref",
+                "v": "numbers.js::program:signed"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "assign",
+                "x": "bits",
+                "e": {
+                 "k": "fnref",
+                 "v": "numbers.js::program:bits"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "assign",
+                 "x": "complement",
+                 "e": {
+                  "k": "fnref",
+                  "v": "numbers.js::program:complement"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "assign",
+                  "x": "signedAssign",
+                  "e": {
+                   "k": "fnref",
+                   "v": "numbers.js::program:signedAssign"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "assign",
+                   "x": "unsignedAssign",
+                   "e": {
+                    "k": "fnref",
+                    "v": "numbers.js::program:unsignedAssign"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "assign",
+                    "x": "unsignedValue",
+                    "e": {
+                     "k": "fnref",
+                     "v": "numbers.js::program:unsignedValue"
+                    }
+                   },
+                   "b": {
+                    "k": "assign",
+                    "x": "add",
+                    "e": {
+                     "k": "fnref",
+                     "v": "numbers.js::program:add"
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:unsigned",
+  "file": "numbers.js",
+  "sourceName": "unsigned",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:>>>",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:signed",
+  "file": "numbers.js",
+  "sourceName": "signed",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:>>",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:bits",
+  "file": "numbers.js",
+  "sourceName": "bits",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:|",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:complement",
+  "file": "numbers.js",
+  "sourceName": "complement",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "num:js:i32:~",
+    "a": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:signedAssign",
+  "file": "numbers.js",
+  "sourceName": "signedAssign",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "binop",
+     "op": "num:js:i32:>>",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:unsignedAssign",
+  "file": "numbers.js",
+  "sourceName": "unsignedAssign",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "binop",
+     "op": "num:js:i32:>>>",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:unsignedValue",
+  "file": "numbers.js",
+  "sourceName": "unsignedValue",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "binop",
+     "op": "num:js:i32:>>>",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "name",
+     "v": "a"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.js::program:add",
+  "file": "numbers.js",
+  "sourceName": "add",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "js:+",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ }
+]

@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SUBCOMMANDS = ('init', 'doctor', 'source', 'assure', 'machine')
+SUBCOMMANDS = ('init', 'doctor', 'source', 'assure', 'regress', 'machine')
 
 
 def run_cli(*args, env=None, cwd=None, timeout=180):

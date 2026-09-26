@@ -581,20 +581,30 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                     | some o =>
                         rw [hg] at hy
                         dsimp only at hy ⊢
-                        by_cases hp : (ctx.dialect == .python &&
-                            ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = true
-                        · rw [if_pos hp] at hy ⊢
-                          cases hm : ctx.resolveMethod o.cls f with
-                          | none => rw [hm] at hy; exact hy
-                          | some fn =>
-                              rw [hm] at hy
-                              dsimp only at hy ⊢
-                              by_cases hc : o.captured.isEmpty = true
-                              · rw [if_pos hc] at hy ⊢
-                                exact ihF _ hctx _ _ (hctx.2 _ _ _ hm) _ _ _ _ _ hy hne
-                              · rw [if_neg hc] at hy ⊢
-                                exact ihC _ hctx _ _ (hctx.2 _ _ _ hm) _ _ _ _ _ hy hne
-                        · rw [if_neg hp] at hy ⊢; exact hy
+                        cases hgap : ctx.classLookupGap o.cls f with
+                        | some reason => rw [hgap] at hy; exact hy
+                        | none =>
+                          rw [hgap] at hy
+                          dsimp only at hy ⊢
+                          cases hs : ctx.readSlot o f with
+                          | some result => rw [hs] at hy; exact hy
+                          | none =>
+                            rw [hs] at hy
+                            dsimp only at hy ⊢
+                            by_cases hp : (ctx.dialect == .python &&
+                                ctx.isProperty o.cls f) = true
+                            · rw [if_pos hp] at hy ⊢
+                              cases hm : ctx.resolveMethod o.cls f with
+                              | none => rw [hm] at hy; exact hy
+                              | some fn =>
+                                  rw [hm] at hy
+                                  dsimp only at hy ⊢
+                                  by_cases hc : o.captured.isEmpty = true
+                                  · rw [if_pos hc] at hy ⊢
+                                    exact ihF _ hctx _ _ (hctx.2 _ _ _ hm) _ _ _ _ _ hy hne
+                                  · rw [if_neg hc] at hy ⊢
+                                    exact ihC _ hctx _ _ (hctx.2 _ _ _ hm) _ _ _ _ _ hy hne
+                            · rw [if_neg hp] at hy ⊢; exact hy
                 all_goals exact hy
         | listE es =>
             simp only [evalExpr] at hy ⊢
@@ -785,6 +795,14 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 | inr vs =>
                     rw [ihL _ hctx _ _ _ _ _ hB (by simp)]
                     dsimp only at hy ⊢
+                    -- A class value re-dispatches to the `alloc` rule: one `evalExpr`.
+                    cases hcv : classValueOwner fv with
+                    | some owner =>
+                        rw [hcv] at hy
+                        exact ihE _ hctx _ _ _ _ _ hy hne
+                    | none =>
+                    rw [hcv] at hy
+                    dsimp only at hy ⊢
                     cases fv
                     case fn g =>
                         dsimp only at hy ⊢
@@ -860,11 +878,11 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                         dsimp only at hy ⊢
                         -- three nested branches now: the `classDefines` guard, the
                         -- method lookup, and splitting the receiver off the positionals.
-                        cases hcd : Ctx.classDefines ctx (classNameOfValue g) m with
+                        cases hcd : Ctx.classDefines ctx (ctx.classKeyOfValue g) m with
                         | false => simp only [hcd, Bool.false_eq_true, if_false] at hy ⊢; exact hy
                         | true =>
                             simp only [hcd, if_true] at hy ⊢
-                            cases hrm : Ctx.resolveMethod ctx (classNameOfValue g) m with
+                            cases hrm : Ctx.resolveMethod ctx (ctx.classKeyOfValue g) m with
                             | none => simp only [hrm] at hy ⊢; exact hy
                             | some fn2 =>
                                 simp only [hrm] at hy ⊢
@@ -1087,44 +1105,56 @@ private theorem fuelStep : ∀ k, FuelStep k := by
             | inr vs =>
                 rw [ihL _ hctx _ _ _ _ _ hA (by simp)]
                 dsimp only at hy ⊢
-                -- A class with a builtin base allocates a `Val.bobj` by a fuel-free
-                -- computation (`allocBuiltin`), so that branch has nothing to induct on.
+                -- Legacy builtin-base allocation is a fuel-free computation.
                 cases hbb : Ctx.builtinBase ctx cls with
                 | some bb => rw [hbb] at hy; exact hy
                 | none =>
                 rw [hbb] at hy
                 dsimp only at hy ⊢
-                cases hcap : Env.get ρ cls
-                case clsClos cname cvs =>
-                    rw [hcap] at hy
-                    dsimp only at hy ⊢
-                    cases hrm : Ctx.resolveCtor ctx cls with
-                    | none => rw [hrm] at hy; exact hy
-                    | some fn =>
-                        rw [hrm] at hy
-                        dsimp only at hy ⊢
-                        rcases hC : applyFunc ctx k
-                            (h₁ ++ [{ cls := cls, fields := [], captured := cvs }]) fn
-                            (some (Val.ref h₁.length)) vs.1 vs.2 with ⟨h₃, r₃⟩
-                        rw [hC] at hy
-                        cases r₃ <;> first
-                          | (cases hy; exact absurd rfl hne)
-                          | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
-                all_goals
-                  (rw [hcap] at hy
-                   dsimp only at hy ⊢
-                   cases hrm : Ctx.resolveCtor ctx cls with
-                   | none => rw [hrm] at hy; exact hy
-                   | some fn =>
-                       rw [hrm] at hy
-                       dsimp only at hy ⊢
-                       rcases hC : applyFunc ctx k
-                           (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
-                           (some (Val.ref h₁.length)) vs.1 vs.2 with ⟨h₃, r₃⟩
-                       rw [hC] at hy
-                       cases r₃ <;> first
-                         | (cases hy; exact absurd rfl hne)
-                         | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy))
+                cases hgap : ctx.constructionGap cls with
+                | some reason => rw [hgap] at hy; exact hy
+                | none =>
+                rw [hgap] at hy
+                dsimp only at hy ⊢
+                cases hcap : ctx.allocationCaptures ρ cls with
+                | none => rw [hcap] at hy; exact hy
+                | some cap =>
+                rw [hcap] at hy
+                dsimp only at hy ⊢
+                cases hrm : Ctx.resolveCtor ctx cls with
+                | none => rw [hrm] at hy; exact hy
+                | some fn =>
+                  rw [hrm] at hy
+                  dsimp only at hy ⊢
+                  by_cases hcm : (ctx.dialect == .python && fn.isClassMethod) = true
+                  · rw [if_pos hcm] at hy ⊢
+                    by_cases hc : cap.isEmpty = true
+                    · rw [if_pos hc] at hy ⊢
+                      rcases hC : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := cap }]) fn none ((ctx.instanceClassValue { cls := cls, fields := [], captured := cap }) :: vs.1) vs.2 with ⟨h₃, r₃⟩
+                      rw [hC] at hy
+                      cases r₃ <;> first
+                        | (cases hy; exact absurd rfl hne)
+                        | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
+                    · rw [if_neg hc] at hy ⊢
+                      rcases hC : applyClosure ctx k (h₁ ++ [{ cls := cls, fields := [], captured := cap }]) fn cap ((ctx.instanceClassValue { cls := cls, fields := [], captured := cap }) :: vs.1) vs.2 with ⟨h₃, r₃⟩
+                      rw [hC] at hy
+                      cases r₃ <;> first
+                        | (cases hy; exact absurd rfl hne)
+                        | (rw [ihC _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
+                  · rw [if_neg hcm] at hy ⊢
+                    by_cases hc : cap.isEmpty = true
+                    · rw [if_pos hc] at hy ⊢
+                      rcases hC : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := cap }]) fn (some (.ref h₁.length)) vs.1 vs.2 with ⟨h₃, r₃⟩
+                      rw [hC] at hy
+                      cases r₃ <;> first
+                        | (cases hy; exact absurd rfl hne)
+                        | (rw [ihF _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
+                    · rw [if_neg hc] at hy ⊢
+                      rcases hC : applyClosure ctx k (h₁ ++ [{ cls := cls, fields := [], captured := cap }]) fn (if fn.isMethod then ("self", .ref h₁.length) :: cap else cap) vs.1 vs.2 with ⟨h₃, r₃⟩
+                      rw [hC] at hy
+                      cases r₃ <;> first
+                        | (cases hy; exact absurd rfl hne)
+                        | (rw [ihC _ hctx _ _ (resolveCtor_covered hctx hrm) _ _ _ _ _ hC (by simp)]; exact hy)
       · intro ctx hctx h fn hfree self? vs kws h' r hy hne
         simp only [applyFunc] at hy ⊢
         by_cases hk : (kwargsRejected fn kws || posRejected fn vs || signatureRejected fn vs kws) = true
@@ -1586,6 +1616,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 case fn g =>
                     -- Boxing evaluates the right-hand side IN THE POST-ALLOCATION HEAP,
                     -- so the recursion is at `(boxFn h₁ _).1`, not at `h₁`.
+                    by_cases hshared : ctx.isSharedClassValue (Val.fn g) = true
+                    · simp only [hshared, if_true] at hy ⊢; exact hy
+                    simp only [hshared, if_false] at hy ⊢
                     cases re <;> dsimp only [isFnVal] at hy ⊢ <;>
                       first
                         | exact hy
@@ -1599,6 +1632,7 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 case clos g cap =>
                     -- Boxing evaluates the right-hand side IN THE POST-ALLOCATION HEAP,
                     -- so the recursion is at `(boxFn h₁ _).1`, not at `h₁`.
+                    simp only [Ctx.isSharedClassValue, Bool.and_false, if_false] at hy ⊢
                     cases re <;> dsimp only [isFnVal] at hy ⊢ <;>
                       first
                         | exact hy
@@ -1873,6 +1907,13 @@ private theorem resolve_go_mem (sfx : String) :
             · exact Or.inl ⟨q, List.mem_cons_of_mem _ hq, hq2⟩
             · exact Or.inr hacc
 
+/-- Binding a class receiver changes the calling convention and preserves the body. -/
+private theorem bindClassReceiver_body {fn bound : Func} {receiver : String}
+    (h : fn.bindClassReceiver = some (bound, receiver)) : bound.body = fn.body := by
+  unfold Func.bindClassReceiver at h
+  repeat' split at h
+  all_goals cases h <;> rfl
+
 /-- The table-wide condition implies the resolution-wide one: if no function in the table
 uses `tryFinally`, then neither does anything the interpreter can reach. -/
 theorem tfFree_of_table {ctx : Ctx}
@@ -1890,9 +1931,17 @@ theorem tfFree_of_table {ctx : Ctx}
         dsimp only at hr
         repeat' split at hr
         all_goals cases hr <;> rfl
-      · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
-        · exact hq2 ▸ hT q hq
-        · simp at hacc
+      · split at hr
+        · unfold resolveClassBound at hr
+          obtain ⟨bound, hb, heq⟩ := Option.map_eq_some_iff.mp hr
+          obtain ⟨entry, he, hbind⟩ := Option.bind_eq_some_iff.mp hb
+          have hbody := bindClassReceiver_body hbind
+          cases heq
+          rw [hbody]
+          exact hT entry (List.mem_of_find?_eq_some he)
+        · rcases resolve_go_mem _ _ _ _ hr with ⟨q, hq, hq2⟩ | hacc
+          · exact hq2 ▸ hT q hq
+          · simp at hacc
   refine ⟨hres, ?_⟩
   intro c m fn hr
   rw [Ctx.resolveMethod] at hr
@@ -1905,15 +1954,23 @@ theorem tfFree_of_table {ctx : Ctx}
     cases hr
     exact iterationMethod_tfFree hp
   · split at hr
-    · rename_i a f rest hfilt
-      have hmem : (a, f) ∈ ctx.table.filter
-          (fun p => strEndsWith (stripSig p.1) ("." ++ c ++ "." ++ m)) := by
-        rw [hfilt]; exact List.mem_cons_self
-      have : f = fn := by simpa using hr
-      exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1
+    · have hlookup (name : String)
+          (h : (ctx.table.find? (·.1 == name)).map Prod.snd = some fn) :
+          tfFreeS fn.body = true := by
+        obtain ⟨entry, he, hf⟩ := Option.map_eq_some_iff.mp h
+        exact hf ▸ hT entry (List.mem_of_find?_eq_some he)
+      split at hr
+      all_goals first | exact hlookup _ hr | cases hr
     · split at hr
-      · cases hr
-      · exact hres m fn hr
+      · rename_i a f rest hfilt
+        have hmem : (a, f) ∈ ctx.table.filter
+            (fun p => strEndsWith (stripSig p.1) ("." ++ c ++ "." ++ m)) := by
+          rw [hfilt]; exact List.mem_cons_self
+        have : f = fn := by simpa using hr
+        exact this ▸ hT (a, f) (List.mem_filter.mp hmem).1
+      · split at hr
+        · cases hr
+        · exact hres m fn hr
 
 /-! ## Public statements
 

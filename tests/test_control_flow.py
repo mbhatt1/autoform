@@ -7,7 +7,8 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import (ROOT, SOURCE_RUNTIME, SOURCE_STATE_OUTPUT,
+                                 numeric_env, run, stage_source_initial_state)
 
 SOURCE = ROOT / 'examples/python_control/control.py'
 SUBJECTS = ['caught_raise', 'caught_expression', 'final_return', 'final_pending_return',
@@ -67,8 +68,9 @@ def test_exported_control_flow_matches_cpython(tmp_path, numeric_env):
     run([sys.executable, ROOT / 'cartographer/render_lean.py', tmp_path / 'ast.json',
          model, 'Control'], ROOT, numeric_env)
     header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.Control\n'
+    header += SOURCE_RUNTIME
     cases = native_cases()
-    calls = [f'runFunc program 256 "control.py:<module>.{name}" [.int ({value})]'
+    calls = [f'runSource program initialGlobals 256 "control.py:<module>.{name}" [.int ({value})]'
              for name, value, _ in cases]
     driver = header + 'def main : IO Unit := do\n'
     for call in calls:
@@ -76,9 +78,10 @@ def test_exported_control_flow_matches_cpython(tmp_path, numeric_env):
   | .val (.int value) => IO.println value
   | other => IO.println ("unexpected:" ++ reprStr other)
 '''
+    driver += SOURCE_STATE_OUTPUT
     (tmp_path / 'Observe.lean').write_text(driver)
     output = run(['lake', 'env', 'lean', '--run', tmp_path / 'Observe.lean'], ROOT, numeric_env)
-    observed = output.splitlines()
+    header, observed = stage_source_initial_state(header, output)
     expected = [str(value) for _, _, value in cases]
     mismatches = [dict(subject=name, argument=arg, native=want, model=actual)
                   for (name, arg, want), actual in zip(cases, observed) if str(want) != actual]
@@ -91,6 +94,7 @@ def test_exported_control_flow_matches_cpython(tmp_path, numeric_env):
         proofs += (f'example : (match {call} with\n'
                    f'  | .val (.int value) => value == ({expected} : Int)\n'
                    '  | _ => false) = true := by\n'
+                   '  rw [initialGlobals_correct]\n'
                    '  first | decide +kernel | fail "native control-flow result not established"\n')
     (tmp_path / 'Proofs.lean').write_text(proofs)
     run(['lake', 'env', 'lean', tmp_path / 'Proofs.lean'], ROOT, numeric_env)

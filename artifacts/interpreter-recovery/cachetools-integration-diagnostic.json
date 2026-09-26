@@ -1,0 +1,397 @@
+{
+  "status": "DIAGNOSTIC_NOT_PROMOTED",
+  "candidate_revision": "26fefc9db8de3f8cb5c24c8629e72ed64eca0c44",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/cachetools-integration-validation",
+  "source": "/private/tmp/ct-v717",
+  "source_revision": "tree-sha256:49cb5656b594bd27bd84aa1508661bea0a02a65697a95349afb202f07c7f908f:9files",
+  "measurement_basis": "python-class-slots-v6+trace-returns-v1",
+  "scope": "Fresh Cachetools run after inheritance, slots, native oracle and lexical callable changes; before exact class-value outcome comparison.",
+  "source_sha256": {
+    "cartographer/export_ast.sc": "b451f65cdede1131b380d9edf1a82d8e58b2ab8b0eef78f1826cc1db54730eb6",
+    "scripts/differential.py": "929754f05d166de5cd16814c293d46ba0916f116bf683145c15aac815efb64f6",
+    "scripts/synth_specs.py": "dec8f7d98fc9abce6163c850e902b21d2d3a5963d6710136a94b5edc87865564"
+  },
+  "export": {
+    "functions": 209,
+    "holeFree": 198,
+    "verifiableCore": 140,
+    "holes": 16,
+    "holesByLabel": [
+      {
+        "label": "class-construction:unresolved-lexical-identity:OrderedDict",
+        "count": 4
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:FIFOCache",
+        "count": 2
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:TTLCache",
+        "count": 2
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:RRCache",
+        "count": 2
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:LFUCache",
+        "count": 2
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:LRUCache",
+        "count": 2
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:Condition",
+        "count": 1
+      },
+      {
+        "label": "class-construction:unresolved-lexical-identity:WeakKeyDictionary",
+        "count": 1
+      }
+    ]
+  },
+  "comparisons": {
+    "cases": 130,
+    "agree": 35,
+    "divergences": 0,
+    "inconclusive": 95,
+    "functions_covered": 26,
+    "skipped": {
+      "skip_unencodable_args": 0,
+      "skip_unencodable_ret": 110,
+      "skip_no_instance": 133
+    },
+    "inconclusive_detail": {
+      "cachetools/_cachedmethod.py:<module>._warn_classmethod: mcall:<absent:external>warnings.warn:not-a-class-method": 5,
+      "cachetools/_cachedmethod.py:<module>._warn_instance_dict: mcall:<absent:external>warnings.warn:not-a-class-method": 5,
+      "cachetools/__init__.py:<module>._TimedCache._Timer.__init__: class-definition:custom-attribute-hook": 5,
+      "cachetools/__init__.py:<module>._TimedCache._Timer.__call__: class-definition:custom-attribute-hook": 5,
+      "cachetools/__init__.py:<module>._TimedCache._Timer.__enter__: class-definition:custom-attribute-hook": 5,
+      "cachetools/__init__.py:<module>._TimedCache._Timer.__reduce__: class-hierarchy:unresolved-base:<unresolved-base>cachetools/__init__.py:<module>.Cache:0": 5,
+      "cachetools/__init__.py:<module>._TimedCache._Timer.__getattr__: class-definition:custom-attribute-hook": 5,
+      "cachetools/__init__.py:<module>.TTLCache._Link.__reduce__: class-hierarchy:unresolved-base:<unresolved-base>cachetools/__init__.py:<module>.Cache:0": 5,
+      "cachetools/__init__.py:<module>.TLRUCache._Item.__init__: class-definition:decorator-or-metaclass": 5,
+      "cachetools/__init__.py:<module>.TLRUCache._Item.__lt__: class-definition:decorator-or-metaclass": 5,
+      "cachetools/_cached.py:<module>._condition_info.cache_clear: field:__enter__:non-object": 5,
+      "cachetools/_cached.py:<module>._condition_info.cache_info: field:__enter__:non-object": 5,
+      "cachetools/_cached.py:<module>._locked_info.cache_clear: field:__enter__:non-object": 5,
+      "cachetools/_cached.py:<module>._locked_info.cache_info: field:__enter__:non-object": 5,
+      "cachetools/_cached.py:<module>._unlocked_info.cache_clear: mcall:cache.clear:not-a-class-method": 5,
+      "cachetools/_cached.py:<module>._unlocked_info.cache_info: call:value:not-callable": 5,
+      "cachetools/_cached.py:<module>._uncached_info.cache_clear: setField:v:non-object": 5,
+      "cachetools/_cached.py:<module>._condition.cache_clear: field:__enter__:non-object": 5,
+      "cachetools/_cached.py:<module>._locked.cache_clear: field:__enter__:non-object": 5
+    },
+    "no_instance_detail": {
+      "Cache.__init__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__repr__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__getitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__contains__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__missing__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__iter__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.__len__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.get": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.pop": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.setdefault": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.maxsize": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.currsize": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "Cache.getsizeof": "no self parameter",
+      "FIFOCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "FIFOCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "FIFOCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "FIFOCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache._Link.__init__": "unencodable receiver/arguments: set",
+      "LFUCache._Link.unlink": "unencodable receiver/arguments: set",
+      "LFUCache.__init__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache.__getitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LFUCache._LFUCache__touch": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache.__getitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "LRUCache._LRUCache__touch": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.__init__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.choice": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "RRCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache._Timer.__exit__": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_TimedCache.__init__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.__repr__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.__len__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.currsize": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.timer": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.get": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_TimedCache.pop": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_TimedCache.setdefault": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_TimedCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_TimedCache.expire": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__contains__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__getitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__iter__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.__setstate__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.ttl": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.expire": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TTLCache._TTLCache__getlink": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.__contains__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.__getitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.__setitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.__delitem__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.__iter__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.ttu": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.expire": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.popitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache.clear": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache._TLRUCache__getitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "TLRUCache._TLRUCache__delitem": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "cached.decorator": "reached through cached(...), but no case survived encoding",
+      "cached.decorator.make_info": "class cached.decorator not found in the module",
+      "cachedmethod.decorator": "reached through cachedmethod(...), but no case survived encoding",
+      "cachedmethod.decorator.make_info": "class cachedmethod.decorator not found in the module",
+      "_condition_info.wrapper": "reached through _condition_info(...), but no case survived encoding",
+      "_locked_info.wrapper": "reached through _locked_info(...), but no case survived encoding",
+      "_unlocked_info.wrapper": "reached through _unlocked_info(...), but no case survived encoding",
+      "_uncached_info.wrapper": "reached through _uncached_info(...), but no case survived encoding",
+      "_condition.wrapper": "nested function, not a method: needs _condition(...) called and its result captured",
+      "_locked.wrapper": "nested function, not a method: needs _locked(...) called and its result captured",
+      "_unlocked.wrapper": "nested function, not a method: needs _unlocked(...) called and its result captured",
+      "_uncached.wrapper": "reached through _uncached(...), but no case survived encoding",
+      "_WrapperBase.__init__": "unencodable receiver/arguments: callable",
+      "_WrapperBase.__call__": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_WrapperBase.cache_clear": "unencodable receiver/arguments: callable",
+      "_WrapperBase.cache": "unencodable receiver/arguments: callable",
+      "_WrapperBase.cache_key": "unencodable receiver/arguments: callable",
+      "_WrapperBase.cache_lock": "unencodable receiver/arguments: callable",
+      "_WrapperBase.cache_condition": "unencodable receiver/arguments: callable",
+      "_DescriptorBase.__init__": "unencodable receiver/arguments: callable",
+      "_DescriptorBase.__set_name__": "unencodable receiver/arguments: callable",
+      "_DescriptorBase.__get__": "unencodable receiver/arguments: callable",
+      "_DeprecatedDescriptorBase.__init__": "unencodable receiver/arguments: callable",
+      "_DeprecatedDescriptorBase.__call__": "varargs/keyword-only: cannot synthesize a faithful call",
+      "_DeprecatedDescriptorBase.cache_clear": "unencodable receiver/arguments: callable",
+      "_condition_info.Descriptor.Wrapper.__init__": "class _condition_info.Descriptor.Wrapper not found in the module",
+      "_condition_info.Descriptor.Wrapper.__call__": "class _condition_info.Descriptor.Wrapper not found in the module",
+      "_condition_info.Descriptor.Wrapper.cache_clear": "class _condition_info.Descriptor.Wrapper not found in the module",
+      "_condition_info.Descriptor.Wrapper.cache_info": "class _condition_info.Descriptor.Wrapper not found in the module",
+      "_locked_info.Descriptor.Wrapper.__init__": "class _locked_info.Descriptor.Wrapper not found in the module",
+      "_locked_info.Descriptor.Wrapper.__call__": "class _locked_info.Descriptor.Wrapper not found in the module",
+      "_locked_info.Descriptor.Wrapper.cache_clear": "class _locked_info.Descriptor.Wrapper not found in the module",
+      "_locked_info.Descriptor.Wrapper.cache_info": "class _locked_info.Descriptor.Wrapper not found in the module",
+      "_unlocked_info.Descriptor.Wrapper.__init__": "class _unlocked_info.Descriptor.Wrapper not found in the module",
+      "_unlocked_info.Descriptor.Wrapper.__call__": "class _unlocked_info.Descriptor.Wrapper not found in the module",
+      "_unlocked_info.Descriptor.Wrapper.cache_clear": "class _unlocked_info.Descriptor.Wrapper not found in the module",
+      "_unlocked_info.Descriptor.Wrapper.cache_info": "class _unlocked_info.Descriptor.Wrapper not found in the module",
+      "_condition.cache_clear": "reached through _condition(...), but no case survived encoding",
+      "_condition.classmethod_wrapper": "nested function, not a method: needs _condition(...) called and its result captured",
+      "_condition.Descriptor.Wrapper.__init__": "class _condition.Descriptor.Wrapper not found in the module",
+      "_condition.Descriptor.Wrapper.__call__": "class _condition.Descriptor.Wrapper not found in the module",
+      "_condition.Descriptor.Wrapper.cache_clear": "class _condition.Descriptor.Wrapper not found in the module",
+      "_locked.cache_clear": "reached through _locked(...), but no case survived encoding",
+      "_locked.Descriptor.Wrapper.__init__": "class _locked.Descriptor.Wrapper not found in the module",
+      "_locked.Descriptor.Wrapper.__call__": "class _locked.Descriptor.Wrapper not found in the module",
+      "_locked.Descriptor.Wrapper.cache_clear": "class _locked.Descriptor.Wrapper not found in the module",
+      "_unlocked.cache_clear": "reached through _unlocked(...), but no case survived encoding",
+      "_unlocked.Descriptor.Wrapper.__init__": "class _unlocked.Descriptor.Wrapper not found in the module",
+      "_unlocked.Descriptor.Wrapper.__call__": "class _unlocked.Descriptor.Wrapper not found in the module",
+      "_unlocked.Descriptor.Wrapper.cache_clear": "class _unlocked.Descriptor.Wrapper not found in the module",
+      "_UnboundTTLCache.__init__": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_UnboundTTLCache.maxsize": "unencodable receiver/arguments: class-identity-unresolved:MutableMapping",
+      "_HashedTuple.__hash__": "unencodable receiver/arguments: container-subclass-state",
+      "_HashedTuple.__add__": "unencodable receiver/arguments: container-subclass-state",
+      "_HashedTuple.__radd__": "unencodable receiver/arguments: container-subclass-state",
+      "_HashedTuple.__getstate__": "unencodable receiver/arguments: container-subclass-state"
+    }
+  },
+  "pipeline": {
+    "status": "completed_with_gaps",
+    "report": "/Users/mbhatt/autoform/.autoform-work/cachetools-integration-validation/artifacts/pipeline/CachetoolsRecovery/run.json",
+    "proofs": 7,
+    "open_obligations": 0,
+    "stage_exit_codes": {
+      "source": 0,
+      "core-oracle": 0,
+      "mutation": 1,
+      "restore-build": 0,
+      "audit": 0,
+      "contracts": 0,
+      "assurance": 1
+    }
+  },
+  "mutation": {
+    "tested": 14,
+    "invalid": 0,
+    "inconclusive": 0,
+    "theorems": {
+      "conform_cachetools___init___py__module__TTLCache__Link___init": {
+        "killed": 2,
+        "survived": 2,
+        "score": 0.5,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.14285714285714285,
+        "verdict": "WEAK",
+        "survivors": [
+          {
+            "op": "ast-setfield:key->expires",
+            "line": 1319,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+            "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+            "after": "            (.setField (.name \"self\") \"expires\" (.name \"key\"))"
+          },
+          {
+            "op": "ast-seq-delete",
+            "line": 1319,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link___init__",
+            "before": "            (.setField (.name \"self\") \"key\" (.name \"key\"))",
+            "after": "            .skip"
+          }
+        ]
+      },
+      "conform_cachetools___init___py__module__TTLCache__Link_unlink": {
+        "killed": 1,
+        "survived": 6,
+        "score": 0.14285714285714285,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.07142857142857142,
+        "verdict": "WEAK",
+        "survivors": [
+          {
+            "op": "ast-name:self->prev",
+            "line": 1342,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "              (.assign \"prev\" (.field (.name \"self\") \"prev\"))",
+            "after": "              (.assign \"prev\" (.field (.name \"prev\") \"prev\"))"
+          },
+          {
+            "op": "ast-name:next->self",
+            "line": 1344,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "                (.setField (.name \"prev\") \"next\" (.name \"next\"))",
+            "after": "                (.setField (.name \"prev\") \"next\" (.name \"self\"))"
+          },
+          {
+            "op": "ast-setfield:prev->next",
+            "line": 1345,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "                (.seq .skip (.seq (.setField (.name \"next\") \"prev\" (.name \"prev\")) .skip))))) }",
+            "after": "                (.seq .skip (.seq (.setField (.name \"next\") \"next\" (.name \"prev\")) .skip))))) }"
+          },
+          {
+            "op": "ast-seq-delete",
+            "line": 1340,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "            (.assign \"next\" (.field (.name \"self\") \"next\"))",
+            "after": "            .skip"
+          },
+          {
+            "op": "ast-name:next->self",
+            "line": 1345,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "                (.seq .skip (.seq (.setField (.name \"next\") \"prev\" (.name \"prev\")) .skip))))) }",
+            "after": "                (.seq .skip (.seq (.setField (.name \"self\") \"prev\" (.name \"prev\")) .skip))))) }"
+          },
+          {
+            "op": "ast-name:prev->self",
+            "line": 1344,
+            "decl": "f_cachetools___init___py__module__TTLCache__Link_unlink",
+            "before": "                (.setField (.name \"prev\") \"next\" (.name \"next\"))",
+            "after": "                (.setField (.name \"self\") \"next\" (.name \"next\"))"
+          }
+        ]
+      },
+      "conform_cachetools___init___py__module___DefaultSize___getitem": {
+        "killed": 1,
+        "survived": 0,
+        "score": 1.0,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.07142857142857142,
+        "verdict": "HAS TEETH",
+        "survivors": []
+      },
+      "conform_cachetools___init___py__module___DefaultSize___setitem": {
+        "killed": 0,
+        "survived": 0,
+        "score": 0.0,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.0,
+        "verdict": "UNTESTED",
+        "survivors": []
+      },
+      "conform_cachetools___init___py__module___DefaultSize_clear": {
+        "killed": 0,
+        "survived": 0,
+        "score": 0.0,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.0,
+        "verdict": "UNTESTED",
+        "survivors": []
+      },
+      "conform_cachetools___init___py__module___DefaultSize_pop": {
+        "killed": 1,
+        "survived": 0,
+        "score": 1.0,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.07142857142857142,
+        "verdict": "HAS TEETH",
+        "survivors": []
+      },
+      "conform_cachetools__cachedmethod_py__module___none": {
+        "killed": 0,
+        "survived": 1,
+        "score": 0.0,
+        "inconclusive": 0,
+        "scope": "on-subject",
+        "coverage_score": 0.0,
+        "verdict": "VACUOUS",
+        "survivors": [
+          {
+            "op": "ast-ret->expr",
+            "line": 3916,
+            "decl": "f_cachetools__cachedmethod_py__module___none",
+            "before": "  , body := (.ret (.lit .unit)) }",
+            "after": "  , body := (.expr (.lit .unit)) }"
+          }
+        ]
+      }
+    }
+  },
+  "fresh_audit": {
+    "verdict": {
+      "failures": [],
+      "pass": true
+    },
+    "artifact_binding": "STABLE",
+    "kernel_recheck": "VERIFIED"
+  },
+  "resolved_export_failure": {
+    "cause": "ujson LinkedHashMap.clear removed keys while iterating its live backing map.",
+    "fix": "Snapshot keys before turning an unresolved constructor into a named hole.",
+    "before_report": "/Users/mbhatt/autoform/.autoform-work/cachetools-integration-validation/artifacts/pipeline/CachetoolsRecovery-at-733aa0d/run.json",
+    "regression": "tests/test_source_constructor_boundaries.py: source export plus kernel hole observation; 1 passed in 26.84s."
+  },
+  "remaining": [
+    "Only 35 calls compared; the goal requires at least 500 per corpus. Ninety-five cases remain inconclusive.",
+    "Imported classes, external ABC behavior, custom attribute hooks and decorators remain gaps.",
+    "Receiver post-state is not observed: six unlink mutants and two constructor mutants survive despite unchanged return values.",
+    "The tracked Cachetools corpus has not been re-landed; no provenance pin was refreshed from this diagnostic."
+  ]
+}

@@ -1,0 +1,71 @@
+{
+ "module": "CompilerRewrite",
+ "ast": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/ast-CompilerRewrite.json",
+ "ast_body_staleness": {
+  "ast_holes": 0,
+  "module_holes": 0,
+  "stale": false,
+  "note": "AST and module agree on hole count"
+ },
+ "source_root": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+ "fuel": 5000,
+ "synthetic_inputs_per_function": 0,
+ "claim": {
+  "functions": 5,
+  "hole_free": 5,
+  "verifiable_core_static": 5
+ },
+ "executed": {
+  "cases": 15,
+  "answered": 15,
+  "core_functions_exercised": 3,
+  "core_functions_with_real_inputs": 3
+ },
+ "result": {
+  "verifiable_core_executed": 3,
+  "verifiable_core_executed_real_inputs_only": 3,
+  "holed_on_some_input": 0,
+  "holed_on_a_real_input": 0,
+  "inconclusive_never_exercised": 2
+ },
+ "holed_functions": [],
+ "verified_functions": [
+  {
+   "name": "numbers.py:<module>.add",
+   "inputs": 5,
+   "real_inputs": 5
+  },
+  {
+   "name": "numbers.py:<module>.fraction",
+   "inputs": 5,
+   "real_inputs": 5
+  },
+  {
+   "name": "numbers.py:<module>.quotient",
+   "inputs": 5,
+   "real_inputs": 5
+  }
+ ],
+ "inconclusive_functions": [
+  {
+   "name": "<module-objects>:<module>",
+   "cases": 0,
+   "no_answer": 0,
+   "outOfFuel": 0
+  },
+  {
+   "name": "numbers.py:<module>",
+   "cases": 0,
+   "no_answer": 0,
+   "outOfFuel": 0
+  }
+ ],
+ "hole_labels": {},
+ "skipped": {
+  "skip_varargs": 0,
+  "skip_unencodable_args": 0,
+  "skip_unencodable_ret": 0,
+  "skip_no_instance": 0
+ },
+ "unencodable_reasons": {}
+}

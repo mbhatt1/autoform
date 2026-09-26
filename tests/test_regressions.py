@@ -19,7 +19,7 @@ import textwrap
 
 import pytest
 
-from conftest import CARTO, ROOT, fn, make_repo, run_script, seq_chain, write_ast
+from conftest import CARTO, ROOT, exporter_source, fn, make_repo, run_script, seq_chain, write_ast
 
 # ===========================================================================
 # 1. mutate.py: error_lines matched only the OLD Lean diagnostic shape
@@ -241,10 +241,19 @@ OLD_MAIN_DRIVER = textwrap.dedent("""
     sys.setrecursionlimit(1000)
     sys.argv = ["render_lean.py"] + sys.argv[2:]
     try:
-        # Reconstruct the old full-subtree flatten. The current printer's iterative
-        # seq renderer no longer overflows here, even with the old recursion limit.
-        # Testing _run_main alone therefore stopped reconstructing the regression.
-        rl.flat_capped = lambda node, kind, cap: rl.flat(node, kind)
+        # Keep the recursive algorithm here: the current flat printer itself is
+        # iterative, so calling it can no longer reconstruct the old overflow.
+        def old_flat(node, kind):
+            head, children = rl.SHAPE[kind](node)
+            if not children:
+                return head
+            return "(" + head + " " + " ".join(old_child(c) for c in children) + ")"
+        def old_child(child):
+            kind, value = child
+            if kind == "atom":
+                return value
+            return old_flat(value, kind)
+        rl.render = lambda node, kind, col: old_flat(node, kind)
         rl._run_main()
     except RecursionError:
         print("RECURSION_ERROR")
@@ -394,7 +403,7 @@ class TestVarargContract:
         if not os.path.exists(sc):
             pytest.fail("cartographer/export_ast.sc absent; the JSON contract has no "
                         "producer to check against")
-        got = self._gate_is_first(open(sc).read())
+        got = self._gate_is_first(exporter_source())
         assert got is not None, ("paramStars is gone or reshaped — re-derive this "
                                  "check, do not delete it")
         assert got, ("paramStars no longer gates on the .py extension; in C a `*` "

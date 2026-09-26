@@ -504,8 +504,9 @@ its `make_info` still computes with `unit`. One more reason a tracked AST is evi
 about the exporter that produced it (`docs/integrity.md`).
 
 *The general case was priced here and is now done — see §16.A.* A missing attribute on
-an ordinary object raises `AttributeError` under `.python`, as the Language Reference
-specifies (§3.2.11, §3.3.2), instead of answering `unit`. What the pricing predicted was
+an ordinary object raises `AttributeError` under `.python` once class metadata makes
+the hierarchy complete, as the Language Reference specifies (§3.2.11, §3.3.2), and is
+a named gap on a legacy model, instead of answering `unit`. What the pricing predicted was
 right in shape and wrong in size: the accessor lemma `applyFunc_ret_field_self` in
 `SpecsGen/Basis.lean` did have to be restricted, but to a receiver that HAS the field
 (`hfld`), which made its `@property` and class-attribute premises unnecessary rather than
@@ -783,14 +784,22 @@ is "raised when an attribute reference or assignment fails".
 
 **Rule.** `Expr.field` under `.python`, after the instance fields, the closure captures,
 a `@property` getter and the class-attribute fallback have all missed, evaluates to
-`.exn (.str "AttributeError")` (`Semantics.lean`, the `.field` clause; the arm cites the
-sections above). Core has no `__getattr__`, so there is no further fallback to model.
+`.exn (.str "AttributeError")` when the program carries recovered class metadata
+(`Program.classDecls`), so the miss was searched through a complete MRO
+(`Semantics.lean`, the `.field` clause; the arm cites the sections above). Core has no
+`__getattr__`, so there is no further fallback to model. On a legacy model with no
+class metadata Core cannot see the bases, and a miss is the named gap
+`field:<attr>:unresolved-inheritance` rather than a claim that CPython raises: on the
+tracked cachetools corpus, `self.getsizeof` on an `LRUCache` instance is the inherited
+`Cache.getsizeof`, and the exception answer was 154 of the 157 divergences the runtime
+oracle found there.
 Every other dialect keeps its previous answer: in JavaScript a missing property is
 `undefined` by ECMA-262 §10.1.8.1 OrdinaryGet ("If desc is undefined, return
 undefined"), which Core spells `.unit`.
 
-**Checked.** `attrMissProg` in `Semantics.lean`: `C().x` is `AttributeError`; `try/except`
-binds the class name; an instance attribute still reads; a `@property` still runs;
+**Checked.** `attrMissMetaProg` in `Semantics.lean` (the class declared): `C().x` is
+`AttributeError`; `try/except` binds the class name; an instance attribute still reads;
+a `@property` still runs; `attrMissProg` (no metadata): the same reads are the named gap;
 `jsMissProg`: `({}).x` is `unit` under `.javascript`. `ExcSafe` closes the new leaf
 (`AttributeError ∈ excNames`); `FuelMono` is unchanged in shape (the arm is not
 recursive).

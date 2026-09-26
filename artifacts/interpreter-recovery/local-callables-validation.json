@@ -1,0 +1,65 @@
+{
+  "status": "IN_PROGRESS_NOT_PROMOTED",
+  "candidate_revision": "733aa0d015123d291850e6e937c62f2d88abc63f",
+  "scope": "Read Python local, parameter and captured callables before inferred static targets; preserve callee-before-argument evaluation.",
+  "source_sha256": {
+    "cartographer/export_ast.sc": "e4339a5120a01044c5dba2268acc0d5149ea557b79d2247f42d18da25c225b81",
+    "examples/python_control/local_callables.py": "9e073361b3cca760b09705a83cf1cecec009c25d184c961a50e674da21631bb7",
+    "tests/test_source_local_callables.py": "c32670855113a7b0503118f74cc6ef6a8c46bc0c5f0407954f183f5037305fca"
+  },
+  "regression": {
+    "source_revision": "10f0779204ef656228259a848a69d55698030b72",
+    "before": {
+      "cases": 28,
+      "agree": 16,
+      "divergences": 12,
+      "inconclusive": 0
+    },
+    "after": {
+      "cases": 28,
+      "agree": 28,
+      "divergences": 0,
+      "inconclusive": 0
+    },
+    "cause": "owner = Child.owner; owner() was emitted as a static call to Base.owner, losing the bound Child receiver.",
+    "before_workspace": "../interpreter-integration-validation",
+    "after_workspace": "../interpreter-integration-validation2"
+  },
+  "checks": {
+    "initial_source": {
+      "status": "PASS",
+      "log": "local-callables-focused2.log",
+      "summary": "2 tests passed in 99.30s; twelve CPython outcomes and matching kernel proofs. Predates the nested-call source-anchor guard."
+    },
+    "final_source_regressions": {
+      "status": "NEW_PROBES_PASS_HARNESS_REPAIRED",
+      "log": "local-callables-source-regressions1.log",
+      "session_id": 67209,
+      "summary": "Thirteen callback cases and kernel observations pass. Full run: ten tests passed and an older callable-shape harness failed for omitted class metadata; that harness then passed in callable-context-source1.log."
+    },
+    "full_python": {
+      "status": "PASS",
+      "log": "integration-python2.log",
+      "session_id": 26332,
+      "summary": "838 passed, 61 skipped, 1 xfailed in 362.97s; final lexical callable candidate 733aa0d."
+    },
+    "packaged_pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "../interpreter-integration-validation2",
+      "log": "integration-pipeline2.log",
+      "session_id": 61041,
+      "summary": "28 agreements, 7 proofs, 0 open obligations, fresh proof audit PASS/STABLE/VERIFIED. Three mutants survive; one class-valued outcome was skipped. Superseded by class-values validation."
+    }
+  },
+  "resolved_validation_failures": [
+    "The first exporter compilation rejected a Scala forward reference; moved the callable helper after its dependencies before rerunning."
+  ],
+  "boundaries": [
+    "Global rebinding and strict unbound-local exceptions still need faithful interpreter name lookup.",
+    "Dynamic class invocation through arbitrary values is not added here. Unique lexical class declarations retain the existing allocation path.",
+    "This batch changes the exporter, not the Lean evaluator. Full candidate validation is recorded separately in integration-validation.json."
+  ],
+  "research": [
+    "https://docs.python.org/3.11/reference/executionmodel.html#resolution-of-names"
+  ]
+}

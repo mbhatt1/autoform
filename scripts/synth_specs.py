@@ -359,7 +359,7 @@ def fuzz_cases(rec, rng, n):
         heap = [list(o) for o in rec["heap"]]
         for o in heap:
             o[1] = [(k, perturb(x, rng) if rng.random() < 0.4 else x) for k, x in o[1]]
-        out.append({"heap": [(c, fs) for c, fs in heap], "self": rec["self"],
+        out.append({"heap": heap, "self": rec["self"],
                     "args": args})
     return out
 
@@ -524,16 +524,7 @@ def val_lit(v):
 
 
 def heap_lit(heap):
-    """Heap literal, written with named fields.
-
-    `differential.py`'s `lean_heap` uses the anonymous constructor, which no longer
-    accepts `Obj` now that it carries a third (defaulted) `captured` field — named fields
-    are the form that survives a structure gaining one."""
-    return "[%s]" % ", ".join(
-        "{ cls := %s, fields := [%s] }"
-        % (lean_str(cls), ", ".join("(%s, %s)" % (lean_str(k), val_lit(v))
-                                    for k, v in fields))
-        for cls, fields in heap)
+    return D.lean_heap(heap, val_lit, lean_str)
 
 
 def case_lit(c):
@@ -555,10 +546,11 @@ def eresult_lit(outcome):
 
 
 def obs_lit(rec):
-    return "{ case := %s, expected := %s }" % (case_lit(rec), eresult_lit(rec["outcome"]))
+    return "{ case := %s, expected := %s, post := %s }" % (
+        case_lit(rec), eresult_lit(rec["outcome"]), D.graph_lit(rec, val_lit, lean_str))
 
 
-def value_has_callable(v):
+def value_has_callable(v, class_values=frozenset()):
     """Does an encoded runtime value contain a function (`["fn", qualname]`) anywhere?
 
     `scripts/differential.py` counts a returned callable as AGREEING when the two sides'
@@ -566,21 +558,37 @@ def value_has_callable(v):
     `__qualname__`, Joern a fully-qualified name, and Core answers a closure. That is a
     name rule, not the `Val` equality `lawConform` states, so such an observation cannot
     be a conformance theorem as written and is left to the oracle rather than emitted as
-    a candidate that refutation would (correctly) reject."""
+    a candidate that refutation would (correctly) reject. Recovered class values
+    admitted by conformance_class_values use exact identity instead and can be
+    checked by the existing Val equality law."""
     if not isinstance(v, (list, tuple)) or not v:
         return False
     t = v[0]
     if t == "fn":
-        return True
+        return len(v) != 2 or v[1] not in class_values
     if t in ("list", "tuple") and len(v) > 1 and isinstance(v[1], list):
-        return any(value_has_callable(x) for x in v[1])
+        return any(value_has_callable(x, class_values) for x in v[1])
     if t == "dict" and len(v) > 1 and isinstance(v[1], list):
-        return any(value_has_callable(a) or value_has_callable(b) for a, b in v[1])
+        return any(value_has_callable(a, class_values) or value_has_callable(b, class_values)
+                   for a, b in v[1])
     return False
 
 
-def outcome_has_callable(outcome):
-    return bool(outcome) and outcome[0] == "val" and value_has_callable(outcome[1])
+def outcome_has_callable(outcome, class_values=frozenset()):
+    return bool(outcome) and outcome[0] == "val" and value_has_callable(outcome[1], class_values)
+
+
+def conformance_class_values(funcs, src_root, native_report):
+    """Class identities whose native evidence used the exact comparison rule.
+
+    Older callable-name evidence cannot establish this stronger observation.
+    Duplicate and unresolved declarations retain the oracle's refusal.
+    """
+    if (native_report.get('runtime') != 'cpython' or
+            'class-values-v1' not in native_report.get('measurement_basis', '').split('+')):
+        return frozenset()
+    identities = D.class_identity_index(funcs, src_root)
+    return frozenset(name + '<meta>' for name in (identities or {}).values() if name is not None)
 
 
 # ---------------------------------------------------------------------------
@@ -695,6 +703,7 @@ def gen_candidates(core, byname, recs, rng, synthetic=False, conformance_only=Fa
                       note="expected outcomes recorded from the source runtime by "
                            "scripts/differential.py")
             cf.extra["try_finally"] = has_try_finally(f["body"])
+            cf.extra["heap_graph"] = any('post_heap' in r for r in uniq[:MAX_DOMAIN])
             cands.append(cf)
 
         if conformance_only:
@@ -858,7 +867,7 @@ def gref : Ref := %s
 def base : Nat := h0.length
 def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref,
                  builtinBases := P.builtinBases, properties := P.properties,
-                 excClasses := P.excClasses }
+                 excClasses := P.excClasses, classDecls := P.classDecls }
 def FUEL : Nat := %d
 open Autoform.Generated.%s
 
@@ -1134,19 +1143,24 @@ PROOF_PROJ = """theorem %(id)s :
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
         (∀ o, h.get r = some o → o.payload = .none) ∧
+        (∀ o, h.get r = some o → (ctxOf P).usesClassMetadata o.cls = true →
+          (ctxOf P).classLookupGap o.cls %(field)s = none ∧
+          (ctxOf P).isProperty o.cls %(field)s = false ∧
+          (ctxOf P).readSlot o %(field)s = none ∧
+          (o.fields.find? (·.1 == %(field)s)).isSome = true) ∧
         ∀ o, h.get r = some o →
           (o.fields.find? (·.1 == %(field)s)).isSome = true ∨
           (o.captured.find? (·.1 == %(field)s)).isSome = true)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hfld⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hmeta, hfld⟩
   refine forall_ge_of_forall_add (N := 4) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s rfl rfl rfl rfl r [] rfl
-      hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld)
+      hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld) (hmeta := hmeta)
 """
 
 PROOF_PROJ_DOC = """theorem %(id)s :
@@ -1154,19 +1168,24 @@ PROOF_PROJ_DOC = """theorem %(id)s :
       (fun h self args => args = [] ∧ ∃ r, self = .ref r ∧
         (∀ o, h.get r = some o → o.cls.startsWith "<module>" = false) ∧
         (∀ o, h.get r = some o → o.payload = .none) ∧
+        (∀ o, h.get r = some o → (ctxOf P).usesClassMetadata o.cls = true →
+          (ctxOf P).classLookupGap o.cls %(field)s = none ∧
+          (ctxOf P).isProperty o.cls %(field)s = false ∧
+          (ctxOf P).readSlot o %(field)s = none ∧
+          (o.fields.find? (·.1 == %(field)s)).isSome = true) ∧
         ∀ o, h.get r = some o →
           (o.fields.find? (·.1 == %(field)s)).isSome = true ∨
           (o.captured.find? (·.1 == %(field)s)).isSome = true)
       (fun h self _ => (h, match self with
                            | .ref r => .ret (fieldOf h r %(field)s)
                            | _      => .ret .unit)) := by
-  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hfld⟩
+  rintro h _ args ⟨rfl, r, rfl, hmod, hbox, hmeta, hfld⟩
   refine forall_ge_of_forall_add (N := 5) ?_
   intro k
   rw [runMethod_of_resolve _ _ _ _ _ _ %(fdef)s rfl]
   simpa [Nat.add_comm, Nat.add_left_comm] using
     applyFunc_doc_ret_field_self (ctxOf P) k h %(fdef)s %(field)s _ rfl rfl rfl rfl r
-      [] rfl hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld)
+      [] rfl hmod (fun _ => hbox) (hsig := by rfl) (hfld := fun _ => hfld) (hmeta := hmeta)
 """
 
 def select_proof_fuel(cands, module):
@@ -1217,10 +1236,11 @@ def execution_hints(cands, module):
     src = [HEADER % (module, module, module, INIT_FUEL, GLOBALS[0], GLOBALS[1], FUEL, module)]
     for c in live:
         src.append(domain_defs(c))
+        projection = '' if c.extra.get('heap_graph') else '.2'
         src.append('#eval IO.println ("@@%s@@" ++ String.intercalate "@|@" '
-                   '((dom_%s).map (fun o => ((repr (runCase C %d %s o.case).2).pretty '
+                   '((dom_%s).map (fun o => ((repr ((runCase C %d %s o.case)%s)).pretty '
                    '(width := 100000000)))))'
-                   % (c.id, c.id, c.extra.get("proof_fuel", FUEL), c.fdef))
+                   % (c.id, c.id, c.extra.get("proof_fuel", FUEL), c.fdef, projection))
     src.append("end Autoform.SpecsGen.%s" % module)
     rc, out, err, _ = lean_run("\n".join(src), "execution_hints")
     if rc:
@@ -1313,11 +1333,16 @@ def staged_conformance(c, budget, execution_tactic):
     for index, observation in enumerate(c.dom):
         results = c.extra.get("execution_results")
         result = results[index] if results else "((%s : Obs).expected)" % observation
-        tactic += ("  · have hrun : (runCase C %d %s ((%s : Obs).case)).2 = %s := by\n"
+        projection = '' if c.extra.get('heap_graph') else '.2'
+        if not results and not projection:
+            tactic += '  · ' + KERNEL_COMPUTE + '\n'
+            continue
+        tactic += ("  · have hrun : (runCase C %d %s ((%s : Obs).case))%s = %s := by\n"
                    "      %s\n"
                    "    unfold lawConform\n"
+                   "    dsimp only\n"
                    "    rw [hrun]\n"
-                   "    rfl\n" % (budget, c.fdef, observation, result, execution_tactic))
+                   "    rfl\n" % (budget, c.fdef, observation, projection, result, execution_tactic))
     return tactic
 
 
@@ -1648,9 +1673,12 @@ def main():
                  "runtime": native_report["runtime"], "evidence": os.path.abspath(args.conformance)}
         tests = native_report.get("test_runs", [])
         print("   loaded %d compared observations from %s" % (len(recs), native_report["runtime"]))
-        callable_recs = [r for r in recs if outcome_has_callable(r["outcome"])]
+        class_values = conformance_class_values(funcs, args.src_root, native_report)
+        callable_recs = [r for r in recs if 'post_heap' not in r
+                         and outcome_has_callable(r["outcome"], class_values)]
         if callable_recs:
-            recs = [r for r in recs if not outcome_has_callable(r["outcome"])]
+            recs = [r for r in recs if 'post_heap' in r
+                    or not outcome_has_callable(r["outcome"], class_values)]
             stats["skip_callable_outcome"] = len(callable_recs)
             print("   %d observation(s) return a callable and stay with the oracle: its "
                   "agreement rule for callables is a name match (see value_has_callable), "

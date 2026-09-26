@@ -1,0 +1,28 @@
+== 0. the analysable core
+   5 functions translated, 5 call-closed
+== 1. existing artifacts (§4 source 1)
+   docstrings 0, doctests 0, `raise` guards 0, asserts 0, hypothesis PBT files 0 (0 @given properties)
+== 2. observations from the repository's own test suite
+   loaded 15 compared observations from cpython
+   15 calls recorded over 3 functions; 15 of them in the call-closed core
+== 3. candidate generation
+   3 candidates
+== 4. refutation (fuzz every candidate before emitting anything)
+   0 refuted, 0 not checkable, 3 survive
+== 5. vacuity screen (the checks §15 ran over FVSpec, run over ourselves)
+   0 flagged vacuous, 3 emitted
+== 5a. characterization (what the translation computes; NOT cross-runtime)
+   skipped (--no-characterize)
+== 5b. fuel-independence guards (FuelMono side condition, evaluated)
+   3 of 3 laws transportable to all fuel ≥ FUEL; 0 contain tryFinally; 0 have a case that reaches outOfFuel at FUEL
+== 6. emission + proof
+   clean: 3 theorems proved, 0 statements left open
+
+== summary
+   candidates generated : 3
+   refuted by fuzzing   : 0
+   flagged vacuous      : 0  (0.0% of 3 screened — FVSpec's rate was 41.0%)
+   emitted + proved     : 3
+   open obligations     : 0
+   fuel-independent     : 3 proved for ALL fuel ≥ FUEL (0 still FUEL-only)
+   report               : /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/specs.json

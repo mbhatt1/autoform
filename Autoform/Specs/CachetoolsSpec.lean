@@ -117,6 +117,16 @@ quietly adapts. -/
 unfold `program` itself (a 233-entry list literal). -/
 theorem P_dialect : P.dialect = Dialect.python := rfl
 
+/-- These existing corpus theorems concern the stored translation. Fresh hierarchy
+metadata is introduced by a re-export, not inferred into this older program. -/
+@[simp] private theorem stored_class_declarations : program.classDecls = [] := rfl
+
+@[simp] private theorem stored_field_write (h : Heap) (r : Ref) (field : String) :
+    (ctxOf P).fieldWriteCheck h r field = .val .unit := rfl
+
+attribute [local simp] Ctx.classLookupGap Ctx.usesClassMetadata Ctx.isProperty
+  Ctx.classStorageKey Ctx.fieldWriteCheck Ctx.fieldWriteKey Ctx.readSlot Ctx.isSharedClassValue
+
 /-- Attribute reads must discharge the descriptor check before unfolding getter
 applications. These facts use the imported property table and preserve all receiver
 domains and postconditions below. -/

@@ -6,6 +6,7 @@ health check that passed on a machine with nothing installed, and a clone that w
 never deleted. As with the rest of this suite, the point is to make those loud.
 """
 from __future__ import annotations
+from conftest import exporter_source
 
 import json
 import os
@@ -215,14 +216,14 @@ RENDERER = ROOT / "cartographer" / "render_lean.py"
 
 
 def test_quoted_character_literal_is_not_an_integer_literal():
-    source = EXPORTER.read_text()
+    source = exporter_source()
     assert "if (trimmed.length >= 3 && trimmed.head == '\\'' && trimmed.last == '\\'') return None" in source, (
         "parseIntLiteral must refuse a quoted character literal so the character-literal "
         "branch can resolve its codepoint; without this, '0' parses as the integer 0.")
 
 
 def test_digit_separators_are_only_stripped_between_digits():
-    source = EXPORTER.read_text()
+    source = exporter_source()
     assert 'replaceAll("(?<=[0-9a-fA-F])\'(?=[0-9a-fA-F])", "")' in source, (
         "a C++14 digit separator only separates DIGITS; stripping every quote is what "
         "consumed the character literal's quotes in the first place")
@@ -333,7 +334,7 @@ class TestLiteralParameterDefaults:
     def test_the_exporter_holes_a_mixed_default_list(self):
         """All-or-nothing, asserted on the exporter source: the literal half of a mixed
         signature must not be emitted on its own."""
-        source = EXPORTER.read_text()
+        source = exporter_source()
         assert 'if any(lit is None for _, lit in values):' in source
         assert "return {'defaults': True, 'defaultValues': []}" in source
 
@@ -361,7 +362,7 @@ class TestBoxedContainerExporterWiring:
     """
 
     def test_python_del_index_emits_delIndex(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'case (x: AstNode) :: Nil if pyFile && asIndex(x).isDefined =>' in src
         # operands threaded in order (§16.R4): receiver then index, each may hoist a prelude
         assert 'seqOf(prelude :+ ujson.Obj("k" -> "delIndex", "a" -> vals(0), "i" -> vals(1)))' in src
@@ -383,7 +384,7 @@ class TestBoxedContainerExporterWiring:
     def test_adjacent_string_literals_fold_to_one_str(self):
         """`"a" "b"` is one value. An f-string uses the same operator with non-literal
         parts and keeps a hole -- folding it would need `str()` semantics per part."""
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'mfn == "<operator>.stringExpressionList"' in src
         assert 'parts.nonEmpty && parts.forall(_.isDefined)' in src
         assert 'hole("op:stringExpressionList:non-literal-part")' in src
@@ -471,7 +472,7 @@ class TestComprehensionLowering:
     """
 
     def test_the_three_statement_shape_is_what_is_matched(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def comprehensionParts(b: Block)' in src
         assert 'case (init: Call) :: loop :: (out: Identifier) :: Nil' in src
         # the container kinds, and the one Core cannot represent
@@ -482,7 +483,7 @@ class TestComprehensionLowering:
         assert 'case "set"                 => (Nil, hole("expr:setComp"))' in src
 
     def test_the_loop_variable_is_rebound_to_an_unspellable_name(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def compName(x: String): String = "$comp$" + x' in src
         assert 'def renameCompBinders(v: ujson.Value)' in src
         # destructured targets (`for k, v in pairs`) follow the loop variable
@@ -491,7 +492,7 @@ class TestComprehensionLowering:
         assert '"x" -> compName(x), "e" -> o("e"),' in src
 
     def test_a_generator_expression_preserves_suspension_for_every_consumer(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert '"k" -> "genExpr"' in src
         assert 'genExpConsumers' not in src
         assert 'genExpEager' not in src
@@ -684,7 +685,7 @@ class TestJavaScriptLowering:
     the end-to-end check is the Joern-backed numeric suite."""
 
     def _src(self):
-        return (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+        return exporter_source()
 
     def test_js_like_files_are_the_dialect_tables_extensions(self):
         src = self._src()
@@ -738,7 +739,7 @@ class TestValueCallees:
     """
 
     def test_exporter_lowers_a_call_callee_to_callV(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'case Some(cl: Call) =>' in src
         assert 'ujson.Obj("k" -> "callV", "f" -> expr(cl), "args" -> argExprs(args, kwArgs))' in src
         assert 'case _ => hole("call:no-callee-name")' in src
@@ -769,26 +770,20 @@ class TestModuleVariables:
     contains (66 of requests' 148 holes; click's `get_completion_class` divergence).
     """
 
-    def test_a_module_level_binding_also_writes_the_module_object(self):
-        src = EXPORTER.read_text()
-        assert 'def bindName(nm: String, e: ujson.Value): ujson.Obj' in src
-        # the globals-frame write is unchanged; the module object's field is the second copy
-        assert '"a" -> ujson.Obj("k" -> "setGlobal", "x" -> nm, "e" -> e)' in src
-        assert '"b" -> ujson.Obj("k" -> "setField", "r" -> moduleRef(currentModuleFull), "f" -> nm' in src
-        # only a Python module has an object to write; a C `<global>` scope keeps `setGlobal`
-        assert 'else if (pyModuleFullNames.contains(currentModuleFull))' in src
-        # every former `setGlobal`/`assign` site goes through it
-        assert 'val k = if (isGlobalWrite(' not in src
+    # CHANGED: the old source-text assertion required a duplicate unqualified
+    # globals write, which caused collisions between modules. Actual imports,
+    # global writes and attribute writes now have CPython/kernel regressions in
+    # test_source_module_namespaces.py.
 
     def test_from_import_of_a_variable_reads_the_field_not_a_hole(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'ujson.Obj("k" -> "field", "a" -> moduleRef(mod), "f" -> name)' in src
         # the old label survives only for a module without an object
         assert 'else hole("import:member-not-found")' in src
         assert '§7.11' in src and '§3.2.9' in src
 
     def test_module_bodies_run_in_import_dependency_order(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'val importEdges = collection.mutable.LinkedHashMap' in src
         assert 'def recordImportEdge(target: String): Unit' in src
         # recorded for `from p import x` and for every prefix of `import a.b.c`
@@ -813,17 +808,17 @@ class TestGoAndCLowering:
     in-repo test can execute without Joern."""
 
     def test_import_declarations_are_not_behaviour(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'case _: Import     => skip' in src
         assert '"Import\n    // declarations"' in src or 'Go spec, "Import' in src
 
     def test_go_raw_strings_drop_carriage_returns_and_nothing_else(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert "else if (goFile && c.length >= 2 && c.head == '`' && c.last == '`')" in src
         assert 'c.drop(1).dropRight(1).replace("\\r", "")' in src
 
     def test_go_tuple_assignment_is_two_phase(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def goTupleAssign(ks: List[AstNode]): ujson.Obj' in src
         # the spec sentence the temporaries exist for
         assert 'The assignment proceeds in two phases' in src
@@ -836,7 +831,7 @@ class TestGoAndCLowering:
         assert 'case ks if goFile && ks.size >= 3 => goTupleAssign(ks)' in src
 
     def test_go_for_forms_are_type_gated(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         # `for cond {}` only when the first child IS a boolean; a range clause is not
         assert 'goFile && ks.size == 2 && !ks(0).isInstanceOf[Block] && staticTypeOf(ks(0)) == "bool"' in src
         assert 'else if (goFile && ks.size == 1)' in src
@@ -858,7 +853,7 @@ class TestSliceJDefinitionTimeSemantics:
     reference). The decoder-level checks are in tests/test_python_signatures.py."""
 
     def test_an_overload_stub_is_a_raise_not_a_hole(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'case Some(s) if s.obj.get("overloadStub").exists(_.bool) => None' in src
         assert 'obj("vararg") = "<overload-stub-args>"' in src
         assert '"op" -> "py:exception:NotImplementedError",' in src
@@ -867,13 +862,13 @@ class TestSliceJDefinitionTimeSemantics:
         assert 'if (overloadStub) None' in src
 
     def test_an_external_decorator_is_named(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'externalDecorator.map(d => "decorator:external:" + d).getOrElse("call:python-decorator-binding")' in src
         # a decorated method is a decorator gap, not a receiver gap
         assert 'else if (signature("decorated").bool) Some(decoratorGap)' in src
 
     def test_kotlin_local_functions_close_over_an_unmutated_scope_only(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'holeS("kotlin:local-fn-capture-mutated")' in src
         assert 'frees.filter(n => assignCount(p, n) > 1)' in src
         # top-level Kotlin functions in the file initialiser are separate exports
@@ -957,7 +952,7 @@ class TestExceptBindingAndCorpusClasses:
         assert '.val (.str "MyErr")' in block               # the binding is the class name
 
     def test_exporter_closes_the_accepted_set_over_the_corpus_hierarchy(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'val pyClassBases: Map[String, String]' in src
         assert 'def acceptedFor(types: List[String], info: ujson.Value): List[String]' in src
         assert 'def isCorpusException(name: String, bb: Map[String, List[String]]): Boolean' in src
@@ -969,7 +964,7 @@ class TestExceptBindingAndCorpusClasses:
         assert 'extra += ", excClasses := [" + excs + "]"' in RENDERER.read_text()
 
     def test_binding_is_exact_or_refused_never_a_string_for_an_object(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         # the decoder's rule
         assert 'def binding_ok(node):' in src
         assert "payload_calls = ('isinstance', 'type', 'str', 'repr', 'format')" in src
@@ -984,7 +979,7 @@ class TestExceptBindingAndCorpusClasses:
 
     def test_decoder_classifies_handlers_and_raises(self):
         import subprocess, sys, json
-        script = EXPORTER.read_text()
+        script = exporter_source()
         decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
         source = ('class MyErr(Exception):\n    pass\n\n'
                   'def boom():\n    raise MyErr("x")\n\n'
@@ -1017,7 +1012,7 @@ class TestJavaScriptObjectsAndEquality:
 
     SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
     SYN = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Syntax.lean').read_text()
-    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+    EXP = exporter_source()
 
     def test_the_constructor_name_is_a_dialect_fact(self):
         assert 'def ctorName : Dialect → String' in self.SYN
@@ -1077,13 +1072,13 @@ class TestSliceDPythonLabels:
     STDLIB = (ROOT / 'Autoform' / 'Lang' / 'Core' / 'Stdlib.lean').read_text()
 
     def test_an_and_or_chain_folds_left_as_the_grammar_is_left_recursive(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert '(mfn == "<operator>.logicalAnd" || mfn == "<operator>.logicalOr") && kids.size > 2' in src
         assert 'kids.map(expr).reduceLeft((a, b) =>' in src
         assert 'Python Language Reference §6.11 (Boolean operations)' in src
 
     def test_assert_lowers_to_the_reference_equivalence(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'callName(c) == "<operator>.assert" && kidsOf(c).nonEmpty' in src
         assert '"op" -> "py:exception:AssertionError"' in src
         assert 'Python Language Reference §7.3 (The assert statement)' in src
@@ -1092,9 +1087,11 @@ class TestSliceDPythonLabels:
         assert 'seqOf(condPrelude :+ ujson.Obj("k" -> "ifte", "c" -> condV, "t" -> skip,' in src
 
     def test_a_set_display_is_a_unit_valued_dict_with_distinct_keys(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'pyFile && mfn == "<operator>.setLiteral" && kids.nonEmpty' in src
-        assert 'ujson.Arr(expr(k), ujson.Obj("k" -> "unit"))' in src
+        assert 'displayValue(mfn, kids.map(expr))' in src
+        builder = src.split('def displayValue(', 1)[1].split('def relationValue(', 1)[0]
+        assert '"k" -> "dictE", "pairs" -> ujson.Arr.from(vals.map(v => ujson.Arr(v, ujson.Obj("k" -> "unit"))))' in builder
         assert 'def dictOfPairs' in self.STDLIB
         assert 'Stdlib.dictOfPairs ps' in self.SEMANTICS
         for method in ('"add"', '"discard"'):
@@ -1106,14 +1103,14 @@ class TestSliceDPythonLabels:
         assert 'if Stdlib.unboxesArgs f then vs.map (·.unbox h₁) else vs' in self.SEMANTICS
 
     def test_impure_block_preludes_are_hoisted_only_where_a_prelude_exists(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def blockExprV(b: Block)' in src
         assert 'comprehensionLowering(b).getOrElse(blockExprV(b))' in src
         # plain `expr` still has no slot and keeps the label
         assert 'if (bad.isEmpty) bad = "expr:BLOCK-impure"' in src
 
     def test_bytes_stay_a_hole_with_the_reference_cited(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'hole("lit:bytes")' in src
         assert 'Python Language Reference §2.5.5' in src
 
@@ -1129,7 +1126,7 @@ class TestJavaCoreSemantics:
 
     SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
     STD = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Stdlib.lean').read_text()
-    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+    EXP = exporter_source()
 
     def test_this_is_the_receiver_in_java_too(self):
         # JLS 15.8.3; without this every `this.x` in a Java method read an unbound name.
@@ -1220,7 +1217,7 @@ class TestStrReprFormat:
         assert '/-- info: Autoform.Core.EResult.val (Autoform.Core.Val.str "vx!") -/' in sem
 
     def test_exporter_reads_conversion_and_spec_off_the_field_text(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def fstringField(c: Call): Either[String, ujson.Obj]' in src
         assert 'if (rest.startsWith("=")) Left("debug-specifier")' in src
         assert 'case Some(cv) if cv != \'r\' && cv != \'s\' => Left("conversion-" + cv)' in src
@@ -1229,7 +1226,7 @@ class TestStrReprFormat:
         assert 'case Some(\'r\') => ujson.Obj("k" -> "call", "f" -> "repr", "args" -> ujson.Arr(base))' in src
 
     def test_exporter_decodes_escapes_and_doubled_braces(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'def pyDecodeEscapes(raw: String): Option[String]' in src
         assert 'pyDecodeEscapes(l.code.replace("{{", "{").replace("}}", "}"))' in src
         assert "case 'N'  => return None" in src            # \N{name} needs the Unicode database
@@ -1237,7 +1234,7 @@ class TestStrReprFormat:
         assert 'if (prefix.toLowerCase.contains("r")) Some(body) else pyDecodeEscapes(body)' in src
 
     def test_adjacent_literals_with_an_fstring_part_concatenate(self):
-        src = EXPORTER.read_text()
+        src = exporter_source()
         assert 'case fc: Call if callName(fc) == "<operator>.formatString" => Some(fstring(kidsOf(fc)))' in src
         assert 'else hole("op:stringExpressionList:non-literal-part")' in src
 
@@ -1250,7 +1247,7 @@ class TestPreludesEverywhere:
     check: `test_joern_native_numeric[python]` (`argOrder`, `kwHoist`, `ctorHoist`,
     `tupleHoist`, `inHoist`), CPython-compared; these pin the exporter side.
     """
-    SRC = EXPORTER.read_text()
+    SRC = exporter_source()
 
     def test_call_shaped_operands_include_computed_callees(self):
         assert 'val shapeOk = Set("call", "mcall", "alloc", "callV").contains(kind) &&' in self.SRC
@@ -1301,7 +1298,7 @@ class TestGoPointersOnInteriorPointerClauses:
     The Core side is pinned by the `goPtrProg` `#guard`s in `Semantics.lean`, whose expected
     values are `go run`'s."""
 
-    EXP = (Path(__file__).resolve().parents[1] / 'cartographer/export_ast.sc').read_text()
+    EXP = exporter_source()
     SEM = (Path(__file__).resolve().parents[1] / 'Autoform/Lang/Core/Semantics.lean').read_text()
 
     def test_go_pointer_types_are_star_prefixed(self):

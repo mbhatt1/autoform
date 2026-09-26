@@ -21,6 +21,13 @@ SCRIPTS = os.path.join(ROOT, "scripts")
 CARTO = os.path.join(ROOT, "cartographer")
 
 
+def exporter_source():
+    """Inspect the actual compile units, including a modular entry's dependencies."""
+    compiler = load(os.path.join(SCRIPTS, "compiler_sources.py"), "af_compiler_sources")
+    return '\n'.join(path.read_text() for path in
+                     compiler.source_files(os.path.join(CARTO, "export_ast.sc")))
+
+
 def load(path: str, name: str) -> types.ModuleType:
     """Import a script by path, without requiring it to be a package."""
     # Executing a script normally adds its own directory to sys.path. Reproduce
@@ -130,7 +137,7 @@ def make_repo(tmp_path, module="Sample", funcs=None, lean_text=None,
     os.makedirs(os.path.join(d, "Autoform", "Generated"), exist_ok=True)
     for s in ("check_render.py", "check_docs.py", "deep_json.py"):
         shutil.copy(os.path.join(SCRIPTS, s), os.path.join(d, "scripts", s))
-    for script in ("render_lean.py", "generator_lowering.py", "python_truth_lowering.py", "python_truth_values.py"):
+    for script in ("render_lean.py", "generator_lowering.py", "python_truth_lowering.py", "python_truth_values.py", "ast_tools.py"):
         shutil.copy(os.path.join(CARTO, script), os.path.join(d, "cartographer", script))
     funcs = funcs if funcs is not None else [fn()]
     ast = os.path.join(d, "ast-%s.json" % module)

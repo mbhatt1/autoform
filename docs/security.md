@@ -131,9 +131,11 @@ containment around acquisition, builds and execution.
 2. Collect an attack reproducer and ordinary boundary cases. Run each against the
    real vulnerable and patched implementations, preserving crashes and timeouts
    as distinct outcomes. C scalar plans reserve their first case for all-zero
-   arguments, covering a zero/equality boundary, then use seeded random inputs.
-   This does not cover every boundary; the conformance generators are not a
-   general fuzzer.
+   arguments, covering a zero/equality boundary; every other remaining case draws
+   each argument from its ABI type's width boundaries (powers of two straddling
+   32 and 64 bits and the type's extremes, where a multiply overflows), and the
+   rest use seeded random inputs. This does not cover every boundary; the
+   conformance generators are not a general fuzzer.
 3. Translate the relevant code and inspect the holes and dependencies. A path
    reaching a hole, unknown external call or exhausted fuel remains unverified.
 4. Supply an independent property in `autoform.properties.json` or with `--properties`, or write a larger hand-authored

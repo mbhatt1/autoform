@@ -45,6 +45,9 @@ def test_installed_distribution(tmp_path):
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = archive.namelist()
         assert "cartographer/export_ast.sc" in names
+        assert "cartographer/compiler/SourceCompiler.scala" in names
+        assert "cartographer/ast_tools.py" in names
+        assert "scripts/compiler_sources.py" in names
         assert "scripts/native_c_worker.py" in names
         assert "scripts/proof_artifacts.py" in names
         assert "scripts/deep_json.py" in names
@@ -59,7 +62,8 @@ def test_installed_distribution(tmp_path):
     venv = tmp_path / "venv"
     subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True, capture_output=True)
     python = venv / "bin/python"
-    subprocess.run([python, "-m", "pip", "install", "--no-deps", str(wheel)],
+    subprocess.run([python, "-m", "pip", "install", "--no-deps", "--no-index",
+                    "--disable-pip-version-check", str(wheel)],
                    check=True, capture_output=True)
     cli = venv / "bin/autoform"
     work = tmp_path / "outside checkout"
@@ -75,6 +79,24 @@ def test_installed_distribution(tmp_path):
     assert result.returncode == 0, result.stderr
     assert invoke("init").returncode == 0
     assert (workspace / "scripts/synth_specs.py").is_file()
+    # Import the actual bundled passes and resolve the modular exporter outside
+    # the checkout; neither source imports nor using-file directives may rely on it.
+    probe = subprocess.run([python, "-c", """
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path[:0] = [str(root / 'cartographer'), str(root / 'scripts')]
+from compiler_sources import source_files
+from generator_lowering import lower_generators
+from python_truth_values import lower_truth_values
+from python_truth_lowering import lower_truth_conditions
+sources = source_files(root / 'cartographer/export_ast.sc')
+assert any(path.name == 'SourceCompiler.scala' for path in sources)
+assert all(path.is_file() and path.is_relative_to(root) for path in sources)
+functions = [{'name': 'probe', 'body': {'k': 'skip'}}]
+assert lower_truth_conditions(lower_truth_values(lower_generators(functions))) == functions
+""", str(workspace)], cwd=work, text=True, capture_output=True, timeout=30)
+    assert probe.returncode == 0, probe.stderr
     assert invoke("source", "--help").returncode == 0
     help_result = invoke("assure", "--help")
     assert help_result.returncode == 0 and '--properties' in help_result.stdout
@@ -119,6 +141,25 @@ def test_installed_distribution(tmp_path):
     # Generated evidence is allowed; edits to bundled semantics require a new workspace.
     (workspace / "Autoform/Lang/Core/Semantics.lean").write_text("modified\n")
     assert "workspace resource changed" in invoke("init").stderr
+
+
+def test_distribution_rejects_builder_omission_of_transitive_compiler_unit(
+        tmp_path, monkeypatch, distribution_checker):
+    folder = tmp_path / 'cartographer/compiler'
+    folder.mkdir(parents=True)
+    entry = folder.parent / 'export_ast.sc'
+    child, leaf = folder / 'SourceCompiler.scala', folder / 'Json.scala'
+    entry.write_text('//> using file compiler/SourceCompiler.scala\n')
+    child.write_text('//> using file Json.scala\n')
+    leaf.write_text('object Json {}\n')
+    resources = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in (entry, child)}
+    monkeypatch.setattr(distribution_checker, 'runtime_files', lambda root: resources)
+    # The builder and its ordinary expected-file check share runtime_files. A
+    # common omission must still fail before either archive is trusted.
+    with pytest.raises(ValueError, match='compiler source missing from runtime: cartographer/compiler/Json.scala'):
+        distribution_checker.check(tmp_path / 'unused.whl', tmp_path / 'unused.tar.gz', tmp_path)
+    resources[leaf.relative_to(tmp_path).as_posix()] = leaf.read_bytes()
+    distribution_checker.check_compiler_sources(tmp_path, resources)
 
 
 def test_distribution_matches_checkout_and_rejects_missing_notice(

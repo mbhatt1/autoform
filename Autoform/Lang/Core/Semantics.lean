@@ -854,6 +854,7 @@ reduces it exactly as it reduced the inline `match` this replaces. -/
 structure Ctx where
   dialect : Dialect
   table   : FuncTable
+  classDecls : List ClassDecl := []
   /-- Classes whose base is a builtin type — see `Program.builtinBases`. -/
   builtinBases : List (String × BuiltinBase) := []
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
@@ -958,6 +959,29 @@ def builtinMethodValue (object : Obj) (receiver : Ref) (name : String) : Option 
     some (.clos (boundMethodAdapter name).name [("<bound:self>", .ref receiver)])
   else none
 
+/-- A classmethod closure captures its actual class receiver. Removing that ordinary
+parameter from the callable signature lets normal closure application bind the rest;
+the original function name remains intact for lexical module resolution. -/
+def Func.bindClassReceiver (fn : Func) : Option (Func × String) :=
+  match fn.pythonSignature, fn.params with
+  | some signature, receiver :: rest =>
+      if signature.receiverKind == some "class" && fn.vararg != some receiver &&
+          fn.kwarg != some receiver && !signature.keywordOnly.contains receiver then
+        let boundSignature := { signature with
+          isMethod := some false, receiverKind := none,
+          receiverName := if signature.positionalOnly.contains receiver then none else some receiver,
+          positionalOnly := signature.positionalOnly.filter (· != receiver),
+          required := signature.required.filter (· != receiver),
+          defaults := signature.defaults.filter (·.1 != receiver),
+          classAttrDefaults := signature.classAttrDefaults.filter (·.1 != receiver) }
+        some ({ fn with params := rest, pythonSignature := some boundSignature }, receiver)
+      else none
+  | _, _ => none
+
+def resolveClassBound (table : FuncTable) (name : String) : Option Func :=
+  let original := String.ofList (name.toList.drop 14)
+  ((table.find? (·.1 == original)).bind (fun entry => entry.2.bindClassReceiver)).map Prod.fst
+
 /-- Resolve a callable by exact name, else by suffix.
 
 Joern emits fully-qualified names like `pkg/mod.py:<module>.Cls.meth`, while call sites
@@ -968,6 +992,7 @@ def Ctx.resolve (ctx : Ctx) (n : String) : Option Func :=
   | some (_, f) => some f
   | none        =>
     if strStartsWith n "<bound-method>." then resolveBoundMethod n else
+    if strStartsWith n "<class-bound>." then resolveClassBound ctx.table n else
     -- Scan for a *unique* suffix match, stopping as soon as a second one is seen.
     -- The previous form built the full match list with `filter`, so every miss
     -- allocated across the whole table — on Django's 10,623 functions that made the
@@ -1237,18 +1262,200 @@ on `.` is safe here because the file part's dots are never the LAST segment. -/
 def Func.ownerClassValue (fn : Func) : Val :=
   .fn (String.mk (dropLastDotSegment fn.name.toList) ++ "<meta>")
 
+def Ctx.classKeyOfValue (ctx : Ctx) (owner : String) : String :=
+  if ctx.classDecls.isEmpty then classNameOfValue owner
+  else if strEndsWith owner "<meta>" then String.ofList (owner.toList.reverse.drop 6).reverse
+  else owner
+
+/-- Class namespace mutation needs shared class-object state. Function boxing
+cannot implement it, because existing instances must observe the same change. -/
+def Ctx.isSharedClassValue (ctx : Ctx) (value : Val) : Bool :=
+  ctx.dialect == .python && !ctx.classDecls.isEmpty &&
+    match value with
+    | .fn owner | .clsClos owner _ => strEndsWith owner "<meta>"
+    | _ => false
+
+def Ctx.usesClassMetadata (ctx : Ctx) (cls : String) : Bool :=
+  ctx.dialect == .python && !ctx.classDecls.isEmpty && !strStartsWith cls "<" &&
+    !["object", "list", "dict", "tuple", "str", "int", "float", "bool", "set"].contains cls
+
+def Ctx.classLookup (ctx : Ctx) (cls attr : String) : ClassLookup :=
+  ClassHierarchy.lookup ctx.classDecls cls attr
+
+def Ctx.classLookupGap (ctx : Ctx) (cls attr : String) : Option String :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with
+    | .blocked reason | .found _ (.opaque reason) => some reason
+    | .found _ (.method name) | .found _ (.property name) =>
+        if (ctx.table.find? (·.1 == name)).isSome then none
+        else some ("class-attribute:unresolved-function:" ++ name)
+    | _ => none
+  else none
+
+def Ctx.isProperty (ctx : Ctx) (cls attr : String) : Bool :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with | .found _ (.property _) => true | _ => false
+  else ctx.properties.any (fun pair => pair.1 == cls && pair.2 == attr)
+
+/-- Slot descriptors read their declaring class's storage before the instance
+dictionary. An uninitialized slot raises even when a dictionary entry exists. -/
+def Ctx.readSlot (ctx : Ctx) (object : Obj) (attr : String) : Option EResult :=
+  if ctx.usesClassMetadata object.cls then
+    match ctx.classLookup object.cls attr with
+    | .found _ (.slot key) =>
+        some (match object.fields.find? (·.1 == key) with
+          | some (_, value) => .val value
+          | none => .exn (.str "AttributeError"))
+    | _ => none
+  else none
+
+def Ctx.fieldWriteKey (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String) : String :=
+  if ctx.dialect != .python || ctx.classDecls.isEmpty then attr else
+  match heap.get receiver with
+  | some object =>
+    if ctx.usesClassMetadata object.cls then
+      match ctx.classLookup object.cls attr with | .found _ (.slot key) => key | _ => attr
+    else attr
+  | none => attr
+
+def Ctx.classStorageKey (ctx : Ctx) (cls attr : String) : String :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls attr with
+    | .found _ (.stored key) => key
+    | _ => "<absent-class-storage>"
+  else classAttrKey cls attr
+
+def classMethodValue (fn : Func) (receiver : Val) (captured : List (String × Val)) : EResult :=
+  match fn.bindClassReceiver with
+  | some (_, parameter) =>
+      .val (.clos ("<class-bound>." ++ fn.name) ((parameter, receiver) :: captured))
+  | none => .hole "class-method:variadic-or-unrecovered-receiver"
+
+def Ctx.instanceClassValue (ctx : Ctx) (object : Obj) : Val :=
+  let owner := (ClassHierarchy.canonicalName ctx.classDecls object.cls).getD object.cls ++ "<meta>"
+  if object.captured.isEmpty then .fn owner else .clsClos owner object.captured
+
+def Ctx.allocationCaptures (ctx : Ctx) (environment : Env) (cls : String) :
+    Option (List (String × Val)) :=
+  if ctx.classDecls.isEmpty then
+    some (match environment.get cls with | .clsClos _ captured => captured | _ => [])
+  else
+    let short := String.ofList (lastDotSegment cls.toList [])
+    match environment.find? (·.1 == short) with
+    | none => some []
+    | some (_, .clsClos owner captured) =>
+        if ctx.classKeyOfValue owner == cls then some captured else none
+    | some (_, .fn owner) => if ctx.classKeyOfValue owner == cls then some [] else none
+    | some _ => none
+
+/-- A class VALUE reached as a callee: `.fn "m.py:<module>.C<meta>"` for a `from m
+import C` binding read out of the importing module, or `.clsClos` for a class defined
+inside a function and passed around. Calling it constructs an instance (Language
+Reference §3.3.1: `type.__call__`), so `Expr.callValue` re-dispatches to the `alloc`
+rule with the arguments it has already evaluated. `none` for every other value. -/
+def classValueOwner : Val → Option String
+  | .fn owner | .clsClos owner _ => if strEndsWith owner "<meta>" then some owner else none
+  | _ => none
+
+/-- The private bindings a class-value call hands to `alloc`. `<class-call:…>` cannot be a
+source identifier, so nothing in `ρ` is shadowed. -/
+def classCallArgName (i : Nat) : String := "<class-call:arg" ++ toString i ++ ">"
+def classCallKwName (k : String) : String := "<class-call:kw:" ++ k ++ ">"
+
+/-- `alloc` re-evaluates these names, which the environment below binds to the values
+`evalList` already produced, so argument evaluation order and effects happen once. -/
+def classCallArgs (vs : List Val) (kws : List (String × Val)) : List Expr :=
+  (List.range vs.length).map (fun i => .name (classCallArgName i)) ++
+  kws.map (fun kv => .kwargE kv.1 (.name (classCallKwName kv.1)))
+
+/-- The class value is bound under both its allocation key and its short name, so both
+`Ctx.allocationCaptures` lookups (legacy `Env.get cls`, metadata `find? short`) see it. -/
+def classCallEnv (cls : String) (value : Val) (vs : List Val) (kws : List (String × Val))
+    (ρ : Env) : Env :=
+  (cls, value) :: (String.ofList (lastDotSegment cls.toList []), value) ::
+  (((List.range vs.length).zip vs).map (fun iv => (classCallArgName iv.1, iv.2)) ++
+   kws.map (fun kv => (classCallKwName kv.1, kv.2)) ++ ρ)
+
+/-- The ordinary allocator is valid only for the builtin allocation slot and an
+ordinary initializer descriptor. Custom `__new__` needs its own returned-object
+and subtype checks before an initializer can be selected. -/
+def Ctx.constructionGap (ctx : Ctx) (cls : String) : Option String :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls "__new__" with
+    | .found "__builtin.object" (.opaque _) =>
+        match ctx.classLookup cls "__init__" with
+        | .found "__builtin.object" (.opaque _) | .found _ (.method _) => none
+        | .blocked reason | .found _ (.opaque reason) => some reason
+        | _ => some "class-construction:initializer-descriptor"
+    | .blocked reason => some reason
+    | _ => some "class-construction:custom-new"
+  else none
+
+/-- Check a Python instance write before changing its dictionary. A recovered
+getter-only property rejects writes; opaque descriptors and custom assignment
+hooks require their own execution models. -/
+def Ctx.fieldWriteCheck (ctx : Ctx) (heap : Heap) (receiver : Ref) (attr : String) :
+    EResult :=
+  if ctx.dialect != .python || ctx.classDecls.isEmpty then .val .unit else
+  match heap.get receiver with
+  | none => .val .unit
+  | some object =>
+    if ctx.usesClassMetadata object.cls then
+      match ctx.classLookup object.cls "__setattr__" with
+      | .found "__builtin.object" (.opaque _) =>
+        match ctx.classLookup object.cls attr with
+        | .blocked reason | .found _ (.opaque reason) => .hole reason
+        | .found _ (.property _) => .exn (.str "AttributeError")
+        | .found _ (.slot _) => .val .unit
+        | _ => if ClassHierarchy.allowsDict ctx.classDecls object.cls then .val .unit
+               else .exn (.str "AttributeError")
+      | .blocked reason => .hole reason
+      | _ => .hole "class-assignment:custom-setattr"
+    else .val .unit
+
+/-- An absent translated constructor is a default object initializer only when
+the recovered hierarchy reaches that builtin slot. Unknown ancestry is a gap. -/
+def Ctx.defaultConstructor (ctx : Ctx) (cls : String) (receiver : Ref)
+    (args : List Val) (keywords : List (String × Val)) : EResult :=
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls "__init__" with
+    | .found "__builtin.object" (.opaque _) =>
+        if args.isEmpty && keywords.isEmpty then .val (.ref receiver)
+        else .exn (.str "TypeError")
+    | .blocked reason | .found _ (.opaque reason) => .hole reason
+    | _ => .hole "class-construction:unresolved-initializer"
+  else .val (.ref receiver)
+
 /-- Read an attribute through a Python class value, without binding an instance.
 
-The class marker retains the qualified owner, so method lookup is exact: a method
-on another class with the same short name cannot answer this read. A property read
-on the class returns its descriptor in Python, not the getter's result. Descriptor
-objects, stored class attributes and inherited attributes remain explicit holes;
-the legacy short-name namespace cannot identify arbitrary class values faithfully. -/
-def Ctx.readClassAttribute (ctx : Ctx) (owner : String)
+The class marker retains the qualified owner. Recovered declarations select the
+first namespace in the C3 order and bind classmethods to the actual receiver class.
+Property descriptor objects and unknown namespace behavior remain named gaps. -/
+def Ctx.readClassAttribute (ctx : Ctx) (heap : Heap) (owner : String)
     (captured : List (String × Val)) (attr : String) : EResult :=
   if ctx.dialect != .python || !strEndsWith owner "<meta>" then
     .hole s!"field:{attr}:non-object"
   else
+    let receiver := if captured.isEmpty then Val.fn owner else Val.clsClos owner captured
+    if !ctx.classDecls.isEmpty then
+      match ctx.classLookup (ctx.classKeyOfValue owner) attr with
+      | .blocked reason | .found _ (.opaque reason) => .hole reason
+      | .absent => .exn (.str "AttributeError")
+      | .found _ (.property _) => .hole s!"class-attribute:{attr}:property-descriptor"
+      | .found _ (.slot _) => .hole s!"class-attribute:{attr}:slot-descriptor"
+      | .found _ (.stored key) =>
+          match (heap.get ctx.globals).bind (fun globals => globals.fields.find? (·.1 == key)) with
+          | some (_, value) => .val value
+          | none => .hole s!"class-attribute:{attr}:uninitialized-storage"
+      | .found _ (.method name) =>
+          match ctx.table.find? (·.1 == name) with
+          | none => .hole s!"class-attribute:{attr}:unresolved-function"
+          | some (_, fn) =>
+              if fn.isClassMethod then classMethodValue fn receiver captured
+              else if captured.isEmpty then .val (.fn fn.name)
+              else if fn.isMethod then .hole s!"class-attribute:{attr}:captured-unbound-method"
+              else .val (.clos fn.name captured)
+    else
     let cls := classNameOfValue owner
     if ctx.properties.any (fun p => p.1 == cls && p.2 == attr) then
       .hole s!"class-attribute:{attr}:property-descriptor"
@@ -1286,6 +1493,12 @@ def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
   match if ctx.dialect == .python then Iteration.resolveMethod cls meth else none with
   | some fn => some fn
   | none =>
+  if ctx.usesClassMetadata cls then
+    match ctx.classLookup cls meth with
+    | .found _ (.method name) | .found _ (.property name) =>
+        (ctx.table.find? (·.1 == name)).map Prod.snd
+    | _ => none
+  else
   match ctx.table.filter (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => if ctx.dialect == .python then none else ctx.resolve meth
@@ -1293,6 +1506,7 @@ def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
 def Ctx.classDefines (ctx : Ctx) (cls meth : String) : Bool :=
+  if ctx.usesClassMetadata cls then (ctx.resolveMethod cls meth).isSome else
   (ctx.dialect == .python && (Iteration.resolveMethod cls meth).isSome) ||
   ctx.table.any (fun p => strEndsWith (stripSig p.1) ("." ++ cls ++ "." ++ meth))
 
@@ -1308,7 +1522,7 @@ def Ctx.usesAttributeCall (ctx : Ctx) (h : Heap) (r : Ref) (name : String) : Boo
         !(Iteration.resolveMethod object.cls name).isSome && object.cls != "<generator>" &&
         (object.payload.toVal.isNone || object.fields.any (·.1 == name) ||
           ctx.classDefines object.cls name ||
-          ctx.properties.any (fun p => p.1 == object.cls && p.2 == name))
+          ctx.isProperty object.cls name)
 
 /-- The constructor a class instance creation runs. Python spells it `__init__`; Java
 spells it `<init>` (JLS §15.9.4: "the selected constructor is invoked" -- and the
@@ -2035,104 +2249,128 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.ref r)) =>
         match h₁.get r with
         | some o =>
-          -- Properties are data descriptors: the getter wins over a same-named
-          -- instance field. A local class's getter retains its lexical captures.
-          if ctx.dialect == .python &&
-              ctx.properties.any (fun p => p.1 == o.cls && p.2 == f) then
-            match ctx.resolveMethod o.cls f with
-            | some fn =>
-                if o.captured.isEmpty then applyFunc ctx n h₁ fn (some (.ref r)) [] []
-                else applyClosure ctx n h₁ fn (("self", .ref r) :: o.captured) [] []
-            | none => (h₁, .hole s!"property:{f}:unresolved")
-          else
-          match o.fields.find? (·.1 == f) with
-          | some (_, v) => (h₁, .val v)
-          | none        => match o.captured.find? (·.1 == f) with
-                           | some (_, v) => (h₁, .val v)
-                           -- A **module object** — the exporter's representation of an
-                           -- imported module, marked by a class name beginning `<module>`
-                           -- that no `class` statement in any language can spell — is
-                           -- Python's module namespace as an object: Language Reference
-                           -- §3.2.9 (Modules), "attribute references are translated to
-                           -- lookups in this dictionary, e.g. `m.x` is equivalent to
-                           -- `m.__dict__["x"]`". Its fields are its top-level functions,
-                           -- classes and submodules (written by `<module-objects>`) AND
-                           -- its module-level variables, written by the module's own body
-                           -- as each binding runs (§5.4.1: the body executes in that
-                           -- namespace) -- so the value is the one the body computed, not
-                           -- a pre-capture. A name the body never bound is, in CPython,
-                           -- an `AttributeError`; answering `unit` for it is the silent
-                           -- wrong answer, naming the miss is the honest one. Ordinary
-                           -- objects fall through to the arms below: `AttributeError`
-                           -- under `.python` (Language Reference §3.2.11), `unit` elsewhere.
-                           | none        =>
-                             if strStartsWith o.cls "<module>" then
-                               (h₁, .hole s!"module-attr:{f}")
-                             -- A boxed container has no `__dict__` to miss into:
-                             -- `{'a': 1}.a` is an AttributeError in Python and was a hole
-                             -- before boxing. Answering `unit` would let the commit that
-                             -- boxes containers introduce a silent wrong answer while
-                             -- removing others. Gated on the dialect because only Python
-                             -- boxes, so no `.cLike` corpus can reach a payload and none
-                             -- of their specs need to say so.
-                             -- JavaScript: a property read on a boxed container is
-                             -- answered on the field path -- `xs.length` on an array, a
-                             -- key on an object literal (`{a: 1}.a`), `undefined` for
-                             -- anything else. `jsContainerField` is the whole table.
-                             else if ctx.dialect == .javascript && o.payload.toVal.isSome then
-                               (h₁, jsContainerField o.payload f)
-                             -- A CLASS attribute read through an instance: `self.__marker`
-                             -- where `__marker = object()` was bound in the class body.
-                             -- Python's lookup falls from the instance to its class, and
-                             -- that is the fallback here -- to the globals-frame key the
-                             -- module initialiser wrote (`classAttrKey`). Python-only,
-                             -- because only Python has class bodies and because that is
-                             -- what keeps every `.cLike` accessor theorem out of the side
-                             -- condition this adds. Not recursive, so fuel-monotonicity of
-                             -- `.field` is unchanged.
-                             --
-                             -- A miss after all of that RAISES. Python Language Reference
-                             -- §3.2.11 "Class instances": the instance dictionary, then the
-                             -- class attributes, then `__getattr__` if the class has one;
-                             -- §3.3.2 `object.__getattribute__` "should either return the
-                             -- (computed) attribute value or raise an `AttributeError`
-                             -- exception"; Library Reference "Built-in Exceptions":
-                             -- `AttributeError` is "raised when an attribute reference or
-                             -- assignment fails". Core has no `__getattr__`, so the miss is
-                             -- the exception. The differential oracle priced the old
-                             -- `unit` answer on click 8.2.1 (`ShellComplete.source_vars`,
-                             -- docs/languages.md §10.9 and §16.A).
-                             else if ctx.dialect == .python then
-                               match (h₁.get ctx.globals).bind
-                                       (fun g => g.fields.find? (·.1 == classAttrKey o.cls f)) with
+          match ctx.classLookupGap o.cls f with
+          | some reason => (h₁, .hole reason)
+          | none =>
+            match ctx.readSlot o f with
+            | some result => (h₁, result)
+            | none =>
+              -- Properties are data descriptors: the getter wins over a same-named
+              -- instance field. A local class's getter retains its lexical captures.
+              if ctx.dialect == .python &&
+                  ctx.isProperty o.cls f then
+                match ctx.resolveMethod o.cls f with
+                | some fn =>
+                    if o.captured.isEmpty then applyFunc ctx n h₁ fn (some (.ref r)) [] []
+                    else applyClosure ctx n h₁ fn (("self", .ref r) :: o.captured) [] []
+                | none => (h₁, .hole s!"property:{f}:unresolved")
+              else
+              match o.fields.find? (·.1 == f) with
+              | some (_, v) => (h₁, .val v)
+              | none        => match (if ctx.usesClassMetadata o.cls then none else o.captured.find? (·.1 == f)) with
                                | some (_, v) => (h₁, .val v)
-                               | none =>
-                                   -- Reading an ordinary method produces a bound callable.
-                                   -- Class membership must be checked before suffix lookup:
-                                   -- an unrelated method with the same name is not a match.
-                                   if ctx.classDefines o.cls f then
-                                     match ctx.resolveMethod o.cls f with
-                                     | some fn =>
-                                         if strStartsWith fn.name "<runtime>." then
-                                           match builtinMethodValue o r f with
-                                           | some callable => (h₁, .val callable)
-                                           | none => (h₁, .hole "field:runtime-method")
-                                         else if fn.isMethod && !fn.isClassMethod then
-                                           (h₁, .val (.clos fn.name (("self", .ref r) :: o.captured)))
-                                         else if !fn.isClassMethod && !o.captured.isEmpty then
-                                           (h₁, .val (.clos fn.name o.captured))
-                                         else (h₁, .val (.fn fn.name))
-                                     | none => (h₁, .hole "field:method-unresolved")
-                                   else if o.payload.toVal.isSome then
-                                     match builtinMethodValue o r f with
-                                     | some callable => (h₁, .val callable)
-                                     | none => (h₁, .hole s!"field:{f}:on-container")
-                                   else (h₁, .exn (.str "AttributeError"))
-                             -- Every other dialect keeps `unit`: in JavaScript a missing
-                             -- property IS `undefined` (ECMA-262 §10.1.8.1
-                             -- OrdinaryGet step 3: "If desc is undefined, return
-                             -- undefined"), and Core spells `undefined` as `.unit`.
-                             else (h₁, .val .unit)
+                               -- A **module object** — the exporter's representation of an
+                               -- imported module, marked by a class name beginning `<module>`
+                               -- that no `class` statement in any language can spell — is
+                               -- Python's module namespace as an object: Language Reference
+                               -- §3.2.9 (Modules), "attribute references are translated to
+                               -- lookups in this dictionary, e.g. `m.x` is equivalent to
+                               -- `m.__dict__["x"]`". Its fields are its top-level functions,
+                               -- classes and submodules (written by `<module-objects>`) AND
+                               -- its module-level variables, written by the module's own body
+                               -- as each binding runs (§5.4.1: the body executes in that
+                               -- namespace) -- so the value is the one the body computed, not
+                               -- a pre-capture. A name the body never bound is, in CPython,
+                               -- an `AttributeError`; answering `unit` for it is the silent
+                               -- wrong answer, naming the miss is the honest one. Ordinary
+                               -- objects fall through to the arms below: `AttributeError`
+                               -- under `.python` (Language Reference §3.2.11), `unit` elsewhere.
+                               | none        =>
+                                 if strStartsWith o.cls "<module>" then
+                                   (h₁, .hole s!"module-attr:{f}")
+                                 -- A boxed container has no `__dict__` to miss into:
+                                 -- `{'a': 1}.a` is an AttributeError in Python and was a hole
+                                 -- before boxing. Answering `unit` would let the commit that
+                                 -- boxes containers introduce a silent wrong answer while
+                                 -- removing others. Gated on the dialect because only Python
+                                 -- boxes, so no `.cLike` corpus can reach a payload and none
+                                 -- of their specs need to say so.
+                                 -- JavaScript: a property read on a boxed container is
+                                 -- answered on the field path -- `xs.length` on an array, a
+                                 -- key on an object literal (`{a: 1}.a`), `undefined` for
+                                 -- anything else. `jsContainerField` is the whole table.
+                                 else if ctx.dialect == .javascript && o.payload.toVal.isSome then
+                                   (h₁, jsContainerField o.payload f)
+                                 -- A CLASS attribute read through an instance: `self.__marker`
+                                 -- where `__marker = object()` was bound in the class body.
+                                 -- Python's lookup falls from the instance to its class, and
+                                 -- that is the fallback here -- to the globals-frame key the
+                                 -- module initialiser wrote (`classAttrKey`). Python-only,
+                                 -- because only Python has class bodies and because that is
+                                 -- what keeps every `.cLike` accessor theorem out of the side
+                                 -- condition this adds. Not recursive, so fuel-monotonicity of
+                                 -- `.field` is unchanged.
+                                 --
+                                 -- A miss after all of that RAISES. Python Language Reference
+                                 -- §3.2.11 "Class instances": the instance dictionary, then the
+                                 -- class attributes, then `__getattr__` if the class has one;
+                                 -- §3.3.2 `object.__getattribute__` "should either return the
+                                 -- (computed) attribute value or raise an `AttributeError`
+                                 -- exception"; Library Reference "Built-in Exceptions":
+                                 -- `AttributeError` is "raised when an attribute reference or
+                                 -- assignment fails". Core has no `__getattr__`, so the miss is
+                                 -- the exception. The differential oracle priced the old
+                                 -- `unit` answer on click 8.2.1 (`ShellComplete.source_vars`,
+                                 -- docs/languages.md §10.9 and §16.A).
+                                 else if ctx.dialect == .python then
+                                   match (h₁.get ctx.globals).bind
+                                           (fun g => g.fields.find? (·.1 == ctx.classStorageKey o.cls f)) with
+                                   | some (_, v) => (h₁, .val v)
+                                   | none =>
+                                       if ctx.usesClassMetadata o.cls &&
+                                           (match ctx.classLookup o.cls f with
+                                            | .found _ (.stored _) => true | _ => false) then
+                                         (h₁, .hole s!"class-attribute:{f}:uninitialized-storage")
+                                       else
+                                       -- Reading an ordinary method produces a bound callable.
+                                       -- Class membership must be checked before suffix lookup:
+                                       -- an unrelated method with the same name is not a match.
+                                       if ctx.classDefines o.cls f then
+                                         match ctx.resolveMethod o.cls f with
+                                         | some fn =>
+                                             if strStartsWith fn.name "<runtime>." then
+                                               match builtinMethodValue o r f with
+                                               | some callable => (h₁, .val callable)
+                                               | none => (h₁, .hole "field:runtime-method")
+                                             else if ctx.usesClassMetadata o.cls && fn.isClassMethod then
+                                               (h₁, classMethodValue fn (ctx.instanceClassValue o) o.captured)
+                                             else if fn.isMethod && !fn.isClassMethod then
+                                               (h₁, .val (.clos fn.name (("self", .ref r) :: o.captured)))
+                                             else if !fn.isClassMethod && !o.captured.isEmpty then
+                                               (h₁, .val (.clos fn.name o.captured))
+                                             else (h₁, .val (.fn fn.name))
+                                         | none => (h₁, .hole "field:method-unresolved")
+                                       else if o.payload.toVal.isSome then
+                                         match builtinMethodValue o r f with
+                                         | some callable => (h₁, .val callable)
+                                         | none => (h₁, .hole s!"field:{f}:on-container")
+                                       -- Without recovered class metadata Core has no
+                                       -- hierarchy: `self.getsizeof` on an `LRUCache`
+                                       -- instance is `Cache.getsizeof` in CPython, but
+                                       -- `classDefines "LRUCache" "getsizeof"` cannot see
+                                       -- the base. Claiming `AttributeError` there was a
+                                       -- definite wrong answer (154 of 157 cachetools
+                                       -- divergences); the honest one is a named gap. The
+                                       -- exception is right once the MRO is complete, which
+                                       -- is exactly when `classLookupGap` above did not fire.
+                                       else if ctx.classDecls.isEmpty then
+                                         (h₁, .hole s!"field:{f}:unresolved-inheritance")
+                                       else (h₁, .exn (.str "AttributeError"))
+                                 -- Every other dialect keeps `unit`: in JavaScript a missing
+                                 -- property IS `undefined` (ECMA-262 §10.1.8.1
+                                 -- OrdinaryGet step 3: "If desc is undefined, return
+                                 -- undefined"), and Core spells `undefined` as `.unit`.
+                                 else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
       -- `Dialect.fieldsOnDicts`), so `alg.cra_priority` is a lookup in it. A *missing*
@@ -2149,9 +2387,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val (.str s)) =>
           if ctx.dialect == .javascript && f == "length" then (h₁, .val (.int s.jsLength))
           else (h₁, .hole s!"field:{f}:non-object")
-      | (h₁, .val (.fn owner)) => (h₁, ctx.readClassAttribute owner [] f)
+      | (h₁, .val (.fn owner)) => (h₁, ctx.readClassAttribute h₁ owner [] f)
       | (h₁, .val (.clsClos owner captured)) =>
-          (h₁, ctx.readClassAttribute owner captured f)
+          (h₁, ctx.readClassAttribute h₁ owner captured f)
       | (h₁, .val _)        => (h₁, .hole s!"field:{f}:non-object")
       | (h₁, r)             => (h₁, r)
   -- `[*a, b]` and `(*a, b)` splice, exactly as in a call. `{**d}` has no display form
@@ -2296,6 +2534,14 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl r)  => (h₂, r)
         | (h₂, .inr (vs, kws)) =>
+          -- A class value constructs: `LeftBox(3)` after `from ns_left import Box as
+          -- LeftBox` reads `.fn "ns_left.py:<module>.Box<meta>"` out of the module and
+          -- must allocate exactly as the lexical `alloc` form does.
+          match classValueOwner fv with
+          | some owner =>
+            let cls := ctx.classKeyOfValue owner
+            evalExpr ctx n h₂ (classCallEnv cls fv vs kws ρ) (.alloc cls (classCallArgs vs kws))
+          | none =>
           match fv with
           | .fn g      => match ctx.resolve g with
                           | some fn =>
@@ -2441,7 +2687,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           -- The class value's name is the exporter's `<meta>` marker on the qualified
           -- name; `resolveMethod` wants the short class name, which is its last dotted
           -- segment (the FILE part contains dots, so this cannot split on the whole name).
-          let short := classNameOfValue g
+          let short := ctx.classKeyOfValue g
           -- `classDefines`, NOT `resolveMethod`: the latter falls back to any free
           -- function of that name, which for an opaque external module (`time.monotonic`)
           -- would invent a method out of an unrelated global. A hole is the right answer
@@ -2586,20 +2832,37 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .inr (vs, kws)) =>
         match ctx.builtinBase cls with
         -- `class X(tuple)` and friends: the instance IS the builtin, not an opaque
-        -- reference. See `Val.bobj`.
+        -- reference. See `Val.bobj`. Checked before the class-metadata gap: the
+        -- exporter cannot resolve `tuple` as a declared base, so the hierarchy is
+        -- `incomplete` for every builtin-based class and the gap would hide this
+        -- allocator entirely. `allocBuiltin` keeps its own `__init__`/`__eq__` refusals.
         | some b => (h₁, allocBuiltin ctx cls b vs)
+        | none =>
+        match ctx.constructionGap cls with
+        | some reason => (h₁, .hole reason)
         | none =>
         -- A class defined inside a function is a *value*; instances carry the bindings it
         -- captured, so its methods can read the enclosing scope.
-        let cap := match ρ.get cls with
-                   | .clsClos _ c => c
-                   | _            => []
+        match ctx.allocationCaptures ρ cls with
+        | none => (h₁, .hole "class-construction:dynamic-binding")
+        | some cap =>
         let (h₂, r) := h₁.alloc { cls := cls, fields := [], captured := cap }
         match ctx.resolveCtor cls with
-        | none    => (h₂, .val (.ref r))
+        | none    => (h₂, ctx.defaultConstructor cls r vs kws)
         | some fn =>
-          match applyFunc ctx n h₂ fn (some (.ref r)) vs kws with
-          | (h₃, .val _)  => (h₃, .val (.ref r))
+          let initialized :=
+            if ctx.dialect == .python && fn.isClassMethod then
+              let classValue := ctx.instanceClassValue { cls := cls, fields := [], captured := cap }
+              if cap.isEmpty then applyFunc ctx n h₂ fn none (classValue :: vs) kws
+              else applyClosure ctx n h₂ fn cap (classValue :: vs) kws
+            else if cap.isEmpty then applyFunc ctx n h₂ fn (some (.ref r)) vs kws
+            else applyClosure ctx n h₂ fn
+              (if fn.isMethod then ("self", .ref r) :: cap else cap) vs kws
+          match initialized with
+          | (h₃, .val .unit) => (h₃, .val (.ref r))
+          | (h₃, .val _)  =>
+              if ctx.dialect == .python then (h₃, .exn (.str "TypeError"))
+              else (h₃, .val (.ref r))
           | (h₃, .hole l) => (h₃, .hole l)
           | (h₃, e)       => (h₃, e)
 
@@ -2790,11 +3053,17 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
               match h₂.payload addr with
               | .dict kvs => (h₂.setPayload addr (.dict (Stdlib.dictSet kvs (.str f) vv)), .normal ρ)
               | _         => (h₂.setField addr f vv, .normal ρ)
-            else (h₂.setField addr f vv, .normal ρ)
+            else
+              match ctx.fieldWriteCheck h₂ addr f with
+              | .val _ => (h₂.setField addr (ctx.fieldWriteKey h₂ addr f) vv, .normal ρ)
+              | .exn ex => (h₂, .exn ex ρ)
+              | .hole reason => (h₂, .hole reason)
+              | .outOfFuel => (h₂, .outOfFuel)
         | (h₂, .exn e)     => (h₂, .exn e ρ)
         | (h₂, .hole l)    => (h₂, .hole l)
         | (h₂, .outOfFuel) => (h₂, .outOfFuel)
       | (h₁, .val fv) =>
+        if ctx.isSharedClassValue fv then (h₁, .hole "class-assignment:shared-namespace") else
         -- A function is a heap object in Python, so an attribute write to one is legal.
         -- It is only expressible here when the receiver is a NAME: boxing rebinds that
         -- name to the new object, and a function value reached any other way has nowhere
@@ -3198,7 +3467,7 @@ theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
                      builtinBases := p.builtinBases, properties := p.properties,
-                     excClasses := p.excClasses }
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -3213,7 +3482,7 @@ def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
                      builtinBases := p.builtinBases, properties := p.properties,
-                     excClasses := p.excClasses }
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -3236,7 +3505,7 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
                      builtinBases := p.builtinBases, properties := p.properties,
-                     excClasses := p.excClasses }
+                     excClasses := p.excClasses, classDecls := p.classDecls }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)
@@ -3834,8 +4103,10 @@ private def cellProg : Program :=
 
 `Expr.callValue` applies whatever its callee EVALUATES to. Every expectation is CPython's:
 `mk(10)(2)` runs the closure `mk` returned; a function fetched out of a dict is called
-with the dict's element as callee; calling `5` is a `TypeError` in CPython and a named
-hole here, because Core does not raise on its own behalf for a shape it cannot dispatch. -/
+with the dict's element as callee; a CLASS value (`from m import C; C(2)`, or a class
+held in a variable) constructs an instance through the `alloc` rule; calling `5` is a
+`TypeError` in CPython and a named hole here, because Core does not raise on its own
+behalf for a shape it cannot dispatch. -/
 private def valueCallProg : Program :=
   { dialect := .python
   , funcs :=
@@ -3856,6 +4127,18 @@ private def valueCallProg : Program :=
     -- `5(1)`: not callable.
     , { name := "notCallable", params := []
       , body := .ret (.callValue (.lit (.int 5)) [.lit (.int 1)]) }
+    -- `class Pt: def __init__(self, v): self.v = v` in module `m.py`, then
+    -- `P = Pt; P(4).v` -- or `from m import Pt; Pt(4).v` -- the class VALUE is the callee.
+    , { name := "m.py:<module>.Pt.__init__", params := ["v"]
+      , body := .setField (.name "self") "v" (.name "v") }
+    , { name := "viaClassValue", params := []
+      , body :=
+          .seq (.assign "P" (.fnref "m.py:<module>.Pt<meta>"))
+               (.ret (.field (.callValue (.name "P") [.lit (.int 4)]) "v")) }
+    -- Keyword arguments reach the constructor through the same re-dispatch.
+    , { name := "viaClassValueKw", params := []
+      , body := .ret (.field (.callValue (.fnref "m.py:<module>.Pt<meta>")
+                                [.kwargE "v" (.lit (.int 7))]) "v") }
     -- `o = Box(); o.cb = twice; o.cb(21)`: a callable held in an INSTANCE FIELD is called
     -- through the attribute with no receiver, as CPython does (click's
     -- `FuncParamType.convert`, docs/languages.md §10.9).
@@ -3869,6 +4152,10 @@ private def valueCallProg : Program :=
 #guard match runFunc valueCallProg 200 "chained" [] with | .val (.int 12) => true | _ => false
 -- d["k"](3)  -- CPython 6
 #guard match runFunc valueCallProg 200 "fromDict" [] with | .val (.int 6) => true | _ => false
+-- P = Pt; P(4).v  -- CPython 4
+#guard match runFunc valueCallProg 200 "viaClassValue" [] with | .val (.int 4) => true | _ => false
+-- Pt(v=7).v  -- CPython 7
+#guard match runFunc valueCallProg 200 "viaClassValueKw" [] with | .val (.int 7) => true | _ => false
 -- 5(1)       -- CPython TypeError; Core: a named hole, never a value
 #guard match runFunc valueCallProg 200 "notCallable" [] with
        | .hole "call:value:not-callable" => true | _ => false
@@ -4093,9 +4380,11 @@ private def mcallOn (recv : Expr) (m : String) (args : List Expr) : Heap × ERes
        | .val (.int 1) => true | _ => false
 #guard (mcallOn (.name "d") "get" [.lit (.str "a")]).1[1]!.version == 0
 
--- An ordinary Python instance with no such attribute raises before argument evaluation.
+-- An ordinary Python instance with no such attribute: without class metadata the
+-- hierarchy is unknown, so the miss is a named gap before argument evaluation (with
+-- metadata it is `AttributeError`; see `attrMissMetaProg`).
 #guard match (mcallOn (.name "o") "append" [.lit (.int 3)]).2 with
-       | .exn (.str "AttributeError") => true | _ => false
+       | .hole "field:append:unresolved-inheritance" => true | _ => false
 
 -- §4, live iteration. `for v in xs: del xs[0]` on [1,2].
 -- CPython sees one element and ends with [2]; a SNAPSHOT loop would see two. This is the
@@ -4819,10 +5108,30 @@ private def attrMissProg : Program :=
                      (.ret (.field (.name "c") "p")) } ]
   , properties := [("C", "p")] }
 
+-- Legacy (no `classDecls`): Core cannot see whether `C` inherits `x`, so the miss is
+-- a named gap, not a claim that CPython raises.
 #guard match runFunc attrMissProg 200 "m.py:<module>.missing" [] with
-       | .exn (.str "AttributeError") => true | _ => false
+       | .hole "field:x:unresolved-inheritance" => true | _ => false
 #guard match runFunc attrMissProg 200 "m.py:<module>.caught" [] with
+       | .hole "field:x:unresolved-inheritance" => true | _ => false
+
+/-- The same program with its class declared: the MRO is complete (`C` → `object`), so
+the miss is CPython's `AttributeError`. -/
+private def attrMissMetaProg : Program :=
+  { attrMissProg with
+    classDecls :=
+      [ { name := "m.py:<module>.C", shortName := "C", bases := ["__builtin.object"]
+        , attributes := [("__init__", .method "m.py:<module>.C.__init__"),
+                         ("p", .property "m.py:<module>.C.p")] } ] }
+
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.missing" [] with
+       | .exn (.str "AttributeError") => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.caught" [] with
        | .val (.str "AttributeError") => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.present" [] with
+       | .val (.int 1) => true | _ => false
+#guard match runFunc attrMissMetaProg 200 "m.py:<module>.viaProperty" [] with
+       | .val (.int 7) => true | _ => false
 #guard match runFunc attrMissProg 200 "m.py:<module>.present" [] with
        | .val (.int 1) => true | _ => false
 #guard match runFunc attrMissProg 200 "m.py:<module>.viaProperty" [] with

@@ -1,0 +1,589 @@
+{
+  "schema_version": 1,
+  "status": "INTEGRATED_AND_VERIFIED",
+  "date_utc": "2026-09-24T07:42:20.465201+00:00",
+  "baseline_revision": "5a1305bf63ceda3d231056ad7a100131e78cbbee",
+  "main_source_baseline": "4221271",
+  "scope": "Compatibility-preserving simplification of the shared compiler for all eight existing source languages; machine frontend and Lean semantics preserved. No arbitrary-program or mathematical-minimality claim.",
+  "agent_assignments": [
+    "architecture inventory",
+    "AST and metadata contracts",
+    "language and validation matrix",
+    "Lean printer rewrite",
+    "shared lowerer traversal",
+    "Scala compilation modules",
+    "expression construction deduplication",
+    "analysis view reuse",
+    "package and reproduction integrity",
+    "independent review"
+  ],
+  "concurrency": "Ten bounded assignments in waves; at most three subagents plus root. Some existing agent threads handled later assignments.",
+  "production_source_sha256": {
+    "MANIFEST.in": "47377127124e2dae7dac2707b4b61ececf296dd009eaf122b4cd54449ab401c2",
+    "assure.sh": "7bd736c6fe552bf2afa49e36ccbe6a57d8e7b68305859f1a486c67146f133612",
+    "autoform.sh": "cd9b54c85d80815bd5cbf4cd3a53a79cb2ec3b737e00d110b68153908743662c",
+    "build_support.py": "6c3b001e098f4eb75e4c8ff9c35aedc98629bd4552e84f0c0a55f1d64e9bdfc8",
+    "cartographer/ast_tools.py": "5f47d6b4cb1bdfb4a4da6a138933f95d47b069c17a3ead6eba863352a4e53b7f",
+    "cartographer/compiler/Json.scala": "679c88ee16e37a5c42f6704430bcd1e18c411802bdfc7c38b4c40b233f94ba17",
+    "cartographer/compiler/Numeric.scala": "6e30ee389e57069d6e03220c08847596199b3d83a9c7f96f1832d769617ea80c",
+    "cartographer/compiler/SourceCompiler.scala": "8a206379ac8dc4831365dad04a7205e60c92deae075cb7c8431345b64afbec22",
+    "cartographer/export_ast.sc": "6551e9e9255b3d969c009b5ba5eeaae74aa10fbb05a07460d2330bb3745426e4",
+    "cartographer/formalization_graph.sc": "d4d32e0fdf3fc0b23716e8af1acff8988f005679e3f201da8cb126d0fe50bd7d",
+    "cartographer/generator_lowering.py": "a1ed2ec48c2c3cd855e0dc1193c4373dedddf74fdb41f6f55b148ef6a0f9342a",
+    "cartographer/python_truth_lowering.py": "8c4a5fd73f223f8d654c686e19fed9a2f4ae5ee1f95a7f95c7d2d2fd372682b1",
+    "cartographer/python_truth_values.py": "e6047d54725e0ce525371bbbcf4c4660aacb9e1130a6ad59af12a4f703658499",
+    "cartographer/render_lean.py": "463c457a39f212eb5f28179409d50316849f4d8d07ac94b17defe36b869b455e",
+    "cartographer/run.sh": "b6ae4ac4ddcbf2e853075c9b0f7393e0fe56fef02e883ef09e2f5f26ddb2007f",
+    "joern-version": "ca37de6518ece2aa1e06c78ac44b3e5c08f46eb2f9c45da1006417837febb2d9",
+    "lake-manifest.json": "fe885bec55411d5c9189f2a4ae816bf629b64753bdbcab1ce57d151a6c7db9c5",
+    "lakefile.toml": "50a9b9bdcc3fcb4f88a1ff585c9cafb7a89c575af3872a4a217193dbb81836ec",
+    "lean-toolchain": "1098ca8368e0db12138f33b070187e1f6527984ae0451a587b20e3e661f96a76",
+    "pyproject.toml": "e0c5fbb26413b1b47270795e885c7e6c6412b6544cec18df3d7428913cb490f3",
+    "scripts/arity_blast.lean.tmpl": "0b90626d8eb99962fc4ae7abcba0bc819316f1b8f9dbf6a2bf5010a99dec3026",
+    "scripts/assure.py": "0f8c4060bd563b0cfb74d620bf474bd974d228fe8daa8c933722804a5d87c8bc",
+    "scripts/audit_all.py": "9617c0be5699eba60f9ce666ad28c242ebbdd921b1d3c2e566ef129506b464dd",
+    "scripts/binary_loader.py": "629ad6773ffddf877c9a48073315c31734d8c20a6e0c42c4487569e6935db826",
+    "scripts/check_distribution.py": "f5a05f063f3f78731f33b75c905fc7b0ad0e1aa67fa53464e8d87fdce2a0d810",
+    "scripts/check_docs.py": "28c000ce77c38ca90785830b0035169f71622a747ecca1c4f7e6f2aac66c1c60",
+    "scripts/check_provenance.py": "c028ff589e2af77916eb8bfad06b5c518981b8ce4153d749f0c187d043444bbd",
+    "scripts/check_render.py": "21ceb975ff83a59f3fb2794085cc27f56b25ba735e5454a485b47ae2bb39260f",
+    "scripts/check_specs.py": "33969439bc369a443f182dfb0cb96ab63e42f64c607ce1586c70c52bb89da969",
+    "scripts/check_specs_fresh.py": "c684cf62920209be15a7a0114fefba155b2b5944ec5054f5d85b3ba09a635cf0",
+    "scripts/compiler_sources.py": "91e3fd8c4b898b5c38dccf5bda2f347e76524506cd953d2698b13d3552440cad",
+    "scripts/core_oracle.py": "e0bc3e746833e43a70292b4f506af7cc89dbf57892bdbdf632152d92b1712108",
+    "scripts/deep_json.py": "cc817269dbc6e7b4040150ebe19e1c6890c9b33b6407913ec8771774a59f4d16",
+    "scripts/differential.py": "6efc7e61153976382fd1ec616fe1e00991e292ae9c8d629d10b1162c793a5167",
+    "scripts/emit_contracts.py": "9e090ba653eb33b20d160b38231aed97e7c100ab1cc5d3d11e85b275dd883481",
+    "scripts/export_with_provenance.sh": "7f263ad5f8c989297217b41a137e68cebc993cb50985fd6f0decc5b661211995",
+    "scripts/external_callees.py": "99088034c8191c8a686ef488150e82b2991896cb804978eff50ebdd5638dcce7",
+    "scripts/formalize_machine.py": "27dc535ec520510752ddd93df4243cdae225ddf90a461880ffdcfe3a58a3ca88",
+    "scripts/fvspec.py": "ae5bf3486b1a297ebf4ffe9384a1ebb45d7626de2672624280043c2e290c6717",
+    "scripts/guarantee.py": "80cef48c448bdd823bf1ae22f1893842623c5901a42d4eb6ac70ff7fe1f54a03",
+    "scripts/integrity_guard.sh": "b3c6a34fede322ede7cc3c9de6bf7e8232b09a3bdec24dbd0df3fb6bb9a83b3f",
+    "scripts/label_function_counts.py": "07ae6962b045aadec65c0869cfead5e829e62e7e4dced16832c782e9baf09c2a",
+    "scripts/lang_matrix.py": "c59262fb8fd719ba1696cbcfb97b135c496642ff030ef0697b938f8670c6fbc0",
+    "scripts/ledger.lean.tmpl": "68aaab505e71fe30047465969c3fa82e8635fd5c70ce07115b9d47b472b337bf",
+    "scripts/mutate.py": "95241a90707efda1fc79994774368929549ea52047a5c1bab25796ee966e0e9f",
+    "scripts/native_c.py": "545b2ca9b7146089044158b3a383fbdb5c4f47cd6c29ca6f0ffbf270a8ba8a76",
+    "scripts/native_c_worker.py": "37a008511f3e815ca469c4c8638a318c43038c6d7c259de2bab78cdfd761cc11",
+    "scripts/native_heap.py": "1be448e9258a51febbd5953b1c208acf6f3d4f250c9c17a9df1b687bdd26d009",
+    "scripts/proof_artifacts.py": "4b7ae58ba1424cadf25fa452df44c6c09e64a4090227c8acf8bb59ff850d9e66",
+    "scripts/provenance.py": "cf030dc5bce847ddec9bc3971ffad99e5d9fec0c9119932ff99f7a4851f478f4",
+    "scripts/prover/propose.py": "0539fae8129e719fa008b7cc5368d1700578411fa05b1d5e2bac5f785dca6c39",
+    "scripts/prover/smt.py": "0f1622de1992c1cd03eacea4c1ebe93f2d2ef1cda967664be7bdbc969655096a",
+    "scripts/reland_corpus.sh": "4beab86d3f3cf5a548d8d2b365cfa15c5caab13a1a9e6aca4952579222f7eacb",
+    "scripts/repository_assurance.py": "9a2de3e620d00300fb3e230794e64cb7057f9618d00ae27727ddae136854d1b6",
+    "scripts/repository_inventory.py": "ee864aee6f894b1614b769268cf3cf89d02e306d2835185a94d28453d7217eed",
+    "scripts/repository_scope.py": "d35c5ea6754fbf331b222dc31fb1a94c792beeecd6cae9c5d51751d57ed32732",
+    "scripts/reproduce_ast.py": "5b2458fb1a7de3b7326c1c3e045069b3435784056456443a7d0152bfb24bae5e",
+    "scripts/runtime_backends.py": "691cbc1997335b51914f7ef4238714fa0044e60bada5eda1bbf55a0d3d7b3a45",
+    "scripts/sacm.py": "8380f9895d8a77a0e9b86bb5f86d2b494d350908af083d1699ff960efc7c74a6",
+    "scripts/scale_test.py": "092a94a5feece7ff427fbbd960a592c7fd00b71e4c9563a36afe03ef90d26db2",
+    "scripts/security_specs.py": "a1e34542b41527bb2ea6a47fa335a2d78f33fcae72fdedfeeaf247c2923be25b",
+    "scripts/source_context.py": "671491d34bf04da34fa55399bedcb25733c395766178b3623fac36e9b270aaf4",
+    "scripts/strip_kernel_attrs.py": "b55e2c63de033f749b4bc15396c9cdba15b989d897a3b9dd8804028350ffa558",
+    "scripts/synth_specs.py": "32d1d2fc91c4ba7a9421700c31d0b9c92e47ab66f0e86ae86795cefca14a0ec0",
+    "scripts/wasm_backend.py": "5905871a175ee793d2e104b1122c05e73a17939c953e0a17c1547c3d85969e48",
+    "scripts/wasm_run.mjs": "6940d0f72e858de28d2a4a8f8f1aab22b0ed86f030e69562cdf27b765fc51373",
+    "setup.py": "f0465fbf9bb52a049869f628cd0a1f4777b15d3e0039f99bd6e56dc33bd50a22",
+    "src/autoform/__init__.py": "a6031b68f7bf6ddc8a5bbf2baa72895e5385e2d5902e58944e3a820ab88d691a",
+    "src/autoform/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "src/autoform/cli.py": "17256e42f70bff3bb68291383f98a977cc22a73d524824e9bd2ea5033934241a",
+    "src/autoform/repository.py": "d418b61f6474085d6632a199fff2fdcce2659d5deb9e12b69108b36705ef5fce"
+  },
+  "frozen_assurance_production_identical": false,
+  "compiler_size": {
+    "files": [
+      {
+        "path": "cartographer/export_ast.sc",
+        "before_lines": 12806,
+        "after_lines": 30,
+        "before_bytes": 783683,
+        "after_bytes": 1729
+      },
+      {
+        "path": "cartographer/render_lean.py",
+        "before_lines": 964,
+        "after_lines": 768,
+        "before_bytes": 50303,
+        "after_bytes": 37800
+      },
+      {
+        "path": "cartographer/generator_lowering.py",
+        "before_lines": 422,
+        "after_lines": 400,
+        "before_bytes": 20869,
+        "after_bytes": 20045
+      },
+      {
+        "path": "cartographer/python_truth_lowering.py",
+        "before_lines": 67,
+        "after_lines": 56,
+        "before_bytes": 3143,
+        "after_bytes": 2546
+      },
+      {
+        "path": "cartographer/python_truth_values.py",
+        "before_lines": 106,
+        "after_lines": 99,
+        "before_bytes": 4380,
+        "after_bytes": 3883
+      },
+      {
+        "path": "cartographer/ast_tools.py",
+        "before_lines": 0,
+        "after_lines": 47,
+        "before_bytes": 0,
+        "after_bytes": 1874
+      },
+      {
+        "path": "cartographer/compiler/Json.scala",
+        "before_lines": 0,
+        "after_lines": 117,
+        "before_bytes": 0,
+        "after_bytes": 6218
+      },
+      {
+        "path": "cartographer/compiler/Numeric.scala",
+        "before_lines": 0,
+        "after_lines": 173,
+        "before_bytes": 0,
+        "after_bytes": 10710
+      },
+      {
+        "path": "cartographer/compiler/SourceCompiler.scala",
+        "before_lines": 0,
+        "after_lines": 12489,
+        "before_bytes": 0,
+        "after_bytes": 763880
+      }
+    ],
+    "before_lines": 14365,
+    "after_lines": 14179,
+    "before_bytes": 862378,
+    "after_bytes": 848685,
+    "note": "Includes every newly extracted Scala unit and the new shared traversal helper. A small entry-point file does not imply removal of its implementation."
+  },
+  "tests": {
+    "full_python": {
+      "passed": 910,
+      "skipped": 65,
+      "xfailed": 1,
+      "seconds": 324.36,
+      "log": "artifacts/compiler-rewrite/logs/compiler-python2.log"
+    },
+    "eight_language_pipeline": {
+      "passed": 8,
+      "seconds": 411.98
+    },
+    "numeric_python_kernel": {
+      "passed": 1,
+      "seconds": 240.48
+    },
+    "control_flow_and_iterators_kernel": {
+      "passed": 2,
+      "seconds": 347.45
+    },
+    "generator_expression_kernel": {
+      "passed": 1,
+      "seconds": 697.56,
+      "note": "Then factored identical staged-state proof text into shared test helper."
+    },
+    "focused_compiler_closure_and_final_guard": {
+      "passed": 8
+    },
+    "distribution": "artifacts/compiler-rewrite/distribution.json",
+    "module_namespace_source": {
+      "passed": 2,
+      "seconds": 40.84
+    },
+    "lean_build": {
+      "passed": true,
+      "jobs": 480,
+      "log": "artifacts/compiler-rewrite/logs/compiler-lean-build.log"
+    },
+    "demo_negative_control": {
+      "exit_code": 1,
+      "expected_diagnostics": [
+        "VACUOUS",
+        "TRUSTED-CODE LEAK [sorryAx]"
+      ],
+      "log": "artifacts/compiler-rewrite/logs/demo-negative-control.log"
+    },
+    "final_scala_compile": "artifacts/compiler-rewrite/final-compiler-smoke.json",
+    "main_focused": {
+      "passed": 95,
+      "seconds": 11.3
+    },
+    "older_namespace_context": {
+      "passed": 18,
+      "failed": 2,
+      "seconds": 3869.21,
+      "failures": [
+        "generator-expression kernel timeout at 900s",
+        "Python numeric kernel timeout at 600s"
+      ],
+      "resolution": "Both original repeated-initialization failures are superseded by the passing staged-initial-state kernel tests recorded above. The older run used the namespace-only checkout, not the integrated compiler.",
+      "log": "artifacts/compiler-rewrite/logs/namespace-context-before-staging.log"
+    }
+  },
+  "language_results": [
+    {
+      "module": "PipelineC",
+      "language": "c",
+      "agree": 57,
+      "divergences": 0,
+      "inconclusive": 3,
+      "inconclusive_detail": {
+        "right: ub:shift count out of range": 3
+      },
+      "proofs": 12,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 13,
+        "nodes": 77,
+        "module": "PipelineC",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 13,
+        "functions": 13,
+        "dynamicHoleRisk": 13,
+        "dialect": "c-like",
+        "contractsUsed": [],
+        "closedByTranslation": 13,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineC"
+    },
+    {
+      "module": "PipelineCPP",
+      "language": "c",
+      "agree": 10,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 2,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 3,
+        "nodes": 10,
+        "module": "PipelineCPP",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 3,
+        "functions": 3,
+        "dynamicHoleRisk": 1,
+        "dialect": "c-like",
+        "contractsUsed": [],
+        "closedByTranslation": 3,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineCPP"
+    },
+    {
+      "module": "PipelineGo",
+      "language": "go",
+      "agree": 45,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 9,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 9,
+        "nodes": 40,
+        "module": "PipelineGo",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 9,
+        "functions": 9,
+        "dynamicHoleRisk": 8,
+        "dialect": "go",
+        "contractsUsed": [],
+        "closedByTranslation": 9,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineGo"
+    },
+    {
+      "module": "PipelineJS",
+      "language": "js",
+      "agree": 45,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 9,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 10,
+        "nodes": 68,
+        "module": "PipelineJS",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 10,
+        "functions": 10,
+        "dynamicHoleRisk": 8,
+        "dialect": "javascript",
+        "contractsUsed": [],
+        "closedByTranslation": 10,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineJS"
+    },
+    {
+      "module": "PipelineJava",
+      "language": "java",
+      "agree": 35,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 7,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 7,
+        "nodes": 37,
+        "module": "PipelineJava",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 7,
+        "functions": 7,
+        "dynamicHoleRisk": 7,
+        "dialect": "java",
+        "contractsUsed": [],
+        "closedByTranslation": 7,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineJava"
+    },
+    {
+      "module": "PipelineKotlin",
+      "language": "kotlin",
+      "agree": 15,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 3,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 4,
+        "nodes": 15,
+        "module": "PipelineKotlin",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 4,
+        "functions": 4,
+        "dynamicHoleRisk": 3,
+        "dialect": "java",
+        "contractsUsed": [],
+        "closedByTranslation": 4,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineKotlin"
+    },
+    {
+      "module": "PipelinePython",
+      "language": "python",
+      "agree": 15,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 3,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 5,
+        "nodes": 36,
+        "module": "PipelinePython",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 5,
+        "functions": 5,
+        "dynamicHoleRisk": 10,
+        "dialect": "python",
+        "contractsUsed": [],
+        "closedByTranslation": 5,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelinePython"
+    },
+    {
+      "module": "PipelineTS",
+      "language": "ts",
+      "agree": 15,
+      "divergences": 0,
+      "inconclusive": 0,
+      "inconclusive_detail": {},
+      "proofs": 3,
+      "open_obligations": null,
+      "ledger": {
+        "verifiableCore": 4,
+        "nodes": 19,
+        "module": "PipelineTS",
+        "holesByLabel": [],
+        "holes": 0,
+        "holeFree": 4,
+        "functions": 4,
+        "dynamicHoleRisk": 2,
+        "dialect": "javascript",
+        "contractsUsed": [],
+        "closedByTranslation": 4,
+        "closedByContract": 0
+      },
+      "evidence": "artifacts/compiler-rewrite/languages/PipelineTS"
+    }
+  ],
+  "native_totals": {
+    "agree": 237,
+    "divergences": 0,
+    "inconclusive": 3,
+    "proofs": 48
+  },
+  "parity_reports": [
+    "render-parity.json",
+    "lowering-parity.json",
+    "exporter-module-parity.json",
+    "expression-verification.json",
+    "expression-access-parity.json",
+    "expression-python-numeric-parity.json",
+    "expression-control-parity.json",
+    "ledger-parity.json"
+  ],
+  "assurance": {
+    "command": "LEAN_NUM_THREADS=1 JOERN_HOME=/Users/mbhatt/joern/joern-cli AUTOFORM_CASES=5 AUTOFORM_MUTANTS=12 ./assure.sh examples/source/python CompilerRewrite --stage-timeout 7200",
+    "exit_code": 1,
+    "execution_status": "completed_with_gaps",
+    "guarantee_status": "verified_scoped",
+    "issues": [
+      "assurance",
+      "repository-coverage"
+    ],
+    "audit_pass": true,
+    "artifact_snapshot_status": "STABLE",
+    "fresh_kernel_replay": {
+      "status": "VERIFIED",
+      "available": true,
+      "exe": "/Users/mbhatt/.elan/bin/leanchecker",
+      "mode": "fresh",
+      "command": "lake env /Users/mbhatt/.elan/bin/leanchecker --fresh Autoform.SpecsGen.CompilerRewrite",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/.lake/packages/batteries' has local changes\n",
+      "detail": "the kernel replayed every constant reachable from `Autoform.SpecsGen.CompilerRewrite` into a fresh environment and accepted them all"
+    },
+    "mutants_run": 11,
+    "on_subject_survivors": 0,
+    "original_checkout": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation",
+    "evidence": "artifacts/compiler-rewrite/assurance",
+    "scope": "Three conformance claims, 15 recorded observations, and their import closure. Source/frontend census completeness is unproven; the workflow correctly retains coverage gaps.",
+    "snapshot_paths": 6603,
+    "present_artifacts": 6522,
+    "expected_absent_paths": 81
+  },
+  "limitations": [
+    "Fixture checks cover recorded cases, not all programs or inputs in any language.",
+    "Three C right-shift cases remain inconclusive because shift counts are out of range.",
+    "Four previously stale Python corpus provenance records now additionally lack complete compiler-source maps; none were repinned.",
+    "Zero-argument static-method calls remain an explicit Core gap.",
+    "The broader arbitrary-codebase objective is incomplete."
+  ],
+  "historical_failures": [
+    {
+      "log": "compiler-python1.log",
+      "result": "908 passed, 65 skipped, 1 xfailed, 2 failed",
+      "resolution": "Updated stale tests that read only the former monolithic exporter; full rerun passed."
+    },
+    {
+      "result": "Original repeated-init generator/numeric proof timeouts and control-flow empty-global harness failures",
+      "resolution": "Initialize source modules and kernel-certify the proposed initial state once; retain native expectations and original call fuel. Focused reruns passed."
+    }
+  ],
+  "repository_gates": {
+    "docs": {
+      "passed": true,
+      "figures": 8,
+      "note": "Restored the existing main Cachetools ledger into the isolated checkout; the first check had correctly failed on its missing input."
+    },
+    "spec_freshness": {
+      "passed": true,
+      "modules": 8
+    },
+    "provenance": {
+      "exit_code": 1,
+      "stale_corpora": [
+        "Cachetools",
+        "Click",
+        "Jinja2",
+        "Requests"
+      ],
+      "violations": 8,
+      "note": "The same four stale exporter records also lack a full compiler-source map after modularization; no records were rewritten."
+    },
+    "render": {
+      "exit_code": 1,
+      "note": "Four tracked Python corpus render mismatches predate this rewrite; local-only artifacts are separately unverifiable. All 17 tracked corpus outputs equal the baseline compiler byte for byte."
+    }
+  },
+  "prior_whole_autoform_audit": {
+    "preflight": "artifacts/compiler-rewrite/main-prior-audit-preflight.json",
+    "snapshot_paths": 7943,
+    "expected_absent_paths": 281,
+    "present_artifacts": 7662,
+    "status": "STABLE",
+    "note": "Hash comparison against the completed prior whole-Autoform replay, not a second full replay."
+  },
+  "final_whitespace_cleanup": {
+    "path": "cartographer/compiler/SourceCompiler.scala",
+    "before_sha256": "98b8fb5c0d86f9f285b68bcab05e3a2ca873a59495b884d81b51231b033001e4",
+    "after_sha256": "8a206379ac8dc4831365dad04a7205e60c92deae075cb7c8431345b64afbec22",
+    "whitespace_split_tokens_identical": true,
+    "note": "Removed trailing spaces on two blank lines after validation; production evidence was collected before this cosmetic change."
+  },
+  "frozen_assurance_production_note": "Every production file matches except two whitespace-only blank lines in SourceCompiler.scala; token comparison is recorded.",
+  "integration_report": "artifacts/compiler-rewrite/integration.json",
+  "post_review_2026_09_25": {
+    "status_note": "The INTEGRATED_AND_VERIFIED status above was recorded while two repository gates exited non-zero. The review below closed one and left the other as the documented deliberate stale-corpus item.",
+    "render_gate": {
+      "exit_code": 3,
+      "note": "Re-rendered the five Python corpora (Ansible, Cachetools, Click, Jinja2, Requests) with the current renderer and re-recorded artifact-manifest.json. Their renders had drifted at commit 4bc664a (`and`/`or` truth lowering) without a re-record; the tracked Autoform/Generated/Cachetools.lean was rebuilt from its AST and every dependent theorem (Contracts, Specs.CachetoolsSpec, SpecsGen.Cachetools) still elaborates. 0 mismatched; exit 3 is the local-only unverifiable set, as in CI policy."
+    },
+    "provenance_gate": {
+      "exit_code": 1,
+      "note": "Unchanged: the four Python corpora were exported by an earlier exporter and docs/integrity.md records why they are not re-exported yet. Already red at the branch base."
+    },
+    "core_regressions_fixed": [
+      "Expr.callValue on a class value (`from m import C; C(x)`, or a class held in a variable) now constructs through the alloc rule instead of holing `call:...<meta>`; the two source tests that pinned the hole now compare with CPython.",
+      "Expr.alloc checks Ctx.builtinBase before the class-metadata construction gap again, as at the branch base, so `class X(tuple)` allocates a Val.bobj under recovered class metadata instead of holing on its unresolved builtin base.",
+      "Expr.field on a legacy model (no classDecls) answers the named gap `field:<attr>:unresolved-inheritance` for an attribute miss instead of `AttributeError`: Core cannot see base classes there, and the exception was wrong for every inherited attribute (`self.getsizeof` on an `LRUCache`). With class metadata the MRO is complete and `AttributeError` stands (`attrMissMetaProg` guards it)."
+    ],
+    "harness_fixes": [
+      "differential.py: a heap-graph verdict no longer overrides a result comparison already classified inconclusive (value-vs-object representation, unmodelled exception payload).",
+      "differential.py: the measurement basis says when a legacy AST without class metadata makes the graph encoder refuse plain-instance snapshots.",
+      "compiler_sources.py reads compile units as UTF-8 regardless of locale; check_distribution.py scans nested .sc entries; provenance.py ignores pure tool caches.",
+      "Three Joern-gated tests resolve JOERN_HOME/joern-cli like the rest of the suite.",
+      "differential.py / native_heap.py: a legacy AST keeps short class names for plain instances and is compared by result only (no `post_heap`, basis without `heap-graph-v1`); refusing every plain instance had reduced the cachetools oracle to 15 agreements, and recording graphs for it produced 33 spurious `some false` verdicts on agreeing results (short vs qualified function names)."
+    ],
+    "review_scope": "Read-only review agents over scripts/, cartographer/ (Python and Scala), and Autoform/ diffs; renderer byte parity re-confirmed on all 17 tracked ASTs; Scala refactor layer traced hunk by hunk with no drift; namespace-candidate layer differences vs HEAD recorded above.",
+    "cachetools_oracle_after_review": {
+      "source": "cachetools 7.1.7 sdist (src/ + tests/)",
+      "command": "PYTHONHASHSEED=0 AUTOFORM_NO_REEXEC=1 scripts/differential.py ast-Cachetools.json <sdist>/src Cachetools 5 --tests <sdist>/tests",
+      "measurement_basis": "python-deadlines-v4+trace-returns-v1",
+      "compared": 167,
+      "agree": 167,
+      "divergences": 0,
+      "inconclusive": 336,
+      "functions_compared": 36,
+      "before_review_same_inputs": {
+        "branch_harness": {
+          "agree": 15,
+          "divergences": 0,
+          "note": "plain instances refused"
+        },
+        "base_harness_on_branch_semantics": {
+          "agree": 192,
+          "divergences": 157,
+          "note": "154 were the legacy inherited-attribute AttributeError; 3 were TTLCache.__setstate__"
+        }
+      }
+    },
+    "spec_freshness_note": "scripts/check_specs.py elaborates with `lake env lean` and does not rebuild dependencies: after a Semantics change it reports every stale Generated/*.olean as a failure until `lake build Autoform.SpecsGen.<M>` refreshes it. All tracked SpecsGen modules (Cachetools, LinuxLib, LinuxLibSample, Requests, V8Base, V8BaseSample, V8Exp, V8Exp2) build after the review changes. Three untracked local artifacts from 2026-09-18 (SpecsGen/CompletionC, PipelineAssureGo, LinuxMathFixed) use the pre-`Obs.post` `unfold lawConform; rw [hrun]` proof shape and no longer elaborate; they are not in git and are regenerated by the next pipeline run."
+  }
+}

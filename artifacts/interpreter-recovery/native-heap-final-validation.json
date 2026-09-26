@@ -1,0 +1,279 @@
+{
+  "status": "PROMOTED_TO_MAIN_SOURCE",
+  "scope": "Native rooted heap graphs, exact heap preservation, visible first-binding fields, injective function identities and strict function metadata encoding. Broader repository completion remains open.",
+  "parent_revisions": [
+    "461a06b",
+    "f03ca00",
+    "1ac2c5f",
+    "21c9dc4",
+    "58c80dd",
+    "7a51af4"
+  ],
+  "source_sha256": {
+    "Autoform/Lang/Core/Observation.lean": "c93cd6a4ecfc1567f6320b4ffde1047c50531f85856db0309ed7a70dbf096a77",
+    "Autoform/SpecsGen/Basis.lean": "8bbe41ce4e7d673fefe30b030d5f832f165d84e83683c23cb3d6b4d3219798e4",
+    "scripts/native_heap.py": "1be448e9258a51febbd5953b1c208acf6f3d4f250c9c17a9df1b687bdd26d009",
+    "scripts/differential.py": "6efc7e61153976382fd1ec616fe1e00991e292ae9c8d629d10b1162c793a5167",
+    "scripts/synth_specs.py": "32d1d2fc91c4ba7a9421700c31d0b9c92e47ab66f0e86ae86795cefca14a0ec0",
+    "scripts/runtime_backends.py": "691cbc1997335b51914f7ef4238714fa0044e60bada5eda1bbf55a0d3d7b3a45",
+    "scripts/core_oracle.py": "4063869b9e15606e98aca64b7ae5fbd3618dfc3fdd29a7ebe16ba1c03c454049",
+    "tests/test_native_heap.py": "555f6a2350b7fa1383bfe2bef446e30e583456700113bf51e30572d60ad25912",
+    "tests/test_source_native_heap.py": "623abf09fe5d7b0d5069634ec8d560911b73690b08b19e9ee1c7977886001b22",
+    "examples/python_control/heap_effects.py": "dcfe9c443e0f6d08adc796f3b29fabef262d72bd7e1af3e9ed715fa5dca9cc5f"
+  },
+  "checks": {
+    "source_regression": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-metadata-final",
+      "log": "function-metadata-source1.log",
+      "summary": "1 passed in 44.76s. Eleven actual CPython graph observations plus an omitted-unlink-body negative check proved in the kernel."
+    },
+    "function_identity": {
+      "status": "PASS",
+      "log": "function-identity-final-focused1.log",
+      "summary": "6 passed in 0.25s. Local and loop definitions are refused; distinct FunctionType clones cannot share one observed identity, including collisions first found in the post-state."
+    },
+    "shadow_fields": {
+      "status": "PASS",
+      "workspace": "../native-heap-shadow-fields",
+      "log": "shadow-fields-focused1.log",
+      "summary": "12 passed in 54.09s; field overwrite and lost-write kernel regressions."
+    },
+    "python": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-metadata-final",
+      "log": "function-metadata-python1.log",
+      "summary": "877 passed, 64 skipped, 1 xfailed in 314.98s. Final executable Python code; later docstring change only."
+    },
+    "corrected_effects_pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "revision": "f03ca00",
+      "source_revision": "b56be16",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-shadow-fields",
+      "log": "shadow-fields-pipeline1.log",
+      "agreements": 15,
+      "divergences": 0,
+      "inconclusive": 9,
+      "by_origin": {
+        "test-suite": {
+          "agree": 9,
+          "diverge": 0,
+          "incon": 0
+        },
+        "random": {
+          "agree": 6,
+          "diverge": 0,
+          "incon": 9
+        }
+      },
+      "proofs": 7,
+      "open_obligations": 0,
+      "holes": 2,
+      "audit": "PASS; STABLE; VERIFIED",
+      "mutation": {
+        "tested": 20,
+        "invalid": 0,
+        "inconclusive": 0,
+        "killed": 19,
+        "survived": 1
+      },
+      "remaining_mutant": "detach final append expression changed to return append result; no difference on the sampled list input. Not waived.",
+      "remaining_inconclusive": "Nine synthetic integer inputs to container operations reach explicit interpreter holes. All nine traced calls agree."
+    },
+    "full_build": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-callable-identity",
+      "log": "native-heap-final-build1.log",
+      "session_id": 28241,
+      "scope": "Lean inputs are byte-identical to this candidate; verified after the Python identity-only correction.",
+      "summary": "Full corrected graph build completed successfully:480jobs. All186rootLeanfilesand678dependencyLeanfilesmatchthiscandidate."
+    },
+    "expanded_pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-final-pipeline",
+      "log": "native-heap-final-pipeline1.log",
+      "source_revision": "f3e0cd5",
+      "candidate_revision": "21c9dc4",
+      "agreements": 18,
+      "divergences": 0,
+      "inconclusive": 9,
+      "proofs": 9,
+      "open_obligations": 0,
+      "mutation": {
+        "tested": 20,
+        "killed": 20,
+        "survived": 0,
+        "invalid": 0,
+        "inconclusive": 0
+      },
+      "scope": "All12tracedcallsagree; all20sampledmutantskilled. The specific former survivor is additionally covered by the focused detach check.",
+      "audit": "PASS; STABLE; VERIFIED (fresh proof-module replay)",
+      "holes": 3,
+      "excluded_subjects": [],
+      "by_origin": {
+        "test-suite": {
+          "agree": 12,
+          "diverge": 0,
+          "incon": 0
+        },
+        "random": {
+          "agree": 6,
+          "diverge": 0,
+          "incon": 9
+        }
+      }
+    },
+    "detach_mutation": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-final-pipeline",
+      "log": "detach-mutation1.log",
+      "report": "artifacts/pipeline/HeapEffects/detach-mutation.json",
+      "tested": 9,
+      "killed": 9,
+      "survived": 0,
+      "invalid": 0,
+      "inconclusive": 0,
+      "restored_build": {
+        "exit_code": 0,
+        "timeout": false,
+        "build_tail": ""
+      },
+      "former_survivor": {
+        "op": "ast-expr->ret",
+        "line": 122,
+        "decl": "f_effects_py__module__detach",
+        "before": "                (.expr (.mcall (.name \"old\") \"append\" [(.lit (.int 8))]))))) }",
+        "after": "                (.ret (.mcall (.name \"old\") \"append\" [(.lit (.int 8))]))))) }",
+        "verdict": {
+          "conform_effects_py__module__detach": "killed"
+        },
+        "timeout": false
+      },
+      "audit": "PASS; STABLE; VERIFIED (fresh proof-module replay; detach-audit1.log)"
+    },
+    "cachetools_links": {
+      "status": "PASS",
+      "report": "artifacts/interpreter-recovery/cachetools-heap-validation.json",
+      "summary": "Four real CPython unlink calls on1/2/3/5nodecycles, eight kernel checks; dropped body caught on2/3/5nodes and observationally equivalenton1node. Direct initializer computation took roughly18minutes under concurrent build load.",
+      "staged_initializer": "PASS; exact initializer equality proved once by rfl, then all eight unchanged claims proved using it."
+    },
+    "candidate_build": {
+      "status": "PASS",
+      "log": "native-heap-candidate-build1.log",
+      "summary": "480jobs, reusing only the terminal build cache after all root and dependency Lean source hashes matched."
+    },
+    "full_audit": {
+      "status": "PASS",
+      "log": "native-heap-final-audit.log",
+      "report": "artifacts/interpreter-recovery/native-heap-final-audit.json",
+      "scope": "Fresh replay of the complete Autoform import closure. Python-only guard integrated afterward; every audited source, compiled module and configuration hash rechecked unchanged.",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-identity-final",
+      "report_sha256": "3e963092db3b20230f8e3029134f2038af8b3c38bac39a0bf3456941a0fb5e8d",
+      "artifact_snapshot": "STABLE",
+      "kernel_replay": "VERIFIED",
+      "artifact_count": 7943
+    },
+    "python_previous": {
+      "status": "PASS",
+      "log": "function-identity-final-python1.log",
+      "summary": "857 passed, 63 skipped, 1 xfailed in 522.15s. Includes loop-defined functions and injective function-object identity checks."
+    },
+    "source_regression_previous": {
+      "status": "PASS",
+      "log": "heap-effects-source2.log",
+      "summary": "1 passed in 44.01s; eleven actual CPython heap observations proved in the kernel, plus a negative proof for an omitted unlink body. Includes a custom append method returning its argument."
+    },
+    "function_metadata": {
+      "status": "PASS",
+      "report": "artifacts/interpreter-recovery/function-metadata-validation.json",
+      "summary": "26 focused tests passed; one deferred-annotation test requires Python 3.14 and is skipped on Python 3.11."
+    },
+    "repository_gates_before_promotion": {
+      "scope": "Main worktree before graph promotion; baseline gates, not graph candidate validation",
+      "checks": {
+        "docs": {
+          "exit_code": 0,
+          "log": ".autoform-work/pre-graph-docs-check.log",
+          "sha256": "0be735e7831d86b58691d974e247a54caeaaa8cb914f1e291663a55e1e6e3779",
+          "summary": [
+            "check_docs: 8 documented figures all match their artifacts"
+          ],
+          "failures": []
+        },
+        "specs": {
+          "exit_code": 0,
+          "log": ".autoform-work/pre-graph-specs-check.log",
+          "sha256": "872ce9bda2475a1f18ef278c92d79a793d0cd85511cfc4d1dfa85d7a508f2885",
+          "summary": [
+            "check_specs_fresh: 8 spec module(s) match the corpus they were generated from"
+          ],
+          "failures": []
+        },
+        "provenance": {
+          "exit_code": 1,
+          "log": ".autoform-work/pre-graph-provenance-check.log",
+          "sha256": "e30b20d455450866e8a17a8081dbdde6be492f9cc1507d23e2cc3383ceced106",
+          "summary": [
+            "check_provenance: 4/17 in-repository artifacts fully attributed to Joern 4.0.606; 13 unattributed (baselined); 29 local-only (gitignored, not judged); 4 violation(s)."
+          ],
+          "failures": [
+            "FAIL   ast-Cachetools.json: cartographer/export_ast.sc changed since this artifact was exported (b82b43eae510\u2026 -> b451f65cdede\u2026). The .cpg is not tracked, so the committed AST cannot be re-verified in place; regenerate it with the recorded command and re-record:",
+            "FAIL   ast-Click.json: cartographer/export_ast.sc changed since this artifact was exported (b82b43eae510\u2026 -> b451f65cdede\u2026). The .cpg is not tracked, so the committed AST cannot be re-verified in place; regenerate it with the recorded command and re-record:",
+            "FAIL   ast-Jinja2.json: cartographer/export_ast.sc changed since this artifact was exported (b82b43eae510\u2026 -> b451f65cdede\u2026). The .cpg is not tracked, so the committed AST cannot be re-verified in place; regenerate it with the recorded command and re-record:",
+            "FAIL   ast-Requests.json: cartographer/export_ast.sc changed since this artifact was exported (b82b43eae510\u2026 -> b451f65cdede\u2026). The .cpg is not tracked, so the committed AST cannot be re-verified in place; regenerate it with the recorded command and re-record:"
+          ]
+        },
+        "render": {
+          "exit_code": 1,
+          "log": ".autoform-work/pre-graph-render-check.log",
+          "sha256": "2b8675d51ef52532a6597dcfc987a3fddd08fa107b42a14831764467fd6075fd",
+          "summary": [
+            "check_render: 15 verified, 5 mismatched, 25 unverifiable (of 45)"
+          ],
+          "failures": [
+            "MISMATCH Ansible: the AST is unchanged but its render is not.",
+            "MISMATCH Cachetools: the AST is unchanged but its render is not.",
+            "MISMATCH Click: the AST is unchanged but its render is not.",
+            "MISMATCH Jinja2: the AST is unchanged but its render is not.",
+            "MISMATCH Requests: the AST is unchanged but its render is not."
+          ]
+        }
+      }
+    },
+    "main_promotion": {
+      "status": "PASS",
+      "candidate_revision": "b4d21bc928c1f58fbf0abed4f71a52f758fb6d57",
+      "backup": "/Users/mbhatt/autoform/.autoform-work/native-heap-promotion-backup",
+      "artifact_manifest": "/Users/mbhatt/autoform/.autoform-work/native-heap-promotion-plan.json",
+      "audited_artifacts_rechecked": 7943,
+      "unchanged_source_files": 245,
+      "scope": "Exact source and binary transport from completed fresh audit; all hashes rechecked after main build. Main Git index remains read-only; source changes are present uncommitted.",
+      "documentation_backup": "/Users/mbhatt/autoform/.autoform-work/native-heap-promotion-backup/docs/interpreter-recovery.md"
+    },
+    "main_build": {
+      "status": "PASS",
+      "log": "/Users/mbhatt/autoform/.autoform-work/main-native-heap-build2.log",
+      "summary": "Build completed successfully (480 jobs).",
+      "initial_attempt": {
+        "log": "/Users/mbhatt/autoform/.autoform-work/main-native-heap-build1.log",
+        "exit_code": 127,
+        "reason": "Main shell PATH did not contain lake; rerun used installed absolute executable."
+      }
+    },
+    "main_docs": {
+      "status": "PASS",
+      "log": "/Users/mbhatt/autoform/.autoform-work/main-native-heap-docs2.log",
+      "summary": "check_docs: 8 documented figures all match their artifacts",
+      "scope": "Checked again after recovery documentation update."
+    }
+  },
+  "prior_evidence": {
+    "initial_graph": "../native-heap-development/artifacts/interpreter-recovery/native-heap-validation.json",
+    "corrected_pipeline": "../native-heap-shadow-fields/artifacts/pipeline/HeapEffects/run.json"
+  },
+  "remaining": [
+    "Four stale Python provenance records, five render mismatches and local artifacts without manifest entries require genuine regeneration.",
+    "Cross-module global namespace divergence is preserved in module-namespace-diagnostic.json; its separate development candidate is not part of this promotion.",
+    "Imported/ABC semantics, global/class/closure snapshots, broad corpus re-lands and arbitrary-codebase milestones remain open."
+  ]
+}

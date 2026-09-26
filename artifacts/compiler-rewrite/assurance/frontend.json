@@ -1,0 +1,9 @@
+{
+  "candidateMethods": 3,
+  "exportedFunctions": 3,
+  "moduleInitializers": 1,
+  "truncatedByMethodLimit": false,
+  "excludedDeclarations": [],
+  "sourceCensusComplete": false,
+  "note": "CPG census only. Unparsed source functions may be absent; compiler census not available."
+}

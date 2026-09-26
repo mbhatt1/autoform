@@ -5,13 +5,16 @@ and 2 means true. A short circuit returns its cached result; a final operand
 stays untested. Materializing a value discards this cache, so a later independent
 truth test still runs the protocol again.
 """
+if __package__:
+    from .ast_tools import rewrite_json
+else:
+    from ast_tools import rewrite_json
 
 
 def _lower_function(function):
     body = function['body']
-    nodes, pairs, helpers = {}, {}, []
+    pairs, helpers = {}, []
     changed = False
-    pending = [(body, False)]
 
     def name(v):
         return {'k': 'name', 'v': v}
@@ -34,33 +37,20 @@ def _lower_function(function):
     def eq(a, n):
         return {'k': 'binop', 'op': '==', 'a': a, 'b': integer(n)}
 
-    def pair(child):
-        state = nodes[id(child)].get('pythonTruthCache', integer(0))
-        return pairs.get(id(child), {'k': 'tupleE', 'items': [nodes[id(child)], state]})
+    def pair(child, value):
+        state = value.get('pythonTruthCache', integer(0))
+        return pairs.get(id(child), {'k': 'tupleE', 'items': [value, state]})
 
-    while pending:
-        node, ready = pending.pop()
-        if not isinstance(node, (dict, list)) or id(node) in nodes:
-            continue
-        children = list(node.values()) if isinstance(node, dict) else node
-        if not ready:
-            pending.append((node, True))
-            pending.extend((child, False) for child in reversed(children)
-                           if isinstance(child, (dict, list)))
-            continue
-        if isinstance(node, list):
-            nodes[id(node)] = [nodes.get(id(child), child) for child in node]
-            continue
-        out = {key: nodes.get(id(child), child) for key, child in node.items()}
-        nodes[id(node)] = out
+    def rewrite(node, out):
+        nonlocal changed
         if node.get('k') != 'binop' or node.get('op') not in ('&&', '||'):
-            continue
+            return out
         helper_name = function['name'] + '<truth:' + str(len(helpers)) + '>'
         # These cannot collide with Python identifiers or the exporter's temporaries.
         saved, value, state, tested = (helper_name + suffix for suffix in (':pair', ':value', ':state', ':test'))
         left, val, flag = name(saved), name(value), name(state)
         helper_body = seq([
-            assign(saved, pair(node['a'])),
+            assign(saved, pair(node['a'], out['a'])),
             assign(value, index(left, 0)),
             assign(state, index(left, 1)),
             {'k': 'ifte', 'c': eq(flag, 0),
@@ -69,7 +59,7 @@ def _lower_function(function):
              'e': {'k': 'skip'}},
             {'k': 'ifte', 'c': eq(flag, 1 if node['op'] == '&&' else 2),
              't': {'k': 'ret', 'e': {'k': 'tupleE', 'items': [val, flag]}},
-             'e': {'k': 'ret', 'e': pair(node['b'])}},
+             'e': {'k': 'ret', 'e': pair(node['b'], out['b'])}},
         ])
         helpers.append({'name': helper_name, 'file': function.get('file', ''),
                         'params': [], 'body': helper_body})
@@ -78,11 +68,14 @@ def _lower_function(function):
         # Simple binary operators already evaluate their left exactly once. Only
         # a compound left operand needs a cached result from the helper protocol.
         if id(node['a']) in pairs or 'pythonTruthCache' in node['a']:
-            nodes[id(node)] = index(call, 0)
             changed = True
+            return index(call, 0)
+        return out
+
+    lowered_body = rewrite_json(body, rewrite, memoize=True)
     if not changed:
         return function, []
-    out = dict(function, body=nodes[id(body)])
+    out = dict(function, body=lowered_body)
     out.setdefault('analysisBody', body)
     # Helpers are auxiliary implementation code, never source-function subjects.
     return out, helpers

@@ -7,7 +7,8 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import (SOURCE_RUNTIME, SOURCE_STATE_OUTPUT, ROOT,
+                                 numeric_env, run, stage_source_initial_state)
 
 
 CASES = [
@@ -57,6 +58,8 @@ def test_iterators_source(tmp_path, numeric_env):
     if not os.environ.get("AUTOFORM_TEST_JOERN"):
         pytest.skip("set AUTOFORM_TEST_JOERN=1 to compare actual source iterators")
     joern = Path(os.environ.get("JOERN_HOME", Path.home() / "joern"))
+    if (joern / "joern-cli").is_dir():
+        joern /= "joern-cli"
     source = ROOT / "examples/python_control/iterators.py"
     spec = importlib.util.spec_from_file_location("iterator_probes", source)
     probes = importlib.util.module_from_spec(spec)
@@ -73,27 +76,30 @@ def test_iterators_source(tmp_path, numeric_env):
     run([sys.executable, ROOT / "cartographer/render_lean.py", tmp_path / "ast.json", model, "Iterators"],
         ROOT, numeric_env)
     header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.Iterators\n"
-    calls = [f'runFunc program 400 "iterators.py:<module>.{name}" [.int 2]' for name in CASES]
+    header += SOURCE_RUNTIME
+    calls = [f'runSource program initialGlobals 400 "iterators.py:<module>.{name}" [.int 2]' for name in CASES]
     driver = header + "def main : IO Unit := do\n"
     for name, call in zip(CASES, calls):
         driver += f'''  match {call} with
   | .val (.int n) => IO.println n
   | other => throw (IO.userError ({json.dumps(name + ': ')} ++ reprStr other))
 '''
+    driver += SOURCE_STATE_OUTPUT
     (tmp_path / "Check.lean").write_text(driver)
     observed = run(["lake", "env", "lean", "--run", tmp_path / "Check.lean"], ROOT, numeric_env, timeout=600)
-    assert [int(value) for value in observed.splitlines()] == expected
+    header, lines = stage_source_initial_state(header, observed)
+    assert [int(value) for value in lines] == expected
     proofs = ""
     for call, result in zip(calls, expected):
         proofs += (f"example : (match {call} with\n"
                    f"  | .val (.int n) => n == ({result} : Int)\n"
-                   "  | _ => false) = true := by decide +kernel\n")
+                   "  | _ => false) = true := by rw [initialGlobals_correct]; decide +kernel\n")
     for name, label in [("changed_dict_keys", "iterator:dict-keys-changed"),
                         ("private_fields", "call:getattr"),
                         ("result_protocol", "iterator:result-protocol"),
                         ("result_protocol_for", "iterator:result-protocol")]:
-        proofs += (f'example : (match runFunc program 400 "iterators.py:<module>.{name}" [.int 2] with\n'
+        proofs += (f'example : (match runSource program initialGlobals 400 "iterators.py:<module>.{name}" [.int 2] with\n'
                    f'  | .hole {json.dumps(label)} => true\n'
-                   '  | _ => false) = true := by decide +kernel\n')
+                   '  | _ => false) = true := by rw [initialGlobals_correct]; decide +kernel\n')
     (tmp_path / "Proofs.lean").write_text(header + proofs)
     run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env, timeout=900)

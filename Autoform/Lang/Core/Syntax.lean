@@ -1,5 +1,6 @@
 import Specimen
 import Autoform.Lang.Core.Float
+import Autoform.Lang.Core.ClassHierarchy
 
 /-!
 # Core — a universal deep-embedded imperative language
@@ -831,6 +832,9 @@ structure Program where
   are represented in the owning function's `analysisBody`. -/
   auxiliaryFuncs : List Func := []
   dialect : Dialect := .python
+  /-- Qualified Python class namespaces and ordered bases recovered from source.
+  Empty for legacy models; missing metadata is not evidence of a missing attribute. -/
+  classDecls : List ClassDecl := []
   /-- Classes whose (single) base is a builtin type, by the **short** class name that
   `Expr.alloc` uses. Empty by default, so a program translated before the exporter
   learned to record bases behaves exactly as it did: opaque `Val.ref` instances.

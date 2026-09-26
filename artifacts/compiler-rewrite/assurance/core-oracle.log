@@ -1,0 +1,25 @@
+note: Autoform/Lang/Core/Syntax.lean — .olean mtime older than source (content hash may still match)
+note: Autoform/Lang/Core/Semantics.lean — .olean mtime older than source (content hash may still match)
+note: Autoform/Ledger.lean — .olean mtime older than source (content hash may still match)
+freshness: names OK — every one of ast-CompilerRewrite.json's 5 functions is present in the loaded .olean; hole counts AGREE (AST 0, module 0)
+ledger claims: 5 functions total, 5 hole-free, 5 VERIFIABLE CORE
+smoke gate: OK -- the harness elaborates and the interpreter answers.
+  ran 15/15 cases (2s)
+executed 15/15 cases; 0 got no answer from the interpreter
+
+╭─ core oracle ─ CompilerRewrite — the verifiable core, executed
+│ ledger's static claim   : 5 / 5 functions (100%) hole-free AND call-closed
+│ executed                : 15 cases over 5 claimed-core functions
+│ exercised at all        : 3 / 5 (60%) of the claimed core
+│   … with real (test-suite) inputs : 3
+├─ outcome ────────────────────────────────────────────────────
+│ NEVER HOLED (executed)  : 3 / 5 (60% of the claim survives)
+│ HOLED on some input     : 0   (of which 0 on a *real* input)
+│ INCONCLUSIVE (unrun)    : 2   — never exercised; not verified, not refuted
+├─ hole labels observed at runtime ────────────────────────────
+╰───────────────────────────────────────────────────────────────
+
+Read this as: of the 5 functions the ledger calls the verifiable core, execution could
+reach 60% of them, and 3 of those never holed over the inputs tried. No claimed-core function holed on any input tried — the claim survived, for the fraction that ran.
+
+`core-oracle.json` written to /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/core-oracle.json.

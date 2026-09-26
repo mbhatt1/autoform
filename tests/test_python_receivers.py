@@ -4,6 +4,7 @@ The native results record what still needs modelling; an explicit hole is not
 a conformance agreement. The kernel proofs establish that no arity check hides
 the unsupported receiver behind a plausible value or exception.
 """
+from conftest import exporter_source
 import importlib.util
 import itertools
 import json
@@ -14,7 +15,7 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import PROGRAM_CONTEXT, ROOT, numeric_env, run
 
 
 SOURCE = ROOT / 'examples/python_control/receivers.py'
@@ -33,7 +34,7 @@ GAP = 'call:python-receiver-signature'
 
 
 def test_receiver_source_signature_metadata():
-    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    script = exporter_source()
     decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
     result = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
                             input=SOURCE.read_text(), text=True, capture_output=True, timeout=30)
@@ -144,7 +145,7 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
         encoded += [f'.kwargE {json.dumps(key)} (.lit (.int ({value})))'
                     for key, value in keywords]
         args = '[' + ', '.join(encoded) + ']'
-        context = '{ table := program.table, dialect := .python }'
+        context = PROGRAM_CONTEXT
         calls.extend([
             f'(evalExpr {context} 512 [{{ cls := "Receiver", fields := [] }}] '
             f'[("receiver", .ref 0)] (.mcall (.name "receiver") {json.dumps(name)} {args})).2',
@@ -230,7 +231,8 @@ def test_source_python_receiver_gaps(tmp_path, numeric_env):
         match = ('| .hole label => label == ' + json.dumps(GAP)
                  if want.startswith('hole:') else
                  '| .exn (.str name) => name == "TypeError"'
-                 if want.startswith('exception:') else '| .val (.int value) => value == 2')
+                 if want.startswith('exception:') else
+                 '| .val (.int value) => value == ' + want.removeprefix('value:'))
         proofs += (f'example : (match {call} with\n'
                    f'  {match}\n'
                    '  | _ => false) = true := by\n'

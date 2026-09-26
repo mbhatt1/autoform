@@ -1,0 +1,44 @@
+{
+  "status": "VALIDATED_NOT_PROMOTED",
+  "revision": "7a51af4",
+  "scope": "Python native function state encoding only; all Lean source inputs unchanged from the full graph candidate under independent audit.",
+  "source_sha256": {
+    "scripts/native_heap.py": "1be448e9258a51febbd5953b1c208acf6f3d4f250c9c17a9df1b687bdd26d009",
+    "tests/test_native_heap.py": "555f6a2350b7fa1383bfe2bef446e30e583456700113bf51e30572d60ad25912",
+    "docs/native-heap-observations.md": "71d390ed1ad1d511fcf4c479a2a1d6712fffd573ccec470d832dd43c87b89408"
+  },
+  "changes": [
+    "Require canonical string/None metadata and exact empty default/attribute/annotation containers.",
+    "Refuse deferred annotation evaluators, generic type parameters and noncanonical code constants without executing metadata hooks.",
+    "Detect code replacement by identity and retain primitive metadata mutation checks."
+  ],
+  "checks": {
+    "focused": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-metadata-final",
+      "log": "function-metadata-focused1.log",
+      "log_sha256": "075d21b07cf08e20453ea7990f7ac3b30c2a50d9d2089e2b837215ec226df919",
+      "summary": "26 passed, 1 skipped, 7 deselected in 0.20s"
+    },
+    "python": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-metadata-final",
+      "log": "function-metadata-python1.log",
+      "log_sha256": "a380c0a95de2a3c2a69f3f1600497a595d7a3502724999bf640fee81d4a18424",
+      "summary": "877 passed, 64 skipped, 1 xfailed in 314.98s (0:05:14)"
+    },
+    "source": {
+      "status": "PASS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-metadata-final",
+      "log": "function-metadata-source1.log",
+      "log_sha256": "305bea3706e71e26bebd8a730369d12c51412163cf6bc5647ca6ea9badcc1e67",
+      "summary": "1 passed in 44.76s"
+    }
+  },
+  "limitations": [
+    "Python 3.14 deferred annotation regression is skipped on the installed Python 3.11 interpreter.",
+    "This correction does not establish hook-free handling of every arbitrary class or object in the base encoder.",
+    "Does not snapshot globals or mutable class namespaces."
+  ],
+  "post_validation_change": "Module docstring narrows its hook-safety claim to the function-state implementation; executable code unchanged."
+}

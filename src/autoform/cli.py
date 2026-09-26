@@ -207,6 +207,7 @@ _DISABLES = {
     'go': ('Go',), 'node': ('JavaScript', 'TypeScript'),
     'cc': ('C',), 'clang': ('C++', 'assembling .s inputs for the machine frontend'),
     'kotlinc': ('Kotlin — Joern bundles a Kotlin compiler, so this is only for the native oracle',),
+    'ld.lld': ('autoform regress --machine',),
     'pypcode': ('the machine-code frontend',), 'pyelftools': ('the machine-code frontend',),
     'macholib': ('the machine-code frontend',), 'pefile': ('the machine-code frontend',),
 }
@@ -243,6 +244,7 @@ def install_hint(name, lean_toolchain=None, joern_pin=None):
         'cc': 'xcode-select --install' if mac else 'sudo apt-get install -y build-essential' if linux else 'install a C compiler',
         'clang': 'xcode-select --install' if mac else 'sudo apt-get install -y clang' if linux else 'install clang',
         'kotlinc': 'brew install kotlin' if mac else 'sdk install kotlin  (SDKMAN) or your distribution package' if linux else 'install kotlinc',
+        'ld.lld': 'brew install lld' if mac else 'sudo apt-get install -y lld' if linux else 'install LLVM lld',
         'python': 'install Python 3.10 or newer and reinstall autoform-lean into it',
     }
     if name in ('pypcode', 'pyelftools', 'macholib', 'pefile'):
@@ -382,6 +384,10 @@ def doctor_report(env):
     for name in ('java', 'javac', 'go', 'node', 'cc', 'clang', 'kotlinc'):
         found = shutil.which(name, path=env['PATH'])
         record(name, found, note=None if found else 'only needed for that source language')
+    # Optional: `regress --machine` links each commit's objects with LLVM's ELF linker.
+    lld = shutil.which('ld.lld', path=env['PATH']) or next(
+        (p for p in ('/opt/homebrew/bin/ld.lld', '/usr/local/opt/lld/bin/ld.lld') if Path(p).is_file()), None)
+    record('ld.lld', lld, note=None if lld else 'only needed for autoform regress --machine')
 
     # Optional: the machine-code frontend, pinned in pyproject's [machine] extra.
     for dist, pin in (('pypcode', '3.3.3'), ('pyelftools', '0.33'),
@@ -482,15 +488,116 @@ def discard_checkout(repository, keep=False):
     shutil.rmtree(Path(checkout).parent, ignore_errors=True)
 
 
+def _discard_previous_report(report, module):
+    for name in ('run.json', 'summary.md', 'guarantee.json', 'guarantee.md',
+                 'pipeline.json', 'conformance.json', 'specs.json', 'audit.json',
+                 'core-oracle.json', 'mutation.json', 'ledger.json', 'frontend.json',
+                 'context.json', 'native-build.json', 'formalization-graph.json',
+                 'assurance.md', f'ast-{module}.json', f'ledger-{module}.json',
+                 'properties.json', 'security-claims.json', 'security-mutation.json',
+                 'security-audit.json', 'security.json', 'security.md',
+                 'inventory.json', 'inventory-after.json', 'source-coverage.json', 'selection.json',
+                 'repository-summary.json', 'repository.json', 'checkout.log',
+                 f'sacm-{module}.json', f'contracts-{module}.json'):
+        (report / name).unlink(missing_ok=True)
+
+
+def _regress(args, workspace, report, env):
+    """Run `autoform.sh` at two commits of one repository and compare the proofs.
+
+    Each run writes the ordinary report under `artifacts/pipeline/<Module>/`; it is
+    copied to `artifacts/regression/<Module>/{base,head}/` before the next run
+    overwrites it, and `scripts/regression.py compare` diffs the two copies. The
+    comparison is by recorded facts (holes, theorems, runtime cases), never by
+    source text, so the same module name is used for both commits on purpose:
+    theorem identifiers are per function and must line up across the runs.
+    """
+    source = args.source
+    if not is_git_url(source):
+        local = Path(source)
+        if local.is_dir() and (local / '.git').exists():
+            source = local.resolve().as_uri()
+        else:
+            raise ValueError('regress compares two commits, so the source must be a Git URL '
+                             'or a local checkout with a .git directory')
+    out = workspace / 'artifacts/regression' / args.module
+    out.mkdir(parents=True, exist_ok=True)
+    if args.machine:
+        return _regress_machine(args, workspace, source, out, env)
+    runs = {}
+    for label, ref in (('base', args.base), ('head', args.head)):
+        _discard_previous_report(report, args.module)
+        print(f'==> {label}: {ref or "HEAD"}', flush=True)
+        repository = None
+        try:
+            checkout, repository = resolve_source(source, workspace, args.module,
+                                                  ref=ref, subdir=args.subdir)
+            code = _run_command(['bash', str(workspace / 'autoform.sh'), str(checkout), args.module],
+                                env=env, timeout=args.timeout)
+        finally:
+            discard_checkout(repository, keep=args.keep_checkout)
+        copy = out / label
+        shutil.rmtree(copy, ignore_errors=True)
+        shutil.copytree(report, copy, ignore=shutil.ignore_patterns('.run.lock'))
+        runs[label] = dict(ref=ref, commit=(repository or {}).get('commit'), exit_code=code)
+        if code >= 128:
+            return code  # interrupted or timed out: nothing to compare yet
+    (out / 'runs.json').write_text(json.dumps(runs, indent=2) + '\n')
+    result = subprocess.run([sys.executable, str(workspace / 'scripts/regression.py'), 'compare',
+                             str(out / 'base'), str(out / 'head'), '--module', args.module,
+                             '--out', str(out / 'regression.json'),
+                             '--markdown', str(out / 'regression.md')], env=env)
+    if result.returncode == 2:
+        # A run that never reached translation leaves nothing to compare; say which.
+        for label in ('base', 'head'):
+            if runs[label]['exit_code'] != 0:
+                print(f"autoform: the {label} run ({runs[label]['ref'] or 'HEAD'}) exited "
+                      f"{runs[label]['exit_code']}; see {out / label / 'pipeline.json'}", file=sys.stderr)
+        return 1
+    print(f'regression report: {out / "regression.md"}')
+    return result.returncode
+
+
+def _regress_machine(args, workspace, source, out, env):
+    """Check out both commits, then let `scripts/machine_regress.py` compare them."""
+    trees, records = {}, {}
+    try:
+        for label, ref in (('base', args.base), ('head', args.head)):
+            print(f'==> {label}: {ref or "HEAD"}', flush=True)
+            tree, record = resolve_source(source, workspace, args.module, ref=ref, subdir=args.subdir)
+            trees[label], records[label] = tree, record
+        command = [sys.executable, str(workspace / 'scripts/machine_regress.py'),
+                   str(trees['base']), str(trees['head']), '--target', args.target,
+                   '--out', str(out / 'machine'),
+                   '--base-label', records['base'].get('commit') or str(args.base),
+                   '--head-label', records['head'].get('commit') or str(args.head or 'HEAD')]
+        command += [arg for name in args.files for arg in ('--file', name)]
+        command += [arg for name in args.functions for arg in ('--function', name)]
+        code = _run_command(command, env=env, timeout=args.timeout)
+        (out / 'runs.json').write_text(json.dumps(
+            {label: dict(ref=getattr(args, label), commit=records[label].get('commit'))
+             for label in records}, indent=2) + '\n')
+        if code in (0, 1):
+            print(f'regression report: {out / "machine" / "regression.md"}')
+        return code
+    finally:
+        for record in records.values():
+            discard_checkout(record, keep=args.keep_checkout)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Formalize source or machine code and check it with Lean.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=("A Git URL alone runs the full workflow: "
-                "autoform https://host/owner/repo.git [Module] [--ref REF] [--subdir PATH]\n\n"
+                "autoform https://host/owner/repo.git [Module] [--ref REF] [--subdir PATH]\n"
+                "Two commits of one repository are compared by what can be proven about each: "
+                "autoform regress <repo> [Module] --base REF [--head REF]\n\n"
                 "exit codes (docs/running.md §7):\n"
-                "  0      completed; for `assure`, every required check passed\n"
-                "  1      a stage failed, or `assure` finished with unresolved verification gaps\n"
+                "  0      completed; for `assure`, every required check passed; for `regress`,\n"
+                "         nothing that held at --base is lost at --head\n"
+                "  1      a stage failed, `assure` finished with unresolved verification gaps, or\n"
+                "         `regress` found a regression or a proven behavior change\n"
                 "  2      invocation, setup or orchestration failure: bad module name, missing\n"
                 "         Joern, busy workspace, unreadable package, or a refused dirty tree\n"
                 "  128+N  interrupted by signal N; `--timeout` expiry is 143 (SIGTERM)\n"
@@ -526,6 +633,28 @@ def main(argv=None):
                                  help="maximum seconds for each assurance stage (default: 7200)")
             command.add_argument("--properties", type=Path,
                                  help="independent Lean security properties (default: autoform.properties.json in selected source directory)")
+    regress = sub.add_parser("regress",
+                             help="run the pipeline at two commits and report what could be proven "
+                                  "at --base but not at --head")
+    regress.add_argument("source", help="Git URL, or a local checkout with a .git directory")
+    regress.add_argument("module", nargs="?", default="Translated")
+    regress.add_argument("--base", required=True, help="the earlier branch, tag or commit")
+    regress.add_argument("--head", help="the later branch, tag or commit (default: the repository's HEAD)")
+    regress.add_argument("--subdir", help="directory inside the checkout to analyze at both commits")
+    regress.add_argument("--timeout", type=float,
+                         help="wall-clock limit in seconds for EACH of the two pipeline runs")
+    regress.add_argument("--keep-checkout", action="store_true",
+                         help="keep both cloned trees under <workspace>/sources after the run")
+    regress.add_argument("--machine", action="store_true",
+                         help="compare compiled machine code instead of running the source pipeline: "
+                              "search for inputs where the two commits' functions return different "
+                              "values and kernel-check each on the SLEIGH-lifted code")
+    regress.add_argument("--files", nargs="+", default=[],
+                         help="with --machine: source files (relative to --subdir) compiled at both commits")
+    regress.add_argument("--functions", nargs="+", default=[],
+                         help="with --machine: functions to compare (default: those whose code changed)")
+    regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
+                         help="with --machine: the Linux target to compile for (default: aarch64)")
     machine = sub.add_parser("machine", add_help=False, help="binary/assembly frontend (machine --help for options)")
     machine.add_argument("args", nargs=argparse.REMAINDER)
     # Let the machine frontend own its flags, including --help and --list-languages.
@@ -546,9 +675,13 @@ def main(argv=None):
         args.args = unknown + args.args
     elif unknown:
         parser.error("unrecognized arguments: " + " ".join(unknown))
+    if args.command == 'regress' and args.machine and not args.files:
+        parser.error('--machine needs --files: the source files to compile at both commits')
+    if args.command == 'regress' and not args.machine and (args.files or args.functions):
+        parser.error('--files and --functions apply only with --machine')
     if args.command == 'assure' and (not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0):
         parser.error('--stage-timeout must be a finite positive number')
-    if args.command == 'source' and args.timeout is not None and (
+    if args.command in ('source', 'regress') and args.timeout is not None and (
             not math.isfinite(args.timeout) or args.timeout <= 0):
         parser.error('--timeout must be a finite positive number')
     env = environment()
@@ -586,6 +719,8 @@ def main(argv=None):
                 fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 raise ValueError('a run for this workspace and module is already in progress') from exc
+            if args.command == 'regress':
+                return _regress(args, workspace, report, env)
             property_input, property_error, property_path = None, None, None
             if args.command == 'assure' and args.properties is not None:
                 try:
@@ -596,17 +731,7 @@ def main(argv=None):
                     property_error = str(exc)
             # Acquisition can fail before the pipeline starts. Never leave a prior
             # proof verdict at the output path for this new invocation.
-            for name in ('run.json', 'summary.md', 'guarantee.json', 'guarantee.md',
-                         'pipeline.json', 'conformance.json', 'specs.json', 'audit.json',
-                         'core-oracle.json', 'mutation.json', 'ledger.json', 'frontend.json',
-                         'context.json', 'native-build.json', 'formalization-graph.json',
-                         'assurance.md', f'ast-{args.module}.json', f'ledger-{args.module}.json',
-                         'properties.json', 'security-claims.json', 'security-mutation.json',
-                         'security-audit.json', 'security.json', 'security.md',
-                         'inventory.json', 'inventory-after.json', 'source-coverage.json', 'selection.json',
-                         'repository-summary.json',
-                         f'sacm-{args.module}.json', f'contracts-{args.module}.json'):
-                (report / name).unlink(missing_ok=True)
+            _discard_previous_report(report, args.module)
             if property_error:
                 (report / 'run.json').write_text(json.dumps(dict(module=args.module,
                     execution_status='property_input_failed', verification_complete=False,

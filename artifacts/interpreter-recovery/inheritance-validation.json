@@ -1,0 +1,183 @@
+{
+  "status": "VALIDATED_INCLUDED_IN_INTEGRATION",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/inheritance-development",
+  "main_revision": "d8aec57",
+  "scope": "Qualified class declarations, C3 lookup, descriptor selection, inherited classmethod receivers, constructor and property-write checks. Based on audited class-attribute main revision d8aec57.",
+  "source_sha256": {
+    "Autoform/Lang/Core/ClassHierarchy.lean": "90974a4db0b73061e58d18a7ae72c25f39b72e5e3ba1de30b5929358d212a0b7",
+    "Autoform/Lang/Core/Semantics.lean": "a60d74997053dca2f7f9708ba0042234badf2c8d62917cf06f12b6ac61c4aa87",
+    "Autoform/Lang/Core/Syntax.lean": "0d3fd9b0b8abee244a15d1c67e23b72df21e6473c012864d33a4796465512c28",
+    "Autoform/Lang/Core/ExcSafe.lean": "e098f5fc7a235d17b5317930b375cf1afe6eb548bd952381af02377600e5b953",
+    "Autoform/FuelMono.lean": "6d501d4821dee784bf45d0fab5c1d907569c3d466f82e0ad52a796b9a06bc621",
+    "Autoform/Refine.lean": "a1c59d92e8706dfd26cca2fd03e095f91c83ee95e06a01f1a9911e2387c43444",
+    "Autoform/Contracts.lean": "de87e1bb19cb70763c9b0f81494ec4b31a45e24a22a4d6aaef1375472f96bf82",
+    "Autoform/SpecsGen/Basis.lean": "9ca5c84fb001d785663f0208da7be1606f10720b8787f233c06d72166e2fdb68",
+    "cartographer/export_ast.sc": "e99199f3a988ffa0e36a6ff4cd96679b82924532270e1ef7c2f4b47aa4b5e7c5",
+    "cartographer/render_lean.py": "446524cea5b1d54daf0615b97930fee421d68696d63237c485616705efea6c56",
+    "scripts/core_oracle.py": "445b9d8c890a783110218759531c78656d4219be6eae75a4a57ab502fd819b9c",
+    "scripts/differential.py": "c635166912315aaa71dc298232b061ada05842174e3ecaa53940422b57799ff0",
+    "scripts/synth_specs.py": "a3842e6bbe5dde5d84c7f9c34508199349114cf637183d5d724ae0e29ea82533",
+    "examples/python_control/inheritance.py": "49bf46552359e499f2288ff56f9b7af490437eb28e0b699aabeb0a6e010552f7",
+    "tests/test_source_inheritance.py": "784ea232f2e905ac5f704a693d356113567c2511a5a8b18d1be09618470aefa0",
+    "Autoform/Specs/CachetoolsSpec.lean": "a0c071eede7a6a84a44c4daa68e076344ba061aaaec9fbb80003589e503be59e",
+    "tests/test_python_signatures.py": "aebce76ae7c754c6339750417f59626fe79ec6de5f0a9c6797a4dff1ab5b150f",
+    "tests/test_python_class_identities.py": "02325a93d2a17b59dab81b8c153bf99f32b0c45967244e04169d75ae33c1e2b7"
+  },
+  "checks": {
+    "source": {
+      "status": "PASS",
+      "log": "inheritance-source2.log",
+      "summary": "2 passed in 94.90s: eleven CPython comparisons and kernel observations, nine kernel hierarchy boundary checks",
+      "latest_recheck": {
+        "status": "PASS",
+        "log": "inheritance-source4.log",
+        "summary": "2 passed in 95.60s; eleven CPython comparisons and kernel observations, nine hierarchy boundary checks"
+      }
+    },
+    "semantics_and_fuel_monotonicity": {
+      "status": "PASS",
+      "log": "inheritance-runtime-build3.log"
+    },
+    "runtime": {
+      "status": "PASS",
+      "log": "inheritance-runtime-build5.log",
+      "note": "Runtime passed; this invocation also failed the earlier exception-safety proof, subsequently repaired."
+    },
+    "exception_safety": {
+      "status": "PASS",
+      "log": "inheritance-excsafe-build6.log",
+      "summary": "56 jobs; standard axioms only in printed theorem dependencies"
+    },
+    "source_regressions": {
+      "status": "PASS",
+      "log": "inheritance-source-regressions1.log",
+      "summary": "6 passed in 193.78s; prior to additional metadata barriers and native identity encoding",
+      "latest_recheck": {
+        "status": "PASS",
+        "log": "inheritance-source-regressions2.log",
+        "summary": "8 passed in 286.90s after allocation-qualification changes; includes source/native/kernel inheritance, class-attribute, object-lookup and bound-call probes"
+      }
+    },
+    "full_build": {
+      "status": "PASS",
+      "log": "inheritance-full-build3.log",
+      "previous": [
+        "inheritance-full-build1.log",
+        "inheritance-full-build2.log"
+      ],
+      "note": "Earlier builds were stopped after proven default-tactic failures; the final tactic passed targeted generated-proof regression compilation.",
+      "summary": "Build completed successfully: 479 jobs."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "inheritance-full-pytest2.log",
+      "summary": "821 passed, 59 skipped, 1 xfailed in 315.30s",
+      "note": "Predates the final allocation-qualification adjustment, which passed the eight source regression tests."
+    },
+    "fresh_audit": {
+      "status": "PASS",
+      "log": "inheritance-audit.log",
+      "report": "artifacts/interpreter-recovery/inheritance-audit.json",
+      "snapshot": "STABLE",
+      "kernel": "VERIFIED",
+      "declarations": 7365
+    },
+    "focused": {
+      "status": "PASS",
+      "log": "inheritance-focused2.log",
+      "summary": "170 passed, 2 skipped; includes rebinding and decorated special-method boundaries"
+    },
+    "qualified_native_encoding": {
+      "status": "PASS",
+      "log": "inheritance-encoder1.log",
+      "summary": "10 passed, 3 skipped; qualified class identity, duplicate rejection, preserved aliasing, unsupported captured/builtin-subclass state and deadline/backend regressions"
+    },
+    "proof_regressions": {
+      "status": "PASS",
+      "log": "inheritance-proof-regressions3.log",
+      "summary": "64 jobs: generated V8 accessor defaults and existing Cachetools functional specifications"
+    },
+    "pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/inheritance-validation",
+      "revision": "6f0e25e",
+      "log": "inheritance-pipeline2.log",
+      "report": "artifacts/pipeline/InheritanceRecovery/run.json",
+      "first_attempt": "Refused because generic SpecsGen/Basis was dirty; the isolated candidate was committed, without bypassing the integrity guard, and the pipeline restarted.",
+      "intermediate": {
+        "source": "PASS",
+        "core_oracle": "PASS",
+        "conformance": {
+          "attempted": 85,
+          "agree": 85,
+          "diverge": 0,
+          "inconclusive": 0,
+          "basis": "python-class-identities-v5"
+        },
+        "proved": 17,
+        "open": 0,
+        "later_stages": "running"
+      },
+      "execution_status": "completed_with_gaps",
+      "stage_exit_codes": {
+        "source": 0,
+        "core-oracle": 0,
+        "mutation": 1,
+        "restore-build": 0,
+        "audit": 0,
+        "contracts": 0,
+        "assurance": 1
+      },
+      "comparisons": 85,
+      "divergences": 0,
+      "proved": 17,
+      "open_obligations": 0,
+      "holes": 0,
+      "audit_pass": true,
+      "mutation": {
+        "tested": 34,
+        "killed": 26,
+        "survived": 8
+      },
+      "coverage": {
+        "exercised": 17,
+        "exported": 22
+      }
+    },
+    "candidate_consistency": {
+      "status": "PASS",
+      "files": 19,
+      "revision": "6f0e25e",
+      "summary": "All nineteen inheritance source inputs match the frozen pipeline candidate byte for byte."
+    }
+  },
+  "remaining_review": [
+    "Allocation qualification skips class namespaces during method lexical lookup and refuses unresolved source identities. Source regressions pass; nested-class value reads and dynamic constructor callees remain gaps.",
+    "Qualified native identity encoding is now implemented with measurement basis python-class-identities-v5; validate its propagation through a fresh packaged pipeline.",
+    "Native class namespace mutation, closure state, and global snapshots still need broader faithful models.",
+    "Imported bases, custom metaclasses, local base captures, slots, descriptor objects and custom allocation remain explicit gaps.",
+    "The full arbitrary-codebase goal still requires fresh corpus re-lands, comparison thresholds, proof coverage and all integrity gates.",
+    "Mutation evidence includes constructors whose observation only pins None, not receiver post-state. The native oracle and generated conformance law need heap-effect observations; do not waive these surviving mutations."
+  ],
+  "resolved_validation_failures": [
+    "Renamed Lean keyword identifiers in the new hierarchy module.",
+    "Moved classDeclarations after exportName to avoid Scala forward references.",
+    "Adapted field/construction refinement and contract evaluation proofs without changing concrete claims.",
+    "Handled the constructor initializer conditional in exception-safety induction.",
+    "Updated expected sentinel metadata and retained the existing constructor-proof notation.",
+    "Guarded Python 3.10 pattern-node attributes for the system Python 3.9 metadata subprocess.",
+    "Accessor metadata defaults now eliminate false = true with cases hm; targeted generated-proof regression compilation passed."
+  ],
+  "research": [
+    {
+      "url": "https://docs.python.org/3.11/library/collections.abc.html",
+      "finding": "MutableMapping supplies inherited mixin methods and requires concrete abstract operations. External base support must preserve both sets."
+    },
+    {
+      "url": "https://docs.python.org/3.11/library/abc.html",
+      "finding": "ABCMeta prevents abstract classes from being instantiated; virtual registration changes subclass tests without adding an MRO namespace. An external-base model cannot just pretend the base is object."
+    }
+  ],
+  "live_jobs": {},
+  "integration": "Integrated validation and source promotion are recorded in integration-validation.json; later integrated runtime/tooling fixes supersede the intermediate candidate basis."
+}

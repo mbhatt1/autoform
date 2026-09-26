@@ -5,6 +5,12 @@ Every resume runs the same fuel-bounded, kernel-reducible Core semantics as othe
 The source body remains available for coverage analysis; frame helper functions are
 auxiliary definitions, excluded from the population of source functions.
 """
+if __package__:
+    from .ast_tools import rewrite_json, walk
+else:
+    from ast_tools import rewrite_json, walk
+
+
 def node(kind, **fields):
     return {"k": kind, **fields}
 
@@ -45,37 +51,9 @@ def raise_class(value):
                                a=node("tupleE", items=[])))
 
 
-def walk(value):
-    pending = [value]
-    while pending:
-        current = pending.pop()
-        if isinstance(current, dict):
-            yield current
-            pending.extend(current.values())
-        elif isinstance(current, list):
-            pending.extend(current)
-
-
 def transform(value, rewrite):
     """Postorder JSON rewrite without using the Python stack for long seq chains."""
-    root = [None]
-    pending = [(value, root, 0, False)]
-    while pending:
-        current, parent, key, done = pending.pop()
-        if done:
-            parent[key] = rewrite(parent[key])
-        elif isinstance(current, dict):
-            copied = {}
-            parent[key] = copied
-            pending.append((None, parent, key, True))
-            pending.extend((item, copied, name, False) for name, item in reversed(list(current.items())))
-        elif isinstance(current, list):
-            copied = [None] * len(current)
-            parent[key] = copied
-            pending.extend((item, copied, i, False) for i, item in reversed(list(enumerate(current))))
-        else:
-            parent[key] = current
-    return root[0]
+    return rewrite_json(value, lambda original, copied: rewrite(copied))
 
 
 class UnsupportedGenerator(ValueError):

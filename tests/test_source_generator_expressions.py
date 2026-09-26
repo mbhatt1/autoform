@@ -7,7 +7,8 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import (SOURCE_RUNTIME, SOURCE_STATE_OUTPUT, ROOT,
+                                 numeric_env, run, stage_source_initial_state)
 from test_python_signatures import _decode
 
 sys.path.insert(0, str(ROOT / "cartographer"))
@@ -26,28 +27,30 @@ CASES = ["stored", "first_iterator", "deferred_failure", "creation_failure", "ne
 # No native result or proposed budget is trusted: both termination and the result
 # at fuel 64 must first pass kernel computation.
 PROOF_SUPPORT = '''
-private theorem runFuncFuelMono {p : Program} {k k' : Nat} {entry : String} {args : List Val}
-    (hk : k ≤ k') (hne : runFunc p k entry args ≠ .outOfFuel) :
-    runFunc p k' entry args = runFunc p k entry args := by
-  unfold runFunc at hne ⊢
-  generalize hc : ({ dialect := p.dialect, table := p.table, builtinBases := p.builtinBases, properties := p.properties, excClasses := p.excClasses } : Ctx) = ctx at hne ⊢
+private theorem runSourceFuelMono {p : Program} {initial : Heap × Ref}
+    {k k' : Nat} {entry : String} {args : List Val}
+    (hk : k ≤ k') (hne : runSource p initial k entry args ≠ .outOfFuel) :
+    runSource p initial k' entry args = runSource p initial k entry args := by
+  unfold runSource at hne ⊢
+  generalize hc : ({ dialect := p.dialect, table := p.table, globals := initial.2, builtinBases := p.builtinBases, properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls } : Ctx) = ctx at hne ⊢
   cases hf : ctx.resolve entry with
   | none => simp only [hf]
   | some fn =>
     simp only [hf] at hne ⊢
-    rcases he : applyFunc ctx k [] fn none args [] with ⟨heap, result⟩
+    rcases he : applyFunc ctx k initial.1 fn none args [] with ⟨heap, result⟩
     have ready : result ≠ .outOfFuel := by simpa only [he] using hne
     rw [applyFunc_fuel_mono_all hk he ready]
 
-private theorem observationFuelMono {p : Program} {k k' : Nat} {entry : String} {args : List Val}
+private theorem observationFuelMono {p : Program} {initial : Heap × Ref}
+    {k k' : Nat} {entry : String} {args : List Val}
     {check : EResult → Bool} (hk : k ≤ k') (rejectsFuel : check .outOfFuel = false)
-    (small : check (runFunc p k entry args) = true) :
-    check (runFunc p k' entry args) = true := by
-  have ready : runFunc p k entry args ≠ .outOfFuel := by
+    (small : check (runSource p initial k entry args) = true) :
+    check (runSource p initial k' entry args) = true := by
+  have ready : runSource p initial k entry args ≠ .outOfFuel := by
     intro exhausted
     rw [exhausted, rejectsFuel] at small
     contradiction
-  rw [runFuncFuelMono hk ready]
+  rw [runSourceFuelMono hk ready]
   exact small
 '''
 
@@ -55,7 +58,8 @@ private theorem observationFuelMono {p : Program} {k k' : Nat} {entry : String} 
 def observation_proof(call, check):
     _, entry, arguments = call.split('"', 2)
     return (f"example : ({check}) ({call}) = true := by\n"
-            f"  exact observationFuelMono (p := program) (entry := {json.dumps(entry)}) "
+            "  rw [initialGlobals_correct]\n"
+            f"  exact observationFuelMono (p := program) (initial := initialGlobalsLiteral) (entry := {json.dumps(entry)}) "
             f"(args := {arguments.strip()}) (check := {check}) "
             "(k := 64) (k' := 500) (by decide) (by rfl) (by decide +kernel)\n")
 
@@ -148,6 +152,8 @@ def test_generator_expressions_source(tmp_path, numeric_env):
     if not os.environ.get("AUTOFORM_TEST_JOERN"):
         pytest.skip("set AUTOFORM_TEST_JOERN=1 for actual source generator expressions")
     joern = Path(os.environ.get("JOERN_HOME", Path.home() / "joern"))
+    if (joern / "joern-cli").is_dir():
+        joern /= "joern-cli"
     source = ROOT / "examples/python_control/generator_expressions.py"
     spec = importlib.util.spec_from_file_location("genexpr_probes", source)
     probes = importlib.util.module_from_spec(spec)
@@ -167,16 +173,21 @@ def test_generator_expressions_source(tmp_path, numeric_env):
     run([sys.executable, ROOT / "cartographer/render_lean.py", tmp_path / "ast.json", model, "GenExpr"],
         ROOT, numeric_env)
     header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.GenExpr\n"
-    calls = [f'runFunc program 500 "generator_expressions.py:<module>.{name}" [.int 2]' for name in CASES]
+    header += SOURCE_RUNTIME
+    calls = [f'runSource program initialGlobals 500 "generator_expressions.py:<module>.{name}" [.int 2]' for name in CASES]
     driver = header + "def main : IO Unit := do\n"
     for name, call in zip(CASES, calls):
         driver += f'''  match {call} with
   | .val (.int n) => IO.println n
   | other => throw (IO.userError ({json.dumps(name + ': ')} ++ reprStr other))
 '''
+    # Native evaluation proposes a reusable initial state. The equality below is
+    # checked by the kernel before that proposal can support any observation.
+    driver += SOURCE_STATE_OUTPUT
     (tmp_path / "Check.lean").write_text(driver)
     observed = run(["lake", "env", "lean", "--run", tmp_path / "Check.lean"], ROOT, numeric_env, timeout=600)
-    assert [int(value) for value in observed.splitlines()] == expected
+    header, lines = stage_source_initial_state(header, observed)
+    assert [int(value) for value in lines] == expected
     proofs = ""
     for call, result in zip(calls, expected):
         proofs += observation_proof(call,
@@ -186,7 +197,7 @@ def test_generator_expressions_source(tmp_path, numeric_env):
                         ("floating_sum", "iterator:sum-type"),
                         ("nested_range", "call:range")]:
         proofs += observation_proof(
-            f'runFunc program 500 "generator_expressions.py:<module>.{name}" [.int 2]',
+            f'runSource program initialGlobals 500 "generator_expressions.py:<module>.{name}" [.int 2]',
             f'fun result => match result with | .hole {json.dumps(label)} => true | _ => false')
     (tmp_path / "Proofs.lean").write_text("import Autoform.FuelMono\n" + header + PROOF_SUPPORT + proofs)
     run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env, timeout=900)

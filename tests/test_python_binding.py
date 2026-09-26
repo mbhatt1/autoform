@@ -9,7 +9,7 @@ import sys
 import pytest
 
 from test_python_raises import lean_value
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import PROGRAM_CONTEXT, ROOT, numeric_env, run
 
 
 SOURCE = ROOT / 'examples/python_control/binding.py'
@@ -55,7 +55,7 @@ def test_source_python_binding(tmp_path, numeric_env):
         cases.append(dict(subject=name, arguments=args, keywords=kws, native=outcome))
         encoded = [f'.lit (.int ({v}))' for v in args]
         encoded += [f'.kwargE {json.dumps(k)} (.lit (.int ({v})))' for k, v in kws]
-        calls.append('(evalExpr { table := program.table, dialect := .python } 512 [] [] '
+        calls.append(f'(evalExpr {PROGRAM_CONTEXT} 512 [] [] '
                      f'(.call "binding.py:<module>.{name}" [{", ".join(encoded)}])).2')
         expected.append(result)
     header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.Binding\n'

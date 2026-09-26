@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import SOURCE_RUNTIME, ROOT, numeric_env, run
 
 
 SUBJECTS = ('any_generator', 'all_generator', 'any_nested', 'all_nested', 'list_objects',
@@ -55,7 +55,8 @@ def test_truth_consumers_source(tmp_path, numeric_env):
     run([sys.executable, ROOT / 'cartographer/render_lean.py', tmp_path / 'ast.json', model, 'TruthConsumers'],
         ROOT, numeric_env)
     header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.TruthConsumers\n'
-    calls = [f'runFunc program 200 "truth_consumers.py:<module>.{name}" [.int 2]' for name in SUBJECTS]
+    header += SOURCE_RUNTIME
+    calls = [f'runSource program initialGlobals 200 "truth_consumers.py:<module>.{name}" [.int 2]' for name in SUBJECTS]
     driver = header + 'def main : IO Unit := do\n'
     for name, call in zip(SUBJECTS, calls):
         driver += f'''  match {call} with
@@ -71,7 +72,7 @@ def test_truth_consumers_source(tmp_path, numeric_env):
                    '| _ => false) = true := by decide +kernel\n')
     for name, label in [('unknown_truth', 'truth:unresolved-protocol'),
                         ('platform_length', 'truth:length-platform')]:
-        proofs += (f'example : (match runFunc program 200 "truth_consumers.py:<module>.{name}" [.int 2] '
+        proofs += (f'example : (match runSource program initialGlobals 200 "truth_consumers.py:<module>.{name}" [.int 2] '
                    f'with | .hole {json.dumps(label)} => true | _ => false) = true := by decide +kernel\n')
     (tmp_path / 'Proofs.lean').write_text(proofs)
     run(['lake', 'env', 'lean', tmp_path / 'Proofs.lean'], ROOT, numeric_env, timeout=1200)

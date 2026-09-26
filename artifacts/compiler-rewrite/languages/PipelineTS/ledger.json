@@ -1,0 +1,12 @@
+{"verifiableCore": 4,
+ "nodes": 19,
+ "module": "PipelineTS",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 4,
+ "functions": 4,
+ "dynamicHoleRisk": 2,
+ "dialect": "javascript",
+ "contractsUsed": [],
+ "closedByTranslation": 4,
+ "closedByContract": 0}

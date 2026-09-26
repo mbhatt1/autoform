@@ -1,0 +1,2 @@
+provenance: cannot record — no Joern at /Users/mbhatt/joern/joern-cli/joern-cli/lib (JOERN_HOME=/Users/mbhatt/joern/joern-cli, default ~/joern). See docs/running.md; note that joern-install.sh can exit 0 having installed nothing.
+provenance: recording an artifact without knowing which Joern made it is the gap this tool closes; refusing.

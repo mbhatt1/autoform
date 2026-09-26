@@ -155,6 +155,14 @@ class NativeLibrary:
         self.functions.update(loaded)
 
 
+def _link_failure(diagnostics):
+    """The unit compiled; only undefined external symbols stopped the link."""
+    return (' error:' not in diagnostics.replace('clang: error: linker', '')
+            .replace('collect2: error: ld', '')
+            and ('linker command failed' in diagnostics or 'undefined reference' in diagnostics
+                 or 'Undefined symbols' in diagnostics or 'ld returned' in diagnostics))
+
+
 def compile_sources(source, funcs, work):
     source, work = Path(source).resolve(), Path(work)
     work.mkdir(parents=True, exist_ok=True)
@@ -219,21 +227,27 @@ def compile_sources(source, funcs, work):
     arch = ['-arch', platform.machine()] if sys.platform == 'darwin' else []
     suffix = '.dylib' if sys.platform == 'darwin' else '.so'
 
-    def build(selected, label):
+    def build(selected, label, partners=()):
         output, deps = work / (label + suffix), work / (label + '.d')
         compiler = 'c++' if any(u.suffix == '.cpp' for u, _, _ in selected) else 'cc'
         inputs = [arg for u, _, _ in selected for arg in
                   ('-x', 'c++' if u.suffix == '.cpp' else 'c', str(u))]
+        # Link partners are sibling sources compiled in unchanged, without wrappers:
+        # they supply definitions, not entry points.
+        inputs += [arg for p in partners for arg in
+                   ('-x', 'c++' if p.suffix != '.c' else 'c', str(p))]
         command = [compiler, '-shared', '-fPIC', '-O0', *arch, *flags,
                    '-MMD', '-MF', str(deps), '-MT', 'autoform', '-o', str(output),
                    *inputs]
         record = dict(files=[str(p.relative_to(source)) for _, p, _ in selected], command=command)
+        if partners:
+            record['link_partners'] = [str(p.relative_to(source)) for p in partners]
         try:
             proc = subprocess.run(command, capture_output=True, text=True, timeout=60)
             record.update(exit_code=proc.returncode, diagnostics=proc.stdout + proc.stderr)
             if proc.returncode:
                 return False, record
-            if len(selected) > 1:
+            if len(selected) + len(partners) > 1:
                 # A shared -MF is overwritten by each translation unit. Ask for
                 # the union before accepting evidence from the combined library.
                 dep = subprocess.run([compiler, *arch, *flags, '-MM', '-MT', 'autoform', *inputs],
@@ -267,14 +281,32 @@ def compile_sources(source, funcs, work):
         if ok:
             result.info.update(files_compiled=len(units), entry_points=len(result.functions), status='available')
             return result
+    compiled, link_failed = [], []
     for index, unit in enumerate(units):
         ok, record = build([unit], 'library%d' % index)
         result.info['units'].append(record)
         if ok:
             result.info['files_compiled'] += 1
+            compiled.append(unit[1])
+        elif record.get('exit_code') and _link_failure(record.get('diagnostics', '')):
+            link_failed.append((index, unit))
         else:
             for f, _ in unit[2]:
                 result.skipped[f['name']] = 'translation unit compile/load failed: ' + str(unit[1].relative_to(source))
+    # A kernel unit that compiled but did not link calls into a sibling file
+    # (`lcm` -> `gcd`). Retry it with the siblings that built on their own, which
+    # are exactly the definitions this portability build can already stand behind.
+    for index, unit in link_failed:
+        partners = [p for p in compiled if p != unit[1]]
+        ok, record = build([unit], 'linked%d' % index, partners) if partners else (False, None)
+        if record is not None:
+            result.info['units'].append(record)
+        if ok:
+            result.info['files_compiled'] += 1
+        else:
+            for f, _ in unit[2]:
+                result.skipped[f['name']] = ('translation unit link failed: ' +
+                                             str(unit[1].relative_to(source)))
     result.info['entry_points'] = len(result.functions)
     result.info['status'] = ('available' if result.functions else 'unsupported: no translation unit could be executed')
     return result

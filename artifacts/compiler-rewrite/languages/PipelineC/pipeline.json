@@ -1,0 +1,8 @@
+{
+  "module": "PipelineC",
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/c",
+  "stage": "complete",
+  "exit_code": 0,
+  "status": "passed",
+  "finished_at": "2026-09-24T07:23:13.627853+00:00"
+}

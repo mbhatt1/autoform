@@ -1,5 +1,6 @@
 import Autoform.Refine
 import Autoform.FuelMono
+import Autoform.Lang.Core.Observation
 
 /-!
 # `SpecsGen.Basis` — the hand-written substrate the synthesized specifications stand on
@@ -92,10 +93,58 @@ def EResult.beq : EResult → EResult → Bool
   | .outOfFuel, .outOfFuel => true
   | _,          _          => false
 
-/-- Structural equality on heap objects. -/
+mutual
+/-- Exact stored state, including closure captures and floating-point bits.
+Unlike language-level `Val.beq`, this must detect changes from an integer to an
+equal float, between signed zeros, or between closures with different captures. -/
+def Val.stateEq : Val → Val → Bool
+  | .int a, .int b => a == b
+  | .str a, .str b => a == b
+  | .bool a, .bool b => a == b
+  | .float a, .float b => decide (a = b)
+  | .unit, .unit => true
+  | .ref a, .ref b => a == b
+  | .iref a i, .iref b j => a == b && decide (i = j)
+  | .fn a, .fn b => a == b
+  | .clos a xs, .clos b ys => a == b && Val.bindingsStateEq xs ys
+  | .clsClos a xs, .clsClos b ys => a == b && Val.bindingsStateEq xs ys
+  | .list a, .list b => Val.listStateEq a b
+  | .tuple a, .tuple b => Val.listStateEq a b
+  | .dict a, .dict b => Val.pairsStateEq a b
+  | .bobj a x, .bobj b y => a == b && Val.stateEq x y
+  | _, _ => false
+
+def Val.listStateEq : List Val → List Val → Bool
+  | [], [] => true
+  | a :: as, b :: bs => Val.stateEq a b && Val.listStateEq as bs
+  | _, _ => false
+
+def Val.pairsStateEq : List (Val × Val) → List (Val × Val) → Bool
+  | [], [] => true
+  | (a, b) :: xs, (c, d) :: ys =>
+      Val.stateEq a c && Val.stateEq b d && Val.pairsStateEq xs ys
+  | _, _ => false
+
+def Val.bindingsStateEq : List (String × Val) → List (String × Val) → Bool
+  | [], [] => true
+  | (a, b) :: xs, (c, d) :: ys =>
+      a == c && Val.stateEq b d && Val.bindingsStateEq xs ys
+  | _, _ => false
+end
+
+/-- Exact container state, preserving its kind and insertion order. -/
+def Payload.stateEq : Payload → Payload → Bool
+  | .none, .none => true
+  | .list a, .list b => Val.listStateEq a b
+  | .tuple a, .tuple b => Val.listStateEq a b
+  | .dict a, .dict b => Val.pairsStateEq a b
+  | _, _ => false
+
+/-- Structural equality on every component of a heap object. -/
 def Obj.beq (a b : Obj) : Bool :=
-  a.cls == b.cls && a.fields.length == b.fields.length
-    && (a.fields.zip b.fields).all (fun kv => kv.1.1 == kv.2.1 && Val.beq kv.1.2 kv.2.2)
+  a.cls == b.cls && Val.bindingsStateEq a.fields b.fields
+    && Val.bindingsStateEq a.captured b.captured
+    && Payload.stateEq a.payload b.payload && a.version == b.version
 
 /-- Structural equality on heaps. -/
 def Heap.beq (h g : Heap) : Bool :=
@@ -107,6 +156,8 @@ structure Obs where
   /-- What CPython did. Recorded by `scripts/differential.py`'s trace hook, not by the
   interpreter this file is about. -/
   expected : EResult
+  /-- Optional native final graph. Historical return-only observations remain explicit. -/
+  post : Option HeapObservation := none
   deriving Repr, Inhabited
 
 /-! ## 2. The laws
@@ -120,7 +171,10 @@ looks for. -/
 The right-hand side comes from outside this system, so this is not the interpreter
 agreeing with itself. -/
 def lawConform (ctx : Ctx) (fuel : Nat) (fn : Func) (o : Obs) : Bool :=
-  EResult.beq (runCase ctx fuel fn o.case).2 o.expected
+  let result := runCase ctx fuel fn o.case
+  match o.post with
+  | none => EResult.beq result.2 o.expected
+  | some graph => graph.compare result.1 o.expected result.2 == some true
 
 /-- Check execution before structural comparison. Keeping the interpreter outside
 `Val.beq`'s nested recursor avoids costly kernel reductions of unused shift branches.
@@ -128,9 +182,10 @@ The expected outcome still comes from the native runtime, and both premises are
 kernel checked. The second premise is explicit because NaN is not equal to itself. -/
 theorem lawConform_of_result {ctx : Ctx} {fuel : Nat} {fn : Func} {o : Obs}
     (hrun : (runCase ctx fuel fn o.case).2 = o.expected)
-    (heq : EResult.beq o.expected o.expected = true) :
+    (heq : EResult.beq o.expected o.expected = true) (hpost : o.post = none) :
     lawConform ctx fuel fn o = true := by
   unfold lawConform
+  simp only [hpost]
   rw [hrun]
   exact heq
 
@@ -143,8 +198,8 @@ def lawRuns (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
 def lawReturns (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
   isVal (runCase ctx fuel fn c).2
 
-/-- **Purity of the heap.** The call leaves the heap structurally unchanged. False for
-anything that writes a field, so `Stmt.setField` mutations are caught by it. -/
+/-- **Purity of the heap.** The final heap has exactly the initial stored state,
+including container payloads, closure captures and mutation versions. -/
 def lawHeapPreserved (ctx : Ctx) (fuel : Nat) (fn : Func) (c : Case) : Bool :=
   Heap.beq (runCase ctx fuel fn c).1 c.heap
 
@@ -352,9 +407,10 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
     -- `bindParams`, and the accessor claim is about a call that reaches its body.
     (hcad : fn.classAttrDefaults = [] := by rfl)
-    -- Under Python the receiver HAS the field (or captures it): a miss now raises
-    -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
-    -- `.field`), so "an accessor returns the field it names" is a claim about receivers
+    -- Under Python the receiver HAS the field (or captures it): a miss raises
+    -- `AttributeError` under recovered class metadata (Python Language Reference
+    -- §3.2.11/§3.3.2; `Semantics.lean`, `.field`) and is a named gap without it, so
+    -- "an accessor returns the field it names" is a claim about receivers
     -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
     -- answers there. A property takes precedence even on a hit; `hprop` below excludes
     -- that case. Python specs carry the field-presence condition as a domain conjunct
@@ -365,7 +421,14 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
       intro hc; exact absurd hc (by decide))
     -- Accessor synthesis uses this lemma only when the accessed name is absent from
     -- the program's property table. A same-named property would run arbitrary code.
-    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide) :
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide)
+    -- Recovered class namespaces must permit an ordinary dictionary projection.
+    -- Lexical captures are not instance attributes on this path.
+    (hmeta : ∀ o, h.get r = some o → ctx.usesClassMetadata o.cls = true →
+        ctx.classLookupGap o.cls fld = none ∧ ctx.isProperty o.cls fld = false ∧
+        ctx.readSlot o fld = none ∧
+        (o.fields.find? (·.1 == fld)).isSome = true := by
+      intro o ho hm; change false = true at hm; cases hm) :
     applyFunc ctx (n + 4) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
@@ -376,34 +439,48 @@ theorem applyFunc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func)
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
-    have hpr : (ctx.dialect == .python &&
-        ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld)) = false := by
+    have hgap : ctx.classLookupGap o.cls fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).1
+      · simp [Ctx.classLookupGap, hm]
+    have hpr : (ctx.dialect == .python && ctx.isProperty o.cls fld) = false := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · simp [(hmeta o hgr hm).2.1]
       have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
         apply List.any_eq_false.mpr
         intro p hmem
         have hn := List.all_eq_true.mp hprop p hmem
         simp_all
-      simp [hp]
+      simp [Ctx.isProperty, hm, hp]
+    have hslot : ctx.readSlot o fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).2.2.1
+      · simp [Ctx.readSlot, hm]
     have hnop : (o.cls, fld) ∉ ctx.properties := by
       intro hmem
       have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
       simp at hp
-    simp only [hgr, hpr, Bool.false_eq_true, if_false]
+    simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+    · have hmdata : ctx.usesClassMetadata o.cls = false := by
+        cases hm : ctx.usesClassMetadata o.cls
+        · rfl
+        · have hh := (hmeta o hgr hm).2.2.2
+          simp [hf] at hh
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
         · -- Both lookups missed: `hfld` says that cannot happen under Python.
           exfalso
           have hhit := hfld hd o hgr
           simp [hf, hc] at hhit
         · by_cases hbx : ctx.dialect.boxesContainers = true
-          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
           · -- JavaScript boxes containers, so a dialect that does not box is not it and
             -- the JS property path (`jsContainerField`) is not taken.
             have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
-            simp [hgr, hf, hc, hm, hd, hbx, hjs]
-      · simp [hgr, hf, hc, hm, hnop]
-    · simp [hgr, hf, hnop]
+            simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hbx, hjs]
+      · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hnop]
+    · simp [hgap, hslot, hpr, hgr, hf, hnop]
 
 /-- The same theorem for the shape a *documented* accessor actually has.
 
@@ -430,9 +507,10 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
     -- No class-attribute default either: `applyFunc` seeds those from the heap before
     -- `bindParams`, and the accessor claim is about a call that reaches its body.
     (hcad : fn.classAttrDefaults = [] := by rfl)
-    -- Under Python the receiver HAS the field (or captures it): a miss now raises
-    -- `AttributeError` (Python Language Reference §3.2.11/§3.3.2; `Semantics.lean`,
-    -- `.field`), so "an accessor returns the field it names" is a claim about receivers
+    -- Under Python the receiver HAS the field (or captures it): a miss raises
+    -- `AttributeError` under recovered class metadata (Python Language Reference
+    -- §3.2.11/§3.3.2; `Semantics.lean`, `.field`) and is a named gap without it, so
+    -- "an accessor returns the field it names" is a claim about receivers
     -- that have it, and `fieldOf`'s `unit` on a miss is never what the interpreter
     -- answers there. A property takes precedence even on a hit; `hprop` below excludes
     -- that case. Python specs carry the field-presence condition as a domain conjunct
@@ -443,7 +521,14 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
       intro hc; exact absurd hc (by decide))
     -- Accessor synthesis uses this lemma only when the accessed name is absent from
     -- the program's property table. A same-named property would run arbitrary code.
-    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide) :
+    (hprop : ctx.properties.all (fun p => p.2 != fld) = true := by decide)
+    -- Recovered class namespaces must permit an ordinary dictionary projection.
+    -- Lexical captures are not instance attributes on this path.
+    (hmeta : ∀ o, h.get r = some o → ctx.usesClassMetadata o.cls = true →
+        ctx.classLookupGap o.cls fld = none ∧ ctx.isProperty o.cls fld = false ∧
+        ctx.readSlot o fld = none ∧
+        (o.fields.find? (·.1 == fld)).isSome = true := by
+      intro o ho hm; change false = true at hm; cases hm) :
     applyFunc ctx (n + 5) h fn (some (.ref r)) args [] = (h, .val (fieldOf h r fld)) := by
   have hbind (base : Env) : bindParams fn base args [] = base := by
     simp [bindParams, hdef, Func.posParams, hp, hv, hkw]
@@ -454,34 +539,48 @@ theorem applyFunc_doc_ret_field_self (ctx : Ctx) (n : Nat) (h : Heap) (fn : Func
   rcases hgr : h.get r with _ | o
   · simp [hgr]
   · have hm := hmod o hgr
-    have hpr : (ctx.dialect == .python &&
-        ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld)) = false := by
+    have hgap : ctx.classLookupGap o.cls fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).1
+      · simp [Ctx.classLookupGap, hm]
+    have hpr : (ctx.dialect == .python && ctx.isProperty o.cls fld) = false := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · simp [(hmeta o hgr hm).2.1]
       have hp : ctx.properties.any (fun p => p.1 == o.cls && p.2 == fld) = false := by
         apply List.any_eq_false.mpr
         intro p hmem
         have hn := List.all_eq_true.mp hprop p hmem
         simp_all
-      simp [hp]
+      simp [Ctx.isProperty, hm, hp]
+    have hslot : ctx.readSlot o fld = none := by
+      by_cases hm : ctx.usesClassMetadata o.cls = true
+      · exact (hmeta o hgr hm).2.2.1
+      · simp [Ctx.readSlot, hm]
     have hnop : (o.cls, fld) ∉ ctx.properties := by
       intro hmem
       have hp := List.all_eq_true.mp hprop (o.cls, fld) hmem
       simp at hp
-    simp only [hgr, hpr, Bool.false_eq_true, if_false]
+    simp only [hgr, hgap, hslot, hpr, Bool.false_eq_true, if_false]
     rcases hf : o.fields.find? (fun x => x.1 == fld) with _ | ⟨a, v⟩
-    · rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
+    · have hmdata : ctx.usesClassMetadata o.cls = false := by
+        cases hm : ctx.usesClassMetadata o.cls
+        · rfl
+        · have hh := (hmeta o hgr hm).2.2.2
+          simp [hf] at hh
+      rcases hc : o.captured.find? (fun x => x.1 == fld) with _ | ⟨b, w⟩
       · by_cases hd : ctx.dialect = .python
         · -- Both lookups missed: `hfld` says that cannot happen under Python.
           exfalso
           have hhit := hfld hd o hgr
           simp [hf, hc] at hhit
         · by_cases hbx : ctx.dialect.boxesContainers = true
-          · simp [hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
+          · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hbox hbx o hgr, Payload.toVal, hd]
           · -- JavaScript boxes containers, so a dialect that does not box is not it and
             -- the JS property path (`jsContainerField`) is not taken.
             have hjs : ctx.dialect ≠ .javascript := fun hj => hbx (by rw [hj]; rfl)
-            simp [hgr, hf, hc, hm, hd, hbx, hjs]
-      · simp [hgr, hf, hc, hm, hnop]
-    · simp [hgr, hf, hnop]
+            simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hd, hbx, hjs]
+      · simp [hgap, hslot, hpr, hmdata, hgr, hf, hc, hm, hnop]
+    · simp [hgap, hslot, hpr, hgr, hf, hnop]
 
 /-! ## 3b. Fuel independence
 

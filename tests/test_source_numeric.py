@@ -15,8 +15,40 @@ import subprocess
 import sys
 
 import pytest
+from conftest import exporter_source
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Keyword-argument harnesses use evalExpr directly; carry the same program
+# metadata as runFunc/runMain instead of silently exercising a legacy context.
+PROGRAM_CONTEXT = (
+    '{ table := program.table, dialect := program.dialect, '
+    'builtinBases := program.builtinBases, properties := program.properties, '
+    'excClasses := program.excClasses, classDecls := program.classDecls }'
+)
+
+# Source functions execute after import. Keep that initial state fixed while
+# varying call fuel, so kernel fuel-transport proofs compare the same call.
+SOURCE_RUNTIME = '''
+private def runSource (p : Program) (initial : Heap × Ref) (fuel : Nat)
+    (entry : String) (args : List Val) : EResult :=
+  let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := initial.2, builtinBases := p.builtinBases, properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls }
+  match ctx.resolve entry with
+  | none => .hole ("entry:" ++ entry)
+  | some fn => (applyFunc ctx fuel initial.1 fn none args []).2
+private def initialGlobals : Heap × Ref := initGlobals program 300 moduleInits
+'''
+
+SOURCE_STATE_OUTPUT = '  IO.println ("@@INITIAL@@" ++ (repr initialGlobals).pretty (width := 100000000))\n'
+
+
+def stage_source_initial_state(header, output):
+    """Propose a literal natively; certify it before reusing it in kernel proofs."""
+    lines = output.splitlines()
+    assert lines and lines[-1].startswith('@@INITIAL@@')
+    header += 'private def initialGlobalsLiteral : Heap × Ref := ' + lines[-1][11:] + '\n'
+    header += 'private theorem initialGlobals_correct : initialGlobals = initialGlobalsLiteral := by rfl\n'
+    return header, lines[:-1]
 
 
 def run(args, cwd, env, timeout=240):
@@ -656,14 +688,23 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
         values = [f".float (Fl.ofBits {struct.unpack('>Q', struct.pack('>d', n))[0]})"
                   if isinstance(n, float) else f".int ({n})" for n in args]
         if language == "js":
-            assert f["params"] == ["this", "a"] or f["params"] == ["this", "a", "b"]
-            values.insert(0, ".unit")
+            # Current exports remove the synthetic this parameter. Older
+            # frontend shapes may retain it, so supply only the recorded slot.
+            params = f["params"]
+            if params and params[0] == "this":
+                values.insert(0, ".unit")
+                params = params[1:]
+            assert params in (["a"], ["a", "b"])
         assert len(values) == len(f["params"])
-        calls.append(f"runFunc program 200 {json.dumps(f['name'])} [{', '.join(values)}]")
+        runner = 'runSource program initialGlobals' if language == 'python' else 'runFunc program'
+        calls.append(f"{runner} 200 {json.dumps(f['name'])} [{', '.join(values)}]")
     # Check native agreement before proof search: a translation error must be
     # reported as its concrete outcome, not hidden behind an expensive failed goal.
     header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.Numeric\n"
-    proofs = f"example : {calls[0]} = .val (.int ({expected[0]})) := by rfl\n"
+    if language == 'python':
+        header += SOURCE_RUNTIME
+    initial_rewrite = 'rw [initialGlobals_correct]; ' if language == 'python' else ''
+    proofs = f"example : {calls[0]} = .val (.int ({expected[0]})) := by {initial_rewrite}rfl\n"
     if language == "c":
         for i, (name, _) in enumerate(CASES[language]):
             if name.startswith(("remainder_", "compound_", "narrow_", "mask_", "loop_", "conditional_",
@@ -680,6 +721,7 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
                         f"example : (match {calls[i]} with\n"
                         f"  | .val (.int n) => n == ({expected[i]} : Int)\n"
                         "  | _ => false) = true := by\n"
+                        '  rw [initialGlobals_correct]\n'
                         '  first | decide +kernel | fail "native observation not established"\n')
                     continue
                 value = f".int ({expected[i]})"
@@ -697,10 +739,16 @@ def test_joern_native_numeric(language, tmp_path, numeric_env):
     else throw (IO.userError "unexpected floating-point format")
   | other => throw (IO.userError (reprStr other))
 '''
+    if language == 'python':
+        driver += SOURCE_STATE_OUTPUT
     (tmp_path / "Check.lean").write_text(driver)
     actual = run(["lake", "env", "lean", "--run", tmp_path / "Check.lean"], ROOT, numeric_env)
+    if language == 'python':
+        header, lines = stage_source_initial_state(header, actual)
+    else:
+        lines = actual.splitlines()
     observed = [struct.unpack('>d', int(s[6:]).to_bytes(8, 'big'))[0]
-                if s.startswith('float:') else int(s) for s in actual.splitlines()]
+                if s.startswith('float:') else int(s) for s in lines]
     assert observed == expected
     (tmp_path / "Proofs.lean").write_text(header + proofs)
     # Kernel computation over a boxed-container program is slow under machine load; the
@@ -779,7 +827,7 @@ class TestJavaScriptContainers:
     of the implementation in place when that suite is skipped."""
 
     def test_array_factory_becomes_an_empty_list_literal(self):
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert '"__ecma.Array.factory"' in src
         assert 'ujson.Obj("k" -> "listE", "items" -> ujson.Arr())' in src
         # a factory WITH arguments is a different constructor and must not be swallowed
@@ -819,7 +867,7 @@ def test_try_dispatch_guard_is_gone_and_the_invariant_is_a_theorem():
     strength of that theorem, so both facts are asserted together: if either the guard
     comes back or the theorem disappears, this notices.
     """
-    exporter = (ROOT / 'cartographer/export_ast.sc').read_text()
+    exporter = exporter_source()
     assert 'control:TRY-exception-representation' not in exporter
     semantics = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
     assert 'def pythonRaise (extra : List String) (v : Val) : EResult' in semantics

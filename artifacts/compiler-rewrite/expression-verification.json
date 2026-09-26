@@ -1,0 +1,90 @@
+{
+  "implementation": "complete; compiler frozen",
+  "compiler_sha256": "98b8fb5c0d86f9f285b68bcab05e3a2ca873a59495b884d81b51231b033001e4",
+  "changes": [
+    "Shared indexRead classification and construction across callExpr and exprV",
+    "Shared slice/display/relation value builders",
+    "Reused threadValuesInOrder for tagged call operands",
+    "Adapted one existing set-display source assertion to the shared builder"
+  ],
+  "preserved": [
+    "CallExpr-only byte-cursor guard",
+    "Index receiver snapshots, including literal receivers",
+    "Pointer/boxed index lowering order",
+    "Temporary identifier allocation order",
+    "Call callee/receiver before arguments",
+    "Starred expansion refusal labels",
+    "Lazy short-circuit/conditional lowering",
+    "Dialect and shape guards"
+  ],
+  "reduction": {
+    "bytes": 2685,
+    "lines": 35,
+    "noncomment_nonblank_lines": 28,
+    "regex_lexical_code_tokens": 668
+  },
+  "token_measurement_note": "Regex lexical estimate with comments removed, not model/BPE tokens; no model tokenizer installed.",
+  "checks": {
+    "source_regressions": {
+      "status": "passed",
+      "passed": 141,
+      "skipped": 1,
+      "log": "source-checks.log"
+    },
+    "focused_python_c_parity": [
+      {
+        "language": "python",
+        "functions": 10,
+        "ast_byte_identical": true,
+        "ast_sha256": "4307dd4f790ddbeb61b87d9c98f83950caf2bcc5ff11780e1e525263ed35d7e5",
+        "census_byte_identical": true,
+        "census_sha256": "21e6fac21ad59db556adc217bb05cef025a104f92f5e13a1d591826c358f61be"
+      },
+      {
+        "language": "c",
+        "functions": 8,
+        "ast_byte_identical": true,
+        "ast_sha256": "1958a872ea4ca71e014295f4f0aea4260c6f7b2122f2a47069b936f79850acdb",
+        "census_byte_identical": true,
+        "census_sha256": "68ebd59fda82dee6ecc590cffc3e464aae80ae7ac42e0a33b6ae1a8aa0b2d90f"
+      }
+    ],
+    "python_numeric_parity": {
+      "functions": 50,
+      "ast_byte_identical": true,
+      "ast_sha256": "cf1858f7be443cefb2c01fa07a9e79a6d629ab7d653cb4465146ca2ce05b85b8",
+      "census_byte_identical": true,
+      "census_sha256": "eb90f1e7cc6b83098a6a5dbd76f68161cd7646014438da53154ee0ffcb991922"
+    },
+    "control_parity": {
+      "entries": 14,
+      "ast_byte_identical": true,
+      "ast_sha256": "10016e1f831e14ffb39d5d34e59e7b58ca9bf8ed337fb61a4f01eb7c353c6f23",
+      "census_byte_identical": true,
+      "census_sha256": "d288e2ea4088586283db070fd1d06589900a4396107d78721f354838549ee7c6"
+    },
+    "c_numeric_native_and_kernel": {
+      "status": "passed"
+    },
+    "python_numeric_native": {
+      "status": "passed"
+    },
+    "python_numeric_kernel": {
+      "status": "not done",
+      "reason": "Original proof harness timed out after 600 seconds; root owns staged-harness rerun"
+    },
+    "control_native_and_kernel": {
+      "status": "not done",
+      "reason": "3/33 observations failed in caller_environment with field:callee_raise:non-object; AST/census byte-identical to frozen baseline. Harness uses runFunc without initialized module globals; root notified"
+    },
+    "native_log": "native-checks.log"
+  },
+  "processes": "all terminal",
+  "scope_limits": [
+    "No production Python edits",
+    "No method/program analysis or emit/run lifecycle edits",
+    "No full build or audit",
+    "No commits or subagents",
+    "LEAN_NUM_THREADS=1; Joern heap capped at 6 GiB"
+  ]
+}

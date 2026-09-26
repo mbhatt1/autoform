@@ -1,0 +1,322 @@
+[
+ {
+  "name": "gcd",
+  "file": "gcd.c",
+  "sourceName": "gcd",
+  "paramTypes": [
+   "longunsigned",
+   "longunsigned"
+  ],
+  "returnType": "unsigned long",
+  "paramIntegerTypes": [
+   "u64",
+   "u64"
+  ],
+  "returnIntegerType": "u64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "num:c:u64:<",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "b"
+      }
+     },
+     "t": {
+      "k": "exprS",
+      "e": {
+       "k": "call",
+       "f": "swap",
+       "args": [
+        {
+         "k": "name",
+         "v": "a"
+        },
+        {
+         "k": "name",
+         "v": "b"
+        }
+       ]
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "unop",
+       "op": "!",
+       "a": {
+        "k": "name",
+        "v": "b"
+       }
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "cast:u64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        }
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "loop",
+       "c": {
+        "k": "bool",
+        "v": true
+       },
+       "body": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "r",
+         "e": {
+          "k": "unop",
+          "op": "cast:u64",
+          "a": {
+           "k": "binop",
+           "op": "num:c:u64:%",
+           "a": {
+            "k": "name",
+            "v": "a"
+           },
+           "b": {
+            "k": "name",
+            "v": "b"
+           }
+          }
+         }
+        },
+        "b": {
+         "k": "ifte",
+         "c": {
+          "k": "binop",
+          "op": "num:c:u64:!=",
+          "a": {
+           "k": "name",
+           "v": "r"
+          },
+          "b": {
+           "k": "int",
+           "v": "0"
+          }
+         },
+         "t": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "a",
+           "e": {
+            "k": "unop",
+            "op": "cast:u64",
+            "a": {
+             "k": "name",
+             "v": "b"
+            }
+           }
+          },
+          "b": {
+           "k": "assign",
+           "x": "b",
+           "e": {
+            "k": "unop",
+            "op": "cast:u64",
+            "a": {
+             "k": "name",
+             "v": "r"
+            }
+           }
+          }
+         },
+         "e": {
+          "k": "brk"
+         }
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "unop",
+        "op": "cast:u64",
+        "a": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "lcm",
+  "file": "lcm.c",
+  "sourceName": "lcm",
+  "paramTypes": [
+   "longunsigned",
+   "longunsigned"
+  ],
+  "returnType": "unsigned long",
+  "paramIntegerTypes": [
+   "u64",
+   "u64"
+  ],
+  "returnIntegerType": "u64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "&&",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    },
+    "t": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "binop",
+       "op": "num:c:u64:*",
+       "a": {
+        "k": "binop",
+        "op": "num:c:u64:/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "call",
+         "f": "gcd",
+         "args": [
+          {
+           "k": "name",
+           "v": "a"
+          },
+          {
+           "k": "name",
+           "v": "b"
+          }
+         ]
+        }
+       },
+       "b": {
+        "k": "name",
+        "v": "b"
+       }
+      }
+     }
+    },
+    "e": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "num:c:u64:!=",
+      "a": {
+       "k": "name",
+       "v": "b"
+      },
+      "b": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "t": {
+      "k": "ret",
+      "e": {
+       "k": "unop",
+       "op": "cast:u64",
+       "a": {
+        "k": "name",
+        "v": "b"
+       }
+      }
+     },
+     "e": {
+      "k": "skip"
+     }
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "unop",
+     "op": "cast:u64",
+     "a": {
+      "k": "name",
+      "v": "a"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "gcd.c:<global>",
+  "file": "gcd.c",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ },
+ {
+  "name": "lcm.c:<global>",
+  "file": "lcm.c",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "skip"
+  }
+ }
+]

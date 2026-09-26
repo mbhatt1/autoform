@@ -1,0 +1,11 @@
+MISSING  docs/scale.md or ledger-Cachetools.json
+MISSING  docs/scale.md or ledger-Cachetools.json
+MISSING  docs/scale.md or ledger-Cachetools.json
+MISSING  docs/contracts.md or ledger-Cachetools.json
+MISSING  docs/languages.md or ledger-Cachetools.json
+MISSING  docs/contracts.md or ledger-Cachetools.json
+MISSING  docs/contracts.md or ledger-Cachetools.json
+MISSING  docs/languages.md or ledger-Cachetools.json
+STALE    cannot cross-check function count: ledger-Cachetools.json absent. This check is the only one that detects a stale artifact; treat its absence as a failure, not a pass.
+
+check_docs: 1 stale figure(s). The docs are the claim; update them or explain the difference.

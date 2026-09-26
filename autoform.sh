@@ -52,17 +52,6 @@ fi
 SRC="$(cd "$SRC" && pwd)"
 JOERN="${JOERN_HOME:-$HOME/joern}"
 if [ -d "$JOERN/joern-cli" ]; then JOERN="$JOERN/joern-cli"; fi
-# Joern is a ~1.7 GB external prerequisite and by far the most likely thing to be
-# missing on a first run. Without this check the pipeline gets as far as clone +
-# inventory and then dies on a bare "No such file or directory" from the shell,
-# which names a path the user never typed and suggests no remedy.
-if [ ! -x "$JOERN/joern-parse" ]; then
-  echo "autoform: no Joern frontend at $JOERN/joern-parse" >&2
-  echo "  Joern is required to translate source code and is installed separately." >&2
-  echo "  Set JOERN_HOME to an existing install, or see docs/running.md to install it." >&2
-  echo "  Run 'autoform doctor' to check every prerequisite at once." >&2
-  exit 2
-fi
 PYTHON="${AUTOFORM_PYTHON:-python3}"
 if [ -z "${AUTOFORM_PYTHON:-}" ] && [ -x "$ROOT/.venv/bin/python" ]; then
   PYTHON="$ROOT/.venv/bin/python"
@@ -114,6 +103,18 @@ for name in ("conformance.json", "specs.json", "ledger.json", "audit.json",
 (report / "pipeline.json").write_text(json.dumps(dict(
     module=sys.argv[2], source=sys.argv[3], status="running", stage="setup")))
 PY
+STAGE=prerequisites
+# Joern is a ~1.7 GB external prerequisite and by far the most likely thing to be
+# missing on a first run. Without this check the pipeline gets as far as clone +
+# inventory and then dies on a bare "No such file or directory" from the shell,
+# which names a path the user never typed and suggests no remedy.
+if [ ! -x "$JOERN/joern-parse" ]; then
+  echo "autoform: no Joern frontend at $JOERN/joern-parse" >&2
+  echo "  Joern is required to translate source code and is installed separately." >&2
+  echo "  Set JOERN_HOME to an existing install, or see docs/running.md to install it." >&2
+  echo "  Run 'autoform doctor' to check every prerequisite at once." >&2
+  exit 2
+fi
 export PATH="$HOME/.elan/bin:$PATH"
 # `export_ast.sc`'s own comments are full of real prose punctuation (em-dashes,
 # curly quotes). Joern's C frontend does not need a locale to run correctly,

@@ -315,6 +315,67 @@ class TestLinearity:
         assert dt < 60, "4000 statements took %.1fs" % dt
 
 
+class TestIterativePrinter:
+    @pytest.mark.parametrize("shape", ["expression", "list", "pairs", "loop", "left_seq"])
+    def test_all_nesting_shapes_render_at_the_default_recursion_limit(self, render_lean, shape):
+        """The former seq-only loop left expressions, pairs, and left spines recursive."""
+        node = {"k": "skip"} if shape in ("loop", "left_seq") else {"k": "unit"}
+        depth = 4000
+        for _ in range(depth):
+            if shape == "expression":
+                node = {"k": "unop", "op": "-", "a": node}
+            elif shape == "list":
+                node = {"k": "listE", "items": [node]}
+            elif shape == "pairs":
+                node = {"k": "dictE", "pairs": [[{"k": "unit"}, node]]}
+            elif shape == "loop":
+                node = {"k": "loop", "c": {"k": "bool", "v": True}, "body": node}
+            else:
+                node = {"k": "seq", "a": node, "b": {"k": "skip"}}
+        kind = "s" if shape in ("loop", "left_seq") else "e"
+        previous = sys.getrecursionlimit()
+        try:
+            sys.setrecursionlimit(1000)
+            flat = render_lean.stmt(node) if kind == "s" else render_lean.expr(node)
+            wrapped = render_lean.render(node, kind, 0)
+            assert sys.getrecursionlimit() == 1000
+        finally:
+            sys.setrecursionlimit(previous)
+        assert "".join(flat.split()) == "".join(wrapped.split())
+        assert wrapped.count("\n") > depth // 2
+        assert max(len(line) - len(line.lstrip()) for line in wrapped.splitlines()) <= 40
+        assert len(wrapped) < depth * 200
+
+    def test_mixed_list_pair_layout_matches_the_existing_spelling(self, render_lean):
+        a = {"k": "name", "v": "a" * 25}
+        b = {"k": "name", "v": "b" * 25}
+        node = {"k": "call", "f": "factory", "args": [
+            {"k": "dictE", "pairs": [[a, b], [{"k": "int", "v": 1},
+                                                  {"k": "listE", "items": [a, b]}]]},
+            {"k": "name", "v": "end"}]}
+        assert render_lean.render(node, "e", 0) == (
+            '(.call\n  "factory"\n  [ (.dictE\n'
+            '      [ ((.name "aaaaaaaaaaaaaaaaaaaaaaaaa"), (.name "bbbbbbbbbbbbbbbbbbbbbbbbb"))\n'
+            '      , ((.lit (.int 1)),\n'
+            '          (.listE [(.name "aaaaaaaaaaaaaaaaaaaaaaaaa"), (.name "bbbbbbbbbbbbbbbbbbbbbbbbb")])) ])\n'
+            '  , (.name "end") ])')
+
+    def test_width_boundary_and_nullary_overflow(self, render_lean):
+        node = {"k": "name", "v": "x" * 50}
+        flat = render_lean.expr(node)
+        assert render_lean.render(node, "e", 100 - len(flat)) == flat
+        assert "\n" in render_lean.render(node, "e", 101 - len(flat))
+        assert render_lean.render({"k": "skip"}, "s", 110) == ".skip"
+
+    @pytest.mark.parametrize("pair", [[], [{"k": "unit"}], [{"k": "unit"}] * 3,
+                                      ({"k": "unit"}, {"k": "unit"})])
+    def test_malformed_pair_after_wide_prefix_is_refused(self, render_lean, pair):
+        node = {"k": "dictE", "pairs": [
+            [{"k": "str", "v": "x" * 200}, {"k": "unit"}], pair]}
+        with pytest.raises(ValueError, match="2-element array"):
+            render_lean.render(node, "e", 0)
+
+
 # ---------------------------------------------------------------------------
 # module scaffolding
 # ---------------------------------------------------------------------------

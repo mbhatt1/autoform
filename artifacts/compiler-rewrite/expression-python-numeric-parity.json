@@ -1,0 +1,7 @@
+{
+  "functions": 50,
+  "ast_byte_identical": true,
+  "ast_sha256": "cf1858f7be443cefb2c01fa07a9e79a6d629ab7d653cb4465146ca2ce05b85b8",
+  "census_byte_identical": true,
+  "census_sha256": "eb90f1e7cc6b83098a6a5dbd76f68161cd7646014438da53154ee0ffcb991922"
+}

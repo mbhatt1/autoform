@@ -1,0 +1,12 @@
+{"verifiableCore": 5,
+ "nodes": 36,
+ "module": "PipelinePython",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 5,
+ "functions": 5,
+ "dynamicHoleRisk": 10,
+ "dialect": "python",
+ "contractsUsed": [],
+ "closedByTranslation": 5,
+ "closedByContract": 0}

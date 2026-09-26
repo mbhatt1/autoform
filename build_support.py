@@ -25,9 +25,9 @@ def runtime_files(root=ROOT):
         files[name] = (root / name).read_bytes()
     for path in sorted((root / "licenses").glob("*.txt")):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
-    for folder, suffixes in (("scripts", {".py", ".tmpl", ".mjs", ".sh"}),
+    for folder, suffixes in (("scripts", {".py", ".tmpl", ".mjs", ".sh", ".h"}),
                              ("docs", {".md"}),
-                             ("cartographer", {".py", ".sc", ".sh"}),
+                             ("cartographer", {".py", ".sc", ".scala", ".sh"}),
                              ("examples", {".s", ".asm", ".py", ".c", ".cpp", ".go", ".java", ".kt", ".js", ".ts", ".json"})):
         for path in sorted((root / folder).rglob("*")):
             if path.is_file() and path.suffix in suffixes and "__pycache__" not in path.parts:

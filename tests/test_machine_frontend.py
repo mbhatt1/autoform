@@ -41,7 +41,7 @@ def pcode():
 @pytest.fixture(scope="module")
 def lean_env():
     # Keep credentials out of pytest's fixture/argument representations on failure.
-    env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR") if k in os.environ}
+    env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "LEAN_NUM_THREADS") if k in os.environ}
     env["PATH"] = str(Path.home() / ".elan/bin") + os.pathsep + env.get("PATH", "")
     if not shutil.which("lake", path=env["PATH"]):
         if os.environ.get("AUTOFORM_REQUIRE_LEAN"):

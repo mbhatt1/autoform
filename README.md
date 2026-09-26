@@ -28,7 +28,16 @@ autoform doctor
 autoform https://github.com/OWNER/REPOSITORY.git
 autoform --workspace ./proofs source /path/to/source MyProject
 autoform --workspace ./proofs machine /path/to/executable MyBinary
+autoform --workspace ./proofs regress /path/to/checkout MyProject --base v1.2.0 --head main
+autoform --workspace ./proofs regress /path/to/checkout MyProject --base v1.2.0 --machine --files lib/lcm.c lib/gcd.c
 ```
+
+`regress` runs the pipeline at two commits of one repository and reports what could be
+proven at `--base` but not at `--head`: functions that now hole, theorems that no longer
+hold, recorded runtime cases that now diverge, and cases with identical inputs whose
+proven outcome changed (`docs/running.md` §2). With `--machine` it compiles the listed
+files at both commits, searches for inputs where the two versions return different
+values, and kernel-checks each divergence on the SLEIGH-lifted machine code.
 
 The package bundles the Lean library, Joern exporter, proof tools and examples.
 Git, Lean/elan, Joern and the source language's runtime are external prerequisites.
@@ -345,7 +354,7 @@ python3 scripts/lang_matrix.py ast-Cachetools.json   # holes by cause, per corpu
 | label | holes (snapshot) | what would close it |
 |---|---|---|
 | `call:python-receiver-signature` | 0 (was 11) | every one was `def f(self, *args, **kwargs)` — a receiver followed by nothing but collectors (`_TimedCache.get/pop/setdefault`, the six `Descriptor.Wrapper.__call__`s, the two descriptor bases). **Done** since this snapshot: the stripped receiver's name travels in the signature (`receiverName`) and `kwargsRejected` refuses the `self=` keyword that `**kwargs` used to be able to swallow — the only thing the refusal was protecting (`#guard`s in `Semantics.lean`, `tests/test_python_receivers.py`). What still holes is a method with no ordinary first positional `self` (`def f()`, `def f(*, self)`, `def f(*self)`) or one named otherwise (`def f(receiver, a)`); re-measure to see the count move. Was 23 |
-| `call:computed-callee` | 0 (was 6) | `_cache.decorator` and the five `*_cache` factories call a closure chosen by a branch — the callee is a run-time value, not a name. `Expr.callValue` applies what the callee evaluates to (a function, closure or boxed function object) and holes `call:value:not-callable` on anything else; the exporter emits it for a callee that is itself a call |
+| `call:computed-callee` | 0 (was 6) | `_cache.decorator` and the five `*_cache` factories call a closure chosen by a branch — the callee is a run-time value, not a name. `Expr.callValue` applies what the callee evaluates to (a function, closure or boxed function object; a class value constructs an instance) and holes `call:value:not-callable` on anything else; the exporter emits it for a callee that is itself a call |
 | `op:stringExpressionList:non-literal-part` | 3 — the last label standing | f-strings whose parts are not literals (the `_DescriptorBase` deprecation messages) — `str()` of an arbitrary value is the `__str__`/`__repr__` protocol, which Core does not model |
 | `expr:genExp` | 0 (was 2) | Historical eager consumer lowering removes these static holes, but does not establish faithful lazy behavior: early stopping, interleaved effects and consumer errors can differ. Stored or returned generator expressions keep the hole. Ordinary generator functions now use suspended frames; generator-expression lowering still needs replacement ([§10.6](docs/languages.md), [recovery](docs/interpreter-recovery.md)). |
 | `control:TRY-exception-representation` | 0 | **done** (was 34). The guard was standing in for a proof; `ExcSafe.lean` is the proof — under `.python` every exception Core raises names a represented class, by simultaneous induction over the interpreter ([§10](docs/languages.md)) |

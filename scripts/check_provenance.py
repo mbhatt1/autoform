@@ -246,6 +246,17 @@ def main() -> int:
                     f"regenerate it with the recorded command and re-record:\n"
                     f"        {rec['command']}\n"
                     f"        source: {rec['source_path']} @ {rec['source_revision']}")
+            try:
+                sources = P.exporter_sources(exp)
+                recorded_sources = rec.get("exporter_sources")
+                if recorded_sources is None and len(sources) > 1:
+                    fail.append(f"{rel}: exporter has multiple source files but its record "
+                                "has no exporter_sources; regenerate and record the complete compiler.")
+                elif recorded_sources is not None and recorded_sources != sources:
+                    fail.append(f"{rel}: exporter source dependencies changed since export; "
+                                "regenerate with the recorded command and re-record.")
+            except (OSError, ValueError) as error:
+                fail.append(f"{rel}: cannot read exporter source dependencies: {error}")
         if a.verify_source:
             src = Path(rec["source_path"])
             if not src.exists():

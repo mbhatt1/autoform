@@ -47,6 +47,8 @@ def load_observations(report_path, ast_path, source_root, module, generated):
     names = {f["name"] for f in funcs}
     if any(r.get("name") not in names or r.get("comparison") != "agree" for r in rows):
         raise ValueError("unattributed or non-agreeing runtime observation")
+    from native_heap import validate_records
+    validate_records(rows, report, funcs)
     return rows, report
 
 

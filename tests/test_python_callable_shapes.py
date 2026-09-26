@@ -7,15 +7,16 @@ import subprocess
 import sys
 
 import pytest
+from conftest import exporter_source
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import PROGRAM_CONTEXT, ROOT, numeric_env, run
 
 
 SOURCE = ROOT / 'examples/python_control/callable_shapes.py'
 
 
 def test_callable_lexical_metadata():
-    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    script = exporter_source()
     decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
     result = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
                             input=SOURCE.read_text(), text=True, capture_output=True, timeout=30)
@@ -63,7 +64,9 @@ def test_source_python_callable_shapes(tmp_path, numeric_env):
     spec.loader.exec_module(native)
     requests = [
         ('decorated', [], None, 'call:python-decorator-binding'),
-        ('call_decorated', [], None, 'call:python-decorator-binding'),
+        # CHANGED: the call reads the decorated module binding and returns the
+        # wrapper's result. Direct entry to the raw decorated body remains a gap.
+        ('call_decorated', [], None, None),
         ('Outer', [23], None, None),
         ('private_positional', [], None, 'call:python-private-parameters'),
         ('private_keyword', [], None, 'call:python-private-parameters'),
@@ -90,11 +93,16 @@ def test_source_python_callable_shapes(tmp_path, numeric_env):
         encoded += [f'.kwargE {json.dumps(key)} (.lit (.int ({value})))'
                     for key, value in (keywords or {}).items()]
         expression = f'(.call {json.dumps(prefix + name)} [{", ".join(encoded)}])'
-        calls.append(f'(evalExpr {{ table := program.table, dialect := .python }} 512 [] [] {expression}).2')
+        calls.append(f'(evalExpr sourceCtx 512 sourceGlobals.1 [] {expression}).2')
         expected.append(want)
         observations.append(dict(subject=name, args=args, keywords=keywords or {}, native=outcome,
                                  expected_model=want, compared=gap is None))
     header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.CallableShapes\n'
+    # Native functions were imported before these calls. Their defining module
+    # must exist in Core too; a table-only context has no Python global namespace.
+    header += 'private def sourceGlobals : Heap × Ref := initGlobals program 300 moduleInits\n'
+    header += ('private def sourceCtx : Ctx := { (' + PROGRAM_CONTEXT +
+               ' : Ctx) with globals := sourceGlobals.2 }\n')
     driver = header + 'def main : IO Unit := do\n'
     for call in calls:
         driver += (f'  match {call} with\n'

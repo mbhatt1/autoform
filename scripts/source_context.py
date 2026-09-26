@@ -72,6 +72,43 @@ def profile(source):
     )
 
 
+HOST_HEADER_SHIMS = {
+    'endian.h': (
+        '/* autoform: glibc <endian.h> for hosts without it. */\n'
+        '#pragma once\n'
+        '#if defined(__has_include_next) && __has_include_next(<endian.h>)\n'
+        '#include_next <endian.h>\n'
+        '#else\n'
+        '#ifndef __LITTLE_ENDIAN\n#define __LITTLE_ENDIAN 1234\n#endif\n'
+        '#ifndef __BIG_ENDIAN\n#define __BIG_ENDIAN 4321\n#endif\n'
+        '#ifndef __BYTE_ORDER\n'
+        '#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__\n'
+        '#define __BYTE_ORDER __BIG_ENDIAN\n'
+        '#else\n#define __BYTE_ORDER __LITTLE_ENDIAN\n#endif\n'
+        '#endif\n'
+        '#endif\n'),
+    'byteswap.h': (
+        '/* autoform: glibc <byteswap.h> for hosts without it. */\n'
+        '#pragma once\n'
+        '#if defined(__has_include_next) && __has_include_next(<byteswap.h>)\n'
+        '#include_next <byteswap.h>\n'
+        '#else\n'
+        '#define bswap_16(x) __builtin_bswap16(x)\n'
+        '#define bswap_32(x) __builtin_bswap32(x)\n'
+        '#define bswap_64(x) __builtin_bswap64(x)\n'
+        '#endif\n'),
+}
+
+
+KERNEL_COMPAT_HEADER = (
+    '/* autoform: helpers include/linux/kernel.h provides and tools/include lacks. */\n'
+    '#pragma once\n'
+    '#ifndef swap\n'
+    '#define swap(a, b) \\\n'
+    '\tdo { __typeof__(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)\n'
+    '#endif\n')
+
+
 def native_flags(context, work):
     """Use unchanged kernel tools headers, with generated asm include redirects."""
     flags = ['-D' + d for d in context['defines']]
@@ -80,8 +117,22 @@ def native_flags(context, work):
         root = Path(root)
         headers = Path(work) / 'kernel-include' / 'asm'
         headers.mkdir(parents=True, exist_ok=True)
-        for name in ('types', 'posix_types', 'bitsperlong'):
+        for name in ('types', 'posix_types', 'bitsperlong', 'errno'):
             (headers / (name + '.h')).write_text('#include <asm-generic/' + name + '.h>\n')
+        # `tools/include/linux/kernel.h` includes glibc's <endian.h> and <byteswap.h>.
+        # A host without them (macOS) could not compile ANY unit that reaches
+        # kernel.h, which on lib/math left only int_pow.c observable. Defer to the
+        # host's header when it exists; otherwise supply the three macros and the
+        # byte-swap builtins those two headers are used for.
+        for name, body in HOST_HEADER_SHIMS.items():
+            (headers.parent / name).write_text(body)
+        # The real include/linux/kernel.h reaches minmax.h, so kernel sources call
+        # `swap()` after including only <linux/kernel.h>; the tools copy used here does
+        # not, and such a unit failed to compile. Force-include the kernel's own
+        # definition, guarded so a later minmax.h keeps its body.
+        compat = headers.parent / 'autoform-kernel-compat.h'
+        compat.write_text(KERNEL_COMPAT_HEADER)
+        flags += ['-include', str(compat)]
         # Native compilation resolves attributes via the actual headers. Parser-only
         # attribute substitutions must not override compiler semantics/linkage.
         flags = [f for f in flags if f[2:].split('=', 1)[0] not in KERNEL_ATTRIBUTES]

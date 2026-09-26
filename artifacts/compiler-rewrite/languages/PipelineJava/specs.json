@@ -1,0 +1,216 @@
+{
+ "module": "PipelineJava",
+ "corpus": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/examples/source/java",
+ "mode": "native",
+ "interpreter_fuel": 5000,
+ "initializer_fuel": 5000,
+ "cross_runtime_evidence": true,
+ "self_recorded_families": [
+  "charact"
+ ],
+ "self_recorded_note": "`charact_*` right-hand sides are this interpreter's own output. They are characterization/regression theorems and are NOT cross-implementation evidence; only `conform_*` is, and it needs a runtime this repository can drive.",
+ "families_unavailable": [],
+ "subjects_considered": 7,
+ "subject_population": "observed",
+ "max_subjects": null,
+ "only_subjects": null,
+ "excluded_subjects": [],
+ "functions": 7,
+ "call_closed": 7,
+ "artifacts": {
+  "docstrings": 0,
+  "doctests": 0,
+  "asserts": 0,
+  "raises": 0,
+  "pbt_files": 0,
+  "pbt_properties": 0,
+  "test_files": 0
+ },
+ "observations": {
+  "calls": 35,
+  "in_core": 35,
+  "tests": [],
+  "skipped": {
+   "skip_varargs": 0,
+   "skip_unencodable_args": 0,
+   "skip_unencodable_ret": 0,
+   "runtime": "jvm",
+   "evidence": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/artifacts/pipeline/PipelineJava/conformance.json"
+  }
+ },
+ "candidates": 7,
+ "refuted": 0,
+ "not_checked": 0,
+ "vacuous": 0,
+ "vacuity_checks": {},
+ "vacuity_rate_pct": 0.0,
+ "emitted": 7,
+ "proved": 7,
+ "open_obligations": 0,
+ "build_clean": true,
+ "artifact_hashes": {
+  "ast": "e1e957d69f4d32a7a6be03d42aa44fd662339691df67515e8bddf519e7d446b4",
+  "model": "b0efa6185dd59f889da525460d35006d21919e0cf1ec5b8925295899e9d2d1cc",
+  "conformance": "6b6998cd95e73796b990a06227a785bdc3c49eb483aa282afd2a6a309c8574f9",
+  "proof": "ac861a4c0a4480d80359831808d9d4b1331b6d1ccf81ebbdf0eb2e744a2ccdfb"
+ },
+ "mutation_sample": null,
+ "fuel_independent": 7,
+ "fuel_obligations_remaining": 0,
+ "fuel_blocked_reasons": {},
+ "outOfFuel_cases": {},
+ "by_family": {
+  "conform": {
+   "candidates": 7,
+   "refuted": 0,
+   "vacuous": 0,
+   "proved": 7
+  }
+ },
+ "specs": [
+  {
+   "id": "conform_Numbers_add_long_long_long",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.add:long(long,long)",
+   "definition": "f_Numbers_add_long_long_long_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_bump_byte_byte",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.bump:byte(byte)",
+   "definition": "f_Numbers_bump_byte_byte_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_compound_byte_byte_int",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.compound:byte(byte,int)",
+   "definition": "f_Numbers_compound_byte_byte_int_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_div_long_long_long",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.div:long(long,long)",
+   "definition": "f_Numbers_div_long_long_long_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_inc_long_long",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.inc:long(long)",
+   "definition": "f_Numbers_inc_long_long_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_shift_int_int_int",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.shift:int(int,int)",
+   "definition": "f_Numbers_shift_int_int_int_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  },
+  {
+   "id": "conform_Numbers_unsigned_long_long_int",
+   "family": "conform",
+   "source": "cross-runtime (\u00a74.4)",
+   "subject": "Numbers.unsigned:long(long,int)",
+   "definition": "f_Numbers_unsigned_long_long_int_",
+   "kind": "law",
+   "domain": 5,
+   "status": "proved",
+   "reason": "",
+   "proved": true,
+   "checked": {
+    "holds": true,
+    "domain": 5,
+    "holes": 0,
+    "guard_failures": 0,
+    "fuel": 5000
+   },
+   "note": "expected outcomes recorded from the source runtime by scripts/differential.py"
+  }
+ ],
+ "not_checked_gates": [
+  "scripts/mutate.py \u2014 run separately; a surviving mutant means the spec is vacuous in the sufficient sense",
+  "scripts/audit_all.py \u2014 axiom basis of the emitted theorems"
+ ]
+}

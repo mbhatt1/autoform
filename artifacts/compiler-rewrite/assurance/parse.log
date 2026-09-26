@@ -1,0 +1,14 @@
+Picked up JAVA_TOOL_OPTIONS:  -Dfile.encoding=UTF-8
+Parsing code at: /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python - language: `PYTHONSRC`
+[+] Running language frontend
+=======================================================================================================
+Invoking CPG generator in a separate process. Note that the new process will consume additional memory.
+If you are importing a large codebase (and/or running into memory issues), please try the following:
+1) exit joern
+2) invoke the frontend: /Users/mbhatt/joern/joern-cli/pysrc2cpg -J-Xmx24576m /Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python -o /var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/cpg.bin
+3) start joern, import the cpg: `importCpg("path/to/cpg")`
+=======================================================================================================
+
+[+] Applying default overlays
+Successfully wrote graph to: /var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/cpg.bin
+To load the graph, type `joern /var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/tmp.zp1y8pVFWa/cpg.bin`

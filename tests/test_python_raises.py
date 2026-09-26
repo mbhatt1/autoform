@@ -1,4 +1,5 @@
 """Native constructor outcomes and source raise behavior must survive kernel replay."""
+from conftest import exporter_source
 import ast
 import importlib.util
 import json
@@ -31,7 +32,7 @@ class C:
     assert namespace['xs'] == [ValueError]
     assert namespace['C'].method.__defaults__ == (1,)
     assert namespace['C']().method() is ValueError
-    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    script = exporter_source()
     decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
     process = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
                              input=source, text=True, capture_output=True, timeout=30)
@@ -124,9 +125,11 @@ def test_source_raises_match_cpython(tmp_path, numeric_env):
 '''
     (tmp_path / 'Observe.lean').write_text(driver)
     observed = run(['lake', 'env', 'lean', '--run', tmp_path / 'Observe.lean'], ROOT, numeric_env).splitlines()
-    # Joern lowers a nonempty dict into item stores, which Core does not yet model.
-    # Preserve these cases as explicit gaps, separate from native agreements.
-    gaps = {'invalid_dict': 'setIndex:immutable-containers'}
+    # Known gaps are kept separate from native agreements and pinned by label. The
+    # last one, `invalid_dict` (`raise {"message": a}` lowered to item stores on a
+    # boxed dict), closed once boxed containers accepted item stores: the model now
+    # reaches CPython's `TypeError` handler and returns `a`.
+    gaps = {}
     known_gaps = [dict(subject=name, argument=value, native=want, model=actual)
                   for (name, value, want), actual in zip(cases, observed) if name in gaps]
     mismatches = [dict(subject=name, argument=value, native=want, model=actual)

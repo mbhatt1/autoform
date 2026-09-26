@@ -1,0 +1,14 @@
+{
+  "kind": "source",
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "kernel_root": null,
+  "data_model": "lp64",
+  "compilation_database": null,
+  "defines": [],
+  "frontend_args": [],
+  "native_model_matches_host": true,
+  "configuration": "default",
+  "limitations": [],
+  "language": "python",
+  "frontend": "PYTHONSRC"
+}

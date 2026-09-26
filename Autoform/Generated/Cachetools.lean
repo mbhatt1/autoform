@@ -1706,15 +1706,18 @@ def f_cachetools___init___py__module__TTLCache_expire : Func :=
                                         .skip
                                         (.seq
                                         (.loop
-                                        (.binop
-                                        "&&"
+                                        (.cond
                                         (.isOp true (.name "curr") (.name "root"))
+                                        (.cond
                                         (.unop
                                         "!"
                                         (.binop
                                         "<"
                                         (.name "time")
-                                        (.field (.name "curr") "expires"))))
+                                        (.field (.name "curr") "expires")))
+                                        (.lit (.bool true))
+                                        (.lit (.bool false)))
+                                        (.lit (.bool false)))
                                         (.seq
                                         (.expr
                                         (.mcall
@@ -2090,10 +2093,13 @@ def f_cachetools___init___py__module__TLRUCache___iter__ : Func :=
                           (.seq
                             (.assign "time" (.name "value_tmp0"))
                             (.ifte
-                              (.binop
-                                "&&"
+                              (.cond
                                 (.binop "<" (.name "time") (.field (.name "curr") "expires"))
-                                (.unop "!" (.field (.name "curr") "removed")))
+                                (.cond
+                                  (.unop "!" (.field (.name "curr") "removed"))
+                                  (.lit (.bool true))
+                                  (.lit (.bool false)))
+                                (.lit (.bool false)))
                               (.ret (.field (.name "curr") "key"))
                               .skip))
                           (.expr (.mcall (.name "manager_tmp0") "__exit__" [])))))))))
@@ -2190,18 +2196,24 @@ def f_cachetools___init___py__module__TLRUCache_expire : Func :=
                                         .skip
                                         (.seq
                                         (.loop
-                                        (.binop
-                                        "&&"
+                                        (.cond
                                         (.name "order")
-                                        (.binop
-                                        "||"
+                                        (.cond
+                                        (.cond
                                         (.field (.index (.name "order") (.lit (.int 0))) "removed")
+                                        (.lit (.bool true))
+                                        (.cond
                                         (.unop
                                         "!"
                                         (.binop
                                         "<"
                                         (.name "time")
-                                        (.field (.index (.name "order") (.lit (.int 0))) "expires")))))
+                                        (.field (.index (.name "order") (.lit (.int 0))) "expires")))
+                                        (.lit (.bool true))
+                                        (.lit (.bool false))))
+                                        (.lit (.bool true))
+                                        (.lit (.bool false)))
+                                        (.lit (.bool false)))
                                         (.seq
                                         (.assign
                                         "item"
@@ -3592,10 +3604,13 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                     "cachetools/_cached.py:<module>._uncached_info"
                     [(.name "func"), (.name "info")]))
                 (.ifte
-                  (.binop
-                    "&&"
+                  (.cond
                     (.isOp true (.name "cond") (.lit .unit))
-                    (.isOp true (.name "lock") (.lit .unit)))
+                    (.cond
+                      (.isOp true (.name "lock") (.lit .unit))
+                      (.lit (.bool true))
+                      (.lit (.bool false)))
+                    (.lit (.bool false)))
                   (.assign
                     "wrapper"
                     (.call
@@ -3641,10 +3656,13 @@ def f_cachetools__cached_py__module___wrapper : Func :=
                     "wrapper"
                     (.call "cachetools/_cached.py:<module>._uncached" [(.name "func")]))
                   (.ifte
-                    (.binop
-                      "&&"
+                    (.cond
                       (.isOp true (.name "cond") (.lit .unit))
-                      (.isOp true (.name "lock") (.lit .unit)))
+                      (.cond
+                        (.isOp true (.name "lock") (.lit .unit))
+                        (.lit (.bool true))
+                        (.lit (.bool false)))
+                      (.lit (.bool false)))
                     (.assign
                       "wrapper"
                       (.call
@@ -5189,10 +5207,13 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
             (.ifte
               (.isOp true (.name "info") (.lit .unit))
               (.ifte
-                (.binop
-                  "&&"
+                (.cond
                   (.isOp true (.name "cond") (.lit .unit))
-                  (.isOp true (.name "lock") (.lit .unit)))
+                  (.cond
+                    (.isOp true (.name "lock") (.lit .unit))
+                    (.lit (.bool true))
+                    (.lit (.bool false)))
+                  (.lit (.bool false)))
                 (.assign
                   "wrapper"
                   (.call
@@ -5232,10 +5253,13 @@ def f_cachetools__cachedmethod_py__module___wrapper : Func :=
                         "cachetools/_cachedmethod.py:<module>._unlocked_info"
                         [(.name "method"), (.name "cache"), (.name "key"), (.name "info")])))))
               (.ifte
-                (.binop
-                  "&&"
+                (.cond
                   (.isOp true (.name "cond") (.lit .unit))
-                  (.isOp true (.name "lock") (.lit .unit)))
+                  (.cond
+                    (.isOp true (.name "lock") (.lit .unit))
+                    (.lit (.bool true))
+                    (.lit (.bool false)))
+                  (.lit (.bool false)))
                 (.assign
                   "wrapper"
                   (.call

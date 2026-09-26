@@ -500,7 +500,7 @@ theorem applyUnop_int_neg (x : Int) :
 stated and proved once per program. -/
 def ctxOf (p : Program) : Ctx :=
   { dialect := p.dialect, table := p.table, builtinBases := p.builtinBases,
-    properties := p.properties, excClasses := p.excClasses }
+    properties := p.properties, excClasses := p.excClasses, classDecls := p.classDecls }
 
 /-- Entry-point resolution, factored out. Every demonstration below discharges its
 `resolve` side condition by `rfl` — name resolution on a concrete program is decidable
@@ -826,9 +826,11 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     (ho : h₁.get r = some o)
     (hf : o.fields.find? (·.1 == f) = some (f, v))
     (hp : (ctx.dialect == .python &&
-      ctx.properties.any (fun p => p.1 == o.cls && p.2 == f)) = false := by rfl) :
+      ctx.isProperty o.cls f) = false := by rfl)
+    (hgap : ctx.classLookupGap o.cls f = none := by rfl)
+    (hslot : ctx.readSlot o f = none := by rfl) :
     evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
-  simp [evalExpr, ha, ho, hf, hp]
+  simp [evalExpr, ha, ho, hf, hp, hgap, hslot]
 
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
@@ -839,13 +841,15 @@ theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     -- write, so it asks that the receiver is not one. Decided outright for every other
     -- dialect, which is every corpus that uses it today.
     (hjs : ctx.dialect = .javascript → ∀ kvs, h₂.payload r ≠ .dict kvs := by
-      intro hc; exact absurd hc (by decide)) :
+      intro hc; exact absurd hc (by decide))
+    (hwrite : ctx.fieldWriteCheck h₂ r f = .val .unit := by rfl)
+    (hkey : ctx.fieldWriteKey h₂ r f = f := by rfl) :
     execStmt ctx (k+1) h ρ (.setField a f e) = (h₂.setField r f w, .normal ρ) := by
   by_cases hd : ctx.dialect = .javascript
   · -- With `hnd` in context, `simp` reduces the payload `match` to its default arm itself.
     have hnd := hjs hd
     simp [execStmt, ha, he, hd]
-  · simp [execStmt, ha, he, hd]
+  · simp [execStmt, ha, he, hd, hwrite, hkey]
 
 /-- CHANGED: built-in container iteration precedes source method resolution. -/
 theorem evalExpr_mcall_container (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
@@ -906,7 +910,7 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {cls : String} {args : List Expr} {h₁ h₃ : Heap} {vs : List Val}
     {kws : List (String × Val)} {fn : Func} {w : Val}
     (has : evalList ctx k h ρ args = (h₁, .inr (vs, kws)))
-    (hcap : (∀ c cap, ρ.get cls ≠ .clsClos c cap))
+    (hcap : ctx.allocationCaptures ρ cls = some [])
     -- `cls` is an ordinary class, not one with a builtin base: those allocate a
     -- `Val.bobj` and never reach `__init__` (see `Semantics.allocBuiltin`).
     (hbb : ctx.builtinBase cls = none)
@@ -915,12 +919,14 @@ theorem evalExpr_alloc_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     -- call site proves the premise by computation.
     (hm : ctx.resolveCtor cls = some fn)
     (hinit : applyFunc ctx k (h₁ ++ [{ cls := cls, fields := [], captured := [] }]) fn
-        (some (.ref h₁.length)) vs kws = (h₃, .val w)) :
+        (some (.ref h₁.length)) vs kws = (h₃, .val w))
+    (hgap : ctx.constructionGap cls = none := by rfl)
+    (hcm : fn.isClassMethod = false := by rfl)
+    (hw : ctx.dialect = .python → w = .unit := by intro _; rfl) :
     evalExpr ctx (k+1) h ρ (.alloc cls args) = (h₃, .val (.ref h₁.length)) := by
-  have hc : (match ρ.get cls with | .clsClos _ c => c | _ => []) = ([] : List (String × Val)) := by
-    cases hg : ρ.get cls <;> simp [hg]
-    case clsClos c cap => exact absurd hg (hcap c cap)
-  simp only [evalExpr, has, hbb, hc, Heap.alloc, hm, hinit]
+  by_cases hd : ctx.dialect = .python
+  · simp [evalExpr, has, hbb, hgap, hcap, Heap.alloc, hm, hcm, hinit, hw hd]
+  · cases w <;> simp [evalExpr, has, hbb, hgap, hcap, Heap.alloc, hm, hcm, hinit, hd]
 
 /-- Snapshot iteration, for a subject that is not a boxed container.
 
@@ -2015,6 +2021,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
       rw [evalExpr, evalExpr_name ctxT (j+4) h _ "<mcall:receiver>" (v := .ref r) (by simp)]
       have hd : ctxT.dialect = .python := rfl
       have hp : ctxT.properties = [] := rfl
+      have hmeta : ctxT.usesClassMetadata "Counter" = false := rfl
       have hcd : ctxT.classDefines "Counter" "bump" = true := rfl
       have hfn : f_counter_bump.isMethod = true := rfl
       have hcm : f_counter_bump.isClassMethod = false := rfl
@@ -2022,7 +2029,8 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
         rw [← strStartsWith_eq_startsWith]; rfl
       simp only [classAttrKey, String.reduceAppend] at hglobal
       simp [ho, hcls, hmiss, hcap, hpay, hglobal, hd, hp, Payload.toVal,
-        hcd, resolve_bump, hfn, hcm, hrt]
+        hcd, resolve_bump, hfn, hcm, hrt, Ctx.classLookupGap, Ctx.isProperty, Ctx.readSlot,
+        Ctx.classStorageKey, classAttrKey, hmeta]
     rw [evalExpr_mcall_attribute ctxT (j+6) h ρ
       (evalExpr_name ctxT (j+5) h ρ "c" hc) hat hlookup
       (evalList_cons_val ctxT (j+5) h ρ rfl (evalExpr_name ctxT (j+4) h ρ "x" hx)
@@ -2108,7 +2116,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
     have h := evalExpr_alloc_obj ctxT (G+9) [] [("xs", Val.list (ys.map Val.int))]
       (evalList_cons_val ctxT (G+8) [] _ rfl (evalExpr_lit_int ctxT (G+7) [] _ 0)
         (evalList_nil ctxT (G+7) [] _))
-      (by intro c cap; simp [Env.get])
+      (by rfl)
       (by simp [ctxT, ctxOf, CounterProgram, Ctx.builtinBase])
       resolveCtor_init hinit
     simpa using h

@@ -1,0 +1,58 @@
+{
+  "status": "PASS",
+  "scope": "Four constructed direct calls of the real TTLCache._Link.unlink; eight kernel checks. Not a full corpus re-land or a general functional specification.",
+  "source": "/private/tmp/ct-v717",
+  "source_sha256": {
+    "cachetools/__init__.py": "bdc70bd5dec0be9fb69241dad5badd53482a92d9bffbc86770c0aadac5e528d4",
+    "cachetools/_cached.py": "3f301c0cfbf6a108ca2ffca574568198164f9599439b595c859f6450a4da795b",
+    "cachetools/_cachedmethod.py": "ad2e75ebb6d3131225f36ce63c6f281700e675aff79ce2d447f8e97132b4ecb4",
+    "cachetools/func.py": "87724e4fc82303fd5172cc9fd03c7aaf6a767c6c477f3cb74a245fc45ebf7816",
+    "cachetools/keys.py": "9550bd6914744c2fc6fd211dfb83cdae2d6206b1a1bfcf052d017cb23b39b49e"
+  },
+  "ast_sha256": "0098faa8a4f80ee9df87907544ef70822f13f2d78fd47ac507ec816ab89912d9",
+  "candidate": "58c80dd",
+  "ring_sizes": [
+    1,
+    2,
+    3,
+    5
+  ],
+  "dropped_body_detected": [
+    2,
+    3,
+    5
+  ],
+  "dropped_body_observationally_equivalent": [
+    1
+  ],
+  "observations_sha256": "8377e4497224e9df1c5598deef3009eb68c0d27ff69128647b0868a975fa20f3",
+  "proof_sha256": "fdcee213bc97171e283e38e87127e6f6057ae8cb92af40b5f1ad4f0c3973aa7b",
+  "reproducer": "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe/probe.py",
+  "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-identity-final",
+  "logs": [
+    "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe/probe.log",
+    "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe/proof.log"
+  ],
+  "measurement_note": "Actual CPython calls on constructed cyclic TTLCache._Link objects; interpreter initialGlobals300 and complete metadata are used in every proof. No imported base contract was added.",
+  "implementation_sha256": {
+    "scripts/native_heap.py": "7bbfb3bc8a46c67eb490253e14ce19dfc1907f8cd0171ef283fe4c80cc77bf77",
+    "Autoform/Lang/Core/Observation.lean": "c93cd6a4ecfc1567f6320b4ffde1047c50531f85856db0309ed7a70dbf096a77",
+    "Autoform/SpecsGen/Basis.lean": "8bbe41ce4e7d673fefe30b030d5f832f165d84e83683c23cb3d6b4d3219798e4"
+  },
+  "staged_initializer": {
+    "status": "PASS",
+    "claims": 8,
+    "initializer_equality": "gp_correct, proved by rfl",
+    "scope": "Same four actual Cachetools unlink observations and four dropped-body checks as the direct probe; initializer literal certified in the kernel.",
+    "original_proof_sha256": "fdcee213bc97171e283e38e87127e6f6057ae8cb92af40b5f1ad4f0c3973aa7b",
+    "proof_sha256": "39901a069f69468e79c1584f49edcc571628fc24f0656025711ccd454d8a8de5",
+    "observations_sha256": "8377e4497224e9df1c5598deef3009eb68c0d27ff69128647b0868a975fa20f3",
+    "workspace": "/Users/mbhatt/autoform/.autoform-work/native-function-identity-final",
+    "reproducer": "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe-staged/probe.py",
+    "logs": [
+      "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe-staged/materialize.log",
+      "/Users/mbhatt/autoform/.autoform-work/cachetools-heap-probe-staged/proof.log"
+    ],
+    "timing_note": "Completed in roughly five minutes under concurrent build load. This is not a controlled performance benchmark."
+  }
+}

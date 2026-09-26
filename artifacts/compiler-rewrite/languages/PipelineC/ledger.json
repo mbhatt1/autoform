@@ -1,0 +1,12 @@
+{"verifiableCore": 13,
+ "nodes": 77,
+ "module": "PipelineC",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 13,
+ "functions": 13,
+ "dynamicHoleRisk": 13,
+ "dialect": "c-like",
+ "contractsUsed": [],
+ "closedByTranslation": 13,
+ "closedByContract": 0}

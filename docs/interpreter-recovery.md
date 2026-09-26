@@ -345,7 +345,9 @@ resolve `getsizeof` and `timer`, while `FIFOCache` and `TTLCache` incorrectly ra
 `AttributeError` for the corresponding inherited reads. Correcting this requires
 class identity, ordered base metadata and descriptor lookup together; a global
 method-name fallback would bind unrelated functions. These probes do not claim
-to explain every divergent corpus call.
+to explain every divergent corpus call. Without class metadata that exception is
+now the named gap `field:<attr>:unresolved-inheritance` (docs/languages.md §16.A), so
+a legacy model reports the missing hierarchy instead of asserting an exception.
 
 Python method calls with compiler-lifted argument statements now save the callable
 attribute before those statements. Saved methods on modeled builtin containers and
@@ -366,3 +368,52 @@ replay and prove with this reader; the earlier failed corpus re-land has not bee
 promoted. The packaged class-attribute pipeline still has mutation and assurance
 gaps. Inheritance, descriptor objects and captured unbound methods remain outside
 this validated change.
+
+Corpus identities now distinguish a clean tracked source subtree from an ignored,
+untracked, or changed tree inside a surrounding checkout. The latter receives a
+content digest, and a missing source root is refused. The
+[source-identity validation](../artifacts/interpreter-recovery/source-identity-validation.json)
+records the Git and native-report regression checks. Existing provenance records
+have not been re-pinned; affected corpora need regeneration.
+
+Native tracing now distinguishes an executed return instruction from an exception
+unwind, so a handled exception followed by `return None` is recorded as a return.
+Ambiguous unwind types and suspended generator/coroutine frames remain counted
+gaps. Python reports append `+trace-returns-v1` to their measurement basis. The
+[trace validation](../artifacts/interpreter-recovery/native-trace-validation.json)
+records actual CPython trace-event checks. Receiver post-state observations remain
+necessary to detect constructor mutations that preserve the return value.
+
+The integrated inheritance and slots implementation is now in the main worktree.
+Qualified classes use C3 lookup, slot storage follows declaring-class identity, and
+saved local callables retain their runtime binding. Class-valued outcomes are
+compared by exact qualified declaration. The
+[integration validation](../artifacts/interpreter-recovery/integration-validation.json)
+records the full Python suite, source regressions, completed full builds and fresh
+kernel audits. The packaged pipeline has no native divergences or open conformance
+proof obligations, while mutation and assurance gaps remain recorded. The native heap-observation extension is now also in the main worktree.
+
+
+Native conformance observations now compare the complete rooted input and final
+object graphs alongside the result. This detects lost mutations even when the
+return value is unchanged, and preserves aliases, cycles, detached input objects
+and newly reachable allocations. Function values require unique source identities
+and representable, unchanged metadata; unsupported state remains an explicit gap.
+The [observation model](native-heap-observations.md) defines the exact scope.
+
+The [final graph validation](../artifacts/interpreter-recovery/native-heap-final-validation.json)
+records the full Python suite, source comparisons and kernel proofs, mutation
+checks, completed full Lean build, and fresh strict audit of the complete Autoform
+import closure. The main worktree's source and compiled artifacts were verified
+against that audit after promotion and its local build. This does not establish the
+arbitrary-codebase goal or repair stale corpus evidence.
+
+A separate [module namespace diagnostic](../artifacts/interpreter-recovery/module-namespace-diagnostic.json)
+confirmed that unqualified globals from different modules could collide. The
+[namespace repair](python-module-namespaces.md) now accompanies the shared
+[compiler simplification](compiler-rewrite.md). Their
+[validation report](../artifacts/compiler-rewrite/validation.json) records source
+regressions, the complete tooling test suite, all supported language fixture
+pipelines, package checks and a fresh scoped kernel audit. The earlier
+heap-observation audit remains evidence for its unchanged Lean source and compiled
+artifacts; it does not include these later compiler checks.

@@ -1,0 +1,28 @@
+Unable to find a counter-example
+Demo.lean:17:0: error: 
+===================
+Found a counter-example!
+s := []
+c := Autoform.Imp.Stmt.opaqueHole 0
+issue: Autoform.Imp.Outcome.hitHole 0 = Autoform.Imp.Outcome.ok [] does not hold
+(0 shrinks)
+-------------------
+Autoform.Imp.evalStmt_sound: axioms [propext] — clean
+Autoform.Imp.evalStmt_sound depends on Autoform.Imp.evalStmt — not dependency-vacuous
+Autoform.Imp.evalStmt_sound depends on Autoform.Imp.BigStep — not dependency-vacuous
+Demo.lean:33:0: error: VACUOUS: vacuous_spec never mentions Autoform.Imp.BigStep; it constrains nothing
+Demo.lean:36:8: warning: declaration uses `sorry`
+Demo.lean:39:0: error: not_actually_proved: TRUSTED-CODE LEAK [sorryAx] (full basis [propext, sorryAx])
+[{"name": "Autoform.Imp.evalStmt_sound",
+  "depCount": 433,
+  "clean": true,
+  "axioms": ["propext"]},
+ {"name": "vacuous_spec",
+  "depCount": 432,
+  "clean": true,
+  "axioms": ["propext"]},
+ {"name": "not_actually_proved",
+  "depCount": 432,
+  "clean": false,
+  "axioms": ["propext", "sorryAx"]}]
+warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/compiler-rewrite/.lake/packages/batteries' has local changes

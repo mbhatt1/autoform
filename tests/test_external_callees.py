@@ -126,6 +126,29 @@ def test_generator_analysis_keeps_source_calls_and_resolves_helpers(mod, tmp_pat
     assert report["external_callees"] == {"remote": {"sites": 2, "blocks": 2}}
 
 
+def test_analysis_uses_source_bodies_and_excludes_auxiliary_holes(mod, tmp_path, monkeypatch):
+    from conftest import load
+    monkeypatch.setenv("AUTOFORM_NO_REEXEC", "1")
+    oracle = load(str(ROOT / "scripts" / "core_oracle.py"), "af_core_analysis")
+    source = _fn("source", _ret(_call("execution_only")))
+    source["analysisBody"] = {"k": "seq", "a": {"k": "holeS", "label": "source:gap"},
+                              "b": _ret(_call("remote"))}
+    source["generatorHelpers"] = [_fn("frame", {"k": "holeS", "label": "helper:gap"})]
+    # Auxiliary frame functions resolve calls but do not join the source population.
+    functions = [source, _fn("caller", _ret(_call("frame"))),
+                 _fn("missing", {"k": "yieldS", "e": {"k": "int", "v": "1"}})]
+    path = tmp_path / "ast-analysis.json"
+    path.write_text(json.dumps(functions))
+    report = mod.analyse(str(path))
+    assert report["functions"] == 3
+    assert report["hole_free_but_open"] == 0
+    assert report["external_callees"] == {"remote": {"sites": 1, "blocks": 0}}
+    assert oracle.count_ast_holes(functions) == 2
+    # The oracle's hole fingerprint does not need a renderable source dialect.
+    assert oracle.count_ast_holes([{key: value for key, value in f.items() if key != "file"}
+                                   for f in functions]) == 2
+
+
 def test_deep_source_does_not_exhaust_the_python_stack(mod, tmp_path):
     depth = 2500
     body = ('{"k":"seq","a":{"k":"skip"},"b":' * depth

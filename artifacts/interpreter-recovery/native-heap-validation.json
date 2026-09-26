@@ -1,0 +1,105 @@
+{
+  "status": "IN_PROGRESS_NOT_PROMOTED",
+  "base_revision": "dcb1f2be94cfd46aa1f4e453ef5ae0979eef46aa",
+  "measurement_basis": "heap-graph-v1",
+  "scope": "Native input and post-state object graphs, alias-preserving comparison and generated kernel conformance proofs.",
+  "source_sha256": {
+    "Autoform/Lang/Core/Observation.lean": "4cc2407770bfa0b2ec509d7bca2ba7572a9ac224ae3ad224e4f3b60a6836a3bd",
+    "Autoform/SpecsGen/Basis.lean": "8bbe41ce4e7d673fefe30b030d5f832f165d84e83683c23cb3d6b4d3219798e4",
+    "scripts/differential.py": "b43f69016a7b103bb45ef31821b90373bd72abe0099d6be39e8283a46d2e96c4",
+    "scripts/native_heap.py": "f9fd71aa144c596f80f940e8eb9052d2f3fbb63cee16e3cac808c1d59e17ae2e",
+    "scripts/synth_specs.py": "32d1d2fc91c4ba7a9421700c31d0b9c92e47ab66f0e86ae86795cefca14a0ec0",
+    "scripts/core_oracle.py": "4063869b9e15606e98aca64b7ae5fbd3618dfc3fdd29a7ebe16ba1c03c454049",
+    "scripts/runtime_backends.py": "691cbc1997335b51914f7ef4238714fa0044e60bada5eda1bbf55a0d3d7b3a45",
+    "tests/test_native_heap.py": "1f1676dbda413d433244c57b186e5293ee9b3e0ed55c1891bbcef333cd07945b"
+  },
+  "checks": {
+    "focused": {
+      "status": "PASS",
+      "log": "native-heap-focused4.log",
+      "summary": "37 passed in 85.87s. Snapshot cycles/aliases/fresh/detached objects, exception effects, evidence validation, kernel graph comparisons, mutation rejection, fuel transport and old/new proof emitter regressions."
+    },
+    "python": {
+      "status": "PASS",
+      "log": "native-heap-python-full1.log",
+      "summary": "852 passed, 62 skipped, 1 xfailed in 327.13s"
+    },
+    "full_build": {
+      "status": "PASS",
+      "log": "native-heap-full-build1.log",
+      "summary": "Build completed successfully:480jobs. This is the initial461a06bgraph, before first-binding field normalization and function-identity corrections."
+    },
+    "integrated_pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "revision": "461a06b",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-validation",
+      "log": "native-heap-pipeline1.log",
+      "source_revision": "10f0779204ef656228259a848a69d55698030b72",
+      "agreements": 20,
+      "divergences": 0,
+      "inconclusive": 0,
+      "proofs": 8,
+      "open_obligations": 0,
+      "holes": 0,
+      "audit": "PASS; STABLE; VERIFIED",
+      "mutation": {
+        "killed": 12,
+        "survived": 4,
+        "inconclusive": 0
+      },
+      "notes": [
+        "Constructor field-write mutation rejected. Remaining sample survivors concern a returning-None path, an unexercised branch and a test assertion. Mutation and assurance gates remain gaps."
+      ]
+    },
+    "effects_pipeline_initial": {
+      "status": "FAILED_COMPARISON_BUG",
+      "revision": "461a06b",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-validation",
+      "log": "native-heap-effects-pipeline1.log",
+      "source_revision": "b56be16",
+      "agreements": 13,
+      "divergences": 2,
+      "inconclusive": 9,
+      "cause": "Field comparator counted Core shadowed bindings as extra Python attributes. A separate shadow-fields fix is in progress. Nine synthesized integer cases reach real modeled holes; no native disagreements were hidden."
+    },
+    "corrected_effects_pipeline": {
+      "status": "COMPLETED_WITH_GAPS",
+      "revision": "f03ca00",
+      "source_revision": "b56be16",
+      "workspace": "/Users/mbhatt/autoform/.autoform-work/native-heap-shadow-fields",
+      "log": "shadow-fields-pipeline1.log",
+      "agreements": 15,
+      "divergences": 0,
+      "inconclusive": 9,
+      "by_origin": {
+        "test-suite": {
+          "agree": 9,
+          "diverge": 0,
+          "incon": 0
+        },
+        "random": {
+          "agree": 6,
+          "diverge": 0,
+          "incon": 9
+        }
+      },
+      "proofs": 7,
+      "open_obligations": 0,
+      "holes": 2,
+      "audit": "PASS; STABLE; VERIFIED",
+      "mutation": {
+        "tested": 20,
+        "invalid": 0,
+        "inconclusive": 0,
+        "killed": 19,
+        "survived": 1
+      },
+      "remaining_mutant": "detach final append expression changed to return append result; no difference on the sampled list input. Not waived.",
+      "remaining_inconclusive": "Nine synthetic integer inputs to container operations reach explicit interpreter holes. All nine traced calls agree."
+    }
+  },
+  "remaining": [
+    "Final corrected graph candidate must complete its full build and fresh strict audit before promotion.",
+    "Broader mutation/assurance gaps, corpus re-lands and arbitrary-codebase milestones remain open."
+  ]
+}

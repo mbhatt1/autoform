@@ -37,18 +37,30 @@ coverage metric is a fold over that value, and a "specification" is a statement 
 
 Step 2 is normally per-language: one front end, one syntax type and one transpiler per
 supported language. Joern's **code property graph** collapses that. C, C++, Java,
-JavaScript, Python, Kotlin and compiled binaries all normalize into a single node
+JavaScript, TypeScript, Go, Python and Kotlin normalize into a single node
 vocabulary — `CALL`, `IDENTIFIER`, `LITERAL`, `CONTROL_STRUCTURE`, `RETURN`, `BLOCK`,
 `FIELD_IDENTIFIER`, `METHOD_REF`, `TYPE_REF` — with operators appearing as `<operator>.*`
 calls. The system therefore writes:
 
 * **one** semantics for that vocabulary (`Autoform/Lang/Core/*`),
-* **one** CPG → JSON exporter (`cartographer/export_ast.sc`),
+* **one** CPG → JSON exporter (`cartographer/export_ast.sc`, backed by
+  `cartographer/compiler/SourceCompiler.scala`),
 * **one** JSON → Lean printer (`cartographer/render_lean.py`),
 
-and every Joern-supported front end is covered. Compared with the alternative (compile
+shared by the supported source front ends. Sharing a vocabulary does not establish
+support for every Joern language or construct; the native fixture tests and explicit
+holes define the checked boundary. Compared with the alternative (compile
 everything to Wasm and write one Wasm semantics), source-level structure survives, which
 keeps the deep≈shallow refinement tractable.
+
+The exporter entry point loads the CPG and creates one compilation instance. JSON
+encoding and typed numeric operations live in `compiler/Json.scala` and
+`compiler/Numeric.scala`; source analysis and lowering remain in `SourceCompiler.scala`.
+Its analysis priming, module initialization and method emission retain their order.
+The Python lowering passes share iterative JSON traversal in `cartographer/ast_tools.py`,
+while the Lean printer uses one measured document engine for both flat and multiline
+output. See [compiler-rewrite.md](compiler-rewrite.md) for the compatibility boundary
+and validation commands.
 
 ### The CPG front end is a pinned dependency
 
@@ -157,6 +169,8 @@ provenance/<artifact>.prov.json
     artifact_sha256    the artifact this record describes
     joern_version      the front end, checked against ./joern-version
     exporter           + exporter_sha256 of the .sc that produced it
+    exporter_sources   relative compile-unit paths and their SHA-256 digests,
+                       following every transitive Joern `using file` directive
     source_path        + source_revision (git commit, or `tree-sha256:…` content
                        digest for a tree that is not a checkout)
     command            the exact command line
@@ -174,7 +188,7 @@ Two checks, one cheap and one expensive:
   coverage (every artifact has a record or is a named entry in the backlog), integrity
   (the record's digest is the file's digest), the Joern pin, required fields, orphans, and
   — the one that closes the "cannot re-verify without the CPG" gap — **exporter drift**.
-  The moment `export_ast.sc` changes, every AST that predates the change is mechanically
+  The moment any exporter compile unit changes, every AST that predates the change is mechanically
   known to be stale, and the record holds the command that regenerates it.
 * **`scripts/reproduce_ast.py`** is the independent recomputation: rebuild the CPG from the
   recorded source tree with the pinned Joern, re-run the committed exporter, diff. It does

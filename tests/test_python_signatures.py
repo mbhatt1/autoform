@@ -1,4 +1,5 @@
 """Unsupported Python signatures must not yield plausible but wrong proofs."""
+from conftest import exporter_source
 import importlib.util
 import json
 import os
@@ -8,7 +9,7 @@ import subprocess
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import PROGRAM_CONTEXT, ROOT, numeric_env, run
 
 
 SOURCE = ROOT / 'examples/python_control/signatures.py'
@@ -25,7 +26,7 @@ def computed(a=len("x")): pass
 def mixed(a=1, b=len("x")): pass
 mapper = lambda a=2: a
 '''
-    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    script = exporter_source()
     decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
     result = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
                             input=source, text=True, capture_output=True, timeout=30)
@@ -96,10 +97,12 @@ def test_python_signature_gaps(tmp_path, numeric_env):
         encoded += [f'.kwargE {json.dumps(key)} (.lit (.int ({value})))'
                     for key, value in kwargs.items()]
         # evalExpr accepts keyword argument syntax; runFunc only takes values.
-        calls.append('(evalExpr { table := program.table, dialect := .python } 512 [] [] '
+        calls.append(f'(evalExpr {PROGRAM_CONTEXT} 512 [] [] '
                      f'(.call "signatures.py:<module>.{name}" [{", ".join(encoded)}])).2')
-        if name == 'ordinary':
-            expected.append('value:13')
+        if name in ('ordinary', 'literal_default'):
+            expected.append('value:' + str(native['value']))
+        elif name == 'none_default':
+            expected.append('bool:' + str(native['value']).lower())
         elif name in ('keyword_only', 'positional_only'):
             expected.append('value:13' if 'value' in native else 'exception:TypeError')
         elif name in ('lambda_default', 'unused_default_error'):
@@ -113,6 +116,7 @@ def test_python_signature_gaps(tmp_path, numeric_env):
         driver += (f'  match {call} with\n'
                    '  | .hole label => IO.println ("hole:" ++ label)\n'
                    '  | .val (.int n) => IO.println ("value:" ++ toString n)\n'
+                   '  | .val (.bool b) => IO.println ("bool:" ++ toString b)\n'
                    '  | .exn (.str n) => IO.println ("exception:" ++ n)\n'
                    '  | other => IO.println ("unexpected:" ++ reprStr other)\n')
     (tmp_path / 'Observe.lean').write_text(driver)
@@ -130,7 +134,9 @@ def test_python_signature_gaps(tmp_path, numeric_env):
     proofs = header + '\nset_option maxRecDepth 10000\nset_option maxHeartbeats 2000000\n'
     # Unsupported default evaluation cannot be concealed by an earlier arity
     # result. Every already-evaluated argument shape reaches the explicit gap.
-    for name in ('default_exception', 'literal_default', 'none_default'):
+    # Literal and None defaults are modeled values. Their positive observations
+    # below replace the old refusal claims; effectful defaults still stay gaps.
+    for name in ('default_exception',):
         proofs += ('example (ctx : Ctx) (fuel : Nat) (heap : Heap) (receiver : Option Val) '
                    '(args : List Val) (keywords : List (String × Val)) :\n'
                    f'  (applyFunc ctx (fuel + 2) heap f_signatures_py__module__{name} '
@@ -139,11 +145,16 @@ def test_python_signature_gaps(tmp_path, numeric_env):
         match = ('| .hole label => label == ' + json.dumps(want[5:])
                  if want.startswith('hole:') else
                  '| .exn (.str n) => n == "TypeError"' if want.startswith('exception:')
-                 else '| .val (.int n) => n == 13')
+                 else '| .val (.bool b) => b' if want == 'bool:true'
+                 else '| .val (.int n) => n == ' + want.removeprefix('value:'))
         proofs += (f'example : (match {call} with\n  {match}\n  | _ => false) = true := by\n'
                    '  first | decide +kernel | fail "signature outcome was not established"\n')
-    # Default evaluation also happens during module initialization, before calls.
-    proofs += ('example : (match runFunc program 512 "signatures.py:<module>" [] with\n'
+    # Prepare the module objects before executing a source initializer. Running
+    # it against an empty heap fails at its first module-field write instead.
+    # Default evaluation must still refuse before any caller uses the function.
+    proofs += ('example : (match runMain program 512\n'
+               '    (moduleInits.filter (fun f => f.name == "<module-objects>:<module>"))\n'
+               '    "signatures.py:<module>" [] with\n'
                '  | .hole label => label == "function:python-default-evaluation"\n'
                '  | _ => false) = true := by\n'
                '  first | decide +kernel | fail "default definition was silently skipped"\n')
@@ -153,7 +164,7 @@ def test_python_signature_gaps(tmp_path, numeric_env):
 
 def _decode(source: str) -> dict:
     """Run the exporter's embedded Python source-metadata decoder on `source`."""
-    script = (ROOT / 'cartographer/export_ast.sc').read_text()
+    script = exporter_source()
     decoder = script.split('  val pythonHandlerDecoder = """', 1)[1].split('\n"""', 1)[0]
     result = subprocess.run([sys.executable, '-I', '-S', '-c', decoder],
                             input=source, text=True, capture_output=True, timeout=30)
@@ -331,7 +342,7 @@ class TestPropertyDispatch:
     def test_only_unmodelled_properties_hole_at_the_access(self):
         """Both lowering paths -- `callExpr` and `exprV` -- consult the same rule, and
         that rule now reads `propertiesUnmodelled`, not every property name."""
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert src.count('call:python-property-access') == 2
         assert '_("propertiesUnmodelled").arr.exists(_.str == f)' in src
         assert 'obj("classProperties") = ujson.Arr.from(pairs.toList)' in src
@@ -396,14 +407,14 @@ class TestNonlocalBoxing:
         """`globalDeclNames` strips the literal prefix `global`, which leaves
         `nonlocal x` as the name `"nonlocal x"` — silently, and the caller then keeps a
         hole that should have gone. That cost a debugging cycle."""
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert 'def nonlocalDeclNames' in src
         assert 'nonlocalDeclNames(u).forall(capturedBoxes.contains)' in src
 
     def test_captured_boxes_get_no_allocation_prologue(self):
         """Allocating in the closure would rebind the name to a fresh box and destroy
         the alias the box exists to create. `prologues` iterates `boxedLocals` only."""
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert 'val prologues: List[ujson.Obj] = boxedLocals.toList.sorted.map' in src
         assert 'capturedBoxes' in src
 
@@ -443,7 +454,7 @@ class TestFunctionReferenceDefaults:
         assert recs['f']['defaultValues'] == []
 
     def test_resolution_requires_exactly_one_match(self):
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert 'if (ms.size == 1) Some(ms.head) else None' in src
         # An unresolved name must drop the WHOLE signature to the hole: binding some
         # defaults and skipping others is worse than binding none.
@@ -486,7 +497,7 @@ class TestModuleAttributeDefaults:
     def test_the_marker_is_the_one_absentModule_uses(self):
         """One representation for "the binding exists and its value is unmodellable",
         not two that can drift apart."""
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert 'externalModule(value("v").str, "external")' in src
         assert 'def externalModule(path: String, why: String)' in src
 
@@ -566,7 +577,7 @@ class TestClassMethodBinding:
         """Source assertions on the Scala side, since the exporter is not run here: the
         receiver-stripping filter, the shape check and the gap check all exempt a
         classmethod, and the emitted signature says what the receiver is."""
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert '.filterNot(p => isMethodDecl && !isClassMethodDecl && p.name == "self")' in src
         assert '.filterNot(p => isMethodDecl && !isClassMethodDecl && p == "self")' in src
         assert 'if (isMethodDecl && !isClassMethodDecl &&' in src
@@ -631,7 +642,7 @@ class TestClassAttributeDefaults:
         assert recs['pop']['defaultValues'] == [
             ['default', {'k': 'classAttr', 'cls': 'Cache', 'attr': '_Cache__marker'}]]
         # ...and the sentinel itself is reported so the module initialiser can allocate it.
-        assert out['classAttrSentinels'] == [{'cls': 'Cache', 'attr': '_Cache__marker'}]
+        assert out['classAttrSentinels'] == [{'cls': 'Cache', 'owner': 'Cache', 'attr': '_Cache__marker'}]
 
     def test_mangling_follows_cpython(self):
         """Two leading underscores and at most one trailing mangle; `__x__`, `_x` and an
@@ -668,10 +679,10 @@ class TestClassAttributeDefaults:
         source = ('class Cache:\n'
                   '    __marker = object()\n'
                   '    __size = _DefaultSize()\n')
-        assert _decode(source)['classAttrSentinels'] == [{'cls': 'Cache', 'attr': '_Cache__marker'}]
+        assert _decode(source)['classAttrSentinels'] == [{'cls': 'Cache', 'owner': 'Cache', 'attr': '_Cache__marker'}]
 
     def test_core_and_exporter_share_one_key_format(self):
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         sem = (ROOT / 'Autoform/Lang/Core/Semantics.lean').read_text()
         assert '"<classattr>" + e("cls").str + "." + e("attr").str' in src
         assert 'def classAttrKey (cls attr : String) : String := "<classattr>" ++ cls ++ "." ++ attr' in sem
@@ -719,7 +730,7 @@ class TestReceiverThenCollectors:
         assert sigs['f']['decorated'] is False and sigs['f']['isMethod'] is True
 
     def test_the_exporter_records_the_name_instead_of_refusing(self):
-        src = (ROOT / 'cartographer/export_ast.sc').read_text()
+        src = exporter_source()
         assert 'receiverKeywordCollision' not in src
         assert 'List("receiverName" -> ujson.Str("self"))' in src
         # Only when the shadowing is possible: a keyword collector and a non-positional-only self.
@@ -805,3 +816,19 @@ class TestOverloadStubsAndDecoratorNames:
         assert rec['defaults'] is False
         assert rec['defaultValues'][0] == ['n', {'k': 'int', 'v': '-1'}]
         assert rec['defaultValues'][1][0] == 'x' and rec['defaultValues'][1][1]['k'] == 'float'
+
+
+@pytest.mark.parametrize('rebinding', [
+    'Target = object\n',
+    'def replace():\n    global Target\n    Target = object\n',
+    'def replace():\n    global Target\n    import builtins as Target\n',
+])
+def test_class_identity_refuses_rebound_namespace(rebinding):
+    metadata = _decode('class Target:\n    pass\n' + rebinding)['classDeclarations']
+    assert metadata[0]['definitionBarrier'] == 'class-definition:rebound-class-name'
+
+
+def test_special_method_descriptor_requires_its_implicit_call_model():
+    metadata = _decode('class Target:\n    @classmethod\n'
+                       '    def __len__(cls):\n        return 1\n')['classDeclarations']
+    assert metadata[0]['definitionBarrier'] == 'class-definition:special-method-descriptor'

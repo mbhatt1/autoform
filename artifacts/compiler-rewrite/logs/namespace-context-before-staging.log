@@ -1,0 +1,225 @@
+.........F.........F                                                     [100%]
+=================================== FAILURES ===================================
+______________________ test_generator_expressions_source _______________________
+
+tmp_path = PosixPath('/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-245/test_generator_expressions_sou0')
+numeric_env = {'HOME': '/Users/mbhatt', 'JAVA_HOME': '/opt/homebrew/Cellar/openjdk@17/17.0.15/libexec/openjdk.jdk/Contents/Home', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', ...}
+
+    def test_generator_expressions_source(tmp_path, numeric_env):
+        if not os.environ.get("AUTOFORM_TEST_JOERN"):
+            pytest.skip("set AUTOFORM_TEST_JOERN=1 for actual source generator expressions")
+        joern = Path(os.environ.get("JOERN_HOME", Path.home() / "joern"))
+        source = ROOT / "examples/python_control/generator_expressions.py"
+        spec = importlib.util.spec_from_file_location("genexpr_probes", source)
+        probes = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(probes)
+        expected = [getattr(probes, name)(2) for name in CASES]
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / source.name).write_text(source.read_text())
+        run([joern / "joern-parse", src, "--language", "PYTHONSRC", "--output", "cpg.bin"],
+            tmp_path, numeric_env, timeout=600)
+        run([joern / "joern", "--script", ROOT / "cartographer/export_ast.sc",
+             "--param", "cpgPath=cpg.bin", "--param", "out=ast.json"], tmp_path, numeric_env, timeout=600)
+        functions = json.loads((tmp_path / "ast.json").read_text())
+        lowered = lower_generators(functions)
+        assert len(lowered) == len(functions)
+        model = tmp_path / "Model.lean"
+        run([sys.executable, ROOT / "cartographer/render_lean.py", tmp_path / "ast.json", model, "GenExpr"],
+            ROOT, numeric_env)
+        header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.GenExpr\n"
+        header += SOURCE_RUNTIME
+        calls = [f'runSource program initialGlobals 500 "generator_expressions.py:<module>.{name}" [.int 2]' for name in CASES]
+        driver = header + "def main : IO Unit := do\n"
+        for name, call in zip(CASES, calls):
+            driver += f'''  match {call} with
+      | .val (.int n) => IO.println n
+      | other => throw (IO.userError ({json.dumps(name + ': ')} ++ reprStr other))
+    '''
+        (tmp_path / "Check.lean").write_text(driver)
+        observed = run(["lake", "env", "lean", "--run", tmp_path / "Check.lean"], ROOT, numeric_env, timeout=600)
+        assert [int(value) for value in observed.splitlines()] == expected
+        proofs = ""
+        for call, result in zip(calls, expected):
+            proofs += observation_proof(call,
+                f"fun result => match result with | .val (.int n) => n == ({result} : Int) | _ => false")
+        for name, label in [("captured_cell", "genexpr:free-variable-cells"),
+                            ("custom_length_hint", "iterator:length-hint"),
+                            ("floating_sum", "iterator:sum-type"),
+                            ("nested_range", "call:range")]:
+            proofs += observation_proof(
+                f'runSource program initialGlobals 500 "generator_expressions.py:<module>.{name}" [.int 2]',
+                f'fun result => match result with | .hole {json.dumps(label)} => true | _ => false')
+        (tmp_path / "Proofs.lean").write_text("import Autoform.FuelMono\n" + header + PROOF_SUPPORT + proofs)
+>       run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env, timeout=900)
+
+tests/test_source_generator_expressions.py:195: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_source_numeric.py:43: in run
+    p = subprocess.run(list(map(str, args)), cwd=cwd, env=env, text=True,
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:550: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:1209: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:2116: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['lake', 'env', 'lean', '/private/var/folders/v...>
+endtime = 269259.606594333, orig_timeout = 900, stdout_seq = []
+stderr_seq = [b"warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/module-namespace-development/.lake/packages/batteries' has local changes\n"]
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['lake', 'env', 'lean', '/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-245/test_generator_expressions_sou0/Proofs.lean']' timed out after 900 seconds
+
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:1253: TimeoutExpired
+______________________ test_joern_native_numeric[python] _______________________
+
+language = 'python'
+tmp_path = PosixPath('/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-245/test_joern_native_numeric_pyth0')
+numeric_env = {'HOME': '/Users/mbhatt', 'JAVA_HOME': '/opt/homebrew/Cellar/openjdk@17/17.0.15/libexec/openjdk.jdk/Contents/Home', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', ...}
+
+    @pytest.mark.parametrize("language", list(SOURCES))
+    def test_joern_native_numeric(language, tmp_path, numeric_env):
+        if not os.environ.get("AUTOFORM_TEST_JOERN"):
+            pytest.skip("set AUTOFORM_TEST_JOERN=1 to parse/export and compare native runtimes")
+        joern_home = Path(os.environ.get("JOERN_HOME", Path.home() / "joern"))
+        if (joern_home / "joern-cli").is_dir():
+            joern_home /= "joern-cli"
+        required = {"python": [], "java": ["java", "javac"], "go": ["go"], "c": ["cc"], "js": ["node"]}[language]
+        for exe in required:
+            assert shutil.which(exe, path=numeric_env["PATH"]), f"missing runtime: {exe}"
+        assert (joern_home / "joern").is_file(), "set JOERN_HOME to the joern-cli directory"
+        src = tmp_path / "src"
+        src.mkdir()
+        frontend, filename, source = SOURCES[language]
+        (src / filename).write_text(source)
+        expected = native_results(language, tmp_path, numeric_env)
+        assert len(expected) == len(CASES[language])
+        run([joern_home / "joern-parse", src, "--language", frontend, "--output", "cpg.bin"],
+            tmp_path, numeric_env, timeout=600)
+        run([joern_home / "joern", "--script", ROOT / "cartographer/export_ast.sc",
+             "--param", "cpgPath=cpg.bin", "--param", "out=ast.json", "--param", "dataModel=lp64"],
+            tmp_path, numeric_env, timeout=600)
+        functions = json.loads((tmp_path / "ast.json").read_text())
+        model = tmp_path / "Model.lean"
+        run([sys.executable, ROOT / "cartographer/render_lean.py", tmp_path / "ast.json", model, "Numeric"],
+            ROOT, numeric_env)
+        calls = []
+        for name, args in CASES[language]:
+            full = {"python": f"numbers.py:<module>.{name}", "java": f"Numbers.{name}:", "go": f"numbers.{name}",
+                    "c": name, "js": f"numbers.js::program:{name}"}[language]
+            candidates = [f for f in functions if
+                          (f["name"].startswith(full) if language == "java" else f["name"] == full)]
+            assert len(candidates) == 1, (name, [f["name"] for f in functions])
+            f = candidates[0]
+            values = [f".float (Fl.ofBits {struct.unpack('>Q', struct.pack('>d', n))[0]})"
+                      if isinstance(n, float) else f".int ({n})" for n in args]
+            if language == "js":
+                # Current exports remove the synthetic this parameter. Older
+                # frontend shapes may retain it, so supply only the recorded slot.
+                params = f["params"]
+                if params and params[0] == "this":
+                    values.insert(0, ".unit")
+                    params = params[1:]
+                assert params in (["a"], ["a", "b"])
+            assert len(values) == len(f["params"])
+            runner = 'runSource program initialGlobals' if language == 'python' else 'runFunc program'
+            calls.append(f"{runner} 200 {json.dumps(f['name'])} [{', '.join(values)}]")
+        # Check native agreement before proof search: a translation error must be
+        # reported as its concrete outcome, not hidden behind an expensive failed goal.
+        header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.Numeric\n"
+        if language == 'python':
+            header += SOURCE_RUNTIME
+        proofs = f"example : {calls[0]} = .val (.int ({expected[0]})) := by rfl\n"
+        if language == "c":
+            for i, (name, _) in enumerate(CASES[language]):
+                if name.startswith(("remainder_", "compound_", "narrow_", "mask_", "loop_", "conditional_",
+                                    "assignment_", "field_", "array_", "logical_")):
+                    proofs += f"example : {calls[i]} = .val (.int ({expected[i]})) := by first | rfl | cbv\n"
+        if language in ("python", "java", "js"):
+            for i, (name, _) in enumerate(CASES[language]):
+                if language == "python" or name.startswith(("call", "aug", "index", "cast", "shiftWrapped", "shiftNested")):
+                    if language == "python":
+                        # Kernel computation avoids elaborator unification expanding
+                        # the heap/constructor trace. The expected integer still comes
+                        # independently from CPython, and every other outcome fails.
+                        proofs += (
+                            f"example : (match {calls[i]} with\n"
+                            f"  | .val (.int n) => n == ({expected[i]} : Int)\n"
+                            "  | _ => false) = true := by\n"
+                            '  first | decide +kernel | fail "native observation not established"\n')
+                        continue
+                    value = f".int ({expected[i]})"
+                    if language == "js" and not name.startswith(("augShift", "augUnsigned", "index", "shift")):
+                        bits = struct.unpack('>Q', struct.pack('>d', expected[i]))[0]
+                        value = f".float (Fl.ofBits {bits})"
+                    proofs += f"example : {calls[i]} = .val ({value}) := by first | rfl | cbv\n"
+        driver = header + "def main : IO Unit := do\n"
+        for call in calls:
+            driver += f'''  match {call} with
+      | .val (.int n) => IO.println n
+      | .val (.bool b) => IO.println (if b then 1 else 0)
+      | .val (.float n) =>
+        if n.fmt == .binary64 then IO.println ("float:" ++ toString n.bits)
+        else throw (IO.userError "unexpected floating-point format")
+      | other => throw (IO.userError (reprStr other))
+    '''
+        (tmp_path / "Check.lean").write_text(driver)
+        actual = run(["lake", "env", "lean", "--run", tmp_path / "Check.lean"], ROOT, numeric_env)
+        observed = [struct.unpack('>d', int(s[6:]).to_bytes(8, 'big'))[0]
+                    if s.startswith('float:') else int(s) for s in actual.splitlines()]
+        assert observed == expected
+        (tmp_path / "Proofs.lean").write_text(header + proofs)
+        # Kernel computation over a boxed-container program is slow under machine load; the
+        # receiver-gap test already allows 600 s for the same kind of run.
+>       run(["lake", "env", "lean", tmp_path / "Proofs.lean"], ROOT, numeric_env, timeout=600)
+
+tests/test_source_numeric.py:736: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_source_numeric.py:43: in run
+    p = subprocess.run(list(map(str, args)), cwd=cwd, env=env, text=True,
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:550: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:1209: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:2116: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['lake', 'env', 'lean', '/private/var/folders/v...>
+endtime = 271987.574224291, orig_timeout = 600, stdout_seq = []
+stderr_seq = [b"warning: batteries: repository '/Users/mbhatt/autoform/.autoform-work/module-namespace-development/.lake/packages/batteries' has local changes\n"]
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['lake', 'env', 'lean', '/private/var/folders/vq/k4kj9hy522759qwl6r6kq1vw0000gn/T/pytest-of-mbhatt/pytest-245/test_joern_native_numeric_pyth0/Proofs.lean']' timed out after 600 seconds
+
+/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib/python3.11/subprocess.py:1253: TimeoutExpired
+=========================== short test summary info ============================
+FAILED tests/test_source_generator_expressions.py::test_generator_expressions_source
+FAILED tests/test_source_numeric.py::test_joern_native_numeric[python] - subp...
+2 failed, 18 passed in 3869.21s (1:04:29)

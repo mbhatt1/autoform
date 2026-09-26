@@ -1,0 +1,80 @@
+[
+ {
+  "name": "add:long(long,long)",
+  "file": "numbers.cpp",
+  "sourceName": "add",
+  "paramTypes": [
+   "long",
+   "long"
+  ],
+  "returnType": "long",
+  "paramIntegerTypes": [
+   "i64",
+   "i64"
+  ],
+  "returnIntegerType": "i64",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:i64",
+    "a": {
+     "k": "binop",
+     "op": "num:c:i64:+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "wide:longlong()",
+  "file": "numbers.cpp",
+  "sourceName": "wide",
+  "paramTypes": [],
+  "returnType": "unsigned long long",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "u64",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "unop",
+    "op": "cast:u64",
+    "a": {
+     "k": "int",
+     "v": "18446744073709551615"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.cpp:<global>",
+  "file": "numbers.cpp",
+  "sourceName": "<global>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "skip"
+   }
+  }
+ }
+]

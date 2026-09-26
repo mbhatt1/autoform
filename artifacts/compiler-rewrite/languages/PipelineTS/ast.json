@@ -1,0 +1,145 @@
+[
+ {
+  "name": "numbers.ts::program:shift",
+  "file": "numbers.ts",
+  "sourceName": "shift",
+  "paramTypes": [
+   "__ecma.Number",
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:<<",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.ts::program",
+  "file": "numbers.ts",
+  "sourceName": ":program",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "shift",
+       "e": {
+        "k": "fnref",
+        "v": "numbers.ts::program:shift"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "unsigned",
+        "e": {
+         "k": "fnref",
+         "v": "numbers.ts::program:unsigned"
+        }
+       },
+       "b": {
+        "k": "assign",
+        "x": "constant",
+        "e": {
+         "k": "fnref",
+         "v": "numbers.ts::program:constant"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.ts::program:unsigned",
+  "file": "numbers.ts",
+  "sourceName": "unsigned",
+  "paramTypes": [
+   "__ecma.Number",
+   "__ecma.Number"
+  ],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "binop",
+    "op": "num:js:i32:>>>",
+    "a": {
+     "k": "name",
+     "v": "a"
+    },
+    "b": {
+     "k": "name",
+     "v": "b"
+    }
+   }
+  }
+ },
+ {
+  "name": "numbers.ts::program:constant",
+  "file": "numbers.ts",
+  "sourceName": "constant",
+  "paramTypes": [],
+  "returnType": "__ecma.Number",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "ret",
+   "e": {
+    "k": "int",
+    "v": "7"
+   }
+  }
+ }
+]

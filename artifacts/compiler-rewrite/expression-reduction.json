@@ -1,0 +1,23 @@
+{
+  "before": {
+    "sha256": "56a0244588348041ed97e8aeeddffc974a09110d2b09a653a66e1d29e7acf4f0",
+    "bytes": 766569,
+    "lines": 12524,
+    "noncomment_nonblank_lines": 6076,
+    "regex_lexical_code_tokens": 87537
+  },
+  "after": {
+    "sha256": "98b8fb5c0d86f9f285b68bcab05e3a2ca873a59495b884d81b51231b033001e4",
+    "bytes": 763884,
+    "lines": 12489,
+    "noncomment_nonblank_lines": 6048,
+    "regex_lexical_code_tokens": 86869
+  },
+  "reduction": {
+    "bytes": 2685,
+    "lines": 35,
+    "noncomment_nonblank_lines": 28,
+    "regex_lexical_code_tokens": 668
+  },
+  "token_measurement_note": "Regex lexical estimate with comments removed, not model/BPE tokens; no model tokenizer installed."
+}

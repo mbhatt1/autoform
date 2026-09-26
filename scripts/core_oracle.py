@@ -47,7 +47,7 @@ import deep_json
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIFFERENTIAL = os.path.join(REPO, "scripts", "differential.py")
 sys.path.insert(0, os.path.join(REPO, "cartographer"))
-from generator_lowering import lower_generators
+from generator_lowering import analysis_functions
 
 random.seed(20260819)          # deterministic: a moving oracle is not an oracle
 
@@ -212,8 +212,8 @@ def count_ast_holes(funcs):
     so raw suspension markers are not yet the interpreter's hole inventory.
     """
     n = 0
-    for f in lower_generators(funcs):
-        for node in walk(f.get("analysisBody", f.get("body"))):
+    for f in analysis_functions(funcs):
+        for node in walk(f["body"]):
             # Two node kinds carry holes: `hole` in expression position and `holeS` in
             # statement position. Counting only `hole` undercounted V8Base by 324 and
             # made a matching AST look stale — a fingerprint that cries wolf gets
@@ -344,7 +344,7 @@ private def base : Nat := h0.length
 private def octx : Ctx :=
   {{ dialect := program.dialect, table := program.table, globals := gref,
      builtinBases := program.builtinBases, properties := program.properties,
-     excClasses := program.excClasses }}
+     excClasses := program.excClasses, classDecls := program.classDecls }}
 
 private structure OCase where
   idx  : Nat
@@ -383,7 +383,7 @@ FOOTER = """
 def case_lit(i, c):
     slf = "none" if c["self"] is None else "(some (%s))" % lean_val(c["self"])
     chk = ", ".join('(%d, %s)' % (k, json.dumps(cls))
-                    for k, (cls, _) in enumerate(c["heap"]))
+                    for k, cell in enumerate(c["heap"]) for cls in [cell[0]])
     return ("  { idx := %d, objs := %s, fn := %s, slf := %s, args := [%s], chk := [%s] }"
             % (i, lean_heap(c["heap"]), json.dumps(c["name"]), slf,
                ", ".join(lean_val(a) for a in c["args"]), chk))

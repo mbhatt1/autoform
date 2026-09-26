@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import SOURCE_RUNTIME, ROOT, numeric_env, run
 
 
 SUBJECTS = (
@@ -40,7 +40,8 @@ def test_object_lookup_source(tmp_path, numeric_env):
     run([sys.executable, ROOT / 'cartographer/render_lean.py', tmp_path / 'ast.json', model, 'ObjectLookup'],
         ROOT, numeric_env)
     header = model.read_text() + '\nopen Autoform.Core Autoform.Generated.ObjectLookup\n'
-    calls = [f'runFunc program 150 "object_lookup.py:<module>.{name}" [.int 2]' for name in SUBJECTS]
+    header += SOURCE_RUNTIME
+    calls = [f'runSource program initialGlobals 150 "object_lookup.py:<module>.{name}" [.int 2]' for name in SUBJECTS]
     driver = header + 'def main : IO Unit := do\n'
     for name, call in zip(SUBJECTS, calls):
         driver += f'''  match {call} with

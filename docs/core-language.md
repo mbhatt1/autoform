@@ -95,13 +95,16 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 * **Reads of absent things are `unit`** at the heap level: `Env.get` on an unbound name,
   `Heap.getField` on an absent field, `Heap.get` on a dangling ref. `Expr.field` layers
   the language rule on top: under `.python` an attribute that is found nowhere raises
-  `AttributeError` (Language Reference §3.2.11/§3.3.2, `docs/languages.md` §16.A); under
-  `.javascript` it is `undefined` = `unit` (ECMA-262 OrdinaryGet). The differential oracle
+  `AttributeError` when recovered class metadata makes the hierarchy complete, and is the
+  named gap `field:<attr>:unresolved-inheritance` on a legacy model that has no
+  hierarchy to search (Language Reference §3.2.11/§3.3.2, `docs/languages.md` §16.A);
+  under `.javascript` it is `undefined` = `unit` (ECMA-262 OrdinaryGet). The differential oracle
   is what settled the Python answer (private name mangling was the first bug it found
   here, a missing attribute answering `unit` the latest).
 * **Field lookup order** (`Expr.field`) is the object's own fields, then the bindings its
   class captured, then a `@property` getter, then a class attribute; after that,
-  `AttributeError` under `.python` and `unit` elsewhere.
+  `AttributeError` under `.python` with class metadata, a named gap under `.python`
+  without it, and `unit` elsewhere.
 * **Globals live on the heap, not in `Env`.** Module-level bindings must be mutable and
   must outlive any single call, so they occupy a distinguished object (`cls = "<globals>"`)
   at `Ctx.globals`. `runMain` allocates it first, so it is ref 0, and any harness building
@@ -312,7 +315,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `scope:nonlocal-write` | A write to an enclosing function's binding. Capture is by value, so a closure cannot mutate its enclosing frame. | **Permanent by design** until `Env` becomes shared mutable cells — see below. |
 | `scope:class-closure` | A class defined inside a function whose methods read the enclosing scope, where `classClosure` does not apply. | Being closed; check the current AST. |
 | `assign:arity`, `assign:lhs:<shape>`, `assign:aug-impure-target`, `assign:aug-impure-receiver` | Multiple assignment targets, assignment to a shape Core has no statement for, and augmented assignment whose target or receiver would have to be evaluated twice. | Mostly not yet implemented; the "impure" ones are a correctness refusal, not a gap. |
-| `call:no-callee-name` | A call whose callee the CPG left unnamed and that is not itself a call. | `call:computed-callee` is retired: a callee that is itself a call (`f(x)(y)`, `d["k"](3)`) is `Expr.callValue`, which applies what the callee evaluates to and holes `call:value:not-callable` at run time on anything that is not a function, closure or boxed function object. |
+| `call:no-callee-name` | A call whose callee the CPG left unnamed and that is not itself a call. | `call:computed-callee` is retired: a callee that is itself a call (`f(x)(y)`, `d["k"](3)`) is `Expr.callValue`, which applies what the callee evaluates to (a function, closure or boxed function object; a class value constructs an instance through the `alloc` rule) and holes `call:value:not-callable` at run time on anything else. |
 | `call:effect-after-starred` | A starred argument followed by an argument with lifted assignments or increments. Saving the iterable would not preserve the timing of its expansion. | Explicit unsupported evaluation order. |
 | `import:module-value`, `import:unresolved`, `import:absent:external`, `import:absent:prefix-in-cpg`, `import:absent:relative` | A module used as a value, or an import the CPG could not resolve. The `absent:` labels split the second case by *why*: the module is external to the CPG, a proper prefix of its path is in the CPG (so more resolver work could reach it), or it is a relative import whose target is missing. | Permanent for genuinely external modules; that is the boundary the assurance case declares. `absent:prefix-in-cpg` is the part that is not permanent. |
 | `lit:float`, `lit:unquoted` | A float literal unsupported by the source exporter and a literal it could not decode. | Core has float values; source-literal translation still needs coverage. |

@@ -1,0 +1,12 @@
+{"verifiableCore": 7,
+ "nodes": 37,
+ "module": "PipelineJava",
+ "holesByLabel": [],
+ "holes": 0,
+ "holeFree": 7,
+ "functions": 7,
+ "dynamicHoleRisk": 7,
+ "dialect": "java",
+ "contractsUsed": [],
+ "closedByTranslation": 7,
+ "closedByContract": 0}

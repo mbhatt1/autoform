@@ -9,7 +9,7 @@ is the design record, which carries the reasoning behind everything here.
 | [`core-language.md`](core-language.md) | Reference for the Core language: every `Val`/`Expr`/`Stmt` constructor, the heap/env/context model, the four evaluation outcomes, dialects, and the hole taxonomy. |
 | [`trust-model.md`](trust-model.md) | What is claimed and on what basis: the four independent oracles, the G1–G5 assurance goals, the status lattice, and an explicit list of what the system does *not* establish. |
 | [`security.md`](security.md) | Security applications, a vulnerability-fix workflow, current proof boundaries and the features needed for security automation. |
-| [`running.md`](running.md) | Installation (Lean/`elan`, Joern, Python), the two entry points, how to read the ledger, and troubleshooting. |
+| [`running.md`](running.md) | Installation (Lean/`elan`, Joern, Python), the entry points, how to read the ledger, and troubleshooting. |
 | [`packaging.md`](packaging.md) | Pip installation, writable workspaces, distribution validation and CI publishing. |
 | [`fuel.md`](fuel.md) | The fuel-indexed interpreter: why `outOfFuel` is not divergence, fuel monotonicity across all seven interpreter functions, finalizer state and failure propagation, and generated fuel-independent proofs. |
 | [`integrity.md`](integrity.md) | Checking that the program measured is the program intended. Each check is named after the incident that motivated it, including a mutant that survived four commits with every proof passing. |

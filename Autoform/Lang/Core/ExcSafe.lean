@@ -368,14 +368,54 @@ theorem jsContainerField_ne_exn (p : Payload) (f : String) {v : Val} :
   repeat' split at h
   all_goals cases h
 
-/-- Reading a modeled class callable either returns its value or names a gap. -/
-theorem readClassAttribute_ne_exn (ctx : Ctx) (owner : String)
+/-- Creating a classmethod closure does not execute its body. -/
+theorem classMethodValue_ne_exn (fn : Func) (receiver : Val)
+    (captured : List (String × Val)) {v : Val} :
+    classMethodValue fn receiver captured = .exn v → False := by
+  intro h
+  unfold classMethodValue at h
+  split at h <;> cases h
+
+/-- A complete namespace miss raises the represented AttributeError. -/
+theorem readClassAttribute_excSafe (ctx : Ctx) (heap : Heap) (owner : String)
     (captured : List (String × Val)) (attr : String) {v : Val} :
-    ctx.readClassAttribute owner captured attr = .exn v → False := by
+    ctx.readClassAttribute heap owner captured attr = .exn v → ExcSafe v := by
   intro h
   unfold Ctx.readClassAttribute at h
   repeat' (first | split at h | dsimp only at h)
-  all_goals cases h
+  all_goals first
+    | exact (classMethodValue_ne_exn _ _ _ h).elim
+    | (cases h; exact Stdlib.excSafe_str (by decide))
+    | cases h
+
+theorem defaultConstructor_excSafe (ctx : Ctx) (cls : String) (receiver : Ref)
+    (args : List Val) (keywords : List (String × Val)) {v : Val} :
+    ctx.defaultConstructor cls receiver args keywords = .exn v → ExcSafe v := by
+  intro h
+  unfold Ctx.defaultConstructor at h
+  repeat' split at h
+  all_goals first
+    | (cases h; exact Stdlib.excSafe_str (by decide))
+    | cases h
+
+theorem fieldWriteCheck_excSafe (ctx : Ctx) (heap : Heap) (receiver : Ref)
+    (attr : String) {v : Val} :
+    ctx.fieldWriteCheck heap receiver attr = .exn v → ExcSafe v := by
+  intro h
+  unfold Ctx.fieldWriteCheck at h
+  repeat' split at h
+  all_goals first
+    | (cases h; exact Stdlib.excSafe_str (by decide))
+    | cases h
+
+theorem readSlot_excSafe (ctx : Ctx) (object : Obj) (attr : String) {v : Val} :
+    ctx.readSlot object attr = some (.exn v) → ExcSafe v := by
+  intro h
+  unfold Ctx.readSlot at h
+  repeat' split at h
+  all_goals first
+    | (cases h; exact Stdlib.excSafe_str (by decide))
+    | cases h
 
 theorem allocBuiltin_ne_exn (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val)
     {v : Val} : allocBuiltin ctx cls b vs = .exn v → False := by
@@ -479,10 +519,18 @@ macro "exc_close" : tactic => `(tactic| first
   | (cases hy; exact (Stdlib.method_mutating_not_exn hd _ _ _ _ _ _ _ (by assumption)).elim)
   | exact (valIn_ne_exn _ _ (Prod.mk.inj hy).2).elim
   | exact (jsContainerField_ne_exn _ _ (Prod.mk.inj hy).2).elim
-  | exact (readClassAttribute_ne_exn _ _ _ _ (Prod.mk.inj hy).2).elim
+  | exact (classMethodValue_ne_exn _ _ _ (Prod.mk.inj hy).2).elim
+  | exact (readClassAttribute_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
+  | exact (defaultConstructor_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
+  | (cases hy; exact (fieldWriteCheck_excSafe _ _ _ _ (by assumption)).weaken)
+  | (cases hy; exact (readSlot_excSafe _ _ _ (by assumption)).weaken)
   | (cases hy; exact (listSetSlice_excSafe (by assumption)).weaken)
   | exact (builtinDunderResult_excSafe _ _ _ (Prod.mk.inj hy).2).weaken
   | exact (checkedBuiltinDunderResult_excSafe _ _ _ _ _ (Prod.mk.inj hy).2).weaken
+  | (cases hy
+     rename_i hcall
+     repeat' split at hcall
+     all_goals first | exact ihF _ hd hcall | exact ihC _ hd hcall)
   | (exfalso; rename_i hne; rw [hd] at hne; exact hne (by decide))
   | (exfalso; rename_i hne; simp [hd] at hne)
   | (trace_state; fail "exc_close: no closer applies"))

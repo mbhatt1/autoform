@@ -1,0 +1,229 @@
+{
+  "module": "CompilerRewrite",
+  "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+  "execution_status": "completed_with_gaps",
+  "security_requested": false,
+  "stage_timeout_seconds": 7200.0,
+  "property_selection": {
+    "mode": "none"
+  },
+  "stages": {
+    "source": {
+      "status": "completed",
+      "command": [
+        "bash",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/autoform.sh",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+        "CompilerRewrite"
+      ],
+      "log": "source.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 38.08
+    },
+    "core-oracle": {
+      "status": "completed",
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/core_oracle.py",
+        "ast-CompilerRewrite.json",
+        "CompilerRewrite",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+        "--conformance",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/conformance.json",
+        "--inputs",
+        "0",
+        "--scratch",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite",
+        "--out",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/core-oracle.json"
+      ],
+      "log": "core-oracle.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 5.14
+    },
+    "mutation": {
+      "status": "completed",
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/mutate.py",
+        "Autoform/Generated/CompilerRewrite.lean",
+        "Autoform.Generated.CompilerRewrite",
+        "--spec-file",
+        "Autoform/SpecsGen/CompilerRewrite.lean",
+        "--spec-module",
+        "Autoform.SpecsGen.CompilerRewrite",
+        "--spec-report",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/specs.json",
+        "--max-mutants",
+        "12",
+        "--json",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/mutation.json"
+      ],
+      "log": "mutation.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 32.98
+    },
+    "restore-build": {
+      "status": "completed",
+      "command": [
+        "lake",
+        "build",
+        "Autoform.SpecsGen.CompilerRewrite",
+        "Autoform.Contracts"
+      ],
+      "log": "restore-build.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 0.62
+    },
+    "audit": {
+      "status": "completed",
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/audit_all.py",
+        "--strict",
+        "--module",
+        "Autoform.SpecsGen.CompilerRewrite",
+        "--output",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/audit.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/specs.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/conformance.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/mutation.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/core-oracle.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/context.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/ast-CompilerRewrite.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/inventory.json",
+        "--evidence",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/selection.json"
+      ],
+      "log": "audit.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 126.2
+    },
+    "contracts": {
+      "status": "completed",
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/emit_contracts.py",
+        "CompilerRewrite",
+        "--out",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/contracts-CompilerRewrite.json"
+      ],
+      "log": "contracts.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 0,
+      "seconds": 0.05
+    },
+    "assurance": {
+      "status": "completed",
+      "command": [
+        "/Users/mbhatt/autoform/.venv/bin/python",
+        "scripts/sacm.py",
+        "--module",
+        "CompilerRewrite",
+        "--root",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite",
+        "--markdown",
+        "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/artifacts/pipeline/CompilerRewrite/assurance.md",
+        "--quiet"
+      ],
+      "log": "assurance.log",
+      "timeout_seconds": 7200.0,
+      "timed_out": false,
+      "exit_code": 1,
+      "seconds": 1.15
+    }
+  },
+  "updated_at": "2026-09-24T07:38:47.520312+00:00",
+  "verification_complete": false,
+  "issues": [
+    "assurance",
+    "repository-coverage"
+  ],
+  "comparisons": 15,
+  "divergences": 0,
+  "proofs": 3,
+  "open_obligations": 0,
+  "holes": 0,
+  "source_pipeline": {
+    "module": "CompilerRewrite",
+    "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+    "stage": "complete",
+    "exit_code": 0,
+    "status": "passed",
+    "finished_at": "2026-09-24T07:36:01.293807+00:00"
+  },
+  "context": {
+    "kind": "source",
+    "source": "/Users/mbhatt/autoform/.autoform-work/compiler-rewrite-validation/examples/source/python",
+    "kernel_root": null,
+    "data_model": "lp64",
+    "compilation_database": null,
+    "defines": [],
+    "frontend_args": [],
+    "native_model_matches_host": true,
+    "configuration": "default",
+    "limitations": [],
+    "language": "python",
+    "frontend": "PYTHONSRC"
+  },
+  "proof_counts_scope": "conformance",
+  "proof_summary": {
+    "conformance": {
+      "proofs": 3,
+      "open_obligations": 0
+    },
+    "security": {
+      "requested": false,
+      "proofs": null,
+      "open_obligations": null
+    }
+  },
+  "repository": null,
+  "source_coverage": {
+    "schema_version": 1,
+    "language": "python",
+    "inventory_fingerprint": "1a2026657949c3d11ce5d8d9a959e6610b66c435843a583614e6fdcf20e2c3f2",
+    "files": [
+      {
+        "path": "numbers.py",
+        "language": "python",
+        "status": "represented"
+      }
+    ],
+    "counts": {
+      "represented": 1,
+      "unrepresented": 0,
+      "unsupported": 0,
+      "unclassified": 0,
+      "auxiliary": 0,
+      "outside_partition": 0
+    },
+    "source_changes": [],
+    "source_stable": true,
+    "scan_complete": true,
+    "source_census_complete": false,
+    "truncated_by_method_limit": false,
+    "frontend_census_complete": false,
+    "unexpected_ast_files": [],
+    "note": "Represented means at least one exported AST entry names the file. It does not establish complete parsing, translation or proof coverage."
+  },
+  "guarantee_status": "verified_scoped"
+}

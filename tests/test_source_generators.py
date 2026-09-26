@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from test_source_numeric import ROOT, numeric_env, run
+from test_source_numeric import SOURCE_RUNTIME, ROOT, numeric_env, run
 from test_python_signatures import _decode
 
 sys.path.insert(0, str(ROOT / "cartographer"))
@@ -71,6 +71,8 @@ def test_suspended_generators_source(tmp_path, numeric_env, monkeypatch):
     if not os.environ.get("AUTOFORM_TEST_JOERN"):
         pytest.skip("set AUTOFORM_TEST_JOERN=1 to compare actual source generators")
     joern = Path(os.environ.get("JOERN_HOME", Path.home() / "joern"))
+    if (joern / "joern-cli").is_dir():
+        joern /= "joern-cli"
     source = ROOT / "examples/python_control/generators.py"
     spec = importlib.util.spec_from_file_location("generator_probes", source)
     probes = importlib.util.module_from_spec(spec)
@@ -102,7 +104,8 @@ def test_suspended_generators_source(tmp_path, numeric_env, monkeypatch):
     run([sys.executable, ROOT / "cartographer/render_lean.py", tmp_path / "ast.json", model, "Generators"],
         ROOT, numeric_env)
     header = model.read_text() + "\nopen Autoform.Core Autoform.Generated.Generators\n"
-    calls = [f'runFunc program 300 "generators.py:<module>.{name}" [.int {n}]' for name, n in CASES]
+    header += SOURCE_RUNTIME
+    calls = [f'runSource program initialGlobals 300 "generators.py:<module>.{name}" [.int {n}]' for name, n in CASES]
     driver = header + "def main : IO Unit := do\n"
     for (name, _), call in zip(CASES, calls):
         driver += f'''  match {call} with
