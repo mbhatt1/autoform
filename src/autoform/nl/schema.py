@@ -1,0 +1,150 @@
+"""Contracts between the stages of the natural-language autoformalizer.
+
+    repository ──translate──► Translation (Lean model of each function)
+               ──describe───► EnglishSpec per function     (untrusted)
+               ──formalize──► Statement per English property (untrusted, must elaborate)
+               ──check──────► CheckResult: bounded kernel + real-runtime evidence
+               ──prove──────► ProofResult (kernel re-checked)
+               ──report─────► report.json / report.md
+
+Every stage reads and writes plain JSON files in one run directory, named below, so a
+stage can be rerun, cached or replaced independently. Nothing produced by a language
+model is trusted: statements are about the translated program (`runFunc`), their truth
+is decided by the Lean kernel, and their plausibility is tested on real executions.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+FILES = {
+    'translation': 'translation.json',
+    'english': 'english.json',
+    'statements': 'statements.json',
+    'checks': 'checks.json',
+    'proofs': 'proofs.json',
+    'report': 'report.json',
+}
+
+
+@dataclass
+class Param:
+    name: str
+    sort: str                 # int | bool | str | float | any  (from the translation)
+    integer_type: str = ''    # C/Java widths when known
+
+
+@dataclass
+class FunctionInfo:
+    name: str                 # qualified name in the Lean program, e.g. "pkg/mod.py:<module>.f"
+    source_name: str          # e.g. "f"
+    file: str                 # path relative to the source root
+    line: int | None
+    params: list              # [Param]
+    returns: str              # sort
+    hole_free: bool
+    holes: list               # hole labels inside the body
+    call_closed: bool         # every callee translated (or contracted)
+    needs_init: bool          # reads module-level state: must run from the initialized heap
+    source: str               # the function's source text
+    doc: str = ''
+    tests: list = field(default_factory=list)   # [{"location", "text"}] lines calling it
+    callers: list = field(default_factory=list)  # qualified names
+
+
+@dataclass
+class Translation:
+    """What the translate stage guarantees to later stages."""
+    module: str               # Lean module suffix: Autoform.Generated.<module>
+    language: str             # python | c | ...
+    lean_root: str            # Lean project dir (lake root) holding the built module
+    source_root: str
+    source_revision: str      # git sha or tree digest
+    ast: str                  # path to the Core AST JSON
+    program_const: str        # e.g. "Autoform.Generated.<module>.program"
+    init_const: str | None    # Lean term of type `Heap × Ref` with initialized globals, if any
+    call_template: str        # Lean term template, see below
+    fuel: int
+    functions: list           # [FunctionInfo]
+    notes: list = field(default_factory=list)
+    # call_template: a Lean expression with placeholders {name} (Lean string literal) and
+    # {args} (a Lean `List Val` literal) whose type is `EResult`, e.g.
+    #   'runFunc Autoform.Generated.M.program 1000 {name} {args}'
+    # or an initialized-state form built on `init_const`. Statements must use it.
+
+
+@dataclass
+class EnglishProperty:
+    id: str                   # stable within the function, e.g. "p1"
+    text: str                 # one testable sentence
+    kind: str                 # postcondition | precondition | exception | invariant | example
+    evidence: list = field(default_factory=list)  # ["docstring", "tests/test_x.py:12", ...]
+
+
+@dataclass
+class EnglishSpec:
+    function: str             # FunctionInfo.name
+    summary: str
+    properties: list          # [EnglishProperty]
+    model: str = ''           # which LLM produced it
+
+
+@dataclass
+class Statement:
+    """A Lean proposition about the translated function, in a checkable shape.
+
+    lean_prop is the full proposition, e.g.
+      ∀ (a b : Int), <pre> → match <call> with | .val (.int r) => r = a + b | _ => False
+    binders/pre/post give the SAME statement in pieces so the check stage can evaluate it
+    on concrete inputs:
+      binders: [{"name": "a", "type": "Int", "val": ".int a"}]    (val: how it is passed)
+      pre:  Lean `Bool` expression over binder names ("true" if none)
+      post: Lean `Bool` expression over binder names and `r : EResult`
+    """
+    id: str                   # "<function-sanitized>__<property id>"
+    function: str
+    property: str             # EnglishProperty.id
+    english: str
+    lean_prop: str
+    binders: list
+    pre: str
+    post: str
+    elaborates: bool = False
+    elaboration_log: str = ''
+    attempts: int = 0
+
+
+@dataclass
+class CheckResult:
+    statement: str            # Statement.id
+    status: str               # BOUNDED_HOLDS | REFUTED_MODEL | REFUTED_RUNTIME | UNCHECKABLE | ERROR
+    domain_size: int = 0
+    counterexample: dict | None = None   # {"inputs": {...}, "model": "...", "runtime": "..."}
+    runtime_agrees: bool | None = None   # statement's post evaluated on real CPython outputs
+    kernel_bounded_proof: bool = False
+    detail: str = ''
+
+
+@dataclass
+class ProofResult:
+    statement: str
+    status: str               # PROVED | FAILED | SKIPPED
+    proof: str = ''
+    certificate: str | None = None
+    axioms: list = field(default_factory=list)
+    seconds: float = 0.0
+    cost_usd: float = 0.0
+    reason: str = ''
+
+
+def dump(obj, path: Path):
+    def conv(o):
+        if hasattr(o, '__dataclass_fields__'):
+            return asdict(o)
+        raise TypeError(type(o))
+    Path(path).write_text(json.dumps(obj, indent=1, default=conv, ensure_ascii=False))
+
+
+def load(path: Path):
+    return json.loads(Path(path).read_text())

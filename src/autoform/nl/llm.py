@@ -1,0 +1,96 @@
+"""One language-model backend for every stage: headless Claude Code on the logged-in plan.
+
+`ask(prompt, cwd)` returns the model's final text. `ask_json(prompt, keys)` asks for a
+JSON object between <json></json> tags and validates the listed top-level keys, retrying
+once with the parse error. Results are cached on disk by prompt hash so reruns are free.
+`ANTHROPIC_API_KEY` is removed from the child environment: that key has no credits and
+would take precedence over the subscription login.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+from pathlib import Path
+
+CACHE = Path(os.environ.get('AUTOFORM_LLM_CACHE', Path.home() / '.cache/autoform/llm'))
+TOOLS_NONE = ''            # pure text answer
+TOOLS_LEAN = 'Bash(./check.sh:*),Read,Edit,Write,Grep,Glob'
+
+
+class LLMError(RuntimeError):
+    pass
+
+
+def available() -> bool:
+    return shutil.which('claude') is not None
+
+
+def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turns: int = 1,
+        timeout: int = 1800, model: str | None = None, cache: bool = True) -> tuple[str, float]:
+    """Return (text, cost_usd). Tool-using calls (tools != '') are never cached."""
+    key = hashlib.sha256(json.dumps([prompt, tools, max_turns, model]).encode()).hexdigest()
+    hit = CACHE / (key + '.json')
+    if cache and not tools and hit.is_file():
+        data = json.loads(hit.read_text())
+        return data['text'], 0.0
+    if not available():
+        raise LLMError('claude CLI not found on PATH')
+    cmd = ['claude', '-p', prompt, '--output-format', 'json', '--max-turns', str(max_turns)]
+    if tools:
+        cmd += ['--allowedTools', tools, '--permission-mode', 'acceptEdits']
+    else:
+        cmd += ['--allowedTools', '']
+    if model or os.environ.get('AUTOFORM_LLM_MODEL'):
+        cmd += ['--model', model or os.environ['AUTOFORM_LLM_MODEL']]
+    env = {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}
+    proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)   # the agent may have spawned lean processes
+        proc.communicate()
+        raise LLMError(f'model call timed out after {timeout}s')
+    try:
+        data = json.loads(out)
+    except ValueError:
+        raise LLMError('unparseable CLI output: ' + (out or err)[-500:])
+    if data.get('is_error'):
+        raise LLMError('model error: ' + str(data.get('result'))[:500])
+    text, cost = data.get('result') or '', float(data.get('total_cost_usd') or 0)
+    if cache and not tools:
+        CACHE.mkdir(parents=True, exist_ok=True)
+        hit.write_text(json.dumps({'text': text}))
+    return text, cost
+
+
+def extract(tag: str, text: str) -> str | None:
+    found = re.findall(rf'<{tag}>\s*(.*?)\s*</{tag}>', text, re.S)
+    return found[-1] if found else None
+
+
+def ask_json(prompt: str, keys: list, **kw) -> tuple[dict, float]:
+    """Ask for <json>{...}</json>; validate top-level keys; one repair round."""
+    suffix = ('\n\nAnswer with a single JSON object between <json> and </json> tags, with keys: '
+              + ', '.join(keys) + '.')
+    text, cost = ask(prompt + suffix, **kw)
+    for attempt in range(2):
+        body = extract('json', text) or text
+        try:
+            data = json.loads(body)
+            missing = [k for k in keys if k not in data]
+            if not missing:
+                return data, cost
+            problem = f'missing keys {missing}'
+        except ValueError as exc:
+            problem = f'invalid JSON: {exc}'
+        if attempt == 0:
+            text, c = ask(prompt + suffix + f'\n\nYour previous answer was rejected ({problem}). '
+                          'Reply again with only the corrected <json> object.', **dict(kw, cache=False))
+            cost += c
+    raise LLMError('no valid JSON after repair: ' + problem)
