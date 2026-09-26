@@ -32,7 +32,14 @@ FILES = {
     'models': 'models.json',
     'deep_translation': 'deep-translation.json',   # --deep-too: the deep Translation
     'refine': 'refine.json',                       # L1 results (refine.L1Result)
+    # judge stages (autoform.nl.judge / autoform.nl.repair); only with --judge
+    'selection': 'selection.json',                 # ranked, budgeted English properties
+    'adjudication': 'adjudication.json',           # counterexample classes, repairs, lineage
+    'budget': 'budget.json',                       # skips for budget, per stage
+    'decisions': 'decisions.jsonl',                # every judge decision + verifier outcome
+    'jevbench': 'jevbench.jsonl',                  # decisions labeled by verifier outcomes
 }
+JUDGE_FILES = ('selection', 'adjudication', 'budget', 'decisions', 'jevbench')
 
 
 @dataclass
@@ -194,6 +201,16 @@ class LeanModel:
     repairs: int = 0
     level: str = 'none'       # none | L0 | L1
     notes: str = ''
+
+
+def entry_imports(translation) -> str:
+    """`import` lines for the entry modules a call_template names beyond the generated
+    module: `Autoform.NL.<M>` (initialized entry) or `Autoform.NLModel.<M>` (AI model)."""
+    import re
+    tmpl = (translation or {}).get('call_template', '') if isinstance(translation, dict) else \
+        getattr(translation, 'call_template', '')
+    mods = dict.fromkeys(re.findall(r'\b(Autoform\.(?:NLModel|NL)\.[A-Za-z0-9_]+)\.call[FH]?\b', tmpl or ''))
+    return ''.join(f'import {m}\n' for m in mods)
 
 
 def dump(obj, path: Path):

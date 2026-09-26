@@ -2,6 +2,8 @@
 
     model (default) ──┐
     translate (--deep)┴─► describe → formalize → check → prove [→ refine (--deep-too)] → report
+    with a judge (--judge, the CLI default):
+                        describe → select → formalize → check → adjudicate → prove …
 
 `model` (autoform.nl.model) has a language model write a plain Lean def per function and
 validates it against the real code and an independent second translation (level L0).
@@ -18,7 +20,15 @@ missing is `blocked`); the report is always written.
 
     autoform autoformalize <url|dir> [Module] [--deep | --deep-too] [--no-second]
                            [--functions f g] [--no-prove] [--no-runtime] [--budget-usd X]
-                           [--out DIR]
+                           [--judge auto|semif|heuristic|replay:PATH|none]
+                           [--max-properties-per-function N] [--repair-rounds N] [--out DIR]
+
+`select` (autoform.nl.judge) ranks the English properties with the typed-decision judge and
+allocates `--budget-usd` across functions; `formalize` and `prove` then spend in that order
+and stop when the budget is gone. `adjudicate` (autoform.nl.repair) classifies each refuted
+statement (deterministic gates first), turns cross-validated REAL_BUG readings into
+findings, and repairs BAD_SPEC / MISSING_PRECONDITION properties through formalize → check
+again. The judge never sets a status.
     python -m autoform.nl ...
 """
 from __future__ import annotations
@@ -45,16 +55,31 @@ DEEP_TOO_STAGES = ('model', 'translate', 'describe', 'formalize', 'check', 'prov
 STAGES = MODEL_STAGES
 MODES = {'model': MODEL_STAGES, 'deep': DEEP_STAGES, 'deep_too': DEEP_TOO_STAGES}
 NEEDS = {'describe': ('translation',), 'formalize': ('translation', 'english'),
+         'select': ('translation', 'english'), 'adjudicate': ('translation', 'statements', 'checks'),
          'check': ('translation', 'statements'), 'prove': ('translation', 'statements', 'checks'),
          'refine': ('translation', 'models', 'deep_translation')}
 OUTPUT = {'model': 'translation', 'translate': 'translation', 'describe': 'english', 'formalize': 'statements',
-          'check': 'checks', 'prove': 'proofs', 'refine': 'refine'}
+          'check': 'checks', 'prove': 'proofs', 'refine': 'refine', 'select': 'selection',
+          'adjudicate': 'adjudication'}
+STAGE_MODULE = {'select': 'judge', 'adjudicate': 'repair'}
 SKIP_DIRS = {'.git', '.hg', '.svn', '__pycache__', '.lake', 'node_modules', '.venv', 'venv', '.tox', 'build', 'dist'}
 
 
 def _impl(stage: str):
     """The stage function, imported lazily (tests replace this)."""
-    return getattr(importlib.import_module(f'autoform.nl.{stage}'), stage)
+    return getattr(importlib.import_module(f'autoform.nl.{STAGE_MODULE.get(stage, stage)}'), stage)
+
+
+def with_judge(stages: tuple) -> tuple:
+    """Insert `select` after describe and `adjudicate` after check."""
+    out = []
+    for s in stages:
+        out.append(s)
+        if s == 'describe':
+            out.append('select')
+        elif s == 'check':
+            out.append('adjudicate')
+    return tuple(out)
 
 
 def outputs(stage: str, mode: str) -> tuple:
@@ -159,12 +184,17 @@ def _result_cost(result) -> float:
 
 def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=True, runtime=True,
         budget_usd=None, resume=True, ref=None, subdir=None, domain_size=64, parallel=None,
-        deep=False, deep_too=False, second=True, repairs=3) -> dict:
+        deep=False, deep_too=False, second=True, repairs=3, judge=None, max_properties_per_function=None,
+        repair_rounds=2) -> dict:
+    """`judge=None` runs without the judge stages (select, adjudicate); the CLI default is 'auto'."""
     source = str(source)
     if not is_url(source) and Path(source).exists():
         source = str(Path(source).resolve())
     mode = 'deep_too' if deep_too else 'deep' if deep else 'model'
     stages = MODES[mode]
+    judge = None if judge in (None, 'none') else judge
+    if judge:
+        stages = with_judge(stages)
     module = module or default_module(source)
     lean_root = Path(lean_root).resolve() if lean_root else default_lean_root()
     out = Path(out) if out else Path.cwd() / 'artifacts/nl' / module
@@ -179,7 +209,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             previous = {}
     info = {'source': source, 'module': module, 'mode': mode, 'lean_root': str(lean_root), 'out': str(out),
             'functions': functions, 'prove': prove, 'runtime': runtime, 'budget_usd': budget_usd,
-            'second': second, 'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
+            'second': second, 'judge': judge, 'max_properties_per_function': max_properties_per_function,
+            'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
     spent = 0.0
 
     def save():
@@ -205,7 +236,14 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                            second, repairs)
         else:
             extra = {'describe': [functions], 'check': [runtime, domain_size], 'prove': [budget_usd],
-                     'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size]}.get(stage, [])
+                     'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size],
+                     'select': [judge, budget_usd, max_properties_per_function, prove],
+                     'adjudicate': [judge, _file_bytes(out, 'english'), _file_bytes(out, 'selection'), runtime,
+                                    domain_size, budget_usd, repair_rounds]}.get(stage, [])
+            if judge and stage == 'formalize':
+                extra = [_file_bytes(out, 'selection'), budget_usd]
+            if judge and stage == 'prove':
+                extra = extra + [_file_bytes(out, 'adjudication'), _file_bytes(out, 'selection')]
             inputs = _hash(*[_file_bytes(out, k) for k in NEEDS[stage]], *extra)
         rec['input_hash'] = inputs
         prev = previous.get(stage, {})
@@ -223,6 +261,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                 stale.replace(stale.with_name(stale.name + '.stale'))
         key = keys[0]
         started, box = time.time(), [0.0]
+        remaining = None if budget_usd is None else max(0.0, budget_usd - spent)
         try:
             with metered() as box:
                 fn = _impl(stage)
@@ -251,17 +290,38 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                             kw['functions'] = functions
                         result = fn(translation, out, **kw)
                     elif stage == 'formalize':
-                        result = fn(translation, _load(out, 'english'), out, **kw)
+                        selection = _load(out, 'selection') if judge else None
+                        if selection:
+                            from .judge import formalize_within_budget
+                            result = formalize_within_budget(fn, translation, _load(out, 'english'), out, selection,
+                                                             remaining, **kw)
+                        else:
+                            result = fn(translation, _load(out, 'english'), out, **kw)
+                    elif stage == 'select':
+                        result = fn(translation, _load(out, 'english'), out, judge=judge, budget_usd=remaining,
+                                    max_properties_per_function=max_properties_per_function, prove=prove)
+                    elif stage == 'adjudicate':
+                        result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out, judge=judge,
+                                    english=_load(out, 'english'), selection=_load(out, 'selection'),
+                                    models=_load(out, 'models'), formalize_fn=_impl('formalize'),
+                                    check_fn=_impl('check'), budget_usd=remaining, rounds=repair_rounds,
+                                    domain_size=domain_size, runtime=runtime)
                     elif stage == 'check':
                         result = fn(translation, _load(out, 'statements'), out, domain_size=domain_size,
                                     runtime=runtime)
                     else:
-                        remaining = None if budget_usd is None else max(0.0, budget_usd - spent)
                         if parallel:
                             kw['parallel'] = parallel
                         if stage == 'prove':
-                            result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out,
-                                        budget_usd=remaining, **kw)
+                            statements, checks = _load(out, 'statements'), _load(out, 'checks')
+                            adjudication = _load(out, 'adjudication') if judge else None
+                            if adjudication:   # repaired statements are proved too
+                                statements = statements + adjudication.get('statements', [])
+                                checks = checks + adjudication.get('checks', [])
+                            if judge:          # highest utility first: the budget runs out on the rest
+                                from .judge import order_by_utility
+                                statements = order_by_utility(statements, out)
+                            result = fn(translation, statements, checks, out, budget_usd=remaining, **kw)
                         else:
                             result = fn(translation, _load(out, 'models'), _load(out, 'deep_translation'), out,
                                         statements=_load(out, 'statements'), budget_usd=remaining,
@@ -288,13 +348,20 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             rec['note'] = info['fallback']
         save()
 
+    if judge:
+        try:
+            from .judge import finalize_decisions
+            info['decisions'] = finalize_decisions(out)
+        except Exception as exc:  # the decision log is diagnostics; never block the report
+            info['decisions'] = {'error': f'{type(exc).__name__}: {exc}'}
     from .report import report
     started = time.time()
     has_models = 'model' in stages and not info.get('fallback')
     try:
         rep = report(out, proofs=[] if not prove else None, run_info=info, functions=functions,
                      models=None if has_models else [], refine=None if mode == 'deep_too' else [],
-                     deep_translation=None if mode == 'deep_too' else {})
+                     deep_translation=None if mode == 'deep_too' else {},
+                     selection=None if judge else {}, adjudication=None if judge else {})
         info['stages']['report'] = {'status': 'ok', 'seconds': round(time.time() - started, 2),
                                     'output': FILES['report']}
     except Exception as exc:
@@ -329,7 +396,15 @@ def main(argv=None) -> int:
     ap.add_argument('--functions', nargs='+', default=[], help='only these functions (source or qualified names)')
     ap.add_argument('--no-prove', action='store_true', help='stop after checking')
     ap.add_argument('--no-runtime', action='store_true', help='do not execute the source code')
-    ap.add_argument('--budget-usd', type=float, help='total model spend cap (enforced for proving)')
+    ap.add_argument('--budget-usd', type=float,
+                    help='total model spend cap; with a judge it is allocated across functions by utility and '
+                         'enforced for formalize, repairs and proving (otherwise for proving only)')
+    ap.add_argument('--judge', default='auto',
+                    help='typed-decision judge for selection and counterexample adjudication: auto (SemIf if '
+                         'installed, else heuristic), semif, heuristic, replay:PATH, or none')
+    ap.add_argument('--max-properties-per-function', type=int,
+                    help='formalize at most N properties per function (highest utility first)')
+    ap.add_argument('--repair-rounds', type=int, default=2, help='repair rounds per refuted property (default 2)')
     ap.add_argument('--domain-size', type=int, default=64, help='points per bounded check (default 64)')
     ap.add_argument('--out', type=Path, help='run directory (default: ./artifacts/nl/<Module>)')
     ap.add_argument('--lean-root', type=Path, help='Lean project root (default: this checkout)')
@@ -340,7 +415,8 @@ def main(argv=None) -> int:
     res = run(a.source, module=a.module, out=a.out, lean_root=a.lean_root, functions=a.functions,
               prove=not a.no_prove, runtime=not a.no_runtime, budget_usd=a.budget_usd, resume=not a.no_resume,
               ref=a.ref, subdir=a.subdir, domain_size=a.domain_size, parallel=a.parallel, deep=a.deep,
-              deep_too=a.deep_too, second=not a.no_second, repairs=a.repairs)
+              deep_too=a.deep_too, second=not a.no_second, repairs=a.repairs, judge=a.judge,
+              max_properties_per_function=a.max_properties_per_function, repair_rounds=a.repair_rounds)
     for name, st in res['run']['stages'].items():
         print(f"{name:10s} {st.get('status'):9s} {st.get('seconds', '')!s:>8}s  ${st.get('cost_usd', 0)}"
               + (f"  {st['error'].splitlines()[0][:140]}" if st.get('error') else ''))
@@ -353,6 +429,10 @@ def main(argv=None) -> int:
         if lv:
             print('by level: ' + '; '.join(f"{k}: {v['functions']} functions, {v['proved']} proved"
                                            for k, v in lv.items()))
+    dec = res['run'].get('decisions') or {}
+    if dec.get('decisions') is not None:
+        print(f"judge decisions {dec['decisions']} (forced {dec['forced']}); JEVBench rows {dec['jevbench_rows']} "
+              f"{dec.get('labels')}")
     print(f"Report: {res['report_md']}")
     if not (Path(res['out']) / FILES['translation']).is_file():
         return 2

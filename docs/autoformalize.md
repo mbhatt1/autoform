@@ -21,6 +21,14 @@ the stage contracts are in `src/autoform/nl/schema.py`.
    report ────► report.json, report.md
 ```
 
+With a judge (`--judge`, on by default from the CLI) two stages join the pipeline:
+
+```
+   describe ─► select ─────► selection.json     rank + budget the English properties (judge)
+   formalize … check ─► adjudicate ─► adjudication.json   classify counterexamples, repair (judge)
+   … prove (original + repaired statements, highest utility first) ─► report
+```
+
 Each stage reads and writes JSON in one run directory (default `artifacts/nl/<Module>`).
 `run.json` records each stage's input hash, output hash, status, time and spend; a rerun
 skips any stage whose inputs and outputs are unchanged, and a failed stage does not stop
@@ -73,12 +81,147 @@ statements are untrusted: a statement may not mean what its English says.
 
 - **Potential bugs** come first. These are statements refuted on a validated model (or on the
   deep translation) whose English came from docs or tests. The code contradicts what its
-  documentation says.
+  documentation says. With a judge, the rule is stricter: the judge must also read the
+  counterexample as REAL_BUG with a confident intent (cross-validation, below); REAL_BUG
+  without that support is listed as a *suspected bug*.
 - **Model defects** are statements with status REFUTED_RUNTIME only. The statement holds on
   the model but fails on a real run, so the model and the code disagree. They are listed
   separately and are not bug reports.
 - Refutations whose English was read off the implementation, and refutations on a model that
   did not validate, are listed last.
+
+## Selection, budget, adjudication and repair (`judge.py`, `repair.py`)
+
+The judge is the harness's typed-decision judge (`autoform.harness.judge`, see
+[`harness.md`](harness.md)): a state, a question and typed options go in, one score per
+option comes out. `--judge semif` uses SemIf/OpenJev (Qwen3.5-4B on MLX from
+`~/semif/.venv`; weights load once per run), `heuristic` uses the deterministic priors each
+decision computes anyway (offline, reproducible), `replay:PATH` re-reads the scores of a
+previous `decisions.jsonl`, `auto` (the default) takes SemIf when it is installed, and
+`none` turns both stages off.
+
+**Trust: the judge never sets a status.** It chooses what to formalize first, how to read a
+counterexample and which repair to try. PROVED, BOUNDED_HOLDS and REFUTED_* still come only
+from Lean (elaboration, `decide +kernel`, kernel-checked proofs) and real executions. A
+repaired property is a new, separately checked statement; the refuted original stays
+refuted.
+
+### Selection (`select`)
+
+Per function the judge sees the *interface* only (name, signature, docstring, tests,
+callers), never the body: shown `return True`, a judge rates "always returns True" as the
+intended contract. It makes three kinds of decision:
+
+| decision | over | options |
+|---|---|---|
+| `PROPERTY_JUDGMENT` | each English property | USEFUL_PROPERTY, SECURITY_RELEVANT, TRIVIAL, UNSUPPORTED_BY_EVIDENCE, TOO_STRONG, TOO_WEAK, LIKELY_VACUOUS |
+| `PROPERTY_SELECTION` | the function's properties, listwise | which is most worth proving |
+| `INTENT_SELECTION` | each group of mutually incompatible properties | which reading is intended |
+
+Two properties are incompatible when they state different outcomes for the same call on
+the same condition or domain ("If b is 0, f(a, b) raises …" / "… returns 0"; "For all
+integers a and b, add(a, b) returns a + b" / "… a − b"). "Returns an integer" is compatible
+with any specific value. The utility is
+
+    U = .30·Useful + .25·Security + .20·Selection + .20·Evidence + .10·Nontrivial
+        − .10·Unsupported − .05·TooStrong − .10·(implementation-only evidence)
+        + .10 if the chosen intent of its rival group, − .15 if a losing reading
+
+where Evidence weighs tests .5, docstring .4, callers .3, comments .2, name .15 (capped at
+1), and Security is at least .5 when the property, name or docstring mentions an
+authorization, validation or integrity term.
+
+### Budget (`--budget-usd`, `--max-properties-per-function`)
+
+Every property is estimated at formalize + prove cost (`AUTOFORM_EST_FORMALIZE_USD`,
+default $0.05; `AUTOFORM_EST_PROVE_USD`, default $0.60; prove is left out with
+`--no-prove`). Priority is utility × 0.85^rank, where rank is the property's place inside
+its function, so the best property of each function comes before the third-best of
+another. Properties are admitted in priority order until the next estimate would exceed
+what is left of the budget after `describe`; that one and every later one are skipped
+("budget: estimated $X would exceed $B"). A property past the per-function cap is skipped
+with that reason. Then the money is actually spent in the same order:
+
+- `formalize` runs the admitted properties in waves of three and stops once its measured
+  spend reaches the remaining budget; the rest are recorded in `budget.json`;
+- `adjudicate` formalizes a repair only if one more formalization fits;
+- `prove` receives the statements (original and repaired) in utility order, and the prover
+  stops starting agent calls when the budget is gone (`budget exhausted` in the proof
+  reason). Calls already in flight finish, so the spend can overshoot by up to one agent
+  call per prover worker (in the SemIf run below: $6.10 spent by prove against $4.83 left).
+
+The report's **Spent vs budget** section lists the budget, the spend per stage, the
+planned spend and every skip with its stage and reason; each function lists its skipped
+properties.
+
+### Counterexample adjudication (`adjudicate`)
+
+For each REFUTED_MODEL / REFUTED_RUNTIME statement, deterministic gates run first:
+
+| fact | allowed classes |
+|---|---|
+| REFUTED_RUNTIME only (holds on the model, fails on the code) | INCOMPLETE_MODEL (forced) |
+| the model's outcome at the witness is a hole or out of fuel | INCOMPLETE_MODEL (forced) |
+| the real code satisfies the statement on every checked input | INCOMPLETE_MODEL (forced) |
+| otherwise | REAL_BUG, BAD_SPEC |
+| … and the witness lies outside the inputs the docstring or tests use (or none is known) | + MISSING_PRECONDITION |
+| … and the real code was not run | + ABSTRACTION_ARTIFACT |
+| the property lost its INTENT_SELECTION | − REAL_BUG |
+
+The tested domain is read from the literal arguments of calls in the tests and doctest
+examples (per parameter: its types, the numeric range, and for strings the values
+themselves); the documented domain from phrases like
+"b must be nonzero". The judge (`COUNTEREXAMPLE_CLASSIFICATION`) then chooses among the
+allowed classes, shown the function source, the English, the Lean pre/postcondition, the
+counterexample, the model's and the real code's outcomes.
+
+- **REAL_BUG** becomes a *finding* only if cross-validated: the property has evidence other
+  than "implementation", and its intent is confident (it is the chosen reading of its rival
+  group with probability ≥ 0.8, or it has no rival and was not judged
+  UNSUPPORTED_BY_EVIDENCE or TOO_STRONG). Otherwise it is a *suspected bug* for review. A
+  REAL_BUG is never repaired.
+- **INCOMPLETE_MODEL** gets a `MODEL_DEFECT_CLASSIFICATION` (hole ⇒ UNMODELED_CONSTRUCT or
+  FRONTEND_MISTRANSLATION; out of fuel ⇒ FUEL_BOUND; otherwise SEMANTICS_MISMATCH or
+  FRONTEND_MISTRANSLATION) and a report entry naming the model (the AI-written def, or the
+  deep translation). Repairing models is the model stage's job.
+- **BAD_SPEC / MISSING_PRECONDITION** are repaired.
+
+### Repair
+
+Candidates are restatements of the English, generated deterministically:
+
+- a precondition from the code's own guards (`if C: raise` ⇒ `not C`; `assert C` ⇒ `C`;
+  `if C: return …` ⇒ `C` or `not C`), from the docstring ("b must be nonzero" ⇒ `b != 0`),
+  or from the tested domain (`x >= 0`, `x > 0`, `lo <= x <= hi` from the tested values);
+- a weakening: one direction of "exactly when" / "if and only if", or allowing the exception
+  the model raised at the witness;
+- REJECT (the property does not describe intended behavior).
+
+A precondition that mentions a witness value found nowhere in the code, docstring, tests
+or English is never offered, and neither is one the witness satisfies (it would not
+exclude the counterexample). With several preconditions, `PRECONDITION_SELECTION` picks
+one; `REPAIR_SELECTION` then weighs it against the weakenings and REJECT. The chosen
+restatement (`p2` → `p2_r1`) goes through formalize → check again, and later prove. A repair
+refuted again is adjudicated again, for at most `--repair-rounds` rounds (default 2); a
+refutation after the last round is classified but not repaired (`repair_limit`). Every
+repaired property and statement keeps a `parent` link, and the report shows the lineage.
+
+### Decision log and JEVBench
+
+Every judge decision (task, state, options, scores, choice, backend; forced ones included)
+goes to `decisions-select.jsonl` / `decisions-adjudicate.jsonl`. At the end of the run they
+are joined with the verifier outcomes into `decisions.jsonl`, and `jevbench.jsonl` labels
+each unforced decision where verification settles it: the harness rules
+(`harness/bench.py`: an established statement ⇒ USEFUL/SECURITY acceptable; the class
+whose repair was then established ⇒ right, refuted again ⇒ wrong; …), plus:
+
+| task | rule added for this flow |
+|---|---|
+| `PROPERTY_JUDGMENT` | skipped for budget/cap or never formalized ⇒ unlabeled; UNCHECKABLE ⇒ unlabeled (a precondition no domain point meets may be vacuous, or the finite domain may miss the one input it is about); refutation attributed to the model ⇒ unlabeled |
+| `COUNTEREXAMPLE_CLASSIFICATION`, `REPAIR_SELECTION`, `PRECONDITION_SELECTION` | repaired statement REFUTED_RUNTIME (a model defect) ⇒ unlabeled; repair did not elaborate ⇒ unlabeled; repair skipped for budget ⇒ unlabeled |
+
+`python -m autoform.harness.bench fit-temperature <run>/jevbench.jsonl --out t.json` fits
+per-task temperatures from these rows, as for the harness.
 
 ## The L1 step (`refine.py`, `--deep-too`)
 
@@ -102,6 +245,8 @@ autoform autoformalize ./src MyLib --deep           # the deep Joern translation
 autoform autoformalize ./src MyLib --deep-too       # both, and attempt L1
     [--functions f g] [--no-second] [--repairs N] [--no-prove] [--no-runtime]
     [--budget-usd X] [--domain-size N] [--parallel N] [--out DIR] [--no-resume]
+    [--judge auto|semif|heuristic|replay:PATH|none] [--max-properties-per-function N]
+    [--repair-rounds N]
 ```
 
 Exit status: 2 if no translation was produced, 1 if there are potential bugs, else 0.
@@ -111,7 +256,7 @@ Exit status: 2 if no translation was produced, 1 if there are potential bugs, el
 Every language-model call goes through headless Claude Code (`llm.py`). Calls that use no
 tools are cached on disk by prompt, so rerunning one costs nothing.
 The prove and L1 stages call an agent per statement. `--budget-usd` caps the total spend
-of those two stages, and accepted proofs are cached and re-checked by the kernel, not
+of those two stages (with a judge, also of formalize and repairs, allocated by utility), and accepted proofs are cached and re-checked by the kernel, not
 trusted. The per-stage spend is listed in `run.json` and in the report.
 
 ## Limits

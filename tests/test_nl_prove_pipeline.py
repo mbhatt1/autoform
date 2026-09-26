@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 from autoform.harness import prover  # noqa: E402
 from autoform.nl import pipeline, report as nl_report  # noqa: E402
 from autoform.nl import prove as nl_prove  # noqa: E402
-from autoform.nl.schema import (CheckResult, EnglishProperty, EnglishSpec, FILES,  # noqa: E402
+from autoform.nl.schema import (CheckResult, EnglishProperty, EnglishSpec, FILES, JUDGE_FILES,  # noqa: E402
                                 Statement, dump)
 
 FIXTURE = ROOT / 'tests/fixtures/nl/translation-PipelinePython.json'
@@ -97,7 +97,7 @@ def test_pipeline_runs_every_stage_and_resumes(tmp_path, monkeypatch):
     assert run['stages']['prove']['cost_usd'] == 2.0 and run['cost_usd'] == 2.0
     assert res['totals']['proved'] == 1 and res['potential_bugs'] == 1
     for k, f in FILES.items():
-        if k not in ('models', 'deep_translation', 'refine'):
+        if k not in ('models', 'deep_translation', 'refine') + JUDGE_FILES:
             assert (out / f).is_file(), f
     # Unchanged inputs: nothing reruns.
     stubs.calls.clear()

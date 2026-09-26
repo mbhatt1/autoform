@@ -10,6 +10,14 @@ Findings first:
   other refutations   English read off the implementation alone (likely mis-formalized),
                       or refuted on a model that did not validate.
 
+With a judge (selection.json / adjudication.json present) the finding rule is the
+cross-validated one: a refuted statement is a potential bug only if the judge read the
+counterexample as REAL_BUG, the property has evidence other than the implementation, and
+its intent is confident (autoform.nl.repair). REAL_BUG without that support is a suspected
+bug; INCOMPLETE_MODEL readings join the model defects; BAD_SPEC / MISSING_PRECONDITION
+readings are listed with their repair lineage. Each statement shows the judge's reading,
+and each function the properties skipped for budget. The judge never sets a status.
+
 Every function carries a trust level and every statement inherits one:
   L1    the model is proved equal to the deep translation (refine.json) at the
         statement's argument shape;
@@ -69,8 +77,41 @@ def _shape(stmt: dict):
     return statement_shape(stmt)
 
 
+def _lineage(sid: str, lineage: dict) -> list:
+    chain, seen = [sid], {sid}
+    while (lineage.get(chain[0]) or {}).get('parent') and lineage[chain[0]]['parent'] not in seen:
+        chain.insert(0, lineage[chain[0]]['parent'])
+        seen.add(chain[0])
+    return chain
+
+
+def budget_summary(run_info: dict, selection: dict, budget: dict, proofs_by: dict) -> dict:
+    stages = (run_info or {}).get('stages') or {}
+    skipped = {'selection': [dict(function=r['function'], property=r['property'], reason=r['skip_reason'])
+                             for r in (selection or {}).get('properties', []) if not r.get('selected')]}
+    for sk in (budget or {}).get('skipped', []):
+        skipped.setdefault(sk.get('stage', '?'), []).append(sk)
+    skipped['prove'] = [dict(statement=k, reason=p.get('reason', '')[:120]) for k, p in proofs_by.items()
+                        if str(p.get('reason', '')).startswith('budget exhausted')]
+    return dict(budget_usd=(run_info or {}).get('budget_usd', (selection or {}).get('budget_usd')),
+                spent_usd=(run_info or {}).get('cost_usd'), planned_usd=(selection or {}).get('planned_usd'),
+                estimates=(selection or {}).get('estimates'),
+                by_stage={k: v.get('cost_usd') for k, v in stages.items() if v.get('cost_usd') is not None},
+                skipped={k: v for k, v in skipped.items() if v})
+
+
 def build(translation, english, statements, checks, proofs, *, run_info=None, functions=None,
-          models=None, refine=None, deep_translation=None) -> dict:
+          models=None, refine=None, deep_translation=None, selection=None, adjudication=None,
+          budget=None) -> dict:
+    adj = _d(adjudication or {})
+    judged = bool(adj.get('records') is not None and adj) or bool(selection)
+    statements = list(statements or []) + list(adj.get('statements') or [])
+    checks = list(checks or []) + list(adj.get('checks') or [])
+    lineage = adj.get('lineage') or {}
+    records = {r['statement']: r for r in adj.get('records') or []}
+    sel_rows = {r['statement']: r for r in (selection or {}).get('properties', [])}
+    repaired_props = {(p['function'], p['id']): p for p in adj.get('properties') or []}
+    suspected, adjudicated = [], []
     translation = _d(translation or {})
     fns = [_d(f) for f in translation.get('functions', [])]
     specs = {e['function']: e for e in map(_d, english or [])}
@@ -78,6 +119,7 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
     proofs_by = {p['statement']: p for p in map(_d, proofs or [])}
     stmts = [_d(s) for s in statements or []]
     props = {(e['function'], p['id']): _d(p) for e in specs.values() for p in e.get('properties', [])}
+    props.update(repaired_props)
     models_by = {m['function']: m for m in map(_d, models or [])}
     refine_by = {r['function']: r for r in map(_d, refine or [])}
     modelled = bool(models_by)
@@ -136,6 +178,17 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                 'proof': {k: p.get(k) for k in ('status', 'certificate', 'axioms', 'reason', 'seconds', 'cost_usd')}
                 if p else None,
             }
+            if judged:
+                row, rec = sel_rows.get(s['id']) or {}, records.get(s['id']) or {}
+                entry['judge'] = {k: row.get(k) for k in ('utility', 'priority', 'order', 'selection_probability',
+                                                          'intent')} if row else None
+                if row:
+                    entry['judge']['judgment'] = (row.get('judgment') or {}).get('label')
+                entry['adjudication'] = {k: rec.get(k) for k in (
+                    'classification', 'allowed', 'forced', 'facts', 'disposition', 'cross_validation',
+                    'repair', 'repaired_by', 'model_defect', 'round', 'decision')} if rec else None
+                entry['parent'] = (lineage.get(s['id']) or {}).get('parent')
+                entry['lineage'] = _lineage(s['id'], lineage) if entry['parent'] else []
             entries.append(entry)
             if c.get('status') in REFUTED:
                 item = dict(function=fn['name'], source_name=fn.get('source_name'), file=fn.get('file'),
@@ -143,7 +196,19 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                             **{k: entry[k] for k in ('id', 'english', 'evidence', 'lean', 'trust')},
                             status=c['status'], counterexample=c.get('counterexample'))
                 validated = not modelled or (m or {}).get('status') == 'VALIDATED'
-                if c['status'] == 'REFUTED_RUNTIME':
+                rec = records.get(s['id']) if judged else None
+                if rec:
+                    item.update(classification=rec.get('classification'), disposition=rec.get('disposition'),
+                                cross_validation=rec.get('cross_validation'), model_defect=rec.get('model_defect'),
+                                repair=rec.get('repair'), repaired_by=rec.get('repaired_by'),
+                                parent=entry.get('parent'))
+                if rec and validated and c['status'] == 'REFUTED_MODEL':
+                    disp = rec.get('disposition')
+                    (bugs if disp == 'finding' else suspected if disp == 'suspected_bug'
+                     else defects if disp == 'model_defect' else adjudicated).append(item)
+                elif judged and not rec and validated and c['status'] == 'REFUTED_MODEL':
+                    adjudicated.append(dict(item, disposition='not adjudicated'))
+                elif c['status'] == 'REFUTED_RUNTIME':
                     defects.append(item)
                 elif not validated:
                     unvalidated.append(item)
@@ -156,7 +221,14 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
             l1_info = {k: l1.get(k) for k in ('status', 'level', 'deep_function', 'reason', 'cost_usd')}
             keep = ('kinds', 'theorem', 'statement', 'status', 'certificate', 'axioms', 'reason', 'bounded')
             l1_info['shapes'] = [{k: sh.get(k) for k in keep} for sh in l1.get('shapes', [])]
-        out_fns.append({'name': fn['name'], 'source_name': fn.get('source_name'), 'file': fn.get('file'),
+        budget_skips = [dict(property=r['property'], english=r['text'], reason=r['skip_reason'], stage='selection',
+                             utility=r.get('utility'))
+                        for r in (selection or {}).get('properties', [])
+                        if r['function'] == fn['name'] and not r.get('selected')]
+        budget_skips += [dict(sk, english=props.get((fn['name'], sk.get('property')), {}).get('text', ''))
+                         for sk in (budget or {}).get('skipped', []) if sk.get('function') == fn['name']]
+        out_fns.append({'budget_skips': budget_skips if judged else [],
+                        'name': fn['name'], 'source_name': fn.get('source_name'), 'file': fn.get('file'),
                         'line': fn.get('line'), 'eligible': not reasons, 'skipped': reasons, 'level': level,
                         'model': model_info, 'l1': l1_info,
                         'summary': spec.get('summary', ''), 'properties': entries})
@@ -204,13 +276,25 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
         'l1_proved': sum(1 for r in refine_by.values() if r.get('level') == 'L1'),
         'by_level': by_level,
     }
+    if judged:
+        dispositions: dict = {}
+        for r in records.values():
+            dispositions[r.get('disposition')] = dispositions.get(r.get('disposition'), 0) + 1
+        totals.update(suspected_bugs=len(suspected), repaired_statements=len(adj.get('statements') or []),
+                      adjudicated=len(records), dispositions=dispositions,
+                      judge=((selection or {}).get('judge') or adj.get('judge') or {}).get('backend'),
+                      properties_selected=(selection or {}).get('selected'),
+                      properties_skipped=(selection or {}).get('skipped'),
+                      decisions=(run_info or {}).get('decisions'))
     return {'module': translation.get('module'), 'language': translation.get('language'),
             'source_root': translation.get('source_root'), 'source_revision': translation.get('source_revision'),
             'call_template': translation.get('call_template'),
             'deep_call_template': deep_tr.get('call_template'),
             'trust': TRUST, 'totals': totals,
             'findings': {'potential_bugs': bugs, 'model_defects': defects,
-                         'refuted_implementation_only': mismatches, 'refuted_unvalidated_model': unvalidated},
+                         'refuted_implementation_only': mismatches, 'refuted_unvalidated_model': unvalidated,
+                         **({'suspected_bugs': suspected, 'refuted_adjudicated': adjudicated} if judged else {})},
+            'budget': budget_summary(run_info, selection, budget, proofs_by) if judged else None,
             'functions': out_fns, 'run': run_info or {}}
 
 
@@ -283,22 +367,62 @@ def markdown(rep: dict) -> str:
             note = (st.get('error') or '').splitlines()[0][:120] if st.get('error') else st.get('note', '')
             md.append(f"| {name} | {st.get('status')} | {st.get('seconds', '')} | {st.get('cost_usd', '')} | {note} |")
         md.append('')
+    b = rep.get('budget')
+    if b:
+        spent = b.get('spent_usd')
+        md += ['## Spent vs budget', '',
+               f"- budget: {'$%.2f' % b['budget_usd'] if b.get('budget_usd') is not None else 'none'}; spent: "
+               f"${spent or 0:.2f}; planned at selection: ${b.get('planned_usd') or 0:.2f} "
+               f"(estimate ${((b.get('estimates') or {}).get('per_property_usd') or 0):.2f} per property)",
+               '- by stage: ' + (', '.join(f'{k} ${v}' for k, v in (b.get('by_stage') or {}).items()) or 'n/a')]
+        for stage, items in (b.get('skipped') or {}).items():
+            md.append(f"- skipped at {stage}: {len(items)}")
+            for it in items[:12]:
+                md.append(f"  - {it.get('function', '').rsplit('.', 1)[-1]} {it.get('property') or it.get('statement')}: "
+                          f"{it.get('reason')}")
+        dec = t.get('decisions') or {}
+        if dec.get('decisions') is not None:
+            md.append(f"- judge ({t.get('judge')}): {dec['decisions']} decisions ({dec['forced']} forced by the "
+                      f"gates); JEVBench rows {dec['jevbench_rows']}, labels {dec.get('labels')}")
+        md.append('')
     f = rep['findings']
     md += ['## Findings', '']
+    judged = 'suspected_bugs' in f
     if f['potential_bugs']:
-        md += ['### Potential bugs (refuted on a validated model; the English came from docs or tests)', '']
+        md += ['### Potential bugs (' + ('judge: REAL_BUG, cross-validated by evidence other than the implementation '
+                                         'and a confident intent' if judged else
+                                         'refuted on a validated model; the English came from docs or tests') + ')', '']
         for x in f['potential_bugs']:
             md += [f"- **{x['source_name']}** ({x['file']}:{x['line']}) — {x['status']} [{x.get('trust')}]: "
                    f"{x['english']}",
                    f"  - evidence: {', '.join(map(str, x['evidence']))}",
                    f"  - counterexample: {_ce(x) or 'n/a'}", f"  - Lean: `{x['lean']}`"]
+            if x.get('cross_validation'):
+                md.append(f"  - cross-validation: {x['cross_validation']}")
         md.append('')
     else:
         md += ['No potential bugs: no refuted statement on a validated model is backed by documentation or tests.', '']
+    if f.get('suspected_bugs'):
+        md += ['### Suspected bugs (judge: REAL_BUG, but not cross-validated; for review)', '']
+        for x in f['suspected_bugs']:
+            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'}) — "
+                      f"{x.get('cross_validation')}")
+        md.append('')
     if f.get('model_defects'):
-        md += ['### Model defects (REFUTED_RUNTIME: the model and the real code disagree; not bug reports)', '']
+        md += ['### Model defects (the model and the real code disagree; not bug reports)', '']
         for x in f['model_defects']:
-            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'})")
+            d = x.get('model_defect') or {}
+            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'})"
+                      + (f" — {d.get('classification')} in `{d.get('model')}` ({d.get('gate')}; owner: "
+                         f"{d.get('owner')})" if d else ''))
+        md.append('')
+    if f.get('refuted_adjudicated'):
+        md += ['### Refuted, adjudicated as not a bug (repair lineage in the function sections)', '']
+        for x in f['refuted_adjudicated']:
+            r = x.get('repair') or {}
+            md.append(f"- {x['source_name']} {x['id']}: {x.get('classification')} → {x.get('disposition')}"
+                      + (f" ({r.get('kind')}: {r.get('english') or r.get('text')} → `{x.get('repaired_by')}`)"
+                         if x.get('repaired_by') else '') + f" — {x['english']}")
         md.append('')
     if f['refuted_implementation_only']:
         md += ['### Refuted, English read off the implementation (likely mis-formalized)', '']
@@ -329,8 +453,37 @@ def markdown(rep: dict) -> str:
                    (f" — certificate `{pr['certificate']}`, axioms {pr.get('axioms')}" if pr.get('status') == 'PROVED'
                     else (f" — {pr['reason'][:200]}" if pr.get('reason') else '')),
                    f"  - trust: {p.get('trust')}"]
+            md += _judge_lines(p)
+        for sk in fn.get('budget_skips') or []:
+            md.append(f"- skipped {sk.get('property')} ({sk.get('stage')}): {sk.get('reason')} — {sk.get('english', '')}")
         md.append('')
     return '\n'.join(md) + '\n'
+
+
+def _judge_lines(p: dict) -> list:
+    out = []
+    j = p.get('judge')
+    if j:
+        intent = j.get('intent') or {}
+        out.append(f"  - judge: {j.get('judgment')}, utility {j.get('utility')}, order {j.get('order')}"
+                   + (f"; intent {'chosen' if intent.get('chosen') else 'rival'} (p={intent.get('probability')})"
+                      if intent else ''))
+    a = p.get('adjudication')
+    if a:
+        r = a.get('repair') or {}
+        out.append(f"  - counterexample reading: {a.get('classification')}"
+                   + (' (forced by the gates)' if a.get('forced') else f" among {', '.join(a.get('allowed') or [])}")
+                   + f" → {a.get('disposition')}")
+        if r.get('chosen'):
+            out.append(f"  - repair: {r.get('chosen')} ({r.get('kind')})"
+                       + (f": \"{r.get('english')}\"" if r.get('english') else '')
+                       + (f" → `{a.get('repaired_by')}`" if a.get('repaired_by') else '')
+                       + (f"; {r.get('skipped')}" if r.get('skipped') else ''))
+        if a.get('model_defect'):
+            out.append(f"  - model defect: {a['model_defect'].get('classification')} in `{a['model_defect'].get('model')}`")
+    if p.get('parent'):
+        out.append(f"  - repaired from `{p['parent']}` (lineage: {' → '.join(p.get('lineage') or [])})")
+    return out
 
 
 def _load(out: Path, key: str):
@@ -342,7 +495,8 @@ def _load(out: Path, key: str):
 
 
 def report(out_dir, *, translation=None, english=None, statements=None, checks=None, proofs=None,
-           run_info=None, functions=None, models=None, refine=None, deep_translation=None) -> dict:
+           run_info=None, functions=None, models=None, refine=None, deep_translation=None, selection=None,
+           adjudication=None) -> dict:
     """Build from the given stage outputs, or from the JSON files in `out_dir`."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -350,7 +504,9 @@ def report(out_dir, *, translation=None, english=None, statements=None, checks=N
     rep = build(get(translation, 'translation') or {}, get(english, 'english') or [],
                 get(statements, 'statements') or [], get(checks, 'checks') or [], get(proofs, 'proofs') or [],
                 run_info=run_info, functions=functions, models=get(models, 'models') or [],
-                refine=get(refine, 'refine') or [], deep_translation=get(deep_translation, 'deep_translation') or {})
+                refine=get(refine, 'refine') or [], deep_translation=get(deep_translation, 'deep_translation') or {},
+                selection=get(selection, 'selection') or {}, adjudication=get(adjudication, 'adjudication') or {},
+                budget=_load(out, 'budget') if selection is None else None)
     (out / FILES['report']).write_text(json.dumps(rep, indent=1, ensure_ascii=False, default=str))
     (out / 'report.md').write_text(markdown(rep))
     return rep
