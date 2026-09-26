@@ -119,7 +119,13 @@ def describe_outcome(desc) -> str:
     if not isinstance(desc, dict):
         return 'not run'
     if 'k' in desc:        # the model stage's runner (pyvalues tags)
-        return pv.display(pv.canon_outcome(desc)) if pv.canon_outcome(desc) else desc['k']
+        text = pv.display(pv.canon_outcome(desc)) if pv.canon_outcome(desc) else desc['k']
+        if desc.get('k') == 'ok' and 'post' not in desc and desc['v'][0] != 'n':
+            kinds = {'i': 'int', 'b': 'bool', 's': 'str', 'f': 'float', 't': 'tuple', 'l': 'list', 'd': 'dict',
+                     'y': 'bytes', 'F': 'type'}
+            name = kinds.get(desc['v'][0]) or (desc['v'][2] if desc['v'][0] == 'S' else desc['v'][1])
+            text += f' ({name})'
+        return text
     if desc.get('kind') == 'exception':
         return f"raises {desc.get('type')}"
     if desc.get('kind') == 'value':
