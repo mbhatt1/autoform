@@ -100,7 +100,8 @@ IMPURE_MODULES = {
     'concurrent': 'threads', 'queue': 'threads', 'mmap': 'file access', 'resource': 'process state',
     'shelve': 'file access', 'dbm': 'file access', 'zipfile': 'file access', 'tarfile': 'file access',
     'gzip': 'file access', 'bz2': 'file access', 'lzma': 'file access', 'fileinput': 'file access',
-    'weakref': 'object lifetime', 'inspect': 'reflection',
+    'weakref': 'object lifetime', 'inspect': 'reflection', 'urllib3': 'network', 'ssl': 'network',
+    'email': 'I/O', 'mimetypes': 'environment', 'netrc': 'file access',
 }
 MUTATING_METHODS = {'append', 'extend', 'insert', 'pop', 'remove', 'clear', 'update', 'add', 'discard',
                     'setdefault', 'popitem', 'sort', 'reverse', 'write', '__setitem__', '__delitem__'}
@@ -174,6 +175,7 @@ class _Module:
     top_funcs: dict = field(default_factory=dict)  # name -> qualified function name
     globals: set = field(default_factory=set)     # module-level assigned names
     classes: dict = field(default_factory=dict)   # qualified class name -> _Class
+    repo_tops: set = field(default_factory=set)   # top-level packages of the repository itself
 
 
 @dataclass
@@ -432,6 +434,8 @@ def _impure_module(mod: _Module, name: str) -> str | None:
         return None
     target = imp[1]
     top = target.split('.')[0] if target else ''
+    if top in mod.repo_tops:        # the repository's own package (e.g. `requests` inside requests)
+        return None
     if top in IMPURE_MODULES:
         return top
     return None
@@ -535,6 +539,34 @@ def _callees(node, mod: _Module, mods_by_dotted: dict, local: set) -> list:
                     if other is not None:
                         target = other.top_funcs.get(fname)
         if target and target not in out:
+            out.append(target)
+    return out
+
+
+EFFECT_WORDS = tuple(sorted(set(IMPURE_MODULES.values()) | set(IMPURE_CALLS.values()) | {'module-level state'}))
+
+
+def _effectful(f) -> bool:
+    """Is `f` excluded because it has an external effect (I/O, time, randomness, network,
+    module state...), as opposed to a modelling limitation (generator, closure, ...)?"""
+    return f is not None and bool(f.reason) and any(w in f.reason for w in EFFECT_WORDS)
+
+
+def _instantiated(node, mod: '_Module', by_dotted: dict) -> list:
+    """Repository classes the body calls (instantiates): `C(...)`, `mod.C(...)`."""
+    out = []
+    local = _local_names(node)
+    for n in ast.walk(node):
+        if not isinstance(n, ast.Call):
+            continue
+        dotted = _dotted(n.func)
+        if not dotted or dotted.split('.')[0] in local:
+            continue
+        try:
+            kind, target = _resolve_class(mod, n.func, by_dotted)
+        except (KeyError, ValueError):
+            continue
+        if kind == 'repo' and target not in out:
             out.append(target)
     return out
 
@@ -724,7 +756,9 @@ def _tests_for(fn: _Fn, lines: list, limit: int = 12) -> list:
 def _discover(source_root: Path, functions=None, tests=()):
     root = Path(source_root).resolve()
     mods = _parse_modules(root)
+    tops = {m.dotted.split('.')[0] for m in mods.values() if m.dotted}
     for mod in mods.values():
+        mod.repo_tops = tops
         _collect_classes(mod)
         for node, qual, cls in _walk_defs(mod):
             if cls is None:
@@ -760,7 +794,10 @@ def _discover(source_root: Path, functions=None, tests=()):
         for c in f.callees:
             if c in by_name and f.info.name not in by_name[c].info.callers:
                 by_name[c].info.callers.append(f.info.name)
-    # impurity is transitive through repository callees
+    # impurity is transitive through repository callees, and through the repository classes a
+    # function instantiates: an object whose methods do I/O, time, randomness, ... (e.g. a
+    # session that sends requests) makes its creator impure, since the calls on it are not tracked
+    made = {id(f): _instantiated(f.node, f.mod, by_dotted) for f in fns}
     changed = True
     while changed:
         changed = False
@@ -771,6 +808,16 @@ def _discover(source_root: Path, functions=None, tests=()):
                 g = by_name.get(c)
                 if g is not None and g.reason and not g.reason.startswith(('method', 'decorated')):
                     f.reason = f'calls {g.info.source_name}, which is not pure ({g.reason})'
+                    changed = True
+                    break
+            if f.reason:
+                continue
+            for cls in made[id(f)]:
+                bad = next(((c, m) for c in cls.mro() for m in c.methods
+                            if _effectful(by_name.get(_fn_name(c, m)))), None)
+                if bad is not None:
+                    g = by_name[_fn_name(*bad)]
+                    f.reason = f'creates a {cls.name}, whose method {g.qual} is not pure ({g.reason})'
                     changed = True
                     break
     # a method's receiver is built by its class's __init__: if that is not modelled because it
@@ -1650,8 +1697,11 @@ try:
             with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
                 try:
                     import pytest
-                    rc = int(pytest.main([d, '-q', '-p', 'no:cacheprovider', '--no-header']))
                 except ImportError:
+                    pytest = None
+                if pytest is not None:
+                    rc = int(pytest.main([d, '-q', '-p', 'no:cacheprovider', '--no-header']))
+                else:
                     import unittest
                     suite = unittest.TestLoader().discover(d, top_level_dir=os.path.dirname(d))
                     rc = 0 if unittest.TextTestRunner(stream=buf, verbosity=0).run(suite).wasSuccessful() else 1
@@ -2415,6 +2465,19 @@ class _Context:
             return None
         return self.structs.get(fn.cls.dotted)
 
+    def outside(self, outcomes: list) -> list:
+        """Outcomes whose returned object or receiver after the call has attributes outside
+        its class's structure (e.g. an attribute set only for some constructor arguments)
+        cannot be represented by the model: they become 'outside-structure' (not compared)."""
+        out = []
+        for r in outcomes:
+            objs = [r[k] for k in ('v', 'post') if r.get('k') == 'ok' and isinstance(r.get(k), list)
+                    and r[k][:1] == ['O']]
+            if any(o[1] in self.structs and not self.structs[o[1]].fits(o) for o in objs):
+                r = {'k': 'outside-structure'}
+            out.append(r)
+        return out
+
 
 def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: Path, traced: list,
                    done: dict, *, repairs: int = 3, second: bool = True, ask=None, ctx: _Context | None = None
@@ -2472,7 +2535,7 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
                 break
             if p not in points:
                 points.append(p)
-        rt = runtime.run(points) if points else []
+        rt = ctx.outside(runtime.run(points)) if points else []
         ev = evaluate(module, lean_root, work, f'a{rnd}', callee_src, cand, lean_name, fn.info.name, points, rt,
                       structs_src=ctx.text, kind=fn.kind)
         # fuzz.py: once the model agrees on traced + boundary inputs, search for more (coverage-guided,
