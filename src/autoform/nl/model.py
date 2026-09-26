@@ -1542,6 +1542,14 @@ def model_function(fn: _Fn, lean_name: str, module: str, lean_root: Path, work: 
         res.cost += bcost
         notes.append(bnote)
     rec.level = 'L0' if status == 'VALIDATED' and rec.second_translation != 'disagrees' else 'none'
+    # Agreement on inputs that reach little of the function is weak evidence (a model that
+    # types `headers` as a list agreed on every input because line 1 always raised): withhold L0.
+    fuzz_record = Path(work) / 'fuzz.json'
+    if rec.level == 'L0' and fuzz_record.is_file():
+        warning = json.loads(fuzz_record.read_text()).get('warning')
+        if warning:
+            rec.level = 'none'
+            notes.append('L0 withheld: ' + warning)
     rec.notes = '\n'.join(notes)
     res.record = rec
     res.seconds = round(time.time() - t0, 1)
