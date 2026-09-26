@@ -1,0 +1,98 @@
+{
+ "module": "PipelinePython",
+ "language": "python",
+ "lean_root": "/Users/mbhatt/autoform",
+ "source_root": "/Users/mbhatt/autoform/examples/source/python",
+ "source_revision": "fixture",
+ "ast": "/Users/mbhatt/autoform/ast-PipelinePython.json",
+ "program_const": "Autoform.Generated.PipelinePython.program",
+ "init_const": null,
+ "call_template": "runFunc Autoform.Generated.PipelinePython.program 1000 {name} {args}",
+ "fuel": 1000,
+ "functions": [
+  {
+   "name": "numbers.py:<module>.add",
+   "source_name": "add",
+   "file": "numbers.py",
+   "line": 1,
+   "params": [
+    {
+     "name": "a",
+     "sort": "any",
+     "integer_type": ""
+    },
+    {
+     "name": "b",
+     "sort": "any",
+     "integer_type": ""
+    }
+   ],
+   "returns": "any",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "def add(a, b):\n    return a + b\n",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "numbers.py:<module>.fraction",
+   "source_name": "fraction",
+   "file": "numbers.py",
+   "line": 6,
+   "params": [
+    {
+     "name": "a",
+     "sort": "any",
+     "integer_type": ""
+    },
+    {
+     "name": "b",
+     "sort": "any",
+     "integer_type": ""
+    }
+   ],
+   "returns": "any",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "numbers.py:<module>.quotient",
+   "source_name": "quotient",
+   "file": "numbers.py",
+   "line": 3,
+   "params": [
+    {
+     "name": "a",
+     "sort": "any",
+     "integer_type": ""
+    },
+    {
+     "name": "b",
+     "sort": "any",
+     "integer_type": ""
+    }
+   ],
+   "returns": "any",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  }
+ ],
+ "notes": [
+  "hand-made fixture for stage development; built by the parent, not the translate stage"
+ ]
+}

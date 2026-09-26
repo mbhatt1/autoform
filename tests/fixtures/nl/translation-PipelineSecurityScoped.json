@@ -1,0 +1,44 @@
+{
+ "module": "PipelineSecurityScoped",
+ "language": "python",
+ "lean_root": "/Users/mbhatt/autoform",
+ "source_root": "/Users/mbhatt/autoform/examples/security",
+ "source_revision": "fixture",
+ "ast": "/Users/mbhatt/autoform/ast-PipelineSecurityScoped.json",
+ "program_const": "Autoform.Generated.PipelineSecurityScoped.program",
+ "init_const": null,
+ "call_template": "runFunc Autoform.Generated.PipelineSecurityScoped.program 1000 {name} {args}",
+ "fuel": 1000,
+ "functions": [
+  {
+   "name": "policy.py:<module>.authorize",
+   "source_name": "authorize",
+   "file": "policy.py",
+   "line": 1,
+   "params": [
+    {
+     "name": "owner",
+     "sort": "any",
+     "integer_type": ""
+    },
+    {
+     "name": "caller",
+     "sort": "any",
+     "integer_type": ""
+    }
+   ],
+   "returns": "any",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "def authorize(owner, caller):\n    return owner == caller",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  }
+ ],
+ "notes": [
+  "hand-made fixture for stage development; built by the parent, not the translate stage"
+ ]
+}

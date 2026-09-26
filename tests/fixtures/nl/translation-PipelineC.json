@@ -1,0 +1,292 @@
+{
+ "module": "PipelineC",
+ "language": "c",
+ "lean_root": "/Users/mbhatt/autoform",
+ "source_root": "/Users/mbhatt/autoform/examples/source/c",
+ "source_revision": "fixture",
+ "ast": "/Users/mbhatt/autoform/ast-PipelineC.json",
+ "program_const": "Autoform.Generated.PipelineC.program",
+ "init_const": null,
+ "call_template": "runFunc Autoform.Generated.PipelineC.program 1000 {name} {args}",
+ "fuel": 1000,
+ "functions": [
+  {
+   "name": "add",
+   "source_name": "add",
+   "file": "numbers.c",
+   "line": 1,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "i64"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "i64"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "long add(long a, long b) { return a + b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "bump",
+   "source_name": "bump",
+   "file": "numbers.c",
+   "line": 5,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "u8"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "unsigned char bump(unsigned char a) { a++; return a; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "hexliteral",
+   "source_name": "hexliteral",
+   "file": "numbers.c",
+   "line": 10,
+   "params": [],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "unsigned int hexliteral(void) { return 0xffffffff | 0; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "literal",
+   "source_name": "literal",
+   "file": "numbers.c",
+   "line": 7,
+   "params": [],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "long literal(void) { return 2147483648 + 1; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "mixed",
+   "source_name": "mixed",
+   "file": "numbers.c",
+   "line": 3,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "i32"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "u32"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "int mixed(int a, unsigned int b) { return a < b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "mixedwidth",
+   "source_name": "mixedwidth",
+   "file": "numbers.c",
+   "line": 8,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "i64"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "u32"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "long mixedwidth(long a, unsigned int b) { return a + b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "nested",
+   "source_name": "nested",
+   "file": "numbers.c",
+   "line": 6,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "i64"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "i64"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "long nested(long a, long b) { return (a + b) * b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "octalcompare",
+   "source_name": "octalcompare",
+   "file": "numbers.c",
+   "line": 12,
+   "params": [],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "int octalcompare(void) { return 037777777777 < 0; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "promote",
+   "source_name": "promote",
+   "file": "numbers.c",
+   "line": 9,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "u8"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "i32"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "int promote(unsigned char a, int b) { return a + b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "right",
+   "source_name": "right",
+   "file": "numbers.c",
+   "line": 4,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "u32"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "u32"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "unsigned int right(unsigned int a, unsigned int b) { return a >> b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "wideshift",
+   "source_name": "wideshift",
+   "file": "numbers.c",
+   "line": 11,
+   "params": [],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "unsigned long long wideshift(void) { return 1ULL << 40; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  },
+  {
+   "name": "wrap",
+   "source_name": "wrap",
+   "file": "numbers.c",
+   "line": 2,
+   "params": [
+    {
+     "name": "a",
+     "sort": "int",
+     "integer_type": "u32"
+    },
+    {
+     "name": "b",
+     "sort": "int",
+     "integer_type": "u32"
+    }
+   ],
+   "returns": "int",
+   "hole_free": true,
+   "holes": [],
+   "call_closed": true,
+   "needs_init": false,
+   "source": "unsigned int wrap(unsigned int a, unsigned int b) { return a + b; }",
+   "doc": "",
+   "tests": [],
+   "callers": []
+  }
+ ],
+ "notes": [
+  "hand-made fixture for stage development; built by the parent, not the translate stage"
+ ]
+}
