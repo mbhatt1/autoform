@@ -416,10 +416,18 @@ def markdown(rep: dict) -> str:
     else:
         md += ['No potential bugs: no refuted statement on a validated model is backed by documentation or tests.', '']
     if f.get('suspected_bugs'):
-        md += ['### Suspected bugs (judge: REAL_BUG, but not cross-validated; for review)', '']
+        md += ['### Suspected bugs (for review)', '']
         for x in f['suspected_bugs']:
-            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'}) — "
-                      f"{x.get('cross_validation')}")
+            if x.get('documented_intent_contradicted'):
+                why = (f"the docs/tests state this and the code contradicts it (judge read it as "
+                       f"{x.get('classification')}"
+                       + (f", repaired: {(x.get('repair') or {}).get('text')}" if x.get('repair') else '') + ')')
+            else:
+                cv = x.get('cross_validation') or {}
+                why = ('judge: REAL_BUG, not cross-validated (' +
+                       ('no evidence beyond the implementation' if not cv.get('external_evidence')
+                        else f"intent not confident: {cv.get('intent')}") + ')')
+            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'}) — {why}")
         md.append('')
     if f.get('model_defects'):
         md += ['### Model defects (the model and the real code disagree; not bug reports)', '']

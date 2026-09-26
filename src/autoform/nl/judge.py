@@ -247,7 +247,11 @@ def utility(prop: dict, judgment: dict, select_p: float, n: int, intent: dict | 
 
 
 def estimate(prove: bool) -> dict:
-    per = EST_FORMALIZE_USD + (EST_PROVE_USD if prove else 0.0)
+    # Selection admits a property for formalization and checking. Checking (bounded kernel
+    # + CPython) is free and is where refutations -- the bugs -- come from, so it must not be
+    # rationed by the price of proofs. Proofs are budgeted separately: the prove stage spends
+    # what remains, highest utility first (prover.Budget reserves before each call).
+    per = EST_FORMALIZE_USD
     return dict(formalize_usd=EST_FORMALIZE_USD, prove_usd=EST_PROVE_USD if prove else 0.0, per_property_usd=per)
 
 
