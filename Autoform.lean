@@ -23,6 +23,9 @@ import Autoform.CallingConvention
 -- claim, not a proof; grep is not an oracle. Importing them here puts every theorem in
 -- them through the kernel on every build, and through `leanchecker` in the audit.
 import Autoform.SpecsGen.Basis
+-- Structural `DecidableEq` for Core values, used by the NL autoformalizer's generated
+-- `Autoform/NL/NL<Module>.lean` entry points (those are per-run and not imported here).
+import Autoform.NL.Basis
 
 -- ---------------------------------------------------------------------------
 -- Shared corpus specifications imported below participate in this replay graph.

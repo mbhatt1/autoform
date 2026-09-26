@@ -1,0 +1,1046 @@
+[
+ {
+  "name": "limits.py:<module>.add",
+  "file": "limits.py",
+  "sourceName": "add",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "a",
+   "b"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "str",
+     "v": "Sum of two numbers."
+    }
+   },
+   "b": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "+",
+     "a": {
+      "k": "name",
+      "v": "a"
+     },
+     "b": {
+      "k": "name",
+      "v": "b"
+     }
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "a",
+    "b"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "limits.py:<module>.over_limit",
+  "file": "limits.py",
+  "sourceName": "over_limit",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "x"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": ">",
+     "a": {
+      "k": "name",
+      "v": "x"
+     },
+     "b": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "<module>limits.py"
+      },
+      "f": "LIMIT"
+     }
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "x"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "limits.py:<module>.scaled",
+  "file": "limits.py",
+  "sourceName": "scaled",
+  "paramTypes": [
+   "ANY",
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   "",
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "kind",
+   "n"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ret",
+    "e": {
+     "k": "binop",
+     "op": "*",
+     "a": {
+      "k": "index",
+      "a": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "<module>limits.py"
+       },
+       "f": "SCALE"
+      },
+      "b": {
+       "k": "name",
+       "v": "kind"
+      }
+     },
+     "b": {
+      "k": "name",
+      "v": "n"
+     }
+    }
+   },
+   "b": {
+    "k": "skip"
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "kind",
+    "n"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "limits.py:<module>.clamp",
+  "file": "limits.py",
+  "sourceName": "clamp",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "__builtin.int",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "x"
+  ],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "str",
+     "v": "Cap x at LIMIT."
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "callV",
+       "f": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "<module>limits.py"
+        },
+        "f": "over_limit"
+       },
+       "args": [
+        {
+         "k": "name",
+         "v": "x"
+        }
+       ]
+      },
+      "t": {
+       "k": "ret",
+       "e": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "<module>limits.py"
+        },
+        "f": "LIMIT"
+       }
+      },
+      "e": {
+       "k": "skip"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "name",
+        "v": "x"
+       }
+      }
+     }
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "x"
+   ],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "limits.py:<module>.Counter.__init__",
+  "file": "limits.py",
+  "sourceName": "__init__",
+  "paramTypes": [
+   "ANY"
+  ],
+  "returnType": "ANY",
+  "paramIntegerTypes": [
+   ""
+  ],
+  "returnIntegerType": "",
+  "params": [
+   "start"
+  ],
+  "body": {
+   "k": "setField",
+   "r": {
+    "k": "name",
+    "v": "self"
+   },
+   "f": "n",
+   "v": {
+    "k": "name",
+    "v": "start"
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [
+    "start"
+   ],
+   "isMethod": true
+  }
+ },
+ {
+  "name": "limits.py:<module>.Counter.bump",
+  "file": "limits.py",
+  "sourceName": "bump",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setField",
+    "r": {
+     "k": "name",
+     "v": "self"
+    },
+    "f": "n",
+    "v": {
+     "k": "callV",
+     "f": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "<module>limits.py"
+      },
+      "f": "add"
+     },
+     "args": [
+      {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "self"
+       },
+       "f": "n"
+      },
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "self"
+      },
+      "f": "n"
+     }
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": true
+  }
+ },
+ {
+  "name": "tests/limits_cases.py:<module>.test_clamp",
+  "file": "tests/limits_cases.py",
+  "sourceName": "test_clamp",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "ifte",
+    "c": {
+     "k": "binop",
+     "op": "==",
+     "a": {
+      "k": "callV",
+      "f": {
+       "k": "field",
+       "a": {
+        "k": "name",
+        "v": "<module>tests/limits_cases.py"
+       },
+       "f": "clamp"
+      },
+      "args": [
+       {
+        "k": "int",
+        "v": "5"
+       }
+      ]
+     },
+     "b": {
+      "k": "int",
+      "v": "3"
+     }
+    },
+    "t": {
+     "k": "skip"
+    },
+    "e": {
+     "k": "raise",
+     "e": {
+      "k": "unop",
+      "op": "py:exception:AssertionError",
+      "a": {
+       "k": "tupleE",
+       "items": []
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ifte",
+     "c": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "callV",
+       "f": {
+        "k": "field",
+        "a": {
+         "k": "name",
+         "v": "<module>tests/limits_cases.py"
+        },
+        "f": "clamp"
+       },
+       "args": [
+        {
+         "k": "int",
+         "v": "2"
+        }
+       ]
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "t": {
+      "k": "skip"
+     },
+     "e": {
+      "k": "raise",
+      "e": {
+       "k": "unop",
+       "op": "py:exception:AssertionError",
+       "a": {
+        "k": "tupleE",
+        "items": []
+       }
+      }
+     }
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "tests/limits_cases.py:<module>.test_counter",
+  "file": "tests/limits_cases.py",
+  "sourceName": "test_counter",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "c",
+    "e": {
+     "k": "callV",
+     "f": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "<module>tests/limits_cases.py"
+      },
+      "f": "Counter"
+     },
+     "args": [
+      {
+       "k": "int",
+       "v": "1"
+      }
+     ]
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "ifte",
+      "c": {
+       "k": "binop",
+       "op": "==",
+       "a": {
+        "k": "mcall",
+        "recv": {
+         "k": "name",
+         "v": "c"
+        },
+        "m": "bump",
+        "args": []
+       },
+       "b": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "t": {
+       "k": "skip"
+      },
+      "e": {
+       "k": "raise",
+       "e": {
+        "k": "unop",
+        "op": "py:exception:AssertionError",
+        "a": {
+         "k": "tupleE",
+         "items": []
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "skip"
+     }
+    }
+   }
+  },
+  "pythonSignature": {
+   "positionalOnly": [],
+   "keywordOnly": [],
+   "required": [],
+   "isMethod": false
+  }
+ },
+ {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>limits.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>limits.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "<module>tests/limits_cases.py",
+     "e": {
+      "k": "alloc",
+      "cls": "<module>tests/limits_cases.py",
+      "args": []
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>limits.py"
+      },
+      "f": "add",
+      "v": {
+       "k": "fnref",
+       "v": "limits.py:<module>.add"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>limits.py"
+       },
+       "f": "clamp",
+       "v": {
+        "k": "fnref",
+        "v": "limits.py:<module>.clamp"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "<module>limits.py"
+        },
+        "f": "over_limit",
+        "v": {
+         "k": "fnref",
+         "v": "limits.py:<module>.over_limit"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>limits.py"
+         },
+         "f": "scaled",
+         "v": {
+          "k": "fnref",
+          "v": "limits.py:<module>.scaled"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>limits.py"
+          },
+          "f": "Counter",
+          "v": {
+           "k": "fnref",
+           "v": "limits.py:<module>.Counter<meta>"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "<module>tests/limits_cases.py"
+           },
+           "f": "test_clamp",
+           "v": {
+            "k": "fnref",
+            "v": "tests/limits_cases.py:<module>.test_clamp"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>tests/limits_cases.py"
+            },
+            "f": "test_counter",
+            "v": {
+             "k": "fnref",
+             "v": "tests/limits_cases.py:<module>.test_counter"
+            }
+           },
+           "b": {
+            "k": "skip"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "limits.py:<module>",
+  "file": "limits.py",
+  "sourceName": "<module>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "str",
+     "v": "A tiny module whose functions read module-level state (translate-stage fixture)."
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>limits.py"
+     },
+     "f": "LIMIT",
+     "v": {
+      "k": "int",
+      "v": "3"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>limits.py"
+       },
+       "f": "tmp0",
+       "v": {
+        "k": "dictE",
+        "pairs": []
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setIndex",
+        "r": {
+         "k": "name",
+         "v": "tmp0"
+        },
+        "i": {
+         "k": "str",
+         "v": "small"
+        },
+        "v": {
+         "k": "int",
+         "v": "1"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setIndex",
+         "r": {
+          "k": "name",
+          "v": "tmp0"
+         },
+         "i": {
+          "k": "str",
+          "v": "large"
+         },
+         "v": {
+          "k": "int",
+          "v": "10"
+         }
+        },
+        "b": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>limits.py"
+         },
+         "f": "SCALE",
+         "v": {
+          "k": "name",
+          "v": "tmp0"
+         }
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>limits.py"
+       },
+       "f": "add",
+       "v": {
+        "k": "fnref",
+        "v": "limits.py:<module>.add"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "<module>limits.py"
+        },
+        "f": "over_limit",
+        "v": {
+         "k": "fnref",
+         "v": "limits.py:<module>.over_limit"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>limits.py"
+         },
+         "f": "scaled",
+         "v": {
+          "k": "fnref",
+          "v": "limits.py:<module>.scaled"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>limits.py"
+          },
+          "f": "clamp",
+          "v": {
+           "k": "fnref",
+           "v": "limits.py:<module>.clamp"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>limits.py"
+            },
+            "f": "Counter",
+            "v": {
+             "k": "fnref",
+             "v": "limits.py:<module>.Counter<meta>"
+            }
+           },
+           "b": {
+            "k": "exprS",
+            "e": {
+             "k": "fnref",
+             "v": "limits.py:<module>.Counter<meta>"
+            }
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "skip"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "skip"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "skip"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "skip"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "skip"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "skip"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "skip"
+                 },
+                 "b": {
+                  "k": "skip"
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "classDeclarations": [
+   {
+    "name": "limits.py:<module>.Counter",
+    "shortName": "Counter",
+    "bases": [],
+    "attributes": [
+     {
+      "name": "__init__",
+      "kind": "method",
+      "value": "limits.py:<module>.Counter.__init__"
+     },
+     {
+      "name": "bump",
+      "kind": "method",
+      "value": "limits.py:<module>.Counter.bump"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "tests/limits_cases.py:<module>",
+  "file": "tests/limits_cases.py",
+  "sourceName": "<module>",
+  "paramTypes": [],
+  "returnType": "ANY",
+  "paramIntegerTypes": [],
+  "returnIntegerType": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>tests/limits_cases.py"
+     },
+     "f": "clamp",
+     "v": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "<module>limits.py"
+      },
+      "f": "clamp"
+     }
+    },
+    "b": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>tests/limits_cases.py"
+     },
+     "f": "Counter",
+     "v": {
+      "k": "field",
+      "a": {
+       "k": "name",
+       "v": "<module>limits.py"
+      },
+      "f": "Counter"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>tests/limits_cases.py"
+     },
+     "f": "test_clamp",
+     "v": {
+      "k": "fnref",
+      "v": "tests/limits_cases.py:<module>.test_clamp"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>tests/limits_cases.py"
+      },
+      "f": "test_counter",
+      "v": {
+       "k": "fnref",
+       "v": "tests/limits_cases.py:<module>.test_counter"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "skip"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "skip"
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

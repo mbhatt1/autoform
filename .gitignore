@@ -110,3 +110,7 @@ Autoform/SpecsGen/*.compile.log
 build/
 dist/
 *.egg-info/
+
+# Per-run modules written by the NL autoformalizer (autoform.nl.translate); always NL*-named.
+Autoform/Generated/NL*.lean
+Autoform/NL/NL*.lean
