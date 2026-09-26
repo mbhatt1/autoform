@@ -655,10 +655,16 @@ def main(argv=None):
                          help="with --machine: functions to compare (default: those whose code changed)")
     regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
                          help="with --machine: the Linux target to compile for (default: aarch64)")
+    sub.add_parser("formalize", add_help=False,
+                   help="infer candidate claims, rank them with a SemIf judge, verify in Lean (formalize --help)")
     machine = sub.add_parser("machine", add_help=False, help="binary/assembly frontend (machine --help for options)")
     machine.add_argument("args", nargs=argparse.REMAINDER)
     # Let the machine frontend own its flags, including --help and --list-languages.
     values = list(sys.argv[1:] if argv is None else argv)
+    if values[:1] == ['formalize']:
+        # The claim/judge/verify harness owns its own flags (autoform/harness/cli.py).
+        from .harness.cli import main as formalize
+        return formalize(values[1:])
     # A URL alone is the full assurance workflow; explicit subcommands still work.
     index = 0
     while index < len(values):

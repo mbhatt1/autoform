@@ -76,6 +76,13 @@ functions, runs mutation checks and independently replays the proofs. Quantified
 claims retain their stated domain; failed proof attempts remain open obligations.
 See [security properties and the runnable ownership example](docs/security.md).
 
+`autoform formalize <Module>` infers the properties instead of requiring them. It
+generates candidate claims over a translated module, lets a
+[SemIf (OpenJev)](https://github.com/TheoLeeCJ/SemIf-OpenJev) typed-decision judge choose the
+intended and most useful ones, checks them in the Lean kernel, and repairs refuted claims
+from their counterexamples. The judge ranks and classifies; only the kernel sets a status.
+See [the formalization harness](docs/harness.md).
+
 From a checkout, the original entry points remain available:
 
 ```sh

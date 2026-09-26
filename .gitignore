@@ -105,6 +105,7 @@ Autoform/SpecsGen/Pipeline*.lean
 Autoform/Security/*.lean
 Autoform/SpecsGen/*.compile.log
 .autoform-work/
+.autoform-harness/
 *.autoform-init.lock
 build/
 dist/
