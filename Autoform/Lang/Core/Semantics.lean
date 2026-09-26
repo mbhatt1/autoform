@@ -4696,6 +4696,10 @@ private def valueDunderProg : Program :=
     , { name := "d.py:<module>.H.__hash__", params := [], body := .ret (.lit (.int 7)) }
     , { name := "d.py:<module>.H.__str__", params := [], body := .ret (.lit (.str "h")) }
     , { name := "d.py:<module>.Q.__init__", params := [], body := .skip }
+    -- `B` defines both: CPython consults `__bool__` first and never calls `__len__`.
+    , { name := "d.py:<module>.B.__bool__", params := [], body := .ret (.lit (.bool false)) }
+    , { name := "d.py:<module>.B.__len__", params := [], body := .ret (.lit (.int 3)) }
+    , { name := "d.py:<module>.W.__bool__", params := [], body := .ret (.lit (.int 1)) }
     , { name := "eqTrue", params := []
       , body := .ret (.binop "==" (.alloc "P" [.lit (.int 1)]) (.alloc "P" [.lit (.int 1)])) }
     , { name := "eqFalse", params := []
@@ -4713,7 +4717,11 @@ private def valueDunderProg : Program :=
     , { name := "strH", params := [], body := .ret (.call "str" [.alloc "H" []]) }
     , { name := "identityQ", params := []
       , body := .ret (.binop "==" (.alloc "Q" []) (.alloc "Q" [])) }
-    , { name := "lenQ", params := [], body := .ret (.call "len" [.alloc "Q" []]) } ] }
+    , { name := "lenQ", params := [], body := .ret (.call "len" [.alloc "Q" []]) }
+    , { name := "boolB", params := [], body := .ret (.call "bool" [.alloc "B" []]) }
+    , { name := "ifB", params := []
+      , body := .ifte (.alloc "B" []) (.ret (.lit (.str "yes"))) (.ret (.lit (.str "no"))) }
+    , { name := "boolW", params := [], body := .ret (.call "bool" [.alloc "W" []]) } ] }
 
 -- `P(1) == P(1)`  -- CPython True (through `__eq__`; identity would say False)
 #guard match runFunc valueDunderProg 200 "eqTrue" [] with | .val (.bool true) => true | _ => false
@@ -4739,6 +4747,12 @@ private def valueDunderProg : Program :=
 -- `len(Q())`      -- CPython TypeError; Core has no `len` on an instance without `__len__`
 --                    and says so (`call:len`), which is the pre-existing behaviour.
 #guard match runFunc valueDunderProg 200 "lenQ" [] with | .hole _ => true | _ => false
+-- `bool(B())`     -- CPython False: `__bool__` wins over `__len__` (which says 3)
+#guard match runFunc valueDunderProg 200 "boolB" [] with | .val (.bool false) => true | _ => false
+-- `if B(): ...`   -- CPython takes the else branch: the truth test runs `__bool__` too
+#guard match runFunc valueDunderProg 200 "ifB" [] with | .val (.str "no") => true | _ => false
+-- `bool(W())`     -- CPython TypeError: __bool__ should return bool, returned int
+#guard match runFunc valueDunderProg 200 "boolW" [] with | .exn (.str "TypeError") => true | _ => false
 
 /-! ## The iteration protocol, checked against CPython
 
