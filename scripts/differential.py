@@ -2296,6 +2296,14 @@ def main():
             r["origin"] = "test-suite"
             cases.append(r)
         print("cases recorded from the test suite: %d" % len(traced))
+        # pytest: 0 passed, 1 some tests failed (still traced). 2 interrupted, 3 internal
+        # error, 4 usage error, 5 nothing collected -- the suite never ran, so every method
+        # it would have reached reads as "no instance reached". Say so by name.
+        for run in stats.get("test_runs", []):
+            if run.get("error") or run.get("rc") not in (0, 1):
+                print("  TEST SUITE DID NOT RUN: %s (%s) -- a test directory is imported as a "
+                      "package, so it must be named like one (e.g. .../tests)"
+                      % (run["dir"], run.get("error") or "exit %s" % run.get("rc")))
         if test_dirs and not traced:
             print("  (the suite produced no usable calls — if it failed to even "
                   "collect, try re-running this harness under the interpreter the "
