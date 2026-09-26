@@ -414,7 +414,10 @@ def markdown(rep: dict) -> str:
                 md.append(f"  - cross-validation: {x['cross_validation']}")
         md.append('')
     else:
-        md += ['No potential bugs: no refuted statement on a validated model is backed by documentation or tests.', '']
+        md += (['No cross-validated bugs (judge: REAL_BUG with evidence beyond the implementation and a confident '
+                'intent). The suspected bugs below still contradict documented behaviour and need review.', '']
+               if f.get('suspected_bugs') else
+               ['No potential bugs: no refuted statement on a validated model is backed by documentation or tests.', ''])
     if f.get('suspected_bugs'):
         md += ['### Suspected bugs (for review)', '']
         for x in f['suspected_bugs']:
