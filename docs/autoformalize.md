@@ -38,11 +38,16 @@ the rest: later stages run on whatever exists, and the report is always written.
 
 `src/autoform/nl/model.py` (`python -m autoform.nl.model <src> --out DIR [--tests DIR]`):
 
-1. **Discovery** with Python's `ast`: every top-level function and method, named
-   `path/mod.py:<module>.Class.meth` like the deep translation. A static screen skips
-   methods (receiver state), generators, closures, decorated functions and anything that
-   touches I/O, time, randomness, subprocesses, the network, files or module-level state
-   (transitively through repository callees); the reason is kept in `translation.notes`.
+1. **Discovery** with Python's `ast`: every top-level function, method, property getter
+   and constructor, named `path/mod.py:<module>.Class.meth` like the deep translation. A
+   static screen skips generators, closures, classmethods, property setters, decorated
+   functions and anything that touches I/O, time, randomness, subprocesses, the network,
+   files or module-level state, transitively through repository callees, through the
+   constructor that builds a method's receiver (a `timer=time.monotonic` default excludes
+   every method of that class), and through repository classes a function instantiates
+   whose methods have such effects. Classes with a builtin base (`dict`, `list`, ...) and
+   exception classes are skipped. Every reason is kept in `translation.notes` and counted in
+   `model.meta.json` (`skip_reasons`).
 2. **Translation A.** The model states in English what the function computes, then writes
    a plain Lean `def`: `Int` for Python int, `Bool`, `String`, `Option`, `List`, tuples,
    `Val` for genuinely mixed values, `Fl` (IEEE bits) only for floats; raising is
@@ -58,6 +63,74 @@ the rest: later stages run on whatever exists, and the report is always written.
    compared exactly. Counterexamples go back to the model for up to `--repairs` rounds.
 5. **Translation B.** An independent translation from the code alone runs on the same
    inputs; `second_translation` records whether it agrees with A.
+
+Tests may live outside the source tree: `--tests DIR` (repeatable, also on `autoform
+autoformalize`) adds test directories; they are traced for inputs and their lines are
+shown to the model and to describe. `AUTOFORM_PYTHON` selects the interpreter that runs the
+code under test (tracer, differential runner, check-stage runtime), e.g. a newer Python
+than the one running autoform.
+
+### Methods and objects
+
+- **Structures.** Each repository class with an attempted method gets a generated Lean
+  `structure S_<Class>` with one field `f_<attr>` per instance attribute (all attributes
+  along the repository MRO; private names mangled as CPython does, e.g. `_Cache__data`).
+  The attribute set and the field types come from the receiver states the tracer records
+  (before every traced method call and after every traced `__init__`): the most common
+  attribute set wins, and each type is the join of the observed values' types
+  (`Int`, `Dict Val Val`, `Option Int`, ...; mixed → `Val`). The structures are validated in
+  Lean: they must elaborate (else fields fall back to `Val`), and observed states must
+  round-trip through the generated `dObj_S`/`eObj_S` (`structures.*.roundtrip_ok` in
+  `model.meta.json`). Without observations, the attributes assigned in the class's code
+  are used, typed `Val`.
+- **Methods** are plain Lean functions whose first parameter is `self : S_<Class>`. A method
+  that can change its receiver declares `"mutates": true` and returns
+  `τ × S_<Class>` (or `Except String (τ × S_<Class>)`): the Python result and the receiver
+  after the call (state threading); others return just `τ`. A constructor (`__init__`)
+  takes the arguments after `self` and returns `S_<Class>`. Exceptions are `Except String`.
+- **Inheritance.** Fields and method lookup follow the repository MRO. Bases outside the
+  repository (e.g. `collections.abc.MutableMapping`) contribute nothing: a receiver call
+  to a method only such a base defines (`self.popitem()` in `Cache.__setitem__`) is
+  *unmodelled*: the model returns `.error "nl:unmodelled"` on that path, the dispatcher turns
+  it into `.hole "nl:unmodelled"`, and those inputs are excluded from the comparison
+  (counted in the notes). Methods the class itself overrides (`get`, `pop`, ...) are modelled.
+- **Dispatcher.** `call "<method>" (self :: args)` returns the Python result; the second
+  entry `call "<method>#post" (self :: args)` returns `.tuple [result, receiver after the
+  call]`. A constructor's entry returns the new object.
+- **Differential testing.** A method's inputs start with a receiver state; CPython rebuilds
+  the receiver without running `__init__` (`__new__`, then each recorded attribute is set;
+  container attributes get their recorded exact type back, e.g. `OrderedDict`), runs the
+  method, and reports the result AND the receiver afterwards. Both are compared with the
+  model's `#post` entry. Traced receivers whose attributes do not fit the structure, and
+  outcomes whose object has attributes outside it, are skipped and counted. Boundary
+  inputs pair recorded receivers with typed argument values. A trailing argument that is
+  the parameter's own unencodable default (a sentinel `object()`, a function alias such as
+  `cache_setitem=Cache.__setitem__`) is dropped from traced calls, so the call replays with
+  its default.
+
+### Data encoding (`pyvalues.py`, the prelude of every model module)
+
+| Python | Lean model type | `Val` |
+|---|---|---|
+| int / bool / str / None | `Int` / `Bool` / `String` / `Unit`, `Option τ` | `.int` / `.bool` / `.str` / `.unit` |
+| float | `Fl` (IEEE bits) | `.float` |
+| fixed tuple | `τ × σ` (≤ 4) | `.tuple [..]` |
+| variable tuple | `Tuple τ` (= `List τ`) | `.tuple [..]` |
+| list | `List τ` | `.list [..]` |
+| dict | `Dict κ ν` (= `List (κ × ν)`, insertion order) | `.dict [(k, v), ..]` in insertion order |
+| set / frozenset | `PySet τ` / `FrozenSet τ` (= `List τ`) | `.bobj "set" (.list elems)` |
+| bytes | `Bytes` (= `List Nat`) | `.bobj "bytes" (.list [.int b, ..])` |
+| object of a modelled class | `S_<Class>` | `.bobj "obj:<module>.<Class>" (.dict [(.str attr, v), ..])` |
+
+Sets are encoded with their elements sorted by canonical string and deduplicated, on both
+sides (the Lean encoder normalizes whatever list the model keeps), so equal sets have equal
+encodings; mixed-type elements that are equal in Python (`1`, `True`, `1.0`) are refused by
+the tracer. Object attributes are sorted by name. The check stage encodes real CPython
+outcomes the same way, so its runtime comparison covers every type in the table.
+Statements can use the helpers `vField o "attr"`, `vGet d k`, `vHas d k`, `vLen v`, `vKeys d`
+and `vElems v` (opened by `schema.lean_opens`), and `Val` binders, whose check-stage domain
+is the function's validated sample inputs (`FunctionInfo.samples`); a statement with
+`"entry": "post"` is about the receiver after the call.
 
 The module is `Autoform/NLModel/<M>.lean` (a build product, not tracked), built with
 `lake build Autoform.NLModel.<M>`. Later stages import the module that the translation's
@@ -249,7 +322,7 @@ autoform autoformalize ./src MyLib --deep-too       # both, and attempt L1
     [--functions f g] [--no-second] [--repairs N] [--no-prove] [--no-runtime]
     [--budget-usd X] [--domain-size N] [--parallel N] [--out DIR] [--no-resume]
     [--judge auto|semif|heuristic|replay:PATH|none] [--max-properties-per-function N]
-    [--repair-rounds N]
+    [--repair-rounds N] [--tests DIR ...]
 ```
 
 Exit status: 2 if no translation was produced, 1 if there are potential bugs, else 0.
@@ -265,8 +338,13 @@ trusted. The per-stage spend is listed in `run.json` and in the report.
 ## Limits
 
 - The model path reads Python only. Other languages need `--deep`.
-- Bounded checks cover a finite domain of Int/Nat/Bool/String arguments. Other types are
-  UNCHECKABLE.
+- Bounded checks cover a finite domain of Int/Nat/Bool/String arguments, and `Val` binders
+  over the recorded sample inputs only.
+- Methods are modelled for receivers of exactly their class; an inherited method is not
+  re-modelled per subclass (a subclass method that calls it gets its source as context).
+  Instances that hold other objects (linked nodes, locks, callables) have no encoding and
+  their methods are UNTESTABLE or skipped. After an exception, the receiver's state is
+  not compared.
 - L0 is empirical. Only L1 connects a proof to the deep translation, and even that is only
   as faithful as the translator and the interpreter (see [`trust-model.md`](trust-model.md)).
 - An L1 result covers only the argument shapes proved. A statement at any other shape
