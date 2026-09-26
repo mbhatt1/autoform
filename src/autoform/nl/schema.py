@@ -25,6 +25,7 @@ FILES = {
     'checks': 'checks.json',
     'proofs': 'proofs.json',
     'report': 'report.json',
+    'models': 'models.json',
 }
 
 
@@ -136,6 +137,34 @@ class ProofResult:
     seconds: float = 0.0
     cost_usd: float = 0.0
     reason: str = ''
+
+
+@dataclass
+class LeanModel:
+    """An AI-written Lean model of one function, validated against the real code.
+
+    The model stage emits a Lean module (e.g. Autoform/NLModel/<M>.lean) with a plain Lean
+    `def` per function and a dispatcher `call : String → List Val → EResult` that decodes
+    arguments, runs the def and encodes the result (a raised exception is
+    `.exn (.str "<ExceptionClass>")`). It then writes a `Translation` whose call_template is
+    `Autoform.NLModel.<M>.call {name} {args}`, so formalize/check/prove run unchanged.
+
+    Trust levels (reported, never merged):
+      L0  proofs are about this model; the model agreed with the real code on every one of
+          `tests_run` inputs and with an independent second translation;
+      L1  additionally proved equal to the deep (Joern → Core) translation of the function.
+    """
+    function: str             # FunctionInfo.name
+    lean_name: str            # the plain def, e.g. "Autoform.NLModel.M.add"
+    lean_source: str          # the def(s) as written into the module
+    signature: str            # Lean type of the plain def
+    status: str               # VALIDATED | DISAGREES | UNTESTABLE | FAILED
+    tests_run: int = 0
+    disagreements: list = field(default_factory=list)  # [{"inputs", "model", "runtime"}]
+    second_translation: str = 'not_run'                # agrees | disagrees | not_run
+    repairs: int = 0
+    level: str = 'none'       # none | L0 | L1
+    notes: str = ''
 
 
 def dump(obj, path: Path):
