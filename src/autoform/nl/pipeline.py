@@ -1,15 +1,24 @@
 """The natural-language autoformalizer end to end.
 
-    translate → describe → formalize → check → prove → report
+    model (default) ──┐
+    translate (--deep)┴─► describe → formalize → check → prove [→ refine (--deep-too)] → report
+
+`model` (autoform.nl.model) has a language model write a plain Lean def per function and
+validates it against the real code and an independent second translation (level L0).
+`translate` is the deep Joern → Core translation (`runFunc`). `--deep-too` runs both: the
+English, statements, checks and proofs are about the models, and `refine` then tries to
+prove each validated model equal to its hole-free deep translation (level L1). If the model
+stage fails under `--deep-too`, the later stages fall back to the deep translation.
 
 Every stage reads and writes JSON in one run directory (schema.FILES). `run.json` records,
 per stage, the hash of its inputs, its status, wall time and model spend. With `resume`, a
-stage whose output exists and whose recorded input hash matches is not rerun. A failing
+stage whose outputs exist and whose recorded input hash matches is not rerun. A failing
 stage is recorded and later stages run on whatever exists (a stage whose inputs are
 missing is `blocked`); the report is always written.
 
-    autoform autoformalize <git-url|dir> [Module] [--functions f g] [--no-prove]
-                           [--no-runtime] [--budget-usd X] [--out DIR]
+    autoform autoformalize <url|dir> [Module] [--deep | --deep-too] [--no-second]
+                           [--functions f g] [--no-prove] [--no-runtime] [--budget-usd X]
+                           [--out DIR]
     python -m autoform.nl ...
 """
 from __future__ import annotations
@@ -20,6 +29,7 @@ import importlib
 import json
 import os
 import re
+import shutil
 import sys
 import threading
 import time
@@ -29,11 +39,16 @@ from pathlib import Path
 
 from .schema import FILES, dump
 
-STAGES = ('translate', 'describe', 'formalize', 'check', 'prove')
+MODEL_STAGES = ('model', 'describe', 'formalize', 'check', 'prove')
+DEEP_STAGES = ('translate', 'describe', 'formalize', 'check', 'prove')
+DEEP_TOO_STAGES = ('model', 'translate', 'describe', 'formalize', 'check', 'prove', 'refine')
+STAGES = MODEL_STAGES
+MODES = {'model': MODEL_STAGES, 'deep': DEEP_STAGES, 'deep_too': DEEP_TOO_STAGES}
 NEEDS = {'describe': ('translation',), 'formalize': ('translation', 'english'),
-         'check': ('translation', 'statements'), 'prove': ('translation', 'statements', 'checks')}
-OUTPUT = {'translate': 'translation', 'describe': 'english', 'formalize': 'statements', 'check': 'checks',
-          'prove': 'proofs'}
+         'check': ('translation', 'statements'), 'prove': ('translation', 'statements', 'checks'),
+         'refine': ('translation', 'models', 'deep_translation')}
+OUTPUT = {'model': 'translation', 'translate': 'translation', 'describe': 'english', 'formalize': 'statements',
+          'check': 'checks', 'prove': 'proofs', 'refine': 'refine'}
 SKIP_DIRS = {'.git', '.hg', '.svn', '__pycache__', '.lake', 'node_modules', '.venv', 'venv', '.tox', 'build', 'dist'}
 
 
@@ -42,15 +57,24 @@ def _impl(stage: str):
     return getattr(importlib.import_module(f'autoform.nl.{stage}'), stage)
 
 
+def outputs(stage: str, mode: str) -> tuple:
+    """schema.FILES keys a stage writes in this mode (all must exist for a resume)."""
+    if stage == 'model':
+        return ('translation', 'models')
+    if stage == 'translate' and mode == 'deep_too':
+        return ('deep_translation',)
+    return (OUTPUT[stage],)
+
+
 def is_url(source: str) -> bool:
-    return bool(re.match(r'^(https?|ssh|git)://|^git@[^:]+:', str(source)))
+    return bool(re.match(r'^(https?|ssh|git|file)://|^git@[^:]+:', str(source)))
 
 
 def default_module(source: str) -> str:
     base = re.sub(r'\.git$', '', str(source).rstrip('/').split('/')[-1].split(':')[-1]) or 'Source'
     words = [w for w in re.split(r'[^A-Za-z0-9]+', base) if w]
     name = ''.join(w[:1].upper() + w[1:] for w in words) or 'Source'
-    return 'Nl' + name
+    return 'NL' + name   # NL*-named modules are per-run and not tracked (see the ignore file)
 
 
 def default_lean_root() -> Path:
@@ -77,6 +101,17 @@ def source_fingerprint(source: str) -> str:
                 continue
             h.update(f'{f.relative_to(root)}\0{st.st_size}\0{st.st_mtime_ns}\n'.encode())
     return f'{root}:{h.hexdigest()}'
+
+
+def local_source(source: str, out: Path, module: str, ref=None, subdir=None) -> str:
+    """A local directory for the model stage (which reads Python files directly): the
+    directory itself, its `subdir`, or a checkout of a remote repository under `out`."""
+    if not is_url(source) and not ref:
+        root = Path(source).resolve() / (subdir or '.')
+        return str(root.resolve())
+    from autoform.repository import resolve_source
+    path, _ = resolve_source(source, out, module, ref=ref, subdir=subdir)
+    return str(path)
 
 
 def _hash(*parts) -> str:
@@ -117,11 +152,19 @@ def metered():
         llm.ask = orig
 
 
+def _result_cost(result) -> float:
+    return sum(float((r.get('cost_usd') if isinstance(r, dict) else getattr(r, 'cost_usd', 0)) or 0)
+               for r in result or [])
+
+
 def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=True, runtime=True,
-        budget_usd=None, resume=True, ref=None, subdir=None, domain_size=64, parallel=None) -> dict:
+        budget_usd=None, resume=True, ref=None, subdir=None, domain_size=64, parallel=None,
+        deep=False, deep_too=False, second=True, repairs=3) -> dict:
     source = str(source)
     if not is_url(source) and Path(source).exists():
         source = str(Path(source).resolve())
+    mode = 'deep_too' if deep_too else 'deep' if deep else 'model'
+    stages = MODES[mode]
     module = module or default_module(source)
     lean_root = Path(lean_root).resolve() if lean_root else default_lean_root()
     out = Path(out) if out else Path.cwd() / 'artifacts/nl' / module
@@ -134,18 +177,18 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             previous = json.loads(runf.read_text()).get('stages', {})
         except ValueError:
             previous = {}
-    info = {'source': source, 'module': module, 'lean_root': str(lean_root), 'out': str(out),
+    info = {'source': source, 'module': module, 'mode': mode, 'lean_root': str(lean_root), 'out': str(out),
             'functions': functions, 'prove': prove, 'runtime': runtime, 'budget_usd': budget_usd,
-            'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
+            'second': second, 'started': time.strftime('%Y-%m-%dT%H:%M:%S'), 'stages': {}}
     spent = 0.0
 
     def save():
         info['cost_usd'] = round(spent, 4)
         runf.write_text(json.dumps(info, indent=1, default=str))
 
-    for stage in STAGES:
-        key = OUTPUT[stage]
-        rec = info['stages'][stage] = {'status': 'pending', 'output': FILES[key]}
+    for stage in stages:
+        keys = outputs(stage, mode)
+        rec = info['stages'][stage] = {'status': 'pending', 'output': ', '.join(FILES[k] for k in keys)}
         if stage == 'prove' and not prove:
             rec['status'] = 'disabled'
             save()
@@ -157,26 +200,50 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             continue
         if stage == 'translate':
             inputs = _hash(source_fingerprint(source), module, str(lean_root), ref, subdir)
+        elif stage == 'model':
+            inputs = _hash('model', source_fingerprint(source), module, str(lean_root), ref, subdir, functions,
+                           second, repairs)
         else:
-            extra = {'describe': [functions], 'check': [runtime, domain_size], 'prove': [budget_usd]}.get(stage, [])
+            extra = {'describe': [functions], 'check': [runtime, domain_size], 'prove': [budget_usd],
+                     'refine': [_file_bytes(out, 'statements'), budget_usd, domain_size]}.get(stage, [])
             inputs = _hash(*[_file_bytes(out, k) for k in NEEDS[stage]], *extra)
         rec['input_hash'] = inputs
         prev = previous.get(stage, {})
+        # Resume only when the inputs match AND the outputs are the bytes this stage wrote
+        # (translation.json is written by `model` or by `translate`, depending on the mode).
         if resume and prev.get('status') in ('ok', 'resumed') and prev.get('input_hash') == inputs \
-                and (out / FILES[key]).is_file():
-            rec.update(status='resumed', seconds=0.0, cost_usd=0.0)
+                and all((out / FILES[k]).is_file() for k in keys) \
+                and prev.get('output_hash') == _hash(*[_file_bytes(out, k) for k in keys]):
+            rec.update(status='resumed', seconds=0.0, cost_usd=0.0, output_hash=prev['output_hash'])
             save()
             continue
-        stale = out / FILES[key]
-        if stale.is_file():   # its inputs changed (or no resume): never let later stages read it
-            stale.replace(stale.with_name(stale.name + '.stale'))
+        for k in keys:   # its inputs changed (or no resume): never let later stages read it
+            stale = out / FILES[k]
+            if stale.is_file():
+                stale.replace(stale.with_name(stale.name + '.stale'))
+        key = keys[0]
         started, box = time.time(), [0.0]
         try:
             with metered() as box:
                 fn = _impl(stage)
                 kw = {}
                 if stage == 'translate':
-                    result = fn(source, module, str(lean_root), out, ref=ref, subdir=subdir)
+                    if mode == 'deep_too':   # the model owns translation.json; the deep one lives beside it
+                        sub = out / 'deep'
+                        sub.mkdir(exist_ok=True)
+                        (sub / FILES['translation']).unlink(missing_ok=True)
+                        result = fn(source, module, str(lean_root), sub, ref=ref, subdir=subdir)
+                        if (sub / FILES['translation']).is_file():
+                            shutil.copyfile(sub / FILES['translation'], out / FILES[key])
+                    else:
+                        result = fn(source, module, str(lean_root), out, ref=ref, subdir=subdir)
+                elif stage == 'model':
+                    root = local_source(source, out, module, ref, subdir)
+                    if functions:
+                        kw['functions'] = functions
+                    if parallel:
+                        kw['parallel'] = parallel
+                    result = fn(root, out, str(lean_root), module=module, repairs=repairs, second=second, **kw)
                 else:
                     translation = _load(out, 'translation')
                     if stage == 'describe':
@@ -192,15 +259,20 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         remaining = None if budget_usd is None else max(0.0, budget_usd - spent)
                         if parallel:
                             kw['parallel'] = parallel
-                        result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out,
-                                    budget_usd=remaining, **kw)
+                        if stage == 'prove':
+                            result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out,
+                                        budget_usd=remaining, **kw)
+                        else:
+                            result = fn(translation, _load(out, 'models'), _load(out, 'deep_translation'), out,
+                                        statements=_load(out, 'statements'), budget_usd=remaining,
+                                        domain_size=domain_size, **kw)
             cost = box[0]
-            if stage == 'prove':
-                cost += sum(float((r.get('cost_usd') if isinstance(r, dict) else getattr(r, 'cost_usd', 0)) or 0)
-                            for r in result or [])
+            if stage in ('prove', 'refine'):
+                cost += _result_cost(result)
             if not (out / FILES[key]).is_file():
                 dump(result, out / FILES[key])
-            rec.update(status='ok', count=len(result) if isinstance(result, list) else None)
+            rec.update(status='ok', count=len(result) if isinstance(result, list) else None,
+                       output_hash=_hash(*[_file_bytes(out, k) for k in keys]))
         except Exception as exc:  # graceful degradation: record, keep going
             # A partial output the stage chose to write is kept, and later stages use it.
             cost = box[0]
@@ -208,12 +280,21 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                        traceback=traceback.format_exc()[-4000:], partial_output=(out / FILES[key]).is_file())
         rec.update(seconds=round(time.time() - started, 2), cost_usd=round(cost, 4))
         spent += cost
+        if stage == 'translate' and mode == 'deep_too' and not (out / FILES['translation']).is_file() \
+                and (out / FILES['deep_translation']).is_file():
+            # The model stage produced nothing: the statements are about the deep translation instead.
+            shutil.copyfile(out / FILES['deep_translation'], out / FILES['translation'])
+            info['fallback'] = 'model stage failed; later stages use the deep translation'
+            rec['note'] = info['fallback']
         save()
 
     from .report import report
     started = time.time()
+    has_models = 'model' in stages and not info.get('fallback')
     try:
-        rep = report(out, proofs=[] if not prove else None, run_info=info, functions=functions)
+        rep = report(out, proofs=[] if not prove else None, run_info=info, functions=functions,
+                     models=None if has_models else [], refine=None if mode == 'deep_too' else [],
+                     deep_translation=None if mode == 'deep_too' else {})
         info['stages']['report'] = {'status': 'ok', 'seconds': round(time.time() - started, 2),
                                     'output': FILES['report']}
     except Exception as exc:
@@ -235,11 +316,21 @@ def main(argv=None) -> int:
                                  description='Code -> Lean model -> English -> Lean statements -> bounded kernel + '
                                              'real-runtime check -> kernel-checked proofs -> report.')
     ap.add_argument('source', help='git URL or local directory')
-    ap.add_argument('module', nargs='?', help='Lean module suffix (Autoform.Generated.<Module>)')
+    ap.add_argument('module', nargs='?', help='Lean module suffix (Autoform.NLModel.<Module> / Generated.<Module>)')
+    how = ap.add_mutually_exclusive_group()
+    how.add_argument('--deep', action='store_true',
+                     help='use the deep Joern -> Core translation instead of AI-written models')
+    how.add_argument('--deep-too', action='store_true',
+                     help='run both; try to prove each validated model equal to its deep translation (L1)')
+    ap.add_argument('--no-second', action='store_true',
+                    help='skip the independent second translation when validating models')
+    ap.add_argument('--repairs', type=int, default=3, help='model repair rounds per function (default 3)')
+    ap.add_argument('--parallel', type=int, help='concurrent model/prover jobs')
     ap.add_argument('--functions', nargs='+', default=[], help='only these functions (source or qualified names)')
     ap.add_argument('--no-prove', action='store_true', help='stop after checking')
     ap.add_argument('--no-runtime', action='store_true', help='do not execute the source code')
     ap.add_argument('--budget-usd', type=float, help='total model spend cap (enforced for proving)')
+    ap.add_argument('--domain-size', type=int, default=64, help='points per bounded check (default 64)')
     ap.add_argument('--out', type=Path, help='run directory (default: ./artifacts/nl/<Module>)')
     ap.add_argument('--lean-root', type=Path, help='Lean project root (default: this checkout)')
     ap.add_argument('--ref', help='git ref to check out')
@@ -248,7 +339,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     res = run(a.source, module=a.module, out=a.out, lean_root=a.lean_root, functions=a.functions,
               prove=not a.no_prove, runtime=not a.no_runtime, budget_usd=a.budget_usd, resume=not a.no_resume,
-              ref=a.ref, subdir=a.subdir)
+              ref=a.ref, subdir=a.subdir, domain_size=a.domain_size, parallel=a.parallel, deep=a.deep,
+              deep_too=a.deep_too, second=not a.no_second, repairs=a.repairs)
     for name, st in res['run']['stages'].items():
         print(f"{name:10s} {st.get('status'):9s} {st.get('seconds', '')!s:>8}s  ${st.get('cost_usd', 0)}"
               + (f"  {st['error'].splitlines()[0][:140]}" if st.get('error') else ''))
@@ -256,9 +348,13 @@ def main(argv=None) -> int:
     if t:
         print(f"\nstatements {t['statements']} (elaborated {t['statements_elaborated']}); bounded "
               f"{t['bounded_holds']}; refuted model/runtime {t['refuted_by_model']}/{t['refuted_by_runtime']}; "
-              f"proved {t['proved']}; potential bugs {t['potential_bugs']}")
+              f"proved {t['proved']}; potential bugs {t['potential_bugs']}; model defects {t['model_defects']}")
+        lv = t.get('by_level') or {}
+        if lv:
+            print('by level: ' + '; '.join(f"{k}: {v['functions']} functions, {v['proved']} proved"
+                                           for k, v in lv.items()))
     print(f"Report: {res['report_md']}")
-    if res['run']['stages']['translate']['status'] in ('failed', 'blocked'):
+    if not (Path(res['out']) / FILES['translation']).is_file():
         return 2
     return 1 if res['potential_bugs'] else 0
 

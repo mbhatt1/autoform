@@ -1,10 +1,13 @@
 """Contracts between the stages of the natural-language autoformalizer.
 
-    repository ──translate──► Translation (Lean model of each function)
+    repository ──model──────► Translation over AI-written, validated Lean models  (default)
+               │                + LeanModel per function (level L0)
+               └─translate──► Translation (deep: Joern → Core, `runFunc`)          (--deep)
                ──describe───► EnglishSpec per function     (untrusted)
                ──formalize──► Statement per English property (untrusted, must elaborate)
                ──check──────► CheckResult: bounded kernel + real-runtime evidence
                ──prove──────► ProofResult (kernel re-checked)
+               ──refine─────► L1: model = deep translation, kernel-checked   (--deep-too)
                ──report─────► report.json / report.md
 
 Every stage reads and writes plain JSON files in one run directory, named below, so a
@@ -26,6 +29,8 @@ FILES = {
     'proofs': 'proofs.json',
     'report': 'report.json',
     'models': 'models.json',
+    'deep_translation': 'deep-translation.json',   # --deep-too: the deep Translation
+    'refine': 'refine.json',                       # L1 results (refine.L1Result)
 }
 
 

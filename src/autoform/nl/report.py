@@ -1,9 +1,21 @@
 """Report stage: report.json + report.md from the stage outputs of one run directory.
 
-Findings first: statements refuted by the model or by the real runtime whose English came
-from documentation or tests (anything other than the implementation alone) are potential
-bugs — the code disagrees with what its docs/tests say. Refuted statements read off the
-implementation itself more likely mean the English or its formalization is wrong.
+Findings first:
+  potential bugs      REFUTED_MODEL on a validated model (or on the deep translation)
+                      whose English came from documentation or tests — the code disagrees
+                      with what its docs/tests say;
+  model defects       REFUTED_RUNTIME only: the statement holds on the model over the
+                      domain but fails on a real execution, so the model and the program
+                      disagree — a defect of the model/translation, not a bug report;
+  other refutations   English read off the implementation alone (likely mis-formalized),
+                      or refuted on a model that did not validate.
+
+Every function carries a trust level and every statement inherits one:
+  L1    the model is proved equal to the deep translation (refine.json) at the
+        statement's argument shape;
+  L0    the model agreed with the real code on its tests and with a second translation;
+  deep  the statement is about the deep translation itself (--deep);
+  none  no validated model.
 """
 from __future__ import annotations
 
@@ -21,9 +33,17 @@ TRUST = (
     "checked, not in general; REFUTED_MODEL means the kernel found an input where the translated "
     "program violates it. Agreement with real executions (CPython or the native runtime) is "
     "evidence that the translation is faithful, not proof. All proofs are about the translated "
-    "program (the Lean model `runFunc ...`), not about the source code directly; they transfer "
-    "to the source only as far as the translation is faithful.")
+    "program (a Lean model of the code), not about the source code directly; they transfer "
+    "to the source only as far as the translation is faithful. Each result carries the trust "
+    "level of the model it is about. L0: proved about an AI-written Lean model that agreed with "
+    "the real code on every one of N tested inputs and with an independent second translation — "
+    "evidence, not proof, of fidelity. L1: the model is additionally proved (by the kernel) equal "
+    "to the deep Joern → Core translation run by the Core interpreter, so the proof holds of the "
+    "deep translation; fidelity then rests on the deep translator and the interpreter, which are "
+    "differentially tested separately. deep: the statement is about the deep translation itself. "
+    "none: no validated model; results are about an unvalidated model.")
 
+LEVELS = ('L1', 'L0', 'deep', 'none')
 REFUTED = ('REFUTED_MODEL', 'REFUTED_RUNTIME')
 
 
@@ -44,7 +64,13 @@ def skip_reasons(fn: dict) -> list:
     return out
 
 
-def build(translation, english, statements, checks, proofs, *, run_info=None, functions=None) -> dict:
+def _shape(stmt: dict):
+    from .refine import statement_shape
+    return statement_shape(stmt)
+
+
+def build(translation, english, statements, checks, proofs, *, run_info=None, functions=None,
+          models=None, refine=None, deep_translation=None) -> dict:
     translation = _d(translation or {})
     fns = [_d(f) for f in translation.get('functions', [])]
     specs = {e['function']: e for e in map(_d, english or [])}
@@ -52,9 +78,13 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
     proofs_by = {p['statement']: p for p in map(_d, proofs or [])}
     stmts = [_d(s) for s in statements or []]
     props = {(e['function'], p['id']): _d(p) for e in specs.values() for p in e.get('properties', [])}
+    models_by = {m['function']: m for m in map(_d, models or [])}
+    refine_by = {r['function']: r for r in map(_d, refine or [])}
+    modelled = bool(models_by)
+    deep_tr = _d(deep_translation or {})
 
     skipped: dict = {}
-    out_fns, findings, mismatches = [], [], []
+    out_fns, bugs, defects, mismatches, unvalidated = [], [], [], [], []
     by_fn: dict = {}
     for s in stmts:
         by_fn.setdefault(s['function'], []).append(s)
@@ -62,17 +92,45 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
         reasons = skip_reasons(fn)
         if functions and fn['name'] not in functions and fn.get('source_name') not in functions:
             reasons = ['not selected']
+        m, l1 = models_by.get(fn['name']), refine_by.get(fn['name'])
+        if modelled:
+            if m is None:
+                reasons = reasons + ['no model']
+            elif m.get('status') != 'VALIDATED':
+                reasons = reasons + [f"model {str(m.get('status', '?')).lower()}"]
         for r in reasons:
             skipped[r] = skipped.get(r, 0) + 1
+        if not modelled:
+            level = 'deep' if translation else 'none'
+        elif m is None:
+            level = 'none'
+        else:
+            level = 'L1' if (l1 or {}).get('level') == 'L1' else (m.get('level') or 'none')
+            if level == 'L1' and m.get('level') not in ('L0', 'L1'):
+                level = 'none'      # never promote a model that did not validate
+        proved_shapes = {tuple(sh['kinds']) for sh in (l1 or {}).get('shapes', []) if sh.get('status') == 'PROVED'}
+        model_info = None
+        if m is not None:
+            model_info = {k: m.get(k) for k in ('lean_name', 'signature', 'status', 'tests_run', 'second_translation',
+                                                'repairs', 'notes')}
+            model_info['disagreements'] = len(m.get('disagreements') or [])
+            model_info['disagreement_examples'] = (m.get('disagreements') or [])[:3]
+            model_info['level'] = level
         spec = specs.get(fn['name'], {})
         entries = []
         for s in by_fn.get(fn['name'], []):
             c, p = checks_by.get(s['id'], {}), proofs_by.get(s['id'], {})
             prop = props.get((fn['name'], s.get('property')), {})
+            # A statement inherits L1 when the model equality is proved at ITS argument shape
+            # (even if another shape of the function failed); otherwise it stays at L0.
+            if level in ('L0', 'L1') and proved_shapes:
+                trust = 'L1' if _shape(s) in proved_shapes else 'L0'
+            else:
+                trust = level
             entry = {
                 'id': s['id'], 'property': s.get('property'), 'kind': prop.get('kind', ''),
                 'english': s.get('english') or prop.get('text', ''), 'evidence': prop.get('evidence', []),
-                'lean': s.get('lean_prop', ''), 'elaborates': bool(s.get('elaborates')),
+                'lean': s.get('lean_prop', ''), 'elaborates': bool(s.get('elaborates')), 'trust': trust,
                 'check': {k: c.get(k) for k in ('status', 'domain_size', 'counterexample', 'runtime_agrees',
                                                 'kernel_bounded_proof', 'detail')} if c else None,
                 'proof': {k: p.get(k) for k in ('status', 'certificate', 'axioms', 'reason', 'seconds', 'cost_usd')}
@@ -81,21 +139,48 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
             entries.append(entry)
             if c.get('status') in REFUTED:
                 item = dict(function=fn['name'], source_name=fn.get('source_name'), file=fn.get('file'),
-                            line=fn.get('line'), **{k: entry[k] for k in ('id', 'english', 'evidence', 'lean')},
+                            line=fn.get('line'),
+                            **{k: entry[k] for k in ('id', 'english', 'evidence', 'lean', 'trust')},
                             status=c['status'], counterexample=c.get('counterexample'))
-                (findings if _external(entry['evidence']) else mismatches).append(item)
+                validated = not modelled or (m or {}).get('status') == 'VALIDATED'
+                if c['status'] == 'REFUTED_RUNTIME':
+                    defects.append(item)
+                elif not validated:
+                    unvalidated.append(item)
+                elif _external(entry['evidence']):
+                    bugs.append(item)
+                else:
+                    mismatches.append(item)
+        l1_info = None
+        if l1:
+            l1_info = {k: l1.get(k) for k in ('status', 'level', 'deep_function', 'reason', 'cost_usd')}
+            keep = ('kinds', 'theorem', 'statement', 'status', 'certificate', 'axioms', 'reason', 'bounded')
+            l1_info['shapes'] = [{k: sh.get(k) for k in keep} for sh in l1.get('shapes', [])]
         out_fns.append({'name': fn['name'], 'source_name': fn.get('source_name'), 'file': fn.get('file'),
-                        'line': fn.get('line'), 'eligible': not reasons, 'skipped': reasons,
+                        'line': fn.get('line'), 'eligible': not reasons, 'skipped': reasons, 'level': level,
+                        'model': model_info, 'l1': l1_info,
                         'summary': spec.get('summary', ''), 'properties': entries})
     # statements for functions the translation does not list (should not happen) are kept
     known = {f['name'] for f in fns}
     for name, ss in by_fn.items():
         if name not in known:
             out_fns.append({'name': name, 'eligible': None, 'skipped': ['not in translation'], 'summary': '',
-                            'properties': [{'id': s['id'], 'english': s.get('english'), 'lean': s.get('lean_prop')}
-                                           for s in ss]})
+                            'level': 'none', 'model': None, 'l1': None,
+                            'properties': [{'id': s['id'], 'english': s.get('english'), 'lean': s.get('lean_prop'),
+                                            'trust': 'none'} for s in ss]})
 
     status = [(checks_by.get(s['id']) or {}).get('status') for s in stmts]
+    by_level = {}
+    for f in out_fns:
+        lv = by_level.setdefault(f['level'], {'functions': 0, 'statements': 0, 'bounded_holds': 0, 'proved': 0})
+        lv['functions'] += 1
+    for f in out_fns:
+        for e in f['properties']:
+            lv = by_level.setdefault(e['trust'], {'functions': 0, 'statements': 0, 'bounded_holds': 0, 'proved': 0})
+            lv['statements'] += 1
+            lv['bounded_holds'] += (e.get('check') or {}).get('status') == 'BOUNDED_HOLDS'
+            lv['proved'] += (e.get('proof') or {}).get('status') == 'PROVED'
+    by_level = {k: by_level[k] for k in LEVELS if k in by_level}
     totals = {
         'functions_translated': len(fns),
         'functions_eligible': sum(1 for f in out_fns if f.get('eligible')),
@@ -111,12 +196,21 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
         'check_errors': status.count('ERROR'),
         'proved': sum(1 for p in proofs_by.values() if p.get('status') == 'PROVED'),
         'proof_failed': sum(1 for p in proofs_by.values() if p.get('status') == 'FAILED'),
-        'potential_bugs': len(findings),
+        'potential_bugs': len(bugs),
+        'model_defects': len(defects),
+        'models': len(models_by),
+        'models_validated': sum(1 for m in models_by.values() if m.get('status') == 'VALIDATED'),
+        'l1_attempted': sum(1 for r in refine_by.values() if r.get('shapes')),
+        'l1_proved': sum(1 for r in refine_by.values() if r.get('level') == 'L1'),
+        'by_level': by_level,
     }
     return {'module': translation.get('module'), 'language': translation.get('language'),
             'source_root': translation.get('source_root'), 'source_revision': translation.get('source_revision'),
+            'call_template': translation.get('call_template'),
+            'deep_call_template': deep_tr.get('call_template'),
             'trust': TRUST, 'totals': totals,
-            'findings': {'potential_bugs': findings, 'refuted_implementation_only': mismatches},
+            'findings': {'potential_bugs': bugs, 'model_defects': defects,
+                         'refuted_implementation_only': mismatches, 'refuted_unvalidated_model': unvalidated},
             'functions': out_fns, 'run': run_info or {}}
 
 
@@ -132,6 +226,34 @@ def _ce(c) -> str:
     return '; '.join(parts)
 
 
+def _model_line(fn: dict) -> str:
+    m = fn.get('model')
+    if not m:
+        return f"level **{fn.get('level')}**" + (' (deep translation)' if fn.get('level') == 'deep' else
+                                                  ' (no model)')
+    return (f"level **{fn['level']}** — model `{m.get('lean_name')}` : `{m.get('signature')}`, {m.get('status')}; "
+            f"agreed with the real code on {m.get('tests_run')} inputs, {m.get('disagreements')} disagreements; "
+            f"second translation: {m.get('second_translation')}; repairs: {m.get('repairs')}")
+
+
+def _l1_line(fn: dict) -> list:
+    l1 = fn.get('l1')
+    if not l1:
+        return []
+    if l1.get('level') == 'L1':
+        out = [f"- L1: proved equal to the deep translation `{l1.get('deep_function')}` "
+               f"({', '.join(sh['theorem'] for sh in l1['shapes'])}); every proof about the model at these argument "
+               f"shapes transfers to the deep translation."]
+    else:
+        out = [f"- L1 not established ({l1.get('status')}): {str(l1.get('reason') or '')[:300]}"]
+    for sh in l1.get('shapes', []):
+        b = sh.get('bounded') or {}
+        at = f" at {b['disagreement']}" if b.get('disagreement') else ''
+        out.append(f"  - `{sh['theorem']}` ({', '.join(sh['kinds']) or 'no arguments'}): {sh['status']}; bounded "
+                   f"check {b.get('status', 'not run')}{at}")
+    return out
+
+
 def markdown(rep: dict) -> str:
     t = rep['totals']
     md = [f"# Autoformalization report: {rep.get('module') or '?'}", '',
@@ -144,39 +266,60 @@ def markdown(rep: dict) -> str:
           f"- bounded holds: {t['bounded_holds']}; refuted by model: {t['refuted_by_model']}; "
           f"refuted by runtime: {t['refuted_by_runtime']}; uncheckable: {t['uncheckable']}; "
           f"check errors: {t['check_errors']}",
-          f"- proved (kernel): {t['proved']}; proof attempts failed: {t['proof_failed']}", '']
+          f"- proved (kernel): {t['proved']}; proof attempts failed: {t['proof_failed']}"]
+    if t.get('models'):
+        md.append(f"- models: {t['models']}, validated: {t['models_validated']}; L1 attempted: "
+                  f"{t['l1_attempted']}, proved: {t['l1_proved']}")
+    md.append('')
+    if t.get('by_level'):
+        md += ['| trust level | functions | statements | bounded holds | proved |', '|---|---|---|---|---|']
+        for k, v in t['by_level'].items():
+            md.append(f"| {k} | {v['functions']} | {v['statements']} | {v['bounded_holds']} | {v['proved']} |")
+        md.append('')
     run = rep.get('run') or {}
     if run.get('stages'):
         md += ['## Stages', '', '| stage | status | seconds | cost (USD) | note |', '|---|---|---|---|---|']
         for name, st in run['stages'].items():
-            md.append(f"| {name} | {st.get('status')} | {st.get('seconds', '')} | {st.get('cost_usd', '')} | "
-                      f"{(st.get('error') or '').splitlines()[0][:120] if st.get('error') else ''} |")
+            note = (st.get('error') or '').splitlines()[0][:120] if st.get('error') else st.get('note', '')
+            md.append(f"| {name} | {st.get('status')} | {st.get('seconds', '')} | {st.get('cost_usd', '')} | {note} |")
         md.append('')
     f = rep['findings']
     md += ['## Findings', '']
     if f['potential_bugs']:
-        md += ['### Potential bugs (refuted; the English came from docs or tests)', '']
+        md += ['### Potential bugs (refuted on a validated model; the English came from docs or tests)', '']
         for x in f['potential_bugs']:
-            md += [f"- **{x['source_name']}** ({x['file']}:{x['line']}) — {x['status']}: {x['english']}",
+            md += [f"- **{x['source_name']}** ({x['file']}:{x['line']}) — {x['status']} [{x.get('trust')}]: "
+                   f"{x['english']}",
                    f"  - evidence: {', '.join(map(str, x['evidence']))}",
                    f"  - counterexample: {_ce(x) or 'n/a'}", f"  - Lean: `{x['lean']}`"]
         md.append('')
     else:
-        md += ['No potential bugs: no refuted statement is backed by documentation or tests.', '']
+        md += ['No potential bugs: no refuted statement on a validated model is backed by documentation or tests.', '']
+    if f.get('model_defects'):
+        md += ['### Model defects (REFUTED_RUNTIME: the model and the real code disagree; not bug reports)', '']
+        for x in f['model_defects']:
+            md.append(f"- {x['source_name']}: {x['english']} ({_ce(x) or 'no counterexample'})")
+        md.append('')
     if f['refuted_implementation_only']:
         md += ['### Refuted, English read off the implementation (likely mis-formalized)', '']
         for x in f['refuted_implementation_only']:
             md.append(f"- {x['source_name']}: {x['status']} — {x['english']} ({_ce(x) or 'no counterexample'})")
         md.append('')
+    if f.get('refuted_unvalidated_model'):
+        md += ['### Refuted on a model that did not validate (not evidence about the code)', '']
+        for x in f['refuted_unvalidated_model']:
+            md.append(f"- {x['source_name']}: {x['status']} — {x['english']} ({_ce(x) or 'no counterexample'})")
+        md.append('')
     md += ['## Functions', '']
     for fn in rep['functions']:
         md += [f"### {fn.get('source_name') or fn['name']}", '', f"`{fn['name']}`" +
-               (f" — skipped: {', '.join(fn['skipped'])}" if fn.get('skipped') else ''), '']
+               (f" — skipped: {', '.join(fn['skipped'])}" if fn.get('skipped') else ''), '',
+               '- ' + _model_line(fn)] + _l1_line(fn) + ['']
         if fn.get('summary'):
             md += [fn['summary'], '']
         for p in fn.get('properties', []):
             c, pr = p.get('check') or {}, p.get('proof') or {}
-            md += [f"- **{p['id']}** {p.get('english', '')}",
+            md += [f"- **{p['id']}** [{p.get('trust')}] {p.get('english', '')}",
                    f"  - Lean: `{p.get('lean', '')}`" + ('' if p.get('elaborates') else ' (does not elaborate)'),
                    f"  - check: {c.get('status', 'not checked')}" +
                    (f" on {c['domain_size']} points" if c.get('domain_size') else '') +
@@ -184,7 +327,8 @@ def markdown(rep: dict) -> str:
                    (f"; counterexample {_ce(c)}" if c.get('counterexample') else ''),
                    f"  - proof: {pr.get('status', 'not attempted')}" +
                    (f" — certificate `{pr['certificate']}`, axioms {pr.get('axioms')}" if pr.get('status') == 'PROVED'
-                    else (f" — {pr['reason'][:200]}" if pr.get('reason') else ''))]
+                    else (f" — {pr['reason'][:200]}" if pr.get('reason') else '')),
+                   f"  - trust: {p.get('trust')}"]
         md.append('')
     return '\n'.join(md) + '\n'
 
@@ -198,14 +342,15 @@ def _load(out: Path, key: str):
 
 
 def report(out_dir, *, translation=None, english=None, statements=None, checks=None, proofs=None,
-           run_info=None, functions=None) -> dict:
+           run_info=None, functions=None, models=None, refine=None, deep_translation=None) -> dict:
     """Build from the given stage outputs, or from the JSON files in `out_dir`."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     get = lambda v, k: v if v is not None else _load(out, k)   # noqa: E731
     rep = build(get(translation, 'translation') or {}, get(english, 'english') or [],
                 get(statements, 'statements') or [], get(checks, 'checks') or [], get(proofs, 'proofs') or [],
-                run_info=run_info, functions=functions)
+                run_info=run_info, functions=functions, models=get(models, 'models') or [],
+                refine=get(refine, 'refine') or [], deep_translation=get(deep_translation, 'deep_translation') or {})
     (out / FILES['report']).write_text(json.dumps(rep, indent=1, ensure_ascii=False, default=str))
     (out / 'report.md').write_text(markdown(rep))
     return rep

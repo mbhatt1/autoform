@@ -25,6 +25,7 @@ FIXTURE = ROOT / 'tests/fixtures/nl/translation-PipelinePython.json'
 LEAN = pytest.mark.skipif(os.environ.get('AUTOFORM_TEST_LEAN') != '1', reason='set AUTOFORM_TEST_LEAN=1')
 ADD = 'numbers.py:<module>.add'
 CALL = 'runFunc Autoform.Generated.PipelinePython.program 1000 "numbers.py:<module>.add" [.int a, .int b]'
+BINDERS = [{'name': 'a', 'type': 'Int', 'val': '.int a'}, {'name': 'b', 'type': 'Int', 'val': '.int b'}]
 ADD_PROP = f'∀ (a b : Int), match {CALL} with | .val (.int r) => r = a + b | _ => False'
 
 
@@ -57,18 +58,20 @@ class Stubs:
         return [EnglishSpec(ADD, 'Adds two numbers.', [
             EnglishProperty('p1', 'add returns the sum of its arguments.', 'postcondition', ['docstring']),
             EnglishProperty('p2', 'add returns its first argument.', 'postcondition', ['implementation']),
-            EnglishProperty('p3', 'add is never negative.', 'postcondition', ['tests/test_numbers.py:3'])])]
+            EnglishProperty('p3', 'add is never negative.', 'postcondition', ['tests/test_numbers.py:3']),
+            EnglishProperty('p4', 'add is below 100.', 'postcondition', ['docstring'])])]
 
     def formalize(self, translation, english, out, **kw):
-        mk = lambda p, post: Statement(f'add__{p}', ADD, p, f'english {p}', ADD_PROP, [], 'true', post,  # noqa
-                                       elaborates=True)
-        return [mk('p1', 'r == a + b'), mk('p2', 'r == a'), mk('p3', 'r >= 0')]
+        mk = lambda p, post: Statement(f'add__{p}', ADD, p, f'english {p}', ADD_PROP, list(BINDERS), 'true',  # noqa
+                                       post, elaborates=True)
+        return [mk('p1', 'r == a + b'), mk('p2', 'r == a'), mk('p3', 'r >= 0'), mk('p4', 'r < 100')]
 
     def check(self, translation, statements, out, domain_size=64, runtime=True):
         ce = lambda m, rt: {'inputs': {'a': -1, 'b': 0}, 'model': m, 'runtime': rt}  # noqa
         return [CheckResult('add__p1', 'BOUNDED_HOLDS', 64, runtime_agrees=True, kernel_bounded_proof=True),
                 CheckResult('add__p2', 'REFUTED_MODEL', 64, counterexample=ce('.val (.int 1)', '1')),
-                CheckResult('add__p3', 'REFUTED_RUNTIME', 64, counterexample=ce('.val (.int -1)', '-1'))]
+                CheckResult('add__p3', 'REFUTED_MODEL', 64, counterexample=ce('.val (.int -1)', '-1')),
+                CheckResult('add__p4', 'REFUTED_RUNTIME', 64, counterexample=ce('.val (.int 5)', '100'))]
 
     def prove(self, translation, statements, checks, out, budget_usd=None, **kw):
         from autoform.nl.schema import ProofResult
@@ -87,42 +90,43 @@ def test_pipeline_runs_every_stage_and_resumes(tmp_path, monkeypatch):
     stubs = Stubs()
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)
     src, out = _src(tmp_path), tmp_path / 'run'
-    res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
-    assert stubs.calls == list(pipeline.STAGES)
+    res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
+    assert stubs.calls == list(pipeline.DEEP_STAGES)
     run = json.loads((out / 'run.json').read_text())
-    assert all(run['stages'][s]['status'] == 'ok' for s in pipeline.STAGES)
-    assert run['stages']['prove']['cost_usd'] == 1.5 and run['cost_usd'] == 1.5
+    assert run['mode'] == 'deep' and all(run['stages'][s]['status'] == 'ok' for s in pipeline.DEEP_STAGES)
+    assert run['stages']['prove']['cost_usd'] == 2.0 and run['cost_usd'] == 2.0
     assert res['totals']['proved'] == 1 and res['potential_bugs'] == 1
-    for f in FILES.values():
-        assert (out / f).is_file(), f
+    for k, f in FILES.items():
+        if k not in ('models', 'deep_translation', 'refine'):
+            assert (out / f).is_file(), f
     # Unchanged inputs: nothing reruns.
     stubs.calls.clear()
-    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
+    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
     assert stubs.calls == []
     assert json.loads((out / 'run.json').read_text())['stages']['check']['status'] == 'resumed'
     # A changed option reruns only the stages whose inputs changed.
-    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False)
+    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, deep=True)
     assert stubs.calls == ['check']
     stubs.calls.clear()
-    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'])
+    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'], deep=True)
     assert stubs.calls == ['describe']        # same English out -> formalize and later resume
     stubs.calls.clear()
     # A changed source file reruns the translation.
     time.sleep(0.01)
     (src / 'numbers.py').write_text('def add(a, b):\n    return b + a\n')
-    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'])
+    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'], deep=True)
     assert stubs.calls == ['translate']
     stubs.calls.clear()
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, functions=['add'],
-                 resume=False)
-    assert stubs.calls == list(pipeline.STAGES)
+                 resume=False, deep=True)
+    assert stubs.calls == list(pipeline.DEEP_STAGES)
 
 
 def test_pipeline_degrades_gracefully(tmp_path, monkeypatch):
     stubs = Stubs(fail={'describe'})
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)
     out, src = tmp_path / 'run', _src(tmp_path)
-    res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
+    res = pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
     st = res['run']['stages']
     assert st['translate']['status'] == 'ok' and st['describe']['status'] == 'failed'
     assert 'describe exploded' in st['describe']['error'] and 'Traceback' in st['describe']['traceback']
@@ -134,18 +138,19 @@ def test_pipeline_degrades_gracefully(tmp_path, monkeypatch):
     # The failed stage reruns next time (and its successors run on its output).
     stubs.fail.clear()
     stubs.calls.clear()
-    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT)
+    pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
     assert stubs.calls == ['describe', 'formalize', 'check', 'prove']
 
 
 def test_pipeline_check_failure_still_reports_statements_and_no_prove(tmp_path, monkeypatch):
     stubs = Stubs(fail={'check'})
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)
-    res = pipeline.run(_src(tmp_path), module='PipelinePython', out=tmp_path / 'run', lean_root=ROOT, prove=False)
+    res = pipeline.run(_src(tmp_path), module='PipelinePython', out=tmp_path / 'run', lean_root=ROOT, prove=False,
+                       deep=True)
     st = res['run']['stages']
     assert st['check']['status'] == 'failed' and st['prove']['status'] == 'disabled'
     assert 'prove' not in stubs.calls
-    assert res['totals']['statements'] == 3 and res['totals']['bounded_holds'] == 0
+    assert res['totals']['statements'] == 4 and res['totals']['bounded_holds'] == 0
 
 
 def test_report_content_findings_first(tmp_path):
@@ -162,16 +167,20 @@ def test_report_content_findings_first(tmp_path):
     assert (tot['functions_translated'], tot['functions_eligible']) == (3, 2)
     assert tot['functions_skipped'] == {'untranslated constructs (holes)': 1}
     assert (tot['statements_elaborated'], tot['bounded_holds'], tot['refuted_by_model'],
-            tot['refuted_by_runtime'], tot['proved']) == (3, 1, 1, 1, 1)
+            tot['refuted_by_runtime'], tot['proved']) == (4, 1, 2, 1, 1)
     bugs = rep['findings']['potential_bugs']
     assert [b['id'] for b in bugs] == ['add__p3'] and bugs[0]['counterexample']['runtime'] == '-1'
     assert [b['id'] for b in rep['findings']['refuted_implementation_only']] == ['add__p2']
+    # REFUTED_RUNTIME only: the model and the real code disagree -> a model defect, not a bug.
+    assert [b['id'] for b in rep['findings']['model_defects']] == ['add__p4'] and tot['model_defects'] == 1
+    first = rep['functions'][0]
+    assert first['level'] == 'deep' and {p['trust'] for p in first['properties']} == {'deep'}
     add = rep['functions'][0]
     assert add['summary'] == 'Adds two numbers.' and add['properties'][0]['proof']['status'] == 'PROVED'
     assert add['properties'][0]['lean'] == ADD_PROP
     md = (tmp_path / 'report.md').read_text()
     assert 'untrusted' in rep['trust'] and 'Lean kernel' in rep['trust'] and 'translated program' in rep['trust']
-    assert md.index('Potential bugs') < md.index('## Functions')
+    assert md.index('Potential bugs') < md.index('Model defects') < md.index('## Functions')
     assert 'CPython: `-1`' in md and 'certificate `x.lean`' in md
     assert json.loads((tmp_path / 'report.json').read_text())['totals'] == tot
 

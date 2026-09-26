@@ -656,7 +656,8 @@ def main(argv=None):
     regress.add_argument("--target", choices=("aarch64", "x86_64", "i386"), default="aarch64",
                          help="with --machine: the Linux target to compile for (default: aarch64)")
     sub.add_parser("autoformalize", add_help=False,
-                   help="code -> English -> Lean statements -> checks -> kernel proofs (autoformalize --help)")
+                   help="code -> validated Lean model -> English -> Lean statements -> checks -> kernel proofs "
+                        "[--deep | --deep-too] (autoformalize --help)")
     sub.add_parser("formalize", add_help=False,
                    help="infer candidate claims, rank them with a SemIf judge, verify in Lean (formalize --help)")
     machine = sub.add_parser("machine", add_help=False, help="binary/assembly frontend (machine --help for options)")

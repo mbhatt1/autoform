@@ -83,6 +83,13 @@ intended and most useful ones, checks them in the Lean kernel, and repairs refut
 from their counterexamples. The judge ranks and classifies; only the kernel sets a status.
 See [the formalization harness](docs/harness.md).
 
+`autoform autoformalize <src> [Module]` goes from code to English to kernel-checked proofs. By
+default, a language model writes a Lean model of each Python function, and the model is
+validated against real executions and a second translation (level L0). `--deep` uses the Joern
+translation instead. `--deep-too` runs both and tries to prove each model equal to the deep
+translation (level L1). Refuted statements whose English came from docs or tests are
+reported first. See [autoformalize](docs/autoformalize.md).
+
 From a checkout, the original entry points remain available:
 
 ```sh
