@@ -377,7 +377,12 @@ Accepted proofs are cached and re-checked by the kernel, not trusted. The per-st
 
 - The model path reads Python only. Other languages need `--deep`.
 - Bounded checks cover a finite domain of Int/Nat/Bool/String arguments, and `Val` binders
-  over the recorded sample inputs only.
+  over the recorded sample inputs only (24 per function, spread across distinct receivers).
+  A method's receivers come from the tests' calls on exactly its class plus generated
+  states. If the tests only exercise subclasses, those are mostly empty objects, and a
+  precondition such as "the key is in the cache" is then met by no point. Such statements
+  are reported UNCHECKABLE (vacuous), never as holding. On cachetools, about 20% of the
+  statements end up here.
 - Methods are modelled for receivers of exactly their class; an inherited method is not
   re-modelled per subclass (a subclass method that calls it gets its source as context).
   Instances that hold other objects (linked nodes, locks, callables) have no encoding and
