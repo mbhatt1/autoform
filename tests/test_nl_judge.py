@@ -438,3 +438,13 @@ def test_label_rules_for_the_new_flow():
         'negative'
     assert J.label(dict(ce_, outcome={'repair_nl_status': 'REFUTED_RUNTIME'}))['kind'] == 'unlabeled'
     assert J.label(dict(ce_, forced=True))['kind'] == 'forced'
+
+
+def test_ill_typed_counterexample_is_not_a_documented_contradiction():
+    from autoform.nl.report import ill_typed
+    assert ill_typed({'model': 'Autoform.Core.EResult.exn (Autoform.Core.Val.str "TypeError")',
+                      'runtime': 'raises TypeError'})
+    assert ill_typed({'model': '.exn (.str "TypeError")'})
+    assert not ill_typed({'model': '.exn (.str "TypeError")', 'runtime': 'returned 3'})
+    assert not ill_typed({'model': '.exn (.str "KeyError")', 'runtime': 'raises KeyError'})
+    assert not ill_typed({'model': '.val (.int 99)', 'runtime': 'returned 99'})

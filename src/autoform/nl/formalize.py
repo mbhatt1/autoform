@@ -96,6 +96,26 @@ def build_call(template: str, name: str, args: list) -> str:
             .replace('{args}', '[' + ', '.join(args) + ']'))
 
 
+def receiver_guard(fn: dict, binders: list) -> str:
+    """`(dObj_S self).isSome` for a method or property: the statement is about real receivers.
+
+    Without it `self` ranges over every Val (`.unit`, objects of other classes), the dispatcher
+    returns a hole there, and the statement is false for a reason that says nothing about the code."""
+    types = fn.get('lean_types') or []
+    if fn.get('kind') not in RECEIVER_KINDS or not binders or not types or not IDENT.match(str(types[0])) \
+            or types[0] in TYPES or binders[0].get('type') != 'Val':
+        return ''
+    return f"(dObj_{types[0]} {binders[0]['name']}).isSome"
+
+
+def with_receiver_guard(fn: dict, cand: dict) -> dict:
+    guard = receiver_guard(fn, cand['binders'])
+    if not guard or guard in cand['pre']:
+        return cand
+    pre = cand['pre'].strip()
+    return dict(cand, pre=guard if pre in ('', 'true') else f'{guard} && ({pre})')
+
+
 def binder_val(b: dict) -> str:
     return f"{TYPES[b['type']]} {b['name']}".strip()
 
@@ -179,7 +199,9 @@ Facts about the model:
 * Binders of type `Val` range over values recorded from the project's tests (receivers,
   containers, ...), so use `Val` for a parameter whose Lean model type is not Int/Bool/String,
   and for the receiver `self` of a method (always `Val`). Constrain their shape in `pre`
-  (e.g. `vHas (vField self "_Cache__data") k`).
+  (e.g. `vHas (vField self "_Cache__data") k`). The harness adds `(dObj_<Struct> self).isSome`
+  to `pre` itself, so `self` is always a real object of the class; state any further
+  invariant the property needs (e.g. that a size field matches the stored data).
 * Methods. The first parameter of a method is its receiver `self` (an encoded object). By
   default `r` is the method's Python result. To state what the method does to the receiver,
   set "observe": "post": then `r` is `.val (.tuple [result, self'])` where `self'` is the
@@ -472,7 +494,7 @@ def formalize_one(translation: dict, fn: dict, spec: dict, prop: dict, scratch_d
             log.append(f'attempt {attempts}: model error: {exc}')
             break
         cost += c
-        cand = parse_candidate(data)
+        cand = with_receiver_guard(fn, parse_candidate(data))
         call = build_call(translation['call_template'], fn['name'] + ('#post' if cand.get('entry') == 'post' else ''),
                           [b.get('val', b['name']) for b in cand['binders']])
         lean_prop = assemble(cand['binders'], cand['pre'], cand['post'], call)

@@ -103,7 +103,9 @@ def test_pipeline_runs_every_stage_and_resumes(tmp_path, monkeypatch):
     stubs.calls.clear()
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, deep=True)
     assert stubs.calls == []
-    assert json.loads((out / 'run.json').read_text())['stages']['check']['status'] == 'resumed'
+    run = json.loads((out / 'run.json').read_text())
+    assert run['stages']['check']['status'] == 'resumed'
+    assert run['cost_usd'] == 2.0      # resumed stages still count against the budget
     # A changed option reruns only the stages whose inputs changed.
     pipeline.run(src, module='PipelinePython', out=out, lean_root=ROOT, runtime=False, deep=True)
     assert stubs.calls == ['check']

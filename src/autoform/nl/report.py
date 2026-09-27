@@ -28,6 +28,7 @@ Every function carries a trust level and every statement inherits one:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict
 from pathlib import Path
 
@@ -53,6 +54,14 @@ TRUST = (
 
 LEVELS = ('L1', 'L0', 'deep', 'none')
 REFUTED = ('REFUTED_MODEL', 'REFUTED_RUNTIME')
+
+
+def ill_typed(ce) -> bool:
+    """The counterexample raised TypeError in the model and, when it ran, in CPython too."""
+    ce = ce or {}
+    model_te = bool(re.search(r'\.exn\s*\(?\s*(Autoform\.Core\.)?(Val)?\.str\s*"TypeError"', str(ce.get('model', ''))))
+    rt = str(ce.get('runtime') or '')
+    return model_te and (not rt or rt.strip() == 'raises TypeError')
 
 
 def _external(evidence) -> list:
@@ -213,7 +222,9 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
                     disp = rec.get('disposition')
                     # The judge may repair a spec, but it may not hide that the code contradicts
                     # behaviour the docs or tests state: such a refutation is always listed.
-                    documented = bool(_external(entry.get('evidence')))
+                    # An input the code rejects as ill-typed (TypeError in the model and in
+                    # CPython) is outside what the docs describe: it contradicts nothing.
+                    documented = bool(_external(entry.get('evidence'))) and not ill_typed(c.get('counterexample'))
                     if disp not in ('finding', 'suspected_bug', 'model_defect') and documented:
                         item['documented_intent_contradicted'] = True
                         disp = 'suspected_bug'
