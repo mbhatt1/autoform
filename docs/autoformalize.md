@@ -97,6 +97,12 @@ than the one running autoform.
 - **Dispatcher.** `call "<method>" (self :: args)` returns the Python result; the second
   entry `call "<method>#post" (self :: args)` returns `.tuple [result, receiver after the
   call]`. A constructor's entry returns the new object.
+- **Statements about methods** range over real receivers. The formalize stage adds
+  `(Autoform.NLModel.<M>.dObj_S_<Class> self).isSome` to the precondition. Without it,
+  `self` would range over every `Val`: for `.unit` the dispatcher returns a hole and the
+  statement is false for a reason that says nothing about the code. Class invariants that
+  the decoder does not enforce (e.g. a size field that matches the stored data) still
+  have to be stated in `pre`.
 - **Differential testing.** A method's inputs start with a receiver state; CPython rebuilds
   the receiver without running `__init__` (`__new__`, then each recorded attribute is set;
   container attributes get their recorded exact type back, e.g. `OrderedDict`), runs the
@@ -206,21 +212,26 @@ authorization, validation or integrity term.
 
 ### Budget (`--budget-usd`, `--max-properties-per-function`)
 
-Every property is estimated at formalize + prove cost (`AUTOFORM_EST_FORMALIZE_USD`,
-default $0.05; `AUTOFORM_EST_PROVE_USD`, default $0.60; prove is left out with
-`--no-prove`). Priority is utility × 0.85^rank, where rank is the property's place inside
+The budget covers the whole run, including the earlier cost of stages resumed from a
+previous run. When proving is on, selection holds back a proving reserve,
+`AUTOFORM_PROVE_SHARE` (default 0.4) of what is left after `describe`. Formalize and
+repairs may not spend it, so the prove stage always gets money. Each property is estimated at
+its formalize cost (`AUTOFORM_EST_FORMALIZE_USD`, default $0.08, measured on cachetools).
+Proofs are paid for from the reserve and anything formalize left unspent, one agent call
+at a time (`AUTOFORM_EST_PROVE_USD`, default $0.60, is reserved before each call).
+Priority is utility × 0.85^rank, where rank is the property's place inside
 its function, so the best property of each function comes before the third-best of
 another. Properties are admitted in priority order until the next estimate would exceed
-what is left of the budget after `describe`; that one and every later one are skipped
+the budget less the reserve; that one and every later one are skipped
 ("budget: estimated $X would exceed $B"). A property past the per-function cap is skipped
 with that reason. Then the money is actually spent in the same order:
 
 - `formalize` runs the admitted properties in waves of three and stops once its measured
-  spend reaches the remaining budget; the rest are recorded in `budget.json`;
+  spend reaches the remaining budget less the reserve; the rest are recorded in `budget.json`;
 - `adjudicate` formalizes a repair only if one more formalization fits;
 - `prove` receives the statements (original and repaired) in utility order, and the prover
-  stops starting agent calls when the budget is gone (`budget exhausted` in the proof
-  reason). Calls already in flight finish, so the spend can overshoot by up to one agent
+  stops starting agent calls when the budget is gone. Those statements are SKIPPED with
+  `budget exhausted` in the reason, and counted as "not attempted (budget)", not as failed proofs. Calls already in flight finish, so the spend can overshoot by up to one agent
   call per prover worker (in the SemIf run below: $6.10 spent by prove against $4.83 left).
 
 The report's **Spent vs budget** section lists the budget, the spend per stage, the
@@ -312,6 +323,21 @@ and a model that disagrees with the deep translation there is skipped. A stateme
 passes goes to the same prover as the prove stage. If every shape is proved, the function
 reaches level L1. Otherwise it stays at L0, and the reason is recorded.
 
+## Prerequisites
+
+- Lean 4 via elan (`lake` on PATH or in `~/.elan/bin`), and this checkout built with
+  `lake build` (the model modules import `Autoform.NL.Basis`).
+- The `claude` CLI, logged in. All model calls go through `claude -p`. If
+  `ANTHROPIC_API_KEY` is set, it bills that key instead of the logged-in account, and the
+  preflight warns about it.
+- The Python the analysed code needs (`AUTOFORM_PYTHON`, default `python3`), with the
+  code's own dependencies importable. The model stage runs the real functions.
+- Optional: SemIf (`--judge semif`, see `judge.py`). `--judge auto` falls back to the
+  heuristic judge when SemIf is not installed.
+
+Before any stage runs, the CLI checks the Lean project, `lake`, the `claude` CLI and the
+numeric options, and exits with status 2 on a problem. `--skip-preflight` turns this off.
+
 ## Commands
 
 ```sh
@@ -322,18 +348,19 @@ autoform autoformalize ./src MyLib --deep-too       # both, and attempt L1
     [--functions f g] [--no-second] [--repairs N] [--no-prove] [--no-runtime]
     [--budget-usd X] [--domain-size N] [--parallel N] [--out DIR] [--no-resume]
     [--judge auto|semif|heuristic|replay:PATH|none] [--max-properties-per-function N]
-    [--repair-rounds N] [--tests DIR ...]
+    [--repair-rounds N] [--tests DIR ...] [--skip-preflight]
 ```
 
-Exit status: 2 if no translation was produced, 1 if there are potential bugs, else 0.
+Exit status: 2 if the preflight failed or no translation was produced, 1 if there are
+potential bugs, else 0.
 
 ## Costs
 
 Every language-model call goes through headless Claude Code (`llm.py`). Calls that use no
 tools are cached on disk by prompt, so rerunning one costs nothing.
 The prove and L1 stages call an agent per statement. `--budget-usd` caps the total spend
-of those two stages (with a judge, also of formalize and repairs, allocated by utility), and accepted proofs are cached and re-checked by the kernel, not
-trusted. The per-stage spend is listed in `run.json` and in the report.
+of those two stages (with a judge, also of formalize and repairs, allocated by utility).
+Accepted proofs are cached and re-checked by the kernel, not trusted. The per-stage spend is listed in `run.json` and in the report.
 
 ## Limits
 

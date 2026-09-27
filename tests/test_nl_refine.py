@@ -129,6 +129,7 @@ def test_cli_flags_reach_the_pipeline(tmp_path, monkeypatch):
         (out / FILES['translation']).write_text('{}')
         return {'out': str(out), 'run': {'stages': {}}, 'totals': {}, 'report_md': 'r.md', 'potential_bugs': 0}
     monkeypatch.setattr(pipeline, 'run', fake_run)
+    monkeypatch.setattr(pipeline, 'preflight', lambda *a, **k: ([], []))
     assert pipeline.main(['src', 'Mod', '--no-second', '--repairs', '1']) == 0
     assert (seen['deep'], seen['deep_too'], seen['second'], seen['repairs'], seen['module']) == \
         (False, False, False, 1, 'Mod')
@@ -379,3 +380,17 @@ def test_l1_add_kernel_checked(tmp_path):
     wrong = nl_refine.refine(mt, models()[:1], deep, tmp_path / 'wrong', agent=bad, attempts=1, cache_dir=None,
                              lean_root=ROOT, bounded=False)
     assert wrong[0].level == 'L0' and 'independent check failed' in wrong[0].reason
+
+
+def test_cli_preflight_stops_before_spending(tmp_path, monkeypatch, capsys):
+    called = []
+    monkeypatch.setattr(pipeline, 'run', lambda *a, **k: called.append(1))
+    monkeypatch.setattr(pipeline.shutil, 'which', lambda name: None)
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'x')
+    assert pipeline.main(['src', 'Mod', '--lean-root', str(tmp_path), '--budget-usd', '-1']) == 2
+    err = capsys.readouterr().err
+    assert called == []
+    assert 'no Lean project' in err and 'claude CLI is not on PATH' in err and '--budget-usd must be' in err
+    assert 'warning: ANTHROPIC_API_KEY is set' in err
+    errors, _ = pipeline.preflight(None, domain_size=0)
+    assert any('--domain-size' in e for e in errors)

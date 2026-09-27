@@ -42,6 +42,10 @@ def test_installed_distribution(tmp_path):
     wheel = Path(wheel).resolve()
     with zipfile.ZipFile(wheel) as archive:
         payload = archive.read("autoform/runtime.zip")
+        # the subpackages behind `autoform formalize` and `autoform autoformalize`
+        for module in ("autoform/harness/cli.py", "autoform/harness/prover.py", "autoform/harness/semif_worker.py",
+                       "autoform/nl/pipeline.py", "autoform/nl/model.py", "autoform/nl/judge.py"):
+            assert module in archive.namelist(), module
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = archive.namelist()
         assert "cartographer/export_ast.sc" in names

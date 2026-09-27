@@ -168,7 +168,9 @@ def check(wheel, sdist, root=ROOT):
         check_dependency_metadata(metadata, project)
         require(metadata['Name'] == 'autoform-lean', 'wrong distribution name')
         require(metadata['License-Expression'] == 'Apache-2.0 AND MIT', 'missing distribution license expression')
-        package = {p.name: p.read_bytes() for p in (root / 'src/autoform').glob('*.py')}
+        src = root / 'src/autoform'
+        package = {p.relative_to(src).as_posix(): p.read_bytes() for p in src.rglob('*.py')
+                   if '__pycache__' not in p.parts}
         for name, content in package.items():
             require(archive.read('autoform/' + name) == content, 'stale CLI source: ' + name)
         version = next(ast.literal_eval(node.value) for node in ast.parse(

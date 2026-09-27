@@ -62,6 +62,6 @@ norecursedirs = [
 ]
 
 [tool.setuptools]
-packages = ["autoform"]
+packages = ["autoform", "autoform.harness", "autoform.nl"]
 package-dir = {"" = "src"}
 include-package-data = false

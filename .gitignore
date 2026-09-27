@@ -118,3 +118,6 @@ Autoform/NL/NL*.lean
 # hand-written fixture used by tests/test_nl_refine.py is tracked.
 Autoform/NLModel/*.lean
 !Autoform/NLModel/TestFixturePython.lean
+
+# Local autoformalizer runs (reports, prover transcripts, scratch Lean); reproducible from the CLI.
+artifacts/nl/

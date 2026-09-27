@@ -396,6 +396,27 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
             'potential_bugs': len((rep.get('findings') or {}).get('potential_bugs', []))}
 
 
+def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repairs=0, repair_rounds=0,
+              needs_model=True) -> tuple:
+    """(errors, warnings) about the environment and options, before any stage spends money."""
+    from .formalize import lake
+    errors, warnings = [], []
+    root = Path(lean_root).resolve() if lean_root else default_lean_root()
+    if not ((root / 'lakefile.toml').is_file() or (root / 'lakefile.lean').is_file()):
+        errors.append(f'no Lean project at {root} (no lakefile); pass --lean-root')
+    if not Path(lake()).is_file():
+        errors.append('lake not found on PATH or in ~/.elan/bin; install Lean with elan')
+    if needs_model and not shutil.which('claude'):
+        errors.append('the claude CLI is not on PATH; it writes the models, English and statements')
+    if needs_model and os.environ.get('ANTHROPIC_API_KEY'):
+        warnings.append('ANTHROPIC_API_KEY is set: `claude -p` bills that key instead of the logged-in account')
+    for name, v, lo in (('--budget-usd', budget_usd, 0.0), ('--domain-size', domain_size, 1),
+                        ('--parallel', parallel, 1), ('--repairs', repairs, 0), ('--repair-rounds', repair_rounds, 0)):
+        if v is not None and v < lo:
+            errors.append(f'{name} must be at least {lo}, got {v}')
+    return errors, warnings
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog='autoform autoformalize',
                                  description='Code -> Lean model -> English -> Lean statements -> bounded kernel + '
@@ -432,7 +453,17 @@ def main(argv=None) -> int:
     ap.add_argument('--tests', action='append', default=[], metavar='DIR',
                     help='a test directory outside the source tree (repeatable); its tests are traced '
                          'for model inputs and shown to describe')
+    ap.add_argument('--skip-preflight', action='store_true', help='do not check the environment first')
     a = ap.parse_args(argv)
+    if not a.skip_preflight:
+        errors, warnings = preflight(a.lean_root, budget_usd=a.budget_usd, domain_size=a.domain_size,
+                                     parallel=a.parallel, repairs=a.repairs, repair_rounds=a.repair_rounds)
+        for w in warnings:
+            print(f'warning: {w}', file=sys.stderr)
+        if errors:
+            for e in errors:
+                print(f'error: {e}', file=sys.stderr)
+            return 2
     res = run(a.source, module=a.module, out=a.out, lean_root=a.lean_root, functions=a.functions,
               prove=not a.no_prove, runtime=not a.no_runtime, budget_usd=a.budget_usd, resume=not a.no_resume,
               ref=a.ref, subdir=a.subdir, domain_size=a.domain_size, parallel=a.parallel, deep=a.deep,
