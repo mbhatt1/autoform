@@ -259,8 +259,9 @@ def domain(binders: list, fn: dict | None, language: str, cap: int = 64):
 
 # --- per-statement Lean text ---------------------------------------------------------
 
-COMMAND_RE = re.compile(r'(^|\n)\s*(theorem|lemma|def|abbrev|axiom|instance|example|macro|syntax|elab|'
-                        r'attribute|set_option|open|namespace|section|end|import|variable|opaque|@\[|#)', re.M)
+COMMAND_RE = re.compile(r'(^|\n)\s*((theorem|lemma|def|abbrev|axiom|instance|example|macro|syntax|elab|'
+                        r"attribute|set_option|open|namespace|section|end|import|variable|opaque)(?![\w'])|@\[|#)",
+                        re.M)
 
 
 def safe_term(text: str) -> bool:

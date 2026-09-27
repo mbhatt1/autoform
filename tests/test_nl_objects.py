@@ -58,6 +58,10 @@ class Stack:
     def size(self):
         return len(self.items)
 
+    def push_twice(self, x):
+        self.push(x)
+        return self.push(x)
+
 
 class Counter:
     def __init__(self):
@@ -126,6 +130,7 @@ def test_stack():
         s.push(9)
     with pytest.raises(IndexError):
         Stack(1).peek()
+    assert Stack(5).push_twice(4) == 2
 
 
 def test_counter():
@@ -392,6 +397,11 @@ def test_tracer_records_receivers_constructor_args_and_drops_sentinel_defaults(r
     take = rec[N + 'Bag.take']
     assert any(len(p) == 2 for p in take) and any(len(p) == 3 for p in take)
     assert stats['defaults_dropped'] >= 1
+    # push() called from inside push_twice() on the same object is nested: recorded as an
+    # input, but its receiver state does not join the pool (it may be mid-update)
+    nested = stats['nested'][N + 'Stack.push']
+    assert nested and all(p in push for p in nested)
+    assert all(p not in nested for p in push if p[1] == ['i', '1'])
     states = stats['states']
     assert any(dict(s[2])['items'] == ['l', [['i', '1'], ['i', '2']]] for s in states['pkg.stack.Stack'])
     bag = states['pkg.stack.Bag'][0]
@@ -440,6 +450,7 @@ def test_formalize_and_check_accept_val_binders_and_post_entry():
     assert K.python_point(plan, plan.points[0])[0][0] == 'O'
     defs = plan.pass1()[0]
     assert 'def dom_' in defs and '(Val.bobj "obj:pkg.stack.Stack"' in defs and 'List (Val × Int)' in defs
+    assert K.safe_term('default') and not K.safe_term('def x := 1')   # a binder may be named `default`
     assert K.header(tr).count('open Autoform.NLModel.NLx (vField vGet vHas vLen vKeys vElems)') == 1
     with pytest.raises(ValueError, match='sample'):
         K.Plan(0, st, dict(fn, samples=[]), tr, 8)

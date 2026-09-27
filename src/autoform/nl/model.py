@@ -1591,8 +1591,18 @@ for f, lines, key, kind, cls, qual, modname in cfg['wanted']:
         wanted.setdefault((os.path.realpath(f), ln), []).append((key, kind, cls, qual, modname))
 classes = set(cfg.get('classes') or [])
 limit = cfg['limit']
-records, states, known, funcs = {}, {}, {}, {}
-stats = {'calls': 0, 'kwargs': 0, 'unencodable': 0, 'other_receiver': 0, 'defaults_dropped': 0}
+records, states, known, funcs, nested_pts = {}, {}, {}, {}, {}
+stats = {'calls': 0, 'kwargs': 0, 'unencodable': 0, 'other_receiver': 0, 'defaults_dropped': 0, 'nested': 0}
+def is_nested(frame, obj):
+    # a call on `obj` made from inside another method running on the same object: its state
+    # may be mid-update (not reachable from outside), e.g. popitem() inside __setitem__
+    f, depth = frame.f_back, 0
+    while f is not None and depth < 12:
+        c = f.f_code
+        if c.co_argcount and f.f_locals.get(c.co_varnames[0]) is obj:
+            return True
+        f, depth = f.f_back, depth + 1
+    return False
 def defaults_of(key, qual, modname):
     if key not in funcs:
         d = ()
@@ -1673,12 +1683,17 @@ def tracer(frame, event, arg):
     except (pv.Unencodable, ValueError, TypeError, RecursionError):
         stats['unencodable'] += 1
         tagged = None
-    if kind in ('method', 'property'):
+    nested = kind in ('method', 'property') and is_nested(frame, args[0])
+    if nested:
+        stats['nested'] += 1
+    elif kind in ('method', 'property'):
         snapshot(cls, args[0])
     if tagged is not None:
         bucket = records.setdefault(key, {})
         if len(bucket) < limit:
             bucket[tagged] = None
+            if nested:
+                nested_pts.setdefault(key, {})[tagged] = None
     if kind == 'constructor':
         self_name = code.co_varnames[0]
         def local(fr, ev, a):
@@ -1712,6 +1727,7 @@ finally:
     sys.settrace(None); threading.settrace(None)
 json.dump({'records': {k: [json.loads(t) for t in v] for k, v in records.items()}, 'stats': stats,
            'states': {c: [json.loads(t) for t in v] for c, v in states.items()},
+           'nested': {k: [json.loads(t) for t in v] for k, v in nested_pts.items()},
            'runs': ran, 'log_tail': buf.getvalue()[-1500:]}, open(cfg['out'], 'w'))
 '''
 
@@ -1817,8 +1833,11 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
     """Run the repository's tests under a tracer.
 
     Returns ({qualified name: [point]}, stats); stats['states'] maps each class in `classes`
-    to the receiver states observed (pyvalues 'O' tags: before every call of one of its
-    traced methods, and after every traced constructor). A method's point starts with its
+    to the receiver states observed (pyvalues 'O' tags: before every outermost call of one
+    of its traced methods, and after every traced constructor). A call made from inside
+    another method running on the same object is *nested*: its receiver may be mid-update,
+    so it is recorded as an input (stats['nested']) but its state does not join the pool of
+    receivers and it is not used as a check-stage sample. A method's point starts with its
     receiver's state; a constructor's point omits the receiver. A trailing argument that
     is the parameter's own (unencodable) default object, e.g. a sentinel or a function
     alias, is dropped, so the call is replayed with the default."""
@@ -1838,7 +1857,7 @@ def trace_tests(fns: list, source_root: Path, test_dirs: list, work: Path, class
     data, err = _run_script(TRACER, cfg, work, 'trace', TRACE_TIMEOUT)
     if data is None:
         return {}, {'error': err, 'states': {}}
-    stats = dict(data['stats'], runs=data['runs'], states=data.get('states', {}),
+    stats = dict(data['stats'], runs=data['runs'], states=data.get('states', {}), nested=data.get('nested', {}),
                  traced={k: len(v) for k, v in data['records'].items()})
     return data['records'], stats
 
@@ -2849,11 +2868,12 @@ SAMPLES = 24          # validated input points kept per function for the check s
 SAMPLE_BYTES = 4000
 
 
-def _samples(r: _Result) -> list:
-    """Input points on which the model agreed with CPython (traced ones first), small ones."""
+def _samples(r: _Result, nested=()) -> list:
+    """Input points on which the model agreed with CPython (traced ones first), small ones;
+    never a nested call's (possibly mid-update) receiver."""
     out = []
     for p, o, rt in zip(r.points, r.outputs, r.runtime or [None] * len(r.points)):
-        if rt is None or pv.canon_outcome(rt) != o or len(json.dumps(p)) > SAMPLE_BYTES:
+        if rt is None or pv.canon_outcome(rt) != o or len(json.dumps(p)) > SAMPLE_BYTES or p in nested:
             continue
         if p not in out:
             out.append(p)
@@ -2887,6 +2907,7 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
     traced, trace_stats = trace_tests(attempt, source_root, _test_dirs(source_root, tests), work / 'trace',
                                       classes=list(classes))
     states = trace_stats.pop('states', {}) or {}
+    nested = trace_stats.pop('nested', {}) or {}
     trace_stats['receiver_states'] = {c: len(v) for c, v in states.items()}
     trace_secs = round(time.time() - t_trace, 1)
     ctx, struct_report = build_structures(classes, states, lean_root, work / 'structures', module,
@@ -2961,7 +2982,7 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
                                for sp in r.sig.params]   # '*': the varargs parameter
             info.returns = sort_of(r.sig.result)
             info.mutates = r.sig.mutates
-        info.samples = _samples(r)
+        info.samples = _samples(r, nested.get(info.name, []))
         ok = rec.status in ('VALIDATED', 'UNTESTABLE')
         info.hole_free = info.call_closed = ok
         info.holes = [] if ok else [f'nl:model-{rec.status.lower()}']
