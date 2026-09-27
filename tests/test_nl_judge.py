@@ -101,7 +101,8 @@ def test_replay_judge_reproduces_selection(tmp_path):
 
 # --- budget ---------------------------------------------------------------------------
 
-def test_budget_allocation_stops_and_records_reasons(tmp_path):
+def test_budget_allocation_stops_and_records_reasons(tmp_path, monkeypatch):
+    monkeypatch.setattr(J, 'PROVE_SHARE', 0.0)
     est = J.estimate(True)['per_property_usd']
     sel = J.select(translation(), ENGLISH, tmp_path, judge='heuristic', budget_usd=3 * est + 0.01)
     chosen = [r for r in sel['properties'] if r['selected']]
@@ -111,6 +112,17 @@ def test_budget_allocation_stops_and_records_reasons(tmp_path):
     assert all(r['skip_reason'].startswith('budget') for r in sel['properties'] if not r['selected'])
     # Rank damping spreads the budget: the top property of each function is in.
     assert {r['function'] for r in chosen} == {ADD, QUO}
+
+
+def test_selection_keeps_a_proving_reserve(tmp_path, monkeypatch):
+    monkeypatch.setattr(J, 'PROVE_SHARE', 0.5)
+    est = J.estimate(True)['per_property_usd']
+    sel = J.select(translation(), ENGLISH, tmp_path, judge='heuristic', budget_usd=6 * est + 0.02)
+    assert sel['prove_reserve_usd'] == round((6 * est + 0.02) * 0.5, 4)
+    assert sel['selected'] == 3 and sel['planned_usd'] <= 6 * est + 0.02 - sel['prove_reserve_usd']
+    # without proving nothing is held back
+    sel = J.select(translation(), ENGLISH, tmp_path, judge='heuristic', budget_usd=6 * est + 0.02, prove=False)
+    assert sel['prove_reserve_usd'] == 0.0 and sel['selected'] == 6
 
 
 def test_max_properties_per_function(tmp_path):
@@ -357,6 +369,7 @@ class Stubs(Loop):
 
 
 def test_pipeline_with_judge_reports_lineage_budget_and_findings(tmp_path, monkeypatch):
+    monkeypatch.setattr(J, 'PROVE_SHARE', 0.0)
     stubs = Stubs()
     stubs.holds = {'p1', 'p3_r1', 'p2_r1', 'p4', 'p4_r1'}
     monkeypatch.setattr(pipeline, '_impl', stubs.impl)

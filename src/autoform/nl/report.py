@@ -281,6 +281,8 @@ def build(translation, english, statements, checks, proofs, *, run_info=None, fu
         'check_errors': status.count('ERROR'),
         'proved': sum(1 for p in proofs_by.values() if p.get('status') == 'PROVED'),
         'proof_failed': sum(1 for p in proofs_by.values() if p.get('status') == 'FAILED'),
+        'proof_budget_skipped': sum(1 for p in proofs_by.values()
+                                    if str(p.get('reason', '')).startswith('budget exhausted')),
         'potential_bugs': len(bugs),
         'model_defects': len(defects),
         'models': len(models_by),
@@ -363,7 +365,8 @@ def markdown(rep: dict) -> str:
           f"- bounded holds: {t['bounded_holds']}; refuted by model: {t['refuted_by_model']}; "
           f"refuted by runtime: {t['refuted_by_runtime']}; uncheckable: {t['uncheckable']}; "
           f"check errors: {t['check_errors']}",
-          f"- proved (kernel): {t['proved']}; proof attempts failed: {t['proof_failed']}"]
+          f"- proved (kernel): {t['proved']}; proof attempts failed: {t['proof_failed']}; "
+          f"not attempted (budget): {t.get('proof_budget_skipped', 0)}"]
     if t.get('models'):
         md.append(f"- models: {t['models']}, validated: {t['models_validated']}; L1 attempted: "
                   f"{t['l1_attempted']}, proved: {t['l1_proved']}")

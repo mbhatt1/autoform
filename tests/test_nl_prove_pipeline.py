@@ -392,11 +392,11 @@ def test_nl_prove_selects_bounded_statements(tmp_path, monkeypatch):
     assert nl_prove.theorem_name('numbers.py:<module>.add__p1') == 'numbers_py__module__add__p1'
 
 
-def test_nl_prove_budget_zero_fails_without_calling_agent(tmp_path, monkeypatch):
+def test_nl_prove_budget_zero_skips_without_calling_agent(tmp_path, monkeypatch):
     _fake_lean(monkeypatch)
     stmts, checks = _stmts()
     res = nl_prove.prove(fixture(), stmts, checks, tmp_path, agent=Refuse(), budget_usd=0, cache_dir=None)
-    assert res[0].status == 'FAILED' and 'budget' in res[0].reason
+    assert res[0].status == 'SKIPPED' and 'budget' in res[0].reason
 
 
 @LEAN

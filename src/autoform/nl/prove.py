@@ -145,7 +145,9 @@ def prove(translation: dict, statements: list, checks: list, out_dir, *, paralle
             else:
                 reason = ('budget exhausted: ' if res.status == 'BUDGET' else
                           'agent timed out: ' if res.status == 'TIMEOUT' else '') + (res.reason or res.status)
-                results[sid] = ProofResult(sid, 'FAILED', seconds=res.seconds, cost_usd=res.cost_usd,
+                # never attempted for budget: skipped, not a failed proof
+                st = 'SKIPPED' if res.status == 'BUDGET' and not res.cost_usd else 'FAILED'
+                results[sid] = ProofResult(sid, st, seconds=res.seconds, cost_usd=res.cost_usd,
                                            reason='; '.join([reason[:2000]] + notes))
     ordered = [results[s['id']] for s in stmts]
     dump(ordered, out / FILES['proofs'])

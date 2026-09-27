@@ -42,7 +42,9 @@ from .schema import FILES
 
 INTENT_THRESHOLD = 0.8          # as in the harness: a confident intent pick
 RANK_DAMPING = 0.85             # priority = utility * RANK_DAMPING ** (rank inside the function)
-EST_FORMALIZE_USD = float(os.environ.get('AUTOFORM_EST_FORMALIZE_USD', 0.05))
+EST_FORMALIZE_USD = float(os.environ.get('AUTOFORM_EST_FORMALIZE_USD', 0.08))   # measured: cachetools $6.70/90
+# share of the budget left at selection that formalize and repairs may not touch, so proving gets it
+PROVE_SHARE = float(os.environ.get('AUTOFORM_PROVE_SHARE', 0.4))
 EST_PROVE_USD = float(os.environ.get('AUTOFORM_EST_PROVE_USD', 0.60))
 
 EVIDENCE_WEIGHTS = {'tests': 0.5, 'docstring': 0.4, 'caller': 0.3, 'comments': 0.2, 'name': 0.15}
@@ -342,9 +344,10 @@ def select(translation: dict, english: list, out_dir, *, judge='auto', budget_us
                              security=sec,
                              utility=utility(p, probs, sel.get(p['id'], 0), len(props), intents.get(p['id']), sec)))
     est = estimate(prove)
-    planned = allocate(rows, budget_usd, max_properties_per_function, est)
+    reserve = round(budget_usd * PROVE_SHARE, 4) if prove and budget_usd is not None else 0.0
+    planned = allocate(rows, None if budget_usd is None else budget_usd - reserve, max_properties_per_function, est)
     result = dict(judge=info, budget_usd=budget_usd, max_properties_per_function=max_properties_per_function,
-                  estimates=est, planned_usd=planned, functions=per_fn, properties=rows,
+                  estimates=est, planned_usd=planned, prove_reserve_usd=reserve, functions=per_fn, properties=rows,
                   selected=sum(r['selected'] for r in rows), skipped=sum(not r['selected'] for r in rows))
     (out / FILES['selection']).write_text(json.dumps(result, indent=1, ensure_ascii=False, default=str))
     return result

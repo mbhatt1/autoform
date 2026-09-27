@@ -152,6 +152,13 @@ def _file_bytes(out: Path, key: str) -> bytes:
     return f.read_bytes() if f.is_file() else b''
 
 
+def _above_reserve(remaining, selection):
+    """What formalize and repairs may spend: the remaining budget less selection's proving reserve."""
+    if remaining is None:
+        return None
+    return max(0.0, remaining - ((selection or {}).get('prove_reserve_usd') or 0.0))
+
+
 def _load(out: Path, key: str):
     f = out / FILES[key]
     return json.loads(f.read_text()) if f.is_file() else None
@@ -303,7 +310,7 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         if selection:
                             from .judge import formalize_within_budget
                             result = formalize_within_budget(fn, translation, _load(out, 'english'), out, selection,
-                                                             remaining, **kw)
+                                                             _above_reserve(remaining, selection), **kw)
                         else:
                             result = fn(translation, _load(out, 'english'), out, **kw)
                     elif stage == 'select':
@@ -313,7 +320,8 @@ def run(source, *, module=None, out=None, lean_root=None, functions=None, prove=
                         result = fn(translation, _load(out, 'statements'), _load(out, 'checks'), out, judge=judge,
                                     english=_load(out, 'english'), selection=_load(out, 'selection'),
                                     models=_load(out, 'models'), formalize_fn=_impl('formalize'),
-                                    check_fn=_impl('check'), budget_usd=remaining, rounds=repair_rounds,
+                                    check_fn=_impl('check'), rounds=repair_rounds,
+                                    budget_usd=_above_reserve(remaining, _load(out, 'selection')),
                                     domain_size=domain_size, runtime=runtime)
                     elif stage == 'check':
                         result = fn(translation, _load(out, 'statements'), out, domain_size=domain_size,
