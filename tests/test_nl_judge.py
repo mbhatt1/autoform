@@ -455,8 +455,8 @@ def test_undefined_behaviour_witness_is_a_bug_not_a_model_gap():
     ub = {'status': 'REFUTED_MODEL', 'runtime_agrees': None,
           'counterexample': {'inputs': {'x': 18446744073709551615},
                              'model': 'Autoform.Core.EResult.hole "ub:shift count out of range"'}}
-    allowed, facts = R.gates(ub, {'params': [{'name': 'x'}]})
+    allowed, facts = R.gates(ub, {'name': 'int_sqrt64', 'params': [{'name': 'x'}]})
     assert 'INCOMPLETE_MODEL' not in allowed and 'REAL_BUG' in allowed
     assert facts['model_outcome_kind'] == 'undefined_behavior' and 'shift count out of range' in facts['gate']
     gap = dict(ub, counterexample=dict(ub['counterexample'], model='Autoform.Core.EResult.hole "stmt:UNKNOWN"'))
-    assert R.gates(gap, {'params': [{'name': 'x'}]})[0] == ['INCOMPLETE_MODEL']
+    assert R.gates(gap, {'name': 'int_sqrt64', 'params': [{'name': 'x'}]})[0] == ['INCOMPLETE_MODEL']
