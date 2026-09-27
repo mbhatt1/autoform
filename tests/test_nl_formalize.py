@@ -187,13 +187,16 @@ def test_lean_elaboration(tmp_path, cand, expect):
 
 
 def test_receiver_guard_restricts_self_to_real_objects():
+    tr = {'call_template': 'Autoform.NLModel.M.call {name} {args}'}
+    ns = 'Autoform.NLModel.M.'
     meth = {'kind': 'method', 'lean_types': ['S_Cache', 'Val']}
     cand = {'binders': [{'name': 'c', 'type': 'Val'}, {'name': 'k', 'type': 'Val'}], 'pre': 'true', 'post': 'r == r'}
-    assert F.with_receiver_guard(meth, cand)['pre'] == '(dObj_S_Cache c).isSome'
-    guarded = F.with_receiver_guard(meth, dict(cand, pre='vHas (vField c "d") k'))
-    assert guarded['pre'] == '(dObj_S_Cache c).isSome && (vHas (vField c "d") k)'
-    assert F.with_receiver_guard(meth, guarded) == guarded          # idempotent
-    # plain functions, constructors and unknown receiver types are left alone
-    assert F.with_receiver_guard({'kind': 'function', 'lean_types': ['Int']}, cand) == cand
-    assert F.with_receiver_guard({'kind': 'constructor', 'lean_types': ['Int']}, cand) == cand
-    assert F.with_receiver_guard({'kind': 'method', 'lean_types': ['Val', 'Val']}, cand) == cand
+    assert F.with_receiver_guard(meth, cand, tr)['pre'] == f'({ns}dObj_S_Cache c).isSome'
+    guarded = F.with_receiver_guard(meth, dict(cand, pre='vHas (vField c "d") k'), tr)
+    assert guarded['pre'] == f'({ns}dObj_S_Cache c).isSome && (vHas (vField c "d") k)'
+    assert F.with_receiver_guard(meth, guarded, tr) == guarded          # idempotent
+    # plain functions, constructors, unknown receiver types and deep translations are left alone
+    assert F.with_receiver_guard({'kind': 'function', 'lean_types': ['Int']}, cand, tr) == cand
+    assert F.with_receiver_guard({'kind': 'constructor', 'lean_types': ['Int']}, cand, tr) == cand
+    assert F.with_receiver_guard({'kind': 'method', 'lean_types': ['Val', 'Val']}, cand, tr) == cand
+    assert F.with_receiver_guard(meth, cand, {'call_template': 'Autoform.NL.M.callF {name} {args}'}) == cand

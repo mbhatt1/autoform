@@ -175,6 +175,14 @@ def lean_opens(translation) -> str:
     return f'open {mods[0]} ({" ".join(VAL_HELPERS)})\n' if mods else ''
 
 
+def model_namespace(translation) -> str:
+    """`Autoform.NLModel.<M>` for an AI model translation (its structures' dObj_/eObj_ live
+    there); '' for a deep translation."""
+    tr = asdict(translation) if hasattr(translation, '__dataclass_fields__') else translation
+    mods = [m for m in ENTRY_MODULE.findall(tr.get('call_template') or '') if m.startswith('Autoform.NLModel.')]
+    return mods[0] if mods else ''
+
+
 VAL_HELPERS = ('vField', 'vGet', 'vHas', 'vLen', 'vKeys', 'vElems')
 
 

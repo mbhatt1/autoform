@@ -549,7 +549,20 @@ def test_lean_hand_written_class_models_validate_against_cpython(repo, suite, tm
               binders=[{'name': 's', 'type': 'Val', 'val': 's'}, {'name': 'x', 'type': 'Int', 'val': '.int x'}],
               pre='true', post=post, elaborates=True, entry='post')
     wrong = dict(st, id='push_keeps', post=post.replace('+ 1', '+ 0'))
-    res = {r.statement: r for r in K.check(trj, [st, wrong], tmp_path / 'chk', domain_size=24)}
+    # the formalize stage restricts the receiver to real Stacks; the guard elaborates and checks
+    from autoform.nl import formalize as F
+    trd = json.loads((tmp_path / 'out' / 'translation.json').read_text())
+    fn_push = next(f for f in trd['functions'] if f['name'] == N + 'Stack.push')
+    g = F.with_receiver_guard(fn_push, dict(st), trd)
+    assert g['pre'] == f'({ns}.dObj_S_Stack s).isSome'
+    call = F.build_call(trd['call_template'], N + 'Stack.push#post', [b['val'] for b in g['binders']])
+    scratch = tmp_path / 'guard.lean'
+    scratch.write_text(F.scratch_text(trd, 'stmt_guard', g, F.assemble(g['binders'], g['pre'], g['post'], call)))
+    ok, log = F.run_lean(str(_lean_root()), scratch)
+    assert ok, log
+    guarded = dict(st, id='push_grows_guarded', pre=g['pre'])
+    res = {r.statement: r for r in K.check(trj, [st, wrong, guarded], tmp_path / 'chk', domain_size=24)}
+    assert res['push_grows_guarded'].status == 'BOUNDED_HOLDS', res['push_grows_guarded']
     assert res['push_grows'].status == 'BOUNDED_HOLDS' and res['push_grows'].runtime_agrees is True, res['push_grows']
     assert res['push_keeps'].status == 'REFUTED_MODEL' and res['push_keeps'].runtime_agrees is False
 
