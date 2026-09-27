@@ -9,7 +9,8 @@ For every REFUTED_MODEL / REFUTED_RUNTIME statement:
                                                with the real code;
      the model's outcome is undefined behaviour (a `ub:` hole of the C semantics)
                                              ⇒ REAL_BUG, or MISSING_PRECONDITION only if the
-                                               witness lies outside the documented/tested inputs:
+                                               witness is known to lie outside the documented or
+                                               tested inputs:
                                                the code does something C leaves undefined, which
                                                no model gap explains;
      the model's outcome is any other hole/outOfFuel ⇒ INCOMPLETE_MODEL (forced);
@@ -202,7 +203,9 @@ def gates(check: dict, fn: dict, sel_row: dict | None = None) -> tuple:
         facts['gate'] = f'the code reaches undefined behaviour at the witness ({ub.group(1) if ub else "ub"})'
         inside, why = witness_domain(ce.get('inputs'), fn)
         facts.update(witness_in_domain=inside, domain=why)
-        return (['REAL_BUG'] if inside is True else ['REAL_BUG', 'MISSING_PRECONDITION']), facts
+        # A value of the parameter's declared type is a legal input unless the docs or tests
+        # restrict it: only a witness known to lie outside them may be a missing precondition.
+        return (['REAL_BUG', 'MISSING_PRECONDITION'] if inside is False else ['REAL_BUG']), facts
     if kind in ('hole', 'out_of_fuel'):
         facts['gate'] = f'the model reached {kind.replace("_", " ")} at the witness'
         return ['INCOMPLETE_MODEL'], facts

@@ -328,7 +328,7 @@ def _ce(c) -> str:
     if ce.get('model') is not None:
         parts.append(f"model: `{ce['model']}`")
     if ce.get('runtime') is not None:
-        parts.append(f"CPython: `{ce['runtime']}`")
+        parts.append(f"real run: `{ce['runtime']}`")
     return '; '.join(parts)
 
 

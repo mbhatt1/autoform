@@ -183,7 +183,7 @@ def test_report_content_findings_first(tmp_path):
     md = (tmp_path / 'report.md').read_text()
     assert 'untrusted' in rep['trust'] and 'Lean kernel' in rep['trust'] and 'translated program' in rep['trust']
     assert md.index('Potential bugs') < md.index('Model defects') < md.index('## Functions')
-    assert 'CPython: `-1`' in md and 'certificate `x.lean`' in md
+    assert 'real run: `-1`' in md and 'certificate `x.lean`' in md
     assert json.loads((tmp_path / 'report.json').read_text())['totals'] == tot
 
 

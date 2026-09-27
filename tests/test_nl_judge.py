@@ -458,5 +458,8 @@ def test_undefined_behaviour_witness_is_a_bug_not_a_model_gap():
     allowed, facts = R.gates(ub, {'name': 'int_sqrt64', 'params': [{'name': 'x'}]})
     assert 'INCOMPLETE_MODEL' not in allowed and 'REAL_BUG' in allowed
     assert facts['model_outcome_kind'] == 'undefined_behavior' and 'shift count out of range' in facts['gate']
+    assert allowed == ['REAL_BUG']              # no documented domain: the declared type is the domain
+    documented = {'name': 'f', 'params': [{'name': 'x'}], 'tests': [{'text': 'f(1)\nf(2)'}]}
+    assert R.gates(ub, documented)[0] == ['REAL_BUG', 'MISSING_PRECONDITION']   # the tests only use 1 and 2
     gap = dict(ub, counterexample=dict(ub['counterexample'], model='Autoform.Core.EResult.hole "stmt:UNKNOWN"'))
     assert R.gates(gap, {'name': 'int_sqrt64', 'params': [{'name': 'x'}]})[0] == ['INCOMPLETE_MODEL']
