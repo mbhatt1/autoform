@@ -624,3 +624,29 @@ def test_prover_accepts_only_kernel_checked_proofs_of_the_original_statement(tmp
     cheat = prover.prove(_job(), ROOT, tmp_path / 'cheat', attempts=1, agent=_ScriptedAgent(
         '<helpers>axiom magic : ∀ a b : Nat, a + b = b + a</helpers><proof>by\n  exact magic a b</proof>'))
     assert cheat.status == 'FAILED'
+
+
+def test_prover_restore_rolls_back_only_lean_inputs_and_keeps_a_copy(tmp_path):
+    import subprocess
+    from autoform.harness import prover as P
+    root = tmp_path / 'repo'
+    (root / 'Lib').mkdir(parents=True)
+    (root / 'Lib' / 'A.lean').write_text('def a := 1\n')
+    (root / 'tool.py').write_text('x = 1\n')
+    (root / 'notes.lean').write_text('-- user draft\n')
+    git = lambda *a: subprocess.run(['git', '-C', str(root), *a], check=True, capture_output=True)
+    git('init', '-q')
+    git('add', '.')
+    git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init')
+    (root / 'notes.lean').write_text('-- user draft, edited before\n')      # dirty before the attempt
+    before = P.snapshot(root)
+    # during the attempt: a Lean input is tampered with, a Python file is edited, the draft is reverted
+    (root / 'Lib' / 'A.lean').write_text('axiom cheat : False\n')
+    (root / 'tool.py').write_text('x = 2  # concurrent edit\n')
+    git('checkout', '--', 'notes.lean')
+    restored, untracked, other = P.restore(root, before, tmp_path / 'backup')
+    assert restored == ['Lib/A.lean', 'notes.lean'] and untracked == [] and other == ['tool.py']
+    assert (root / 'Lib' / 'A.lean').read_text() == 'def a := 1\n'
+    assert (root / 'notes.lean').read_text() == '-- user draft, edited before\n'
+    assert (root / 'tool.py').read_text() == 'x = 2  # concurrent edit\n'           # never touched
+    assert (tmp_path / 'backup' / 'Lib' / 'A.lean').read_text() == 'axiom cheat : False\n'
