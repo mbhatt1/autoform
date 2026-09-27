@@ -217,8 +217,11 @@ previous run. When proving is on, selection holds back a proving reserve,
 `AUTOFORM_PROVE_SHARE` (default 0.4) of what is left after `describe`. Formalize and
 repairs may not spend it, so the prove stage always gets money. Each property is estimated at
 its formalize cost (`AUTOFORM_EST_FORMALIZE_USD`, default $0.08, measured on cachetools).
-Proofs are paid for from the reserve and anything formalize left unspent, one agent call
-at a time (`AUTOFORM_EST_PROVE_USD`, default $0.60, is reserved before each call).
+Proofs are paid for from the reserve and anything formalize left unspent. Each agent call
+reserves its own cap before it starts: the smaller of `AUTOFORM_PROVE_CALL_CAP_USD`
+(default $1.50) and what is left. That cap is passed to `claude --max-budget-usd`, so no call
+can spend more than it reserved. A call starts only if at least `AUTOFORM_EST_PROVE_USD`
+(default $0.60) is left.
 Priority is utility × 0.85^rank, where rank is the property's place inside
 its function, so the best property of each function comes before the third-best of
 another. Properties are admitted in priority order until the next estimate would exceed
@@ -231,8 +234,10 @@ with that reason. Then the money is actually spent in the same order:
 - `adjudicate` formalizes a repair only if one more formalization fits;
 - `prove` receives the statements (original and repaired) in utility order, and the prover
   stops starting agent calls when the budget is gone. Those statements are SKIPPED with
-  `budget exhausted` in the reason, and counted as "not attempted (budget)", not as failed proofs. Calls already in flight finish, so the spend can overshoot by up to one agent
-  call per prover worker (in the SemIf run below: $6.10 spent by prove against $4.83 left).
+  `budget exhausted` in the reason, and counted as "not attempted (budget)", not as failed
+  proofs. Proving cannot overshoot, because every call is capped by its reservation.
+  Formalize checks its spend between waves of three calls, so it can overshoot by at
+  most one wave (about $0.25).
 
 The report's **Spent vs budget** section lists the budget, the spend per stage, the
 planned spend and every skip with its stage and reason; each function lists its skipped
@@ -327,9 +332,9 @@ reaches level L1. Otherwise it stays at L0, and the reason is recorded.
 
 - Lean 4 via elan (`lake` on PATH or in `~/.elan/bin`), and this checkout built with
   `lake build` (the model modules import `Autoform.NL.Basis`).
-- The `claude` CLI, logged in. All model calls go through `claude -p`. If
-  `ANTHROPIC_API_KEY` is set, it bills that key instead of the logged-in account, and the
-  preflight warns about it.
+- The `claude` CLI. All model calls go through `claude -p`. `AUTOFORM_CLAUDE_AUTH=login`
+  (the default) uses the logged-in account and ignores `ANTHROPIC_API_KEY`.
+  `AUTOFORM_CLAUDE_AUTH=api-key` bills the key instead, for machines with no login such as CI.
 - The Python the analysed code needs (`AUTOFORM_PYTHON`, default `python3`), with the
   code's own dependencies importable. The model stage runs the real functions.
 
