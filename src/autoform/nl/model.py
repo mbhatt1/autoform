@@ -2871,16 +2871,42 @@ SAMPLE_BYTES = 4000
 
 
 def _samples(r: _Result, nested=()) -> list:
-    """Input points on which the model agreed with CPython (traced ones first), small ones;
-    never a nested call's (possibly mid-update) receiver."""
-    out = []
+    """Input points on which the model agreed with CPython, small ones, never a nested
+    call's (possibly mid-update) receiver; they are the check stage's domain for Val binders.
+
+    Kept round-robin across distinct first arguments (receivers), so one receiver crossed
+    with boundary values cannot fill the quota. Within a receiver, first the points whose
+    other arguments occur inside it (a key the cache holds): membership preconditions need
+    them. Otherwise the original order (traced first) is kept."""
+    agreeing = []
     for p, o, rt in zip(r.points, r.outputs, r.runtime or [None] * len(r.points)):
         if rt is None or pv.canon_outcome(rt) != o or len(json.dumps(p)) > SAMPLE_BYTES or p in nested:
             continue
-        if p not in out:
-            out.append(p)
-        if len(out) >= SAMPLES:
-            break
+        if p not in agreeing:
+            agreeing.append(p)
+    return spread_samples(agreeing, SAMPLES)
+
+
+def _member(arg, holder) -> bool:
+    """`arg` (a tagged value) occurs as a component of `holder` (a tagged value)."""
+    if holder == arg:
+        return True
+    if isinstance(holder, list):
+        return any(_member(arg, h) for h in holder)
+    return False
+
+
+def spread_samples(points: list, limit: int) -> list:
+    groups: dict = {}
+    for p in points:
+        key = json.dumps(p[0], sort_keys=True) if len(p) > 1 else ''
+        groups.setdefault(key, []).append(p)
+    queues = [sorted(g, key=lambda p: not any(_member(a, p[0]) for a in p[1:])) for g in groups.values()]
+    out = []
+    while len(out) < limit and any(queues):
+        for q in queues:
+            if q and len(out) < limit:
+                out.append(q.pop(0))
     return out
 
 
