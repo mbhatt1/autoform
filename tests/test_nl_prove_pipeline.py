@@ -424,3 +424,22 @@ def test_prover_statement_with_assignment_is_kernel_checked(tmp_path):
                      statement='theorem t : let n : Nat := 2; n + n = 4')
     r = prover.prove(job, ROOT, tmp_path, agent=Scripted('<proof>by\n  -- sorry-free\n  decide</proof>'), attempts=1)
     assert r.status == 'PROVED', r.reason
+
+
+def test_budget_cap_is_handed_to_the_agent(tmp_path, monkeypatch):
+    _fake_lean(monkeypatch)
+    caps = []
+
+    class Capped(Scripted):
+        def run(self, prompt, cwd, max_budget_usd=None):
+            caps.append(max_budget_usd)
+            return super().run(prompt, cwd)
+    agent = Capped('<proof>FAILED</proof>', cost=0.5)
+    jobs = [_job(n) for n in ('a', 'b', 'c')]
+    res = prover.prove_many(jobs, tmp_path, tmp_path / 'w', parallel=1, budget_usd=2.2, agent=agent, attempts=1)
+    # $1.50 per call at most, and never more than is left: 1.50, then 1.70 left -> 1.50, then 1.20 left
+    assert caps == pytest.approx([1.5, 1.5, 1.2]) and [r.status for r in res] == ['FAILED'] * 3
+    b = prover.Budget(1.0, estimate_usd=0.6, call_cap_usd=1.5)
+    assert b.reserve() == 1.0 and b.reserve() == 0.0     # the whole remainder is reserved by the first call
+    b.charge(0.3, reserved=1.0)
+    assert b.reserve() == pytest.approx(0.7) and prover.Budget(None).reserve() == prover.CALL_CAP_USD

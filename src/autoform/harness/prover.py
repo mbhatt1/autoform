@@ -137,31 +137,42 @@ class Result:
     transcripts: list = field(default_factory=list)
 
 
-class Budget:
-    """Total spend cap shared by concurrent jobs. Each agent call first *reserves* an
-    estimate (`reserve`), so concurrent workers cannot all start on the last dollar; the
-    reservation is replaced by the real cost when the call returns (`charge`)."""
+CALL_CAP_USD = float(os.environ.get('AUTOFORM_PROVE_CALL_CAP_USD', 1.50))
 
-    def __init__(self, limit_usd: float | None = None, estimate_usd: float = 0.60):
+
+class Budget:
+    """Total spend cap shared by concurrent jobs, enforced as a hard limit.
+
+    Each agent call first *reserves* its own cap (`reserve`): the smaller of the per-call
+    cap and what is left, and at least the estimate, or the call is not started. The cap
+    is handed to the agent (`claude --max-budget-usd`), so no call can spend more than it
+    reserved; the reservation is replaced by the real cost when it returns (`charge`)."""
+
+    def __init__(self, limit_usd: float | None = None, estimate_usd: float = 0.60,
+                 call_cap_usd: float | None = None):
         self.limit, self.spent, self.reserved = limit_usd, 0.0, 0.0
         self.estimate, self._lock = estimate_usd, threading.Lock()
+        self.call_cap = CALL_CAP_USD if call_cap_usd is None else call_cap_usd
 
     def exhausted(self) -> bool:
         with self._lock:
             return self.limit is not None and self.spent + self.reserved >= self.limit
 
-    def reserve(self) -> bool:
-        """Claim an estimate for one call; False (and nothing claimed) if it would not fit."""
+    def reserve(self) -> float:
+        """Claim the cap of one call and return it; 0.0 (nothing claimed) if not even the
+        estimate fits. Without a limit the per-call cap alone applies."""
         with self._lock:
-            if self.limit is not None and self.spent + self.reserved + self.estimate > self.limit + 1e-9:
-                return False
-            self.reserved += self.estimate
-            return True
+            amount = self.call_cap
+            if self.limit is not None:
+                amount = min(amount, self.limit - self.spent - self.reserved)
+                if amount + 1e-9 < min(self.estimate, self.call_cap):
+                    return 0.0
+            self.reserved += amount
+            return amount
 
-    def charge(self, usd: float, reserved: bool = False):
+    def charge(self, usd: float, reserved: float = 0.0):
         with self._lock:
-            if reserved:
-                self.reserved = max(0.0, self.reserved - self.estimate)
+            self.reserved = max(0.0, self.reserved - float(reserved or 0))
             self.spent += float(usd or 0)
 
 
@@ -308,10 +319,12 @@ class ClaudeCodeAgent:
         if not shutil.which('claude'):
             raise RuntimeError('claude CLI not found on PATH')
 
-    def run(self, prompt: str, cwd: Path) -> tuple[str, float]:
+    def run(self, prompt: str, cwd: Path, max_budget_usd: float | None = None) -> tuple[str, float]:
         cmd = ['claude', '-p', prompt, '--output-format', 'stream-json', '--verbose',
                '--max-turns', str(self.max_turns), '--allowedTools', ALLOWED_TOOLS,
                '--permission-mode', 'acceptEdits']
+        if max_budget_usd:
+            cmd += ['--max-budget-usd', f'{max_budget_usd:.2f}']
         if self.model:
             cmd += ['--model', self.model]
         from ..nl.llm import claude_env   # AUTOFORM_CLAUDE_AUTH: logged-in account or the API key
@@ -329,6 +342,16 @@ class ClaudeCodeAgent:
                 text, cost = ev.get('result') or '', float(ev.get('total_cost_usd') or 0)
         return (text or out[-4000:] + err[-2000:]), cost
 
+
+
+def run_agent(agent, prompt: str, workdir: Path, cap: float) -> tuple[str, float]:
+    """agent.run, handing it the call's spend cap when it takes one."""
+    import inspect
+    try:
+        takes = 'max_budget_usd' in inspect.signature(agent.run).parameters
+    except (TypeError, ValueError):
+        takes = False
+    return agent.run(prompt, workdir, max_budget_usd=cap or None) if takes else agent.run(prompt, workdir)
 
 # --- confinement of the Lean root ----------------------------------------------------------
 
@@ -479,7 +502,8 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
     toolchain = (root / 'lean-toolchain').read_text().strip() if (root / 'lean-toolchain').exists() else '?'
     restored, untracked, transcripts, status = [], [], [], 'FAILED'
     for attempt in range(1, attempts + 1):
-        if budget is not None and not budget.reserve():
+        cap = budget.reserve() if budget is not None else 0.0
+        if budget is not None and not cap:
             status, reason = 'BUDGET', (reason + '\n' if reason else '') + 'budget exhausted before attempt %d' % attempt
             break
         if agent is None:
@@ -497,7 +521,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
         before = snapshot(root)
         t0, reply, c = time.time(), '', 0.0
         try:
-            reply, c = agent.run(prompt, workdir)
+            reply, c = run_agent(agent, prompt, workdir, cap)
             status = 'FAILED'
         except subprocess.TimeoutExpired:
             status, reason = 'TIMEOUT', 'agent timed out (process group killed)'
@@ -510,7 +534,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
             untracked += u
         cost += c
         if budget is not None:
-            budget.charge(c, reserved=True)
+            budget.charge(c, reserved=cap)
         tr = workdir / f'{job.name}.attempt{attempt}.transcript.json'
         tr.write_text(json.dumps({'agent': getattr(agent, 'name', type(agent).__name__), 'prompt': prompt,
                                   'reply': reply, 'cost_usd': c, 'seconds': round(time.time() - t0, 1),
