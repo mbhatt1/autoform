@@ -332,6 +332,12 @@ reaches level L1. Otherwise it stays at L0, and the reason is recorded.
   preflight warns about it.
 - The Python the analysed code needs (`AUTOFORM_PYTHON`, default `python3`), with the
   code's own dependencies importable. The model stage runs the real functions.
+
+**The analysed code is executed.** The model, fuzz and check stages import the repository and
+call its functions and its tests in CPython with your user's permissions. The prover agents
+work inside the Lean checkout. Run untrusted repositories in a disposable environment
+with no credentials, as described in [SECURITY.md](../SECURITY.md). `--no-runtime` skips
+real executions in the check stage, but the model stage still runs the code to validate models.
 - Optional: SemIf (`--judge semif`, see `judge.py`). `--judge auto` falls back to the
   heuristic judge when SemIf is not installed.
 
