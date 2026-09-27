@@ -751,7 +751,8 @@ _afs.settrace(None)
 _af_cur[0] = None
 def _af_static():
     import dis, inspect
-    f = getattr(obj, '__func__', obj)
+    f = target.__init__ if isinstance(target, type) else target
+    f = getattr(f, '__func__', f)
     try:
         f = inspect.unwrap(f)
     except Exception:
@@ -838,9 +839,11 @@ class CoverageRunner:
             return [(r, frozenset()) for r in self.runtime.run(points)]
         mod = self.fn.mod
         cover_out = (self.work / f'cover{self.calls}.cov.json').resolve()
-        cfg = {'sys_path': [str(mod.import_root)], 'dotted': mod.dotted, 'path': str(mod.path),
-               'qual': self.fn.qual, 'per': self.per_call, 'points': points,
-               'cover_root': str(self.root), 'cover_mark': mark, 'cover_out': str(cover_out)}
+        base = getattr(self.runtime, 'cfg', None) or M.runner_config(
+            mod.import_root, mod.dotted, mod.path, self.fn.qual, getattr(self.fn, 'kind', 'function'))
+        cfg = dict(base)
+        cfg.update(per=self.per_call, points=points, cover_root=str(self.root), cover_mark=mark,
+                   cover_out=str(cover_out))
         if cover_out.exists():
             cover_out.unlink()
         data, err = M._run_script(script, cfg, self.work, f'cover{self.calls}', M.RUNTIME_TIMEOUT,

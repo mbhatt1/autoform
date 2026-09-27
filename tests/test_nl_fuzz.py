@@ -218,7 +218,7 @@ def percent_answer(lean):
 
 
 def interp_evaluate(module, lean_root, work, stem, callee_src, cand, lean_name, qual, points, runtime,
-                    kernel_points=M.KERNEL_POINTS):
+                    kernel_points=M.KERNEL_POINTS, **_structs):
     """Python stand-in for the Lean run of the two percent_of candidates."""
     ev = M.Evaluation(elaborates=True)
     div = (lambda a, b: a // b) if 'Int.fdiv' in cand.data['lean'] else ediv
