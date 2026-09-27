@@ -466,3 +466,15 @@ def test_lean_wrong_quotient_is_caught_at_a_negative_divisor(tmp_path):
     d = neg[0]
     a, b = (int(x) for x in d['inputs'].strip('()').split(', '))
     assert d['runtime'] == f'returns {a // b}' and d['model'] != d['runtime']
+
+
+def test_samples_spread_across_receivers_members_first():
+    empty = ['O', 'C', [['data', ['d', []]]]]
+    full = ['O', 'C', [['data', ['d', [[['i', '5'], ['i', '50']]]]]]]
+    pts = [[empty, ['i', str(k)]] for k in range(30)] + [[full, ['i', '1']], [full, ['i', '5']]]
+    got = M.spread_samples(pts, 6)
+    assert len(got) == 6
+    assert got[1] == [full, ['i', '5']] and got[3] == [full, ['i', '1']]   # alternates; the member key first
+    every = M.spread_samples(pts, 100)
+    assert len(every) == 32 and sorted(map(str, every)) == sorted(map(str, pts))   # nothing lost or duplicated
+    assert M.spread_samples([[['i', '1']], [['i', '2']]], 5) == [[['i', '1']], [['i', '2']]]   # single argument
