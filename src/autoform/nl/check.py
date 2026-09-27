@@ -39,8 +39,6 @@ from __future__ import annotations
 import itertools
 import json
 import re
-import subprocess
-import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor

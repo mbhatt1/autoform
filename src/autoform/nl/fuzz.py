@@ -59,7 +59,7 @@ import threading
 import time
 import weakref
 import zlib
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import pyvalues as pv

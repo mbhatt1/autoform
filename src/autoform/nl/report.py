@@ -73,10 +73,6 @@ def _d(x):
     return asdict(x) if hasattr(x, '__dataclass_fields__') else dict(x)
 
 
-def _external(evidence) -> list:
-    return [e for e in evidence or [] if not str(e).lower().startswith('implementation')]
-
-
 def skip_reasons(fn: dict) -> list:
     out = []
     if not fn.get('hole_free', True):

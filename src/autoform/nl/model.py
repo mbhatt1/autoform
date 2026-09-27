@@ -54,7 +54,7 @@ import sys
 import textwrap
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import fuzz, llm, pyvalues as pv, schema
@@ -1360,12 +1360,12 @@ class Structure:
             discr = ', '.join(f'(dField {pv.lean_str(a)} kvs).bind {decoder(t)}' for a, _, t in self.fields)
             binds = ', '.join(f'some x{i}' for i in range(n))
             build = '{ ' + ', '.join(f'{lf} := x{i}' for i, (_, lf, _) in enumerate(self.fields)) + ' }'
-            lines += [f'  | .bobj n (.dict kvs) =>',
+            lines += ['  | .bobj n (.dict kvs) =>',
                       f'    if n == {tag} && kvs.length == {n} then',
                       f'      match {discr} with',
                       f'      | {binds} => some {build}',
                       f'      | {", ".join("_" for _ in range(n))} => none',
-                      f'    else none']
+                      '    else none']
         else:
             lines += [f'  | .bobj n (.dict kvs) => if n == {tag} && kvs.length == 0 then some {{}} else none']
         lines.append('  | _ => none')

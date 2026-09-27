@@ -349,7 +349,6 @@ class Harness:
         if d['chosen'] == 'REAL_BUG':
             # Cross-validation (design §31): a defect claim needs the intent to be supported by
             # something other than a template — independent evidence, or a confident intent pick.
-            intent = claim.get('intent') or {}
             confident = {r['claim']['id'] for r in self.claims.values()
                          if r['function'] == fn.id and (r['claim'].get('intent') or {}).get('chosen')
                          and r['claim']['intent'].get('probability', 0) >= INTENT_THRESHOLD}

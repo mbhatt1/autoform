@@ -44,7 +44,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
-from ..harness.judge import COUNTEREXAMPLE_CLASSES, MODEL_DEFECTS
+from ..harness.judge import COUNTEREXAMPLE_CLASSES
 from .judge import (EST_FORMALIZE_USD, INTENT_THRESHOLD, external_evidence, full_state, make_judge,
                     record_skips)
 from .schema import FILES
