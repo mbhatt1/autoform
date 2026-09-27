@@ -7,7 +7,12 @@ For every REFUTED_MODEL / REFUTED_RUNTIME statement:
 1. Deterministic gates narrow what the judge may say (`gates`):
      REFUTED_RUNTIME only                   ⇒ INCOMPLETE_MODEL (forced): the model disagrees
                                                with the real code;
-     the model's outcome is a hole/outOfFuel ⇒ INCOMPLETE_MODEL (forced);
+     the model's outcome is undefined behaviour (a `ub:` hole of the C semantics)
+                                             ⇒ REAL_BUG, or MISSING_PRECONDITION only if the
+                                               witness lies outside the documented/tested inputs:
+                                               the code does something C leaves undefined, which
+                                               no model gap explains;
+     the model's outcome is any other hole/outOfFuel ⇒ INCOMPLETE_MODEL (forced);
      the real code satisfies the statement
        on every checked input (runtime_agrees) ⇒ INCOMPLETE_MODEL (forced);
      otherwise REAL_BUG, BAD_SPEC, plus
@@ -166,6 +171,8 @@ def witness_domain(inputs: dict, fn: dict) -> tuple:
 
 def model_kind(model_outcome) -> str:
     text = str(model_outcome or '')
+    if re.search(r'\bhole\s*\(?\s*"ub:', text):
+        return 'undefined_behavior'
     if re.search(r'\bhole\b', text):
         return 'hole'
     if 'outOfFuel' in text or 'out of fuel' in text:
@@ -190,6 +197,12 @@ def gates(check: dict, fn: dict, sel_row: dict | None = None) -> tuple:
     if check['status'] == 'REFUTED_RUNTIME':
         facts['gate'] = 'refuted on the real code only: the model disagrees with the code'
         return ['INCOMPLETE_MODEL'], facts
+    if kind == 'undefined_behavior':
+        ub = re.search(r'"ub:([^"]*)"', str(ce.get('model')))
+        facts['gate'] = f'the code reaches undefined behaviour at the witness ({ub.group(1) if ub else "ub"})'
+        inside, why = witness_domain(ce.get('inputs'), fn)
+        facts.update(witness_in_domain=inside, domain=why)
+        return (['REAL_BUG'] if inside is True else ['REAL_BUG', 'MISSING_PRECONDITION']), facts
     if kind in ('hole', 'out_of_fuel'):
         facts['gate'] = f'the model reached {kind.replace("_", " ")} at the witness'
         return ['INCOMPLETE_MODEL'], facts

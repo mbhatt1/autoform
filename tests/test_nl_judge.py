@@ -448,3 +448,15 @@ def test_ill_typed_counterexample_is_not_a_documented_contradiction():
     assert not ill_typed({'model': '.exn (.str "TypeError")', 'runtime': 'returned 3'})
     assert not ill_typed({'model': '.exn (.str "KeyError")', 'runtime': 'raises KeyError'})
     assert not ill_typed({'model': '.val (.int 99)', 'runtime': 'returned 99'})
+
+
+def test_undefined_behaviour_witness_is_a_bug_not_a_model_gap():
+    from autoform.nl import repair as R
+    ub = {'status': 'REFUTED_MODEL', 'runtime_agrees': None,
+          'counterexample': {'inputs': {'x': 18446744073709551615},
+                             'model': 'Autoform.Core.EResult.hole "ub:shift count out of range"'}}
+    allowed, facts = R.gates(ub, {'params': [{'name': 'x'}]})
+    assert 'INCOMPLETE_MODEL' not in allowed and 'REAL_BUG' in allowed
+    assert facts['model_outcome_kind'] == 'undefined_behavior' and 'shift count out of range' in facts['gate']
+    gap = dict(ub, counterexample=dict(ub['counterexample'], model='Autoform.Core.EResult.hole "stmt:UNKNOWN"'))
+    assert R.gates(gap, {'params': [{'name': 'x'}]})[0] == ['INCOMPLETE_MODEL']
