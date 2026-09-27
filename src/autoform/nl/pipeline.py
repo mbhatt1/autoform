@@ -408,8 +408,18 @@ def preflight(lean_root, *, budget_usd=None, domain_size=64, parallel=None, repa
         errors.append('lake not found on PATH or in ~/.elan/bin; install Lean with elan')
     if needs_model and not shutil.which('claude'):
         errors.append('the claude CLI is not on PATH; it writes the models, English and statements')
-    if needs_model and os.environ.get('ANTHROPIC_API_KEY'):
-        warnings.append('ANTHROPIC_API_KEY is set: `claude -p` bills that key instead of the logged-in account')
+    if needs_model:
+        from .llm import LLMError, claude_auth
+        try:
+            mode = claude_auth()
+        except LLMError as exc:
+            errors.append(str(exc))
+        else:
+            if mode == 'login' and os.environ.get('ANTHROPIC_API_KEY'):
+                warnings.append('ANTHROPIC_API_KEY is set but not used: model calls use the logged-in claude '
+                                'account (AUTOFORM_CLAUDE_AUTH=api-key bills the key instead)')
+            if mode == 'api-key' and not os.environ.get('ANTHROPIC_API_KEY'):
+                errors.append('AUTOFORM_CLAUDE_AUTH=api-key but ANTHROPIC_API_KEY is not set')
     for name, v, lo in (('--budget-usd', budget_usd, 0.0), ('--domain-size', domain_size, 1),
                         ('--parallel', parallel, 1), ('--repairs', repairs, 0), ('--repair-rounds', repair_rounds, 0)):
         if v is not None and v < lo:

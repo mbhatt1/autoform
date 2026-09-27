@@ -314,7 +314,8 @@ class ClaudeCodeAgent:
                '--permission-mode', 'acceptEdits']
         if self.model:
             cmd += ['--model', self.model]
-        env = {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}  # use the logged-in plan
+        from ..nl.llm import claude_env   # AUTOFORM_CLAUDE_AUTH: logged-in account or the API key
+        env = claude_env()
         _, out, err = run_group(cmd, cwd, env, self.timeout)   # TimeoutExpired propagates
         stamp = time.strftime('%Y%m%d-%H%M%S') + f'-{os.getpid()}-{threading.get_ident() % 100000}'
         (Path(cwd) / f'agent-{stamp}.transcript.jsonl').write_text(out + ('\n' + err if err else ''))

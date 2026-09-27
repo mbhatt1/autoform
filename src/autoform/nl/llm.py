@@ -3,8 +3,9 @@
 `ask(prompt, cwd)` returns the model's final text. `ask_json(prompt, keys)` asks for a
 JSON object between <json></json> tags and validates the listed top-level keys, retrying
 once with the parse error. Results are cached on disk by prompt hash so reruns are free.
-`ANTHROPIC_API_KEY` is removed from the child environment: that key has no credits and
-would take precedence over the subscription login.
+Authentication is `AUTOFORM_CLAUDE_AUTH`: `login` (default) removes `ANTHROPIC_API_KEY`
+from the child environment so calls use the logged-in Claude account (a set key would
+take precedence over it); `api-key` keeps the key and bills it (e.g. in CI).
 """
 from __future__ import annotations
 
@@ -30,6 +31,20 @@ def available() -> bool:
     return shutil.which('claude') is not None
 
 
+def claude_auth() -> str:
+    mode = os.environ.get('AUTOFORM_CLAUDE_AUTH', 'login').strip().lower()
+    if mode not in ('login', 'api-key'):
+        raise LLMError(f'AUTOFORM_CLAUDE_AUTH must be login or api-key, not {mode!r}')
+    return mode
+
+
+def claude_env() -> dict:
+    """The environment for a `claude` child process under the chosen authentication."""
+    if claude_auth() == 'api-key':
+        return dict(os.environ)
+    return {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}
+
+
 def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turns: int = 1,
         timeout: int = 1800, model: str | None = None, cache: bool = True) -> tuple[str, float]:
     """Return (text, cost_usd). Tool-using calls (tools != '') are never cached."""
@@ -49,7 +64,7 @@ def ask(prompt: str, cwd: Path | str = '.', *, tools: str = TOOLS_NONE, max_turn
         cmd += ['--allowedTools', '', '--tools', '']
     if model or os.environ.get('AUTOFORM_LLM_MODEL'):
         cmd += ['--model', model or os.environ['AUTOFORM_LLM_MODEL']]
-    env = {k: v for k, v in os.environ.items() if k != 'ANTHROPIC_API_KEY'}
+    env = claude_env()
     proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, start_new_session=True)
     try:

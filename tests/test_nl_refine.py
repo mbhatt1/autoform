@@ -391,6 +391,12 @@ def test_cli_preflight_stops_before_spending(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert called == []
     assert 'no Lean project' in err and 'claude CLI is not on PATH' in err and '--budget-usd must be' in err
-    assert 'warning: ANTHROPIC_API_KEY is set' in err
+    assert 'warning: ANTHROPIC_API_KEY is set but not used' in err
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'api-key')
+    monkeypatch.delenv('ANTHROPIC_API_KEY')
+    errors, _ = pipeline.preflight(None)
+    assert any('ANTHROPIC_API_KEY is not set' in e for e in errors)
+    monkeypatch.setenv('AUTOFORM_CLAUDE_AUTH', 'bogus')
+    assert any('must be login or api-key' in e for e in pipeline.preflight(None)[0])
     errors, _ = pipeline.preflight(None, domain_size=0)
     assert any('--domain-size' in e for e in errors)
