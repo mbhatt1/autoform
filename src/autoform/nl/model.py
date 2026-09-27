@@ -1546,7 +1546,9 @@ def lean_ident(fn_name: str, taken: set) -> str:
 def lean_problems(text: str, lean_name: str) -> list:
     """Reasons a model-written Lean text cannot go into the module (before Lean runs)."""
     problems = []
-    body = re.sub(r'"(?:[^"\\]|\\.)*"', '""', text or '')
+    # char literals first ('"' would otherwise open a string), then strings, then comments
+    body = re.sub(r"(?<![\w'])'(?:[^'\\\n]|\\.)'", "' '", text or '')
+    body = re.sub(r'"(?:[^"\\]|\\.)*"', '""', body)
     body = re.sub(r'--.*', '', body)
     body = re.sub(r'/-.*?-/', '', body, flags=re.S)
     if not body.strip():

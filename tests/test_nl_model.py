@@ -243,6 +243,8 @@ def test_model_text_is_checked_before_lean():
     assert any('Float' in p for p in M.lean_problems('def py_f : Float := 1.0', 'py_f'))
     # strings and comments do not trip the screen
     assert M.lean_problems('def py_f : String := "sorry partial" -- IO', 'py_f') == []
+    # a char literal '"' does not open a string that swallows the next definition
+    assert M.lean_problems("def py_f_q : Char := '\"'\ndef py_f (x' : Nat) : Char := py_f_q", 'py_f') == []
 
 
 def test_boundary_points_are_typed():
