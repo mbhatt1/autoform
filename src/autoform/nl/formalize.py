@@ -277,7 +277,8 @@ def describe_function(translation: dict, fn: dict) -> str:
     kind = fn.get('kind') or 'function'
     if fn.get('lean_types'):
         lines.append('Lean model parameter types: ' + ', '.join(
-            f"{p['name']} : {t}" for p, t in zip(fn['params'], fn['lean_types'])))
+            f"{p['name']} : {t.lstrip('*')}" + (' (*varargs: not checkable on samples)' if t.startswith('*') else '')
+            for p, t in zip(fn['params'], fn['lean_types'])))
     if kind in RECEIVER_KINDS:
         lines.append(f"This is a {'method' if kind == 'method' else 'property getter'} of {fn.get('receiver')}; "
                      f"the first parameter is the receiver (binder type Val). It "

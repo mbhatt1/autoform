@@ -228,6 +228,10 @@ def domain(binders: list, fn: dict | None, language: str, cap: int = 64):
         kinds.append(kind)
         per.append(binder_values(kind, p.get('integer_type', '') or '', ints, strs) if kind != 'val' else None)
     vals = [i for i, k in enumerate(kinds) if k == 'val']
+    lean_types = (fn or {}).get('lean_types') or []
+    if any(i < len(lean_types) and lean_types[i].startswith('*') for i in vals):
+        raise ValueError('a Val binder for a *varargs parameter: the recorded samples spread their '
+                         'arguments, so it has no domain')
     if not vals:
         return kinds, product_capped(per, max(1, cap))
     # Val binders range jointly over the validated sample inputs (a receiver together with

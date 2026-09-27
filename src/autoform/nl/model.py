@@ -2957,7 +2957,8 @@ def model(source_root, out_dir, lean_root, *, module=None, functions=None, paral
         if r.sig is not None:
             info.params = [schema.Param(sp['name'], sort_of(sp['type']) if sp['kind'] == 'positional' else 'any')
                            for sp in r.sig.params]
-            info.lean_types = [show_type(sp['type']) for sp in r.sig.params]
+            info.lean_types = [('*' if sp['kind'] == 'varargs' else '') + show_type(sp['type'])
+                               for sp in r.sig.params]   # '*': the varargs parameter
             info.returns = sort_of(r.sig.result)
             info.mutates = r.sig.mutates
         info.samples = _samples(r)

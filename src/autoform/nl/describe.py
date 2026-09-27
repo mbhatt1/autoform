@@ -107,7 +107,8 @@ def _select(functions: list, wanted) -> list:
     if wanted is None:
         return functions
     wanted = set(wanted)
-    return [f for f in functions if f['name'] in wanted or f.get('source_name') in wanted]
+    return [f for f in functions if f['name'] in wanted or f.get('source_name') in wanted
+            or f['name'].split('<module>.', 1)[-1] in wanted or f.get('file') in wanted]
 
 
 def _brief(fn: dict, key: str, language: str) -> dict:
@@ -339,7 +340,8 @@ def describe(translation: dict, out_dir: Path, *, functions=None, parallel: int 
         why = _eligible(fn)
         (skipped.append(dict(function=fn['name'], reason=why)) if why else todo.append(fn))
     if functions is not None:
-        missing = set(functions) - {f['name'] for f in chosen} - {f.get('source_name') for f in chosen}
+        missing = set(functions) - {f['name'] for f in chosen} - {f.get('source_name') for f in chosen} \
+            - {f['name'].split('<module>.', 1)[-1] for f in chosen} - {f.get('file') for f in chosen}
         skipped += [dict(function=m, reason='not in translation') for m in sorted(missing)]
 
     if use_model is None:
