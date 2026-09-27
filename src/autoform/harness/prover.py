@@ -357,13 +357,36 @@ def snapshot(root: Path) -> dict | None:
     return {'status': status, 'dirty': dirty, 'untracked': untracked}
 
 
-def restore(root: Path, before: dict | None) -> tuple[list, list]:
-    """Undo agent changes to tracked files; return (restored, new_untracked)."""
+PROOF_INPUTS = re.compile(r'(^|/)(lakefile\.(toml|lean)|lean-toolchain|lake-manifest\.json)$|\.lean$')
+
+
+def proof_relevant(path: str) -> bool:
+    """Only Lean inputs can change what a proof means; nothing else is rolled back."""
+    return bool(PROOF_INPUTS.search(path))
+
+
+def restore(root: Path, before: dict | None, backup: Path | None = None) -> tuple[list, list, list]:
+    """Undo changes to the Lean inputs of the root made during an attempt.
+
+    Returns (restored, new_untracked, other_changed). A rolled-back file's changed content
+    is first saved under `backup`, so a concurrent edit by someone else is never lost;
+    tracked files that cannot affect a proof are left alone and only reported."""
     after = snapshot(root)
     if before is None or after is None:
-        return [], []
-    restored = []
+        return [], [], []
+    restored, other = [], []
+    changed = {p for p, c in after['dirty'].items() if before['dirty'].get(p, b'\0clean') != c}
+    changed |= {p for p in before['dirty'] if p not in after['dirty']}
+    for path in sorted(changed):
+        if not proof_relevant(path):
+            other.append(path)
+        elif backup is not None and (Path(root) / path).is_file():
+            dest = Path(backup) / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes((Path(root) / path).read_bytes())
     for path, content in after['dirty'].items():
+        if not proof_relevant(path):
+            continue
         if path in before['dirty']:
             if content != before['dirty'][path]:
                 old = before['dirty'][path]
@@ -378,10 +401,10 @@ def restore(root: Path, before: dict | None) -> tuple[list, list]:
             _git(root, 'checkout', 'HEAD', '--', path)
             restored.append(path)
     for path, content in before['dirty'].items():   # dirty before, cleaned by the agent
-        if path not in after['dirty'] and content is not None:
+        if proof_relevant(path) and path not in after['dirty'] and content is not None:
             (Path(root) / path).write_bytes(content)
             restored.append(path)
-    return sorted(set(restored)), sorted(after['untracked'] - before['untracked'])
+    return sorted(set(restored)), sorted(after['untracked'] - before['untracked']), other
 
 
 # --- proof cache ------------------------------------------------------------------------
@@ -481,7 +504,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
             status, reason = 'ERROR', f'agent error: {exc}'
         finally:
             with _SNAP_LOCK:
-                r, u = restore(root, before)
+                r, u, o = restore(root, before, workdir / f'{job.name}.attempt{attempt}.rolled-back')
             restored += r
             untracked += u
         cost += c
@@ -490,7 +513,7 @@ def prove(job: Job, root: Path, workdir: Path, agent=None, attempts: int = 2, *,
         tr = workdir / f'{job.name}.attempt{attempt}.transcript.json'
         tr.write_text(json.dumps({'agent': getattr(agent, 'name', type(agent).__name__), 'prompt': prompt,
                                   'reply': reply, 'cost_usd': c, 'seconds': round(time.time() - t0, 1),
-                                  'restored': r, 'untracked': u}, indent=1))
+                                  'restored': r, 'untracked': u, 'other_changed': o}, indent=1))
         transcripts.append(str(tr))
         if status in ('TIMEOUT', 'ERROR'):
             continue
