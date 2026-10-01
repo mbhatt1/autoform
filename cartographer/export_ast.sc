@@ -24,7 +24,12 @@ import io.shiftleft.codepropertygraph.generated.nodes._
 import scala.annotation.tailrec
 
 @main def exec(cpgPath: String, out: String = "ast.json", maxMethods: Int = 100000,
-               dataModel: String = "lp64") = {
+               dataModel: String = "lp64", cppDefines: String = "") = {
+  // `cppDefines`: the same comma-separated `NAME` / `NAME=VALUE` list the CPG was
+  // parsed with (`CPP_DEFINES` in `autoform.sh`). Only the NAMES are used, to decide
+  // which `#ifdef`s inside a struct body the parsed configuration compiles -- see
+  // `activeStructText`. Leaving it empty when the parse had defines would make those
+  // decisions against the wrong configuration, so the pipeline passes it through.
   importCpg(cpgPath)
 
   // `seqOf` and `moduleObjectsInit` (below) both fold a flat statement list into a
@@ -253,6 +258,24 @@ import scala.annotation.tailrec
     kernelMetaMacros.contains(head)
   }
 
+  /** `casts-sizeof`: an UNKNOWN node the C frontend produced because it could not
+    * parse a declaration (`CASTProblemDeclaration`/`CASTProblemStatement`). */
+  def isParserProblem(u: Unknown): Boolean =
+    Option(u.parserTypeName).exists(_.startsWith("CASTProblem"))
+
+  /** `casts-sizeof`: exactly one `extern` declaration and nothing else -- see its use
+    * in `stmt`. Comments are stripped first so a `/* ... ; ... */` cannot hide a
+    * second statement; any `{`, `=` or interior `;` disqualifies. Restricted to a
+    * FUNCTION declaration (`NAME(` present): a block-scope `extern int x;` would also
+    * run no code, but it re-binds `x` to the file-scope object for the rest of the
+    * block, which a name-based translation could get wrong if a local `x` is in an
+    * enclosing scope -- so that form keeps its hole. */
+  def isBareExternDecl(code: String): Boolean = {
+    val c = code.replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("//[^\n]*", " ").trim
+    c.startsWith("extern ") && c.endsWith(";") && c.count(_ == ';') == 1 &&
+      !c.contains("{") && !c.contains("=") && """[A-Za-z_]\w*\s*\(""".r.findFirstIn(c).isDefined
+  }
+
 
   val syncPrimitives: Set[String] = Set(
     "spin_lock", "spin_unlock", "spin_lock_irq", "spin_unlock_irq",
@@ -333,6 +356,54 @@ import scala.annotation.tailrec
   def stripBlockCode(code: String): String = {
     val braceless = code.trim.stripPrefix("{").stripSuffix("}").trim
     braceless.replaceAll("/\\*(?s:.*?)\\*/", "").replaceAll("//[^\n]*", "").trim
+  }
+
+  /** `011-control-flow-holes`: every name that survives in the CPG as a call or a
+    * method -- i.e. every name the parse ever saw as something other than an empty
+    * macro expansion. See `onlyEmptiedMacroCalls`. */
+  lazy val survivingCallNames: Set[String] = cpg.call.name.toSet ++ cpg.method.name.toSet
+
+  /** `011-control-flow-holes`: is `code` (a childless block's source text) nothing
+    * but `NAME(...);` statements, each naming a function-like macro that expanded to
+    * nothing? Parsed conservatively: comments stripped, then repeatedly one
+    * identifier, a balanced parenthesised argument list (string/char literals
+    * respected), and a `;`; any other text -- an assignment, a keyword, a
+    * preprocessor line, a bare identifier -- fails. Each name must also be absent
+    * from `survivingCallNames` and not a compiler builtin, so a real function whose
+    * call was dropped by a parse failure can never qualify. */
+  def onlyEmptiedMacroCalls(code: String): Boolean = {
+    val s = stripBlockCode(code)
+    val keywords = Set("if", "while", "for", "switch", "return", "sizeof", "do", "else",
+      "case", "goto", "break", "continue", "default", "typedef", "struct", "union", "enum",
+      "_Static_assert", "static_assert", "__attribute__", "asm", "__asm__", "_Alignof",
+      "alignof", "_Generic", "va_arg", "va_start", "va_end", "va_copy")
+    var i = 0; var names = List.empty[String]; var ok = s.nonEmpty
+    def ws(): Unit = while (i < s.length && s.charAt(i).isWhitespace) i += 1
+    while (ok && { ws(); i < s.length }) {
+      val st = i
+      while (i < s.length && (s.charAt(i).isLetterOrDigit || s.charAt(i) == '_')) i += 1
+      val nm = s.substring(st, i)
+      ws()
+      if (nm.isEmpty || nm.head.isDigit || i >= s.length || s.charAt(i) != '(') ok = false
+      else {
+        var depth = 0; var inStr: Char = 0; var closed = false
+        while (ok && !closed && i < s.length) {
+          val ch = s.charAt(i)
+          if (inStr != 0) {
+            if (ch == '\\') i += 1 else if (ch == inStr) inStr = 0
+          } else if (ch == '"' || ch == '\'') inStr = ch
+          else if (ch == '(') depth += 1
+          else if (ch == ')') { depth -= 1; if (depth == 0) closed = true }
+          i += 1
+        }
+        ws()
+        if (!closed || i >= s.length || s.charAt(i) != ';') ok = false
+        else { i += 1; names = nm :: names }
+      }
+    }
+    ok && names.nonEmpty && names.forall { nm =>
+      !keywords.contains(nm) && !nm.startsWith("__builtin") && !survivingCallNames.contains(nm)
+    }
   }
 
   /** Joern's ARGUMENT index: -1 = the callee/receiver expression, 0 = the implicit
@@ -953,6 +1024,27 @@ import scala.annotation.tailrec
     * cleanup" pattern this whole feature targets), since no label there is
     * ever mid-expansion when reached again. */
   var expandingGotoLabels: Set[String] = Set.empty
+  /** `011-control-flow-holes`: labels in `gotoTailStmts` whose resolved tail ends by
+    * FALLING OFF THE END of the function body rather than at a `return` -- the
+    * spliced copy then gets an explicit `return` (of `unit`) appended. See
+    * `methodBody`'s `resolvedTailStmts`. */
+  var gotoTailFallsOff: Set[String] = Set.empty
+  /** `011-control-flow-holes`: the label a `goto` may be translated as `continue`
+    * for -- a BACKWARD jump to a top-level "restart" label, the rest of the function
+    * from that label wrapped in `while (true) { ...; break }`. Cleared inside every
+    * loop/switch exactly like `gotoAsBreak` (a `continue` there would bind to the
+    * inner loop); see `methodBody`. */
+  var gotoAsRestart: Option[String] = None
+  /** `011-control-flow-holes`: labels that are a direct child of a loop/switch body,
+    * every `goto` to which has that loop/switch as its innermost enclosing one --
+    * label -> (rest of that body after the label, `"cont"` or `"brk"`). The jump is
+    * that tail followed by the exit. Deliberately NOT cleared by `outsideLoopScope`:
+    * the proof is per-`goto`-site (innermost enclosing construct), made once in
+    * `methodBody` (`blockExitLabels`), not a property of the current scope. */
+  var gotoAsBlockExit: Map[String, (List[AstNode], String)] = Map.empty
+  /** `011-control-flow-holes`: AST nodes the `gotoAsBlockExit` splice may still copy
+    * in the current function (reset per function in `methodBody`). */
+  var blockExitSpliceBudget: Int = 0
 
   /** C and C++ specifically, as opposed to the whole `cLike` *dialect* family (which
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
@@ -1151,6 +1243,11 @@ import scala.annotation.tailrec
     * itself starting empty does. */
   var closedIrefOutParamViaVtableTransitive: Set[(String, Int)] = Set.empty
 
+  /** Pointer-indirection family: `computeClosedIrefOutParamsTransitive`'s most recent
+    * result, recomputed by the driver at the start of every whole-program pass (see
+    * that `def`'s comment for why it is no longer a `lazy val`). */
+  var closedIrefOutParamsTransitive: Set[(String, Int)] = Set.empty
+
   /** `010-reach-90pct-hole-free`: SQLite's own small, well-documented memory-
     * allocation API surface, mapped to the 0-based position (in `kidsOf`'s own
     * left-to-right order) of the argument carrying the BYTE COUNT of the buffer
@@ -1241,6 +1338,22 @@ import scala.annotation.tailrec
     * `asField`) -- conservative, not a new gap: comparisons involving that shape
     * simply fall through to the existing hole, exactly as before this feature. */
   var strCursorBase = Map.empty[String, String]
+
+  /** Pointer-arith family: the `strCursorBase` roots whose BINDING cannot change
+    * while the method runs, so that every cursor seeded from one was seeded from
+    * the same VALUE: one that is never rebound, or whose every rebinding is outside
+    * any loop and textually before every seeding of a cursor rooted at it. (A byte
+    * cursor's own `++`/`op=` moves only its `$off`, so for a cursor only a plain `=`
+    * counts as rebinding.)
+    *
+    * Two cursors with the same root are compared/subtracted by their `$off`s
+    * alone (`callExpr`'s cursor-pair case), which silently assumes both offsets
+    * are measured from the same address. A root rebound in between breaks that:
+    * `p = X + 10; X = X + 5; q = X + 7; p < q` compares `10 < 7` where C compares
+    * `X0+10 < X0+12`. (That shape was masked while `X = X + 5` on a `char*` was
+    * itself a hole; it no longer is.) So the cursor-pair case requires its root to
+    * be in this set, for every operator. */
+  var stableCursorRoots = Set.empty[String]
 
   /** `(owning type, member name) -> member type`, for the whole program.
     *
@@ -1826,7 +1939,26 @@ import scala.annotation.tailrec
     "int64_t" -> "i64", "longlong" -> "i64", "longlongint" -> "i64", "s64" -> "i64",
     "__s64" -> "i64",
     "uint64_t" -> "u64", "unsignedlonglong" -> "u64", "unsignedlonglongint" -> "u64",
-    "u64" -> "u64", "__u64" -> "u64"
+    "u64" -> "u64", "__u64" -> "u64",
+    // `casts-sizeof`: the remaining standard SPELLINGS of the same standard types.
+    // C11 6.7.2p2 says a type is named by a *multiset* of specifiers, in any order:
+    // `short unsigned int`, `unsigned short int` and `unsigned short` are one type.
+    // Joern writes whichever order the declaration (or its own typedef resolution)
+    // produced -- confirmed live on the SQLite amalgamation: `typedef UINT16_TYPE u16`
+    // resolves to `"unsigned shortint"`, and Lemon's `YYCODETYPE` to
+    // `"short unsigned int"` -- so `ht_slot` (`typedef u16 ht_slot`) and every
+    // `(YYCODETYPE)x` cast in the parser held as `op:cast:opaque-type` purely over word
+    // order. No width is chosen here that the language does not fix: `short` is 16
+    // bits and `long long` is 64 bits under every model in `dataModelTable`, and plain
+    // `signed` is `signed int`. (`long` spellings are model-dependent and go in that
+    // table instead.)
+    "unsignedshortint" -> "u16", "shortunsignedint" -> "u16", "shortunsigned" -> "u16",
+    "signedshort" -> "i16", "signedshortint" -> "i16", "shortsignedint" -> "i16",
+    "shortsigned" -> "i16",
+    "signed" -> "i32",
+    "signedlonglong" -> "i64", "signedlonglongint" -> "i64", "longlongsigned" -> "i64",
+    "longlongsignedint" -> "i64",
+    "longlongunsigned" -> "u64", "longlongunsignedint" -> "u64"
   )
 
   /** Integer types whose width is a property of the **target data model**.
@@ -1847,16 +1979,22 @@ import scala.annotation.tailrec
     "lp64" -> Map(
       "long" -> "i64", "longint" -> "i64", "signedlong" -> "i64",
       "unsignedlong" -> "u64", "longunsigned" -> "u64", "unsignedlongint" -> "u64",
+      "longunsignedint" -> "u64", "signedlongint" -> "i64", "longsignedint" -> "i64",
+      "longsigned" -> "i64",
       "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
       "intptr_t" -> "i64", "uintptr_t" -> "u64"),
     "llp64" -> Map(
       "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
       "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "longunsignedint" -> "u32", "signedlongint" -> "i32", "longsignedint" -> "i32",
+      "longsigned" -> "i32",
       "size_t" -> "u64", "ssize_t" -> "i64", "ptrdiff_t" -> "i64",
       "intptr_t" -> "i64", "uintptr_t" -> "u64"),
     "ilp32" -> Map(
       "long" -> "i32", "longint" -> "i32", "signedlong" -> "i32",
       "unsignedlong" -> "u32", "longunsigned" -> "u32", "unsignedlongint" -> "u32",
+      "longunsignedint" -> "u32", "signedlongint" -> "i32", "longsignedint" -> "i32",
+      "longsigned" -> "i32",
       "size_t" -> "u32", "ssize_t" -> "i32", "ptrdiff_t" -> "i32",
       "intptr_t" -> "i32", "uintptr_t" -> "u32")
   )
@@ -1882,16 +2020,34 @@ import scala.annotation.tailrec
     * with no answer, which is what a hole is for. */
   lazy val typeAliases: Map[String, String] = {
     val ds = cpg.typeDecl.l.filter(_.aliasTypeFullName.nonEmpty)
-    val byFull = ds.map(td => bareType(td.fullName) -> bareType(td.aliasTypeFullName.get)).toMap
+    // `casts-sizeof`: the qualified map used to be `.toMap` over every declaration,
+    // so a name declared more than once kept whichever declaration came LAST. In C
+    // the qualified name is the plain name, which made the agreement rule below dead
+    // code: on the full SQLite tree `i64` is `sqlite3_int64` in the extensions,
+    // `sqlite_int64` in the core and `long long int` in `tool/showwal.c`, and every
+    // cast to `i64` anywhere took `tool/`'s answer. The same agreement is required
+    // here. Two declarations with the same TEXT are one declaration parsed twice (a
+    // header included from several files) -- when one copy's alias field resolved and
+    // another's did not, the unresolved copy is not a disagreement. A name whose
+    // declarations really differ is left to `resolveIntType`'s width-agreement
+    // fallback (`aliasCandidates`), which accepts it only when every declaration
+    // resolves to the same width.
+    def agreeing(tds: List[TypeDecl]): Option[String] = {
+      def norm(td: TypeDecl) = td.code.replaceAll("\\s+", " ").trim
+      val resolvedTexts = tds.filter(td => bareType(td.aliasTypeFullName.get) != "ANY").map(norm).toSet
+      val effective = tds.filterNot(td => bareType(td.aliasTypeFullName.get) == "ANY" && resolvedTexts.contains(norm(td)))
+      effective.map(td => bareType(td.aliasTypeFullName.get)).distinct match {
+        case List(one) => Some(one)
+        case _         => None
+      }
+    }
+    val byFull = ds.groupBy(td => stripDuplicateSuffix(bareType(td.fullName))).flatMap { case (n, tds) => agreeing(tds).map(n -> _) }
     // A cast writes the *qualified* name it can see, and that is usually the TypeDecl's
     // `fullName`, so the qualified map is the primary one. The unqualified name is used
     // only when every declaration of that name in the program agrees on the target —
     // `Address` is `uintptr_t` in nine different V8 classes — because a short name that
     // means two things is exactly the case where guessing changes arithmetic.
-    val byShort = ds.groupBy(td => bareType(td.name)).collect {
-      case (n, tds) if tds.map(td => bareType(td.aliasTypeFullName.get)).distinct.size == 1 =>
-        n -> bareType(tds.head.aliasTypeFullName.get)
-    }
+    val byShort = ds.groupBy(td => stripDuplicateSuffix(bareType(td.name))).flatMap { case (n, tds) => agreeing(tds).map(n -> _) }
     val merged = byShort ++ byFull
 
     // `009-reduce-remaining-holes-4` US4: Joern's OWN alias-field resolution is
@@ -1966,13 +2122,65 @@ import scala.annotation.tailrec
       else {
         seen += t
         typeAliases.get(t) match {
-          case Some(n) => t = n
-          case None    => go = false
+          case Some(n) if n != "ANY" => t = n
+          case _ =>
+            // `casts-sizeof`: a name the program typedefs more than once with
+            // DIFFERENT spellings -- `i64` is `sqlite3_int64` in the extensions,
+            // `sqlite_int64` in the core and `long long int` in `tool/` -- is
+            // dropped by `typeAliases`' agreement rule, which compares the
+            // spellings. What has to agree is the width each one denotes: resolve
+            // every declaration independently and accept only when all of them
+            // resolve, to the same tag. One unresolvable declaration is enough to
+            // keep the hole.
+            res = aliasCandidates.get(t).filter(_.nonEmpty).flatMap { rhss =>
+              val ws = rhss.toList.map(r => if (seen.contains(bareType(r))) None else resolveIntTypeFrom(r, seen))
+              if (ws.forall(_.isDefined) && ws.flatten.distinct.size == 1) ws.head else None
+            }
+            go = false
         }
       }
     }
     res
     }
+  }
+
+  /** `resolveIntType` for an alias right-hand side met while already inside a
+    * resolution, carrying the names on the current chain so a cycle ends it. */
+  def resolveIntTypeFrom(ty: String, outer: Set[String]): Option[String] =
+    if (outer.size > 32) None
+    else {
+      val b = bareType(ty)
+      if (intTypeNames.contains(b)) intTypeNames.get(b)
+      else if (modelInts.contains(b)) modelInts.get(b)
+      else if (outer.contains(b) || isPointerType(b) || b.contains("(") || b == "ANY" || b.isEmpty) None
+      else typeAliases.get(b) match {
+        case Some(n) if n != "ANY" => resolveIntTypeFrom(n, outer + b)
+        case _ => aliasCandidates.get(b).filter(_.nonEmpty).flatMap { rhss =>
+          val ws = rhss.toList.map(r => resolveIntTypeFrom(r, outer + b))
+          if (ws.forall(_.isDefined) && ws.flatten.distinct.size == 1) ws.head else None
+        }
+      }
+    }
+
+  /** `casts-sizeof`: EVERY right-hand side the program gives a typedef name, from
+    * Joern's alias field (when resolved) and from the declaration's own
+    * `typedef RHS NAME;` text (the same conservative parse `typeAliases` uses) --
+    * the field first, since it has already expanded a macro right-hand side
+    * (`typedef UINT32_TYPE u32;` is `unsigned int` there). */
+  lazy val aliasCandidates: Map[String, Set[String]] = {
+    val pat = """^\s*typedef\s+([^,;\[\]()]+?)\s+([A-Za-z_]\w*)\s*;\s*$""".r
+    cpg.typeDecl.l.flatMap { td =>
+      val nm = bareType(td.name)
+      val fromField = td.aliasTypeFullName.map(bareType).filter(a => a.nonEmpty && a != "ANY").map(nm -> _)
+      val fromText = td.code.trim match {
+        case pat(rhs, n) if bareType(n) == nm => Some(nm -> bareType(rhs))
+        case _ => None
+      }
+      // A declaration whose field is unresolved AND whose text does not parse is
+      // an unknown right-hand side: recorded as `ANY`, which never resolves.
+      val any = if (td.aliasTypeFullName.exists(a => bareType(a) == "ANY") && fromText.isEmpty) Some(nm -> "ANY") else None
+      fromField.orElse(fromText).orElse(any).toList
+    }.groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2).toSet }
   }
 
   /** `005-sizeof-constant-folding`: byte count of a SCALAR type under the resolved
@@ -2262,9 +2470,18 @@ import scala.annotation.tailrec
     * answer, not merely a missed case. Found and fixed before any code shipped, by
     * reading `isPointerType`'s own definition rather than assuming shape checks
     * commute. */
+  // `casts-sizeof`: the same trap one step further. `arrayShape` needs a LITERAL
+  // bound, so `u16[BTCURSOR_MAX_DEPTH-1]` (a macro bound Joern keeps verbatim) and
+  // `char[]` fell through to the pointer case, which `isPointerType`'s `[...]` test
+  // accepted: every such array was sized as ONE POINTER. Measured on the
+  // amalgamation, `sizeof(BtCursor)` came out 120 where `gcc` says 296 (its two
+  // `[BTCURSOR_MAX_DEPTH-1]` arrays). An array whose bound is not a literal is not a
+  // pointer; it is `None` here, and `memberSizeAlign` resolves a macro bound against
+  // the declaring file where it can.
   def sizeofBytes(ty: String): Option[Int] = bareType(ty) match {
     case arrayShape(elem, n) => sizeofBytes(elem).map(_ * n.toInt)
     case t if functionPointerTypedefNames.contains(t) => pointerSizeofBytes
+    case t if t.contains("[")  => None
     case _                   => scalarSizeofBytes(ty).orElse(if (isPointerType(ty)) pointerSizeofBytes else None)
   }
 
@@ -2409,10 +2626,20 @@ import scala.annotation.tailrec
     * either side). Only ONE side needs to be confirmed pointer-shaped -- C
     * itself does not allow pointer+pointer, so if either operand already is
     * one, the other is necessarily the integer offset. */
+  // `casts-sizeof`: SUBTRACTION is not symmetric the way the note above says addition
+  // is. `p - n` is a pointer, but `p - q` (both pointers) is a `ptrdiff_t` INTEGER, and
+  // `n - p` is not C at all -- so a difference is pointer-shaped only when its LEFT
+  // operand is and its right one is not. The old either-side rule would have passed
+  // `(T*)(p - q)` through as though it were the pointer `p`.
   def arithOperandIsPointerShaped(n: AstNode): Boolean = n match {
-    case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
+    case c: Call if c.methodFullName == "<operator>.addition" =>
       kidsOf(c) match {
         case List(a, b) => castOperandIsPointerShaped(a) || castOperandIsPointerShaped(b)
+        case _ => false
+      }
+    case c: Call if c.methodFullName == "<operator>.subtraction" =>
+      kidsOf(c) match {
+        case List(a, b) => castOperandIsPointerShaped(a) && !castOperandIsPointerShaped(b)
         case _ => false
       }
     case _ => false
@@ -2467,6 +2694,65 @@ import scala.annotation.tailrec
     * OTHERWISE-safe parameter (and, via `Fwd`/`wideClosedIrefParam`'s own
     * forwarding, every caller that forwards it onward too) over a detail
     * with no bearing on the argument's actual runtime shape. */
+  /** Does the pointer cast `cast` (whose operand is `operand`) keep the POINTEE type,
+    * modulo cv-qualifiers and scalar typedef aliases (`resolveIntType`)? See
+    * `irefCastPreservesPointee` for why an interior pointer / out-parameter may only
+    * be seen through such a cast. Unrecoverable types answer `false`. */
+  def castPreservesPointee(cast: AstNode, operand: AstNode): Boolean = {
+    def pointee(ty: String): Option[String] = {
+      val b = bareType(ty)
+      if (b.endsWith("*")) Some(b.dropRight(1)) else None
+    }
+    // `&y`'s own type is often unrecovered by the frontend; its pointee is `y`'s type.
+    val operandPointee = operand match {
+      case a: Call if a.methodFullName == "<operator>.addressOf" && kidsOf(a).size == 1 &&
+                      pointee(staticTypeOf(operand)).isEmpty =>
+        Some(bareType(staticTypeOf(kidsOf(a).head))).filter(t => t.nonEmpty && t != "ANY")
+      case _ => pointee(staticTypeOf(operand))
+    }
+    // The cast node's own `typeFullName` is not reliable here (Joern reports `u64`
+    // for `(u64*)e`); the TYPE_REF child's source spelling is the target type.
+    val castPointee = kidsOf(cast) match {
+      case List(t, _) => pointee(t.code).orElse(pointee(staticTypeOf(cast)))
+      case _          => pointee(staticTypeOf(cast))
+    }
+    // Pointee types that are BOTH pointers (`(void**)&pData` for `u8 *pData`, the
+    // `sqlite3OsFetch` out-parameter idiom) are allowed: the stored element is a
+    // pointer value, which Core represents the same way whatever its pointee type
+    // (`Val.ref`/`Val.iref`/`Val.str` carry no C type), and on the flat-address
+    // targets this project models every object pointer has one representation. A
+    // scalar reinterpretation (`*(char*)&one`, `*(i64*)&u64Val`, `(u32*)&intVal`)
+    // is never allowed: reading the stored integer unchanged is the wrong answer.
+    (castPointee, operandPointee) match {
+      case (Some(a), Some(b)) =>
+        a == b || (resolveIntType(a).isDefined && resolveIntType(a) == resolveIntType(b)) ||
+        (a.endsWith("*") && b.endsWith("*"))
+      case _ => false
+    }
+  }
+
+  /** The out-parameter call-site classifiers' view of an argument: a null literal
+    * under any casts (`(T*)0` is still null), otherwise the argument with only
+    * POINTEE-PRESERVING cast layers removed. A type-punning cast
+    * (`f((u64*)&i64Local)`, `f((u32*)&aByte[i])`) stays in place, so the argument
+    * matches none of the trusted `&x` shapes and the pair stays open: the callee's
+    * `*p` would otherwise read/write the stored element unchanged under a different
+    * type -- a wrong answer, not a hole. (Previously every cast layer was stripped,
+    * which was already wrong for the box-model `closedOutParam`; it was merely
+    * masked for scalars by `&n` not yet being an interior pointer.) */
+  def outParamArg(rawArg: AstNode): AstNode = {
+    def strip(n: AstNode): AstNode = n match {
+      case c: Call if c.methodFullName == "<operator>.cast" =>
+        kidsOf(c) match {
+          case List(_, operand) if castPreservesPointee(c, operand) => strip(operand)
+          case _ => n
+        }
+      case _ => n
+    }
+    val all = unwrapCastLayers(rawArg)
+    if (isNullLiteral(all)) all else strip(rawArg)
+  }
+
   def unwrapCastLayers(n: AstNode): AstNode = n match {
     case c: Call if c.methodFullName == "<operator>.cast" =>
       kidsOf(c) match {
@@ -2480,7 +2766,87 @@ import scala.annotation.tailrec
     isPointerType(staticTypeOf(operand)) || isOp(operand, "<operator>.addressOf") ||
     isKnownOpaquePointerTypedef(staticTypeOf(operand)) || isKnownPointerReturningCall(operand) ||
     isKnownOpaquePointerField(operand) || castOperandIsItselfPointerCast(operand) ||
-    arithOperandIsPointerShaped(operand)
+    arithOperandIsPointerShaped(operand) ||
+    isFunctionPointerTypeString(staticTypeOf(operand)) || definedCallReturnsPointer(operand) ||
+    declaredFunctionPointerName(operand)
+
+  /** `casts-sizeof`: a function-pointer TYPE as Joern spells it on an expression --
+    * `void(*)()` (what `sqlite3OsDlSym` returns), `int(*)(Jim_Obj**,Jim_Obj**)`.
+    * `isPointerType` looks for a trailing `*` or `[]` and so misses the one pointer
+    * type whose spelling ends in `)`. A value of this type is a pointer, so casting it
+    * to another pointer type is the same representation-preserving pass-through the
+    * doc comment above argues for. */
+  def isFunctionPointerTypeString(ty: String): Boolean =
+    bareType(ty).matches("""^.*\(\*+\)\(.*\)$""")
+
+  /** `casts-sizeof`: return types of the functions DEFINED in this program, by short
+    * name -- `None` for a name whose definitions disagree on pointer-ness, or that has
+    * none. External stubs (a call site Joern could not bind, `ANY` return) are not
+    * definitions and are ignored. */
+  lazy val definedReturnPointerness: Map[String, Boolean] =
+    cpg.method.l.filterNot(_.isExternal).filterNot(_.name.startsWith("<"))
+      .groupBy(_.name).flatMap { case (nm, ms) =>
+        val kinds = ms.map { m =>
+          val rt = m.methodReturn.typeFullName
+          if (rt.isEmpty || rt == "ANY") None
+          else Some(isPointerType(rt) || isFunctionPointerTypeString(rt))
+        }
+        if (kinds.forall(_.isDefined) && kinds.flatten.distinct.size == 1) Some(nm -> kinds.head.get)
+        else None
+      }
+
+  /** `casts-sizeof`: `(const char*)sqlite3_value_text(argv[0])` and its siblings --
+    * the single largest `op:cast:pointer:int-to-pointer` shape on the full SQLite tree
+    * (~330 of ~900 sites). The call node is typed `ANY` because the calling file
+    * (an extension under `ext/`, or a `test_*.c`) never saw the prototype, but the
+    * function IS defined in this program (`src/vdbeapi.c`) with a pointer return type.
+    * That return type is not a guess about the call: C requires the call to agree
+    * with the definition. Only a name whose every in-program definition returns a
+    * pointer qualifies (`definedReturnPointerness`), so a `static` function of the
+    * same name returning an integer elsewhere makes the whole name ineligible. */
+  def definedCallReturnsPointer(n: AstNode): Boolean = n match {
+    case c: Call if !c.methodFullName.startsWith("<operator>") && c.name.nonEmpty &&
+                    !c.name.startsWith("<") =>
+      definedReturnPointerness.getOrElse(c.name, false)
+    case _ => false
+  }
+
+  /** `casts-sizeof`: `(sqlite3_xauth)xAuth`, where `xAuth` is a parameter declared as
+    * `int(*xAuth)(void*,int,const char*,const char*,const char*,const char*)`: Joern
+    * types the parameter as its function's RETURN type (`int`), so the value looked
+    * like an integer. The declaration's own source text is unambiguous -- the
+    * declarator `(*xAuth)(` makes `xAuth` a pointer to function -- and that is what is
+    * read, from the declaring LOCAL/PARAMETER node the identifier's REF edge names
+    * (never by name alone, so a same-named variable elsewhere cannot be confused). */
+  def declaredFunctionPointerName(n: AstNode): Boolean = n match {
+    case i: Identifier =>
+      val pat = ("""\(\s*\*+\s*(?:const\s+)?""" + java.util.regex.Pattern.quote(i.name) + """\s*\)\s*\(""").r
+      i._refOut.l.exists {
+        case p: MethodParameterIn => pat.findFirstIn(p.code).isDefined
+        case l: Local             => pat.findFirstIn(l.code).isDefined
+        case _                    => false
+      }
+    case _ => false
+  }
+
+  /** `casts-sizeof`: an identifier that names a FUNCTION DEFINED IN THIS PROGRAM, used
+    * as a value -- `(Tcl_ObjCmdProc*)test_config`, `(void*)sqlite3_column_bytes`
+    * (tests registering commands / API tables). Joern leaves these as plain
+    * identifiers of type `ANY` when it did not bind them to a `METHOD_REF`, which is
+    * why the existing `MethodRef` case cannot see them. Three conditions, all
+    * required: the identifier has no declaration as a variable (no REF edge, not a
+    * local/parameter name, not a known global), and exactly one function of that
+    * name is defined in the CPG -- whose full name is then what `fnValue` refers to,
+    * exactly as a `METHOD_REF` to it would be translated. */
+  def definedFunctionNamedBy(n: AstNode): Option[String] = n match {
+    case i: Identifier if !i._refOut.hasNext && !genuineLocalNames.contains(i.name) &&
+                          !localTypes.contains(i.name) && !globalTypes.contains(i.name) =>
+      cpg.method.nameExact(i.name).l.filterNot(_.isExternal) match {
+        case List(m) => Some(m.fullName)
+        case _       => None
+      }
+    case _ => None
+  }
 
   /** `char` is deliberately absent from `intTypeNames`: its signedness is
     * implementation-defined, so `static_cast<char>(300)` has no standard-mandated value.
@@ -2985,11 +3351,88 @@ import scala.annotation.tailrec
   // `structBodyText` must find a real `{...}` body to parse) -- safe to call
   // unconditionally and let IT decide, rather than pre-filtering with a
   // cruder check that can say no when the real answer is yes.
-  def memberSizeofBytes(ty: String): Option[Int] = bareType(ty) match {
-    case t if t.endsWith("[]")  => None
-    case arrayShape(elem, n)    => memberSizeofBytes(elem).map(_ * n.toInt)
-    case _ => sizeofBytes(ty).orElse(aggregateSizeofBytes(ty))
+  //
+  // `casts-sizeof`: returns (size, ALIGNMENT), not a size alone. The layout
+  // arithmetic below used to take every member's alignment to be its SIZE -- right for
+  // a scalar or a pointer, wrong for an array (`char a[10]` is aligned to 1, not 10)
+  // and for a nested aggregate (aligned to its strictest member, not to its size):
+  // `struct { char c; char a[10]; }` came out as 20 bytes where every C compiler
+  // makes it 11, a hole-free wrong `sizeof`. C11 6.2.8 / the psABIs: an array has its
+  // element's alignment; a struct or union the maximum of its members'.
+  //
+  // A scalar's alignment is its size under LP64 and LLP64 (1/2/4/8, the x86-64 and
+  // AArch64 psABIs and Windows x64 alike). Under ILP32 an 8-byte scalar's alignment
+  // inside a struct is ABI-dependent (4 on i386 System V, 8 on 32-bit ARM EABI), and
+  // under an unstated model it is unknown, so those members yield `None` -- a hole,
+  // not a guessed padding.
+  def scalarAlignOf(sz: Int): Option[Int] =
+    if (sz <= 4) Some(sz)
+    else dataModel.toLowerCase match {
+      case "lp64" | "llp64" => Some(sz)
+      case _                => None
+    }
+
+  def sizeofNormType(ty: String): String =
+    bareType(ty).replaceAll("""\*(?:const|volatile|restrict)+""", "*")
+
+  /** `casts-sizeof`: an array bound Joern kept as text -- a literal, an integer
+    * constant expression over literals (`(8-3)`, `(11+1)`, what a macro bound looks
+    * like after the frontend expanded it), or `IDENT [+-] INT` against the declaring
+    * file's `#define`s (`resolveMacroArraySize`). Only `+ - *` and parentheses are
+    * evaluated -- exact integer arithmetic, as C evaluates an integer constant
+    * expression of this size; a `/`, a `sizeof`, a cast or any identifier the table
+    * does not hold leaves it `None`. */
+  def arrayBound(n0: String, filePath: Option[String]): Option[Int] = {
+    val n = n0.trim
+    if (n.matches("""\d+""")) Some(n.toInt)
+    else if (n.matches("""[\d\s+\-*()]+""")) constIntExpr(n)
+    else filePath.flatMap(f => resolveMacroArraySize(n, f))
   }
+
+  def constIntExpr(src: String): Option[Int] = {
+    val toks = """\d+|[+\-*()]""".r.findAllIn(src).toList
+    var pos = 0
+    def peek = if (pos < toks.size) Some(toks(pos)) else None
+    def atom(): Option[BigInt] = peek match {
+      case Some("(") => pos += 1; val v = sum(); if (peek.contains(")")) { pos += 1; v } else None
+      case Some("-") => pos += 1; atom().map(-_)
+      case Some(t) if t.forall(_.isDigit) => pos += 1; Some(BigInt(t))
+      case _ => None
+    }
+    def prod(): Option[BigInt] = {
+      var acc = atom()
+      while (acc.isDefined && peek.contains("*")) { pos += 1; acc = for (a <- acc; b <- atom()) yield a * b }
+      acc
+    }
+    def sum(): Option[BigInt] = {
+      var acc = prod()
+      while (acc.isDefined && (peek.contains("+") || peek.contains("-"))) {
+        val op = toks(pos); pos += 1
+        acc = for (a <- acc; b <- prod()) yield if (op == "+") a + b else a - b
+      }
+      acc
+    }
+    val r = sum()
+    if (pos == toks.size) r.filter(v => v >= 0 && v <= Int.MaxValue).map(_.toInt) else None
+  }
+
+  def memberSizeAlign(ty: String, filePath: Option[String] = None): Option[(Int, Int)] = sizeofNormType(ty) match {
+    case t if t.endsWith("[]")  => None
+    case arrayShape(elem, n)    => memberSizeAlign(elem, filePath).map { case (sz, al) => (sz * n.toInt, al) }
+    // A one-dimensional array whose bound is a macro (`u16[BTCURSOR_MAX_DEPTH-1]`),
+    // resolved against the declaring file's own `#define`s exactly as `boxedArrays`
+    // resolves a local array's bound; unresolvable stays `None` (see `sizeofBytes`).
+    case arrayShapeAny(elem, n) if !elem.contains("[") =>
+      arrayBound(n, filePath).flatMap { nn =>
+        memberSizeAlign(elem, filePath).map { case (sz, al) => (sz * nn, al) }
+      }
+    case t => sizeofBytes(t) match {
+      case Some(sz) => scalarAlignOf(sz).map(al => (sz, al))
+      case None     => aggregateSizeAlign(ty)
+    }
+  }
+
+  def memberSizeofBytes(ty: String): Option[Int] = memberSizeAlign(ty).map(_._1)
 
   /** `006-reduce-remaining-holes`, Story 4 (FR-009/FR-010): the byte size of a
     * struct or union whose full layout is resolvable -- standard C aggregate
@@ -3171,15 +3614,18 @@ import scala.annotation.tailrec
     * factored out so `segmentSizes` below (a struct/union body) and this
     * function's own recursive call into a nested block use the exact same
     * offset/alignment rules, not two copies that could drift. */
-  def aggregateLayoutBytes(memberSizes: List[Int], isUnion: Boolean): Int = {
+  // `casts-sizeof`: over (size, alignment) pairs -- see `memberSizeAlign`. Each
+  // member is placed at the next multiple of its OWN alignment; the aggregate's
+  // alignment is the largest member alignment, and its size is rounded up to it.
+  def aggregateLayout(members: List[(Int, Int)], isUnion: Boolean): (Int, Int) = {
     var offset   = 0
     var maxAlign = 1
-    memberSizes.foreach { sz =>
-      if (sz > maxAlign) maxAlign = sz
-      if (!isUnion) { offset = ((offset + sz - 1) / sz) * sz; offset += sz }
+    members.foreach { case (sz, al) =>
+      if (al > maxAlign) maxAlign = al
+      if (!isUnion) { offset = ((offset + al - 1) / al) * al; offset += sz }
     }
-    val raw = if (isUnion) memberSizes.max else offset
-    ((raw + maxAlign - 1) / maxAlign) * maxAlign
+    val raw = if (isUnion) members.map(_._1).max else offset
+    (((raw + maxAlign - 1) / maxAlign) * maxAlign, maxAlign)
   }
 
   /** `009-reduce-remaining-holes-4`: the per-segment size-classification rules
@@ -3221,13 +3667,21 @@ import scala.annotation.tailrec
     * bounded-fixed-point mechanisms, because each recursive call operates on a
     * texually SMALLER, disjoint substring (the nested block's own inner body),
     * not a graph that could cycle. */
-  def segmentSizes(rawBody: String, filePath: String): Option[List[Int]] = {
+  // `casts-sizeof`: the body is first reduced to the members the parsed
+  // configuration actually compiles (`activeStructText`); a body whose conditionals
+  // cannot be decided yields `None`, the same as any other unreadable segment.
+  def segmentSizes(rawBody: String, filePath: String): Option[List[(Int, Int)]] =
+    activeStructText(rawBody).flatMap(segmentSizesActive(_, filePath))
+
+  def segmentSizesActive(rawBody: String, filePath: String): Option[List[(Int, Int)]] = {
     val body = rawBody.replaceAll("/\\*(?s:.*?)\\*/", "").replaceAll("//[^\n]*", "")
     val declLine   = """^(.*[\s\*])([A-Za-z_]\w*)$""".r
     val nestedKw   = """\A(union|struct)\s*(?:[A-Za-z_]\w*\s*)?\{""".r
-    val nameAt     = """^\s*([A-Za-z_]\w*)\s*;""".r
+    // `casts-sizeof`: the member name may carry array dimensions -- `struct
+    // IdList_item { char *zName; } a[1];` -- each resolved by `arrayBound`.
+    val nameAt     = """^\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*);""".r
     var pos    = 0
-    var sizes  = List.empty[Int]
+    var sizes  = List.empty[(Int, Int)]
     var ok     = true
     var sawAny = false
     while (ok && pos < body.length) {
@@ -3251,9 +3705,12 @@ import scala.annotation.tailrec
             if (closeIdx < 0) ok = false
             else nameAt.findPrefixMatchOf(body.substring(closeIdx + 1)) match {
               case Some(nm) =>
-                segmentSizes(body.substring(absOpen + 1, closeIdx), filePath) match {
-                  case Some(innerSizes) if innerSizes.nonEmpty =>
-                    sizes = sizes :+ aggregateLayoutBytes(innerSizes, isUnion)
+                val count = """\[([^\[\]]*)\]""".r.findAllMatchIn(Option(nm.group(2)).getOrElse(""))
+                  .map(_.group(1)).toList.foldLeft(Option(1))((acc, e) => acc.flatMap(a => arrayBound(e, Some(filePath)).map(_ * a)))
+                (segmentSizes(body.substring(absOpen + 1, closeIdx), filePath), count) match {
+                  case (Some(innerSizes), Some(n)) if innerSizes.nonEmpty =>
+                    val (isz, ial) = aggregateLayout(innerSizes, isUnion)
+                    sizes = sizes :+ ((isz * n, ial))
                     sawAny = true
                     pos = closeIdx + 1 + nm.end
                   case _ => ok = false
@@ -3270,17 +3727,22 @@ import scala.annotation.tailrec
                 sawAny = true
                 val segSize = seg match {
                   case nestedArrayDeclLine(tyPart, _, sizeExpr) if !tyPart.exists(",(){}:".contains(_)) =>
-                    val n =
-                      if (sizeExpr.trim.matches("""\d+""")) Some(sizeExpr.trim.toInt)
-                      else resolveMacroArraySize(sizeExpr, filePath)
-                    n.flatMap(nn => memberSizeofBytes(tyPart.trim).map(_ * nn))
+                    val n = arrayBound(sizeExpr, Some(filePath))
+                    n.flatMap(nn => memberSizeAlign(tyPart.trim, Some(filePath)).map { case (sz, al) => (sz * nn, al) })
+                  // `casts-sizeof`: `int (*xCmp)(void*,int,const void*,int,const void*)`
+                  // -- ONE pointer-to-function member, whatever its signature: pointer
+                  // size and alignment under the data model. Only the single-
+                  // declarator shape (see `isSingleFunctionPointerDecl`) qualifies.
+                  case _ if isSingleFunctionPointerDecl(seg) =>
+                    pointerSizeofBytes.flatMap(sz => scalarAlignOf(sz).map(al => (sz, al)))
+                  case _ if seg.contains(",") => None   // handled just below
                   case _ if seg.exists(",[(){}:".contains(_)) => None
-                  case declLine(tyPart, _) => memberSizeofBytes(tyPart.trim)
+                  case declLine(tyPart, _) => memberSizeAlign(tyPart.trim, Some(filePath))
                   case _ => None
                 }
-                segSize match {
-                  case Some(sz) => sizes = sizes :+ sz
-                  case None     => ok = false
+                segSize.map(List(_)).orElse(multiDeclaratorSizes(seg, filePath)) match {
+                  case Some(szs) => sizes = sizes ++ szs
+                  case None      => ok = false
                 }
               }
             }
@@ -3291,7 +3753,7 @@ import scala.annotation.tailrec
   }
 
   def anonymousNestedAggregateMemberSizes(td: TypeDecl, memberName: String,
-                                           isUnion: Boolean): Option[List[Int]] =
+                                           isUnion: Boolean): Option[List[(Int, Int)]] =
     anonymousNestedAggregates(td).get(memberName).filter(_._1 == isUnion)
       .flatMap { case (_, rawBody) => segmentSizes(rawBody, td.filename) }
 
@@ -3307,16 +3769,16 @@ import scala.annotation.tailrec
     * (the SAME per-segment rules `anonymousNestedAggregateMemberSizes` already
     * uses for an inner nested aggregate) to the struct's own top-level,
     * brace-matched body (`structBodyText`) instead. */
-  def structFieldSizesFromText(td: TypeDecl): Option[List[Int]] =
+  def structFieldSizesFromText(td: TypeDecl): Option[List[(Int, Int)]] =
     structBodyText(td).flatMap(body => segmentSizes(body, td.filename))
 
   /** `009-reduce-remaining-holes-4` US4: the byte size of an anonymous nested
     * union/struct member, via `anonymousNestedAggregateMemberSizes` above, using
     * the SAME layout arithmetic `aggregateSizeofBytes` already uses for a
     * normal, Joern-visible aggregate -- reused directly, not duplicated. */
-  def anonymousNestedAggregateSize(td: TypeDecl, memberName: String, isUnion: Boolean): Option[Int] =
+  def anonymousNestedAggregateSize(td: TypeDecl, memberName: String, isUnion: Boolean): Option[(Int, Int)] =
     anonymousNestedAggregateMemberSizes(td, memberName, isUnion)
-      .filter(_.nonEmpty).map(aggregateLayoutBytes(_, isUnion))
+      .filter(_.nonEmpty).map(aggregateLayout(_, isUnion))
 
   /** `010-reach-90pct-hole-free`: the byte size of `td`, via ITS OWN top-level
     * source text (`structFieldSizesFromText`), using the SAME layout
@@ -3327,8 +3789,8 @@ import scala.annotation.tailrec
     * (the "no members at all" case and the NEW "some members resolved
     * structurally, one did not" case) share one implementation rather than
     * two copies of the same alignment/offset arithmetic. */
-  def aggregateSizeofBytesViaText(td: TypeDecl): Option[Int] =
-    structFieldSizesFromText(td).map(szs => aggregateLayoutBytes(szs, td.code.trim.startsWith("union")))
+  def aggregateSizeofBytesViaText(td: TypeDecl): Option[(Int, Int)] =
+    aggregateIsUnion(td).flatMap(isUnion => structFieldSizesFromText(td).map(szs => aggregateLayout(szs, isUnion)))
 
   /** `010-reach-90pct-hole-free`: REWORKS how this whole function fails.
     * Before this push, the structural (member-list) path was ALL-OR-NOTHING:
@@ -3356,23 +3818,418 @@ import scala.annotation.tailrec
     * cannot be safely segmented), so a struct only remaining unresolved after
     * BOTH have been tried is a substantially stronger claim than either
     * alone. */
-  def aggregateSizeofBytes(ty: String): Option[Int] =
+  def aggregateSizeofBytes(ty: String): Option[Int] = aggregateSizeAlign(ty).map(_._1)
+
+  /** `casts-sizeof`: is this aggregate a UNION? Read from the declaration's own
+    * source up to its opening brace, which must name exactly one of `struct`/`union`.
+    * The old test, `td.code.startsWith("union")`, answered "struct" for every
+    * `typedef union { ... } YYMINORTYPE;` -- the declaration starts with `typedef` --
+    * and laid the union's members out one after another: `sizeof(yyStackEntry)` came
+    * out 200 where `gcc` says 24. */
+  //
+  // It is also the gate that the source window read from `td`'s line number really
+  // is `td`'s OWN declaration: the text before the first `{` must end in
+  // `struct TAG`/`union TAG` for this type's tag, or be an untagged
+  // `typedef struct`/`typedef union` whose closing brace is followed by this name.
+  // A struct declared on the same line as its enclosing one (`struct IL { int n;
+  // struct ILItem { char *z; } a[2]; ... }`) otherwise reads the ENCLOSING body as
+  // its own, and every text-based size built on that would describe the wrong type.
+  def aggregateIsUnion(td: TypeDecl): Option[Boolean] = {
+    val text = typeDeclSourceWindow(td)
+    val open = text.indexOf('{')
+    if (open < 0) None
+    else {
+      val head = text.substring(0, open).replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("//[^\n]*", " ")
+      val tag = java.util.regex.Pattern.quote(stripDuplicateSuffix(td.name))
+      val ownsBody =
+        ("""\b(?:struct|union)\s+""" + tag + """\s*$""").r.findFirstIn(head).isDefined ||
+        ("""\btypedef\s+(?:const\s+)?(?:struct|union)\s*$""".r.findFirstIn(head).isDefined &&
+          structBodyText(td).exists { b =>
+            val after = text.substring((open + 1 + b.length + 1) min text.length)
+            ("""^\s*""" + tag + """\s*;""").r.findFirstIn(after).isDefined
+          })
+      val u = """\bunion\b""".r.findFirstIn(head).isDefined
+      val st = """\bstruct\b""".r.findFirstIn(head).isDefined
+      if (ownsBody && u != st) Some(u) else None
+    }
+  }
+
+  /** `casts-sizeof`: every DEFINITION (a declaration with a body) of this aggregate's
+    * name has the same body. `sqlite3.c` defines `struct SQLiteThread` three times,
+    * for pthreads, Win32 and no threads, under `#if`s the frontend does not decide;
+    * whichever one a lookup happened to pick gave a `sizeof` for a configuration
+    * nobody chose (24 bytes, where the pthreads build's is 40). The same guard covers
+    * two unrelated `static` structs sharing a tag in different files. Byte-identical
+    * re-parses of one header (Joern's `<duplicate>N` copies) are one definition. */
+  def hasUniqueDefinition(td: TypeDecl): Boolean = {
+    val key = stripDuplicateSuffix(bareType(td.fullName))
+    val defs = typeDeclsByName.getOrElse(key, List(td)).filter(_.code.contains("{"))
+    // Compared on the declarations' own recorded text, not on a source window read
+    // from their line numbers: a `<duplicate>` copy can carry a line number a few
+    // lines off, and a window read from there finds some OTHER brace.
+    defs.map(_.code.replaceAll("/\\*(?s:.*?)\\*/", " ").replaceAll("\\s+", " ").trim).distinct.size <= 1
+  }
+
+  /** `casts-sizeof`: a `sizeof` operand whose TYPE the frontend left unresolved, sized
+    * from the declaration it names instead. Three shapes, each read from the source
+    * the same way the aggregate layout itself is:
+    *
+    *   * `a[i]` where `a` is a ONE-dimensional array whose bound is not a literal
+    *     (`MemPage *apNew[NB+2]`, typed `MemPage*[NB+2]`): the element type is the
+    *     type before the brackets, whatever the bound is. A multi-dimensional array is
+    *     not attempted (`T[2][3]` indexed once is `T[3]`, and which bracket is outer in
+    *     Joern's spelling is not something to rely on here).
+    *   * `r->u` where `u` is an ANONYMOUS (or inline-tagged) union/struct member of
+    *     `r`'s struct -- typed by Joern as the bare keyword `union` -- sized from its
+    *     inline body (`anonymousNestedAggregateSize`).
+    *   * `r->u.f`: the member `f` declared inside that inline body, sized from its own
+    *     single declaration (`pMem->u.r` is `double r;` inside `union MemValue`).
+    *
+    * Every size still goes through `segmentSizes`/`memberSizeAlign`, so the refusals
+    * there (bit-fields, undecidable `#if`s, multi-declarators) apply unchanged. */
+  def sizeofOperandFromDecl(operand: AstNode): Option[Int] = {
+    def ownerTd(recv: AstNode): Option[TypeDecl] =
+      fieldReceiverAggregateType(staticTypeOf(recv)).flatMap(structTypeDeclOfAny)
+        .filter(td => hasUniqueDefinition(td) && aggregateIsUnion(td).isDefined)
+    operand match {
+      case c: Call if indexOps.contains(c.methodFullName) =>
+        asIndex(c).flatMap { case (r, _) =>
+          arrayShapeAny.findFirstMatchIn(bareType(staticTypeOf(r))) match {
+            case Some(m) if !m.group(1).contains("[") => memberSizeAlign(m.group(1)).map(_._1)
+            case _                                     => None
+          }
+        }
+      case _ =>
+        asField(operand).flatMap { case (recv, field) =>
+          ownerTd(recv).flatMap { td =>
+            anonymousNestedAggregates(td).get(field).flatMap { case (isUnion, _) =>
+              anonymousNestedAggregateSize(td, field, isUnion).map(_._1)
+            }
+          }.orElse(asField(recv).flatMap { case (recv2, outer) =>
+            ownerTd(recv2).flatMap { td =>
+              anonymousNestedAggregates(td).get(outer).flatMap { case (_, inner) =>
+                memberDeclSizeInBody(inner, field, td.filename)
+              }
+            }
+          })
+        }
+    }
+  }
+
+  /** `casts-sizeof`: `sizeof(aJournalMagic)` for `static const unsigned char
+    * aJournalMagic[] = { 0xd9, ... };` -- an array whose bound is fixed by its
+    * INITIALIZER (C11 6.7.9p22). Joern types it `unsigned char[]`, which the old
+    * pointer fallback answered with the pointer width: right for this one 8-byte
+    * table by coincidence, wrong for every other (`delays[]` in the busy handler is
+    * 12 bytes). The size is the initializer's element count times the element size,
+    * or, for a `char` array initialised by one string literal, the literal's length
+    * plus its terminating NUL.
+    *
+    * The declaring assignment is found by name in the scope the name resolves to --
+    * this method if it has a local of that name (a `static` table inside a function),
+    * otherwise the file-scope initialiser of this method's own file -- and must be
+    * unique there. Refused: designated initializers (`{ [2] = 7 }`, whose size is the
+    * largest index, not the count), Joern's truncated initializer lists (it caps
+    * them at 1000 elements), string literals with numeric escapes or adjacent-literal
+    * concatenation, and multi-dimensional arrays. */
+  def unsizedArraySize(operand: AstNode, inMethod: Option[Method]): Option[Int] = operand match {
+    case i: Identifier =>
+      val t = bareType(staticTypeOf(i))
+      if (!t.endsWith("[]") || t.count(_ == '[') != 1) None
+      else {
+        val elem = t.dropRight(2)
+        // `genuineLocalNames`, not `localTypes`: a file-scope global read inside a
+        // function also has a (closure-bound) LOCAL there, which is not where its
+        // initializer lives.
+        val isLocal = genuineLocalNames.contains(i.name)
+        val scopes: List[Method] =
+          if (isLocal) inMethod.toList
+          else cpg.method.nameExact("<global>").l.filter(_.filename == currentFile)
+        val inits = scopes.flatMap(_.ast.l.collect {
+          case a: Call if a.methodFullName == "<operator>.assignment" && kidsOf(a).headOption.exists {
+                 case id: Identifier => id.name == i.name
+                 case _              => false
+               } && a.code.trim.matches("""^""" + java.util.regex.Pattern.quote(i.name) + """\s*\[\s*\]\s*=[\s\S]*""") => a
+        })
+        inits match {
+          case List(a) => kidsOf(a) match {
+            case List(_, rhs: Call) if rhs.methodFullName == "<operator>.arrayInitializer" =>
+              val ks = kidsOf(rhs)
+              // A designator arrives as `[2] = 7` / `.f = v`, sometimes wrapped in a
+              // BLOCK (seen on a live fixture), so any child that is a block, an
+              // assignment or starts with `[`/`.` disqualifies the count.
+              val designated = ks.exists {
+                case k: Call  => k.methodFullName == "<operator>.assignment"
+                case _: Block => true
+                case k        => k.code.trim.startsWith("[") || k.code.trim.startsWith(".")
+              }
+              if (designated || ks.isEmpty || ks.size >= 1000 || ks.exists(_.code.contains("too-many-initializers"))) None
+              else memberSizeAlign(elem).map(_._1 * ks.size)
+            case List(_, lit: Literal) if Set("char", "signedchar", "unsignedchar").contains(elem) =>
+              val q = lit.code.trim
+              if (q.matches("""^"([^"\\]|\\[ntrabfv'"?\\])*"$""")) {
+                val inner = q.substring(1, q.length - 1)
+                Some(inner.replaceAll("""\\.""", "x").length + 1)
+              } else None
+            case _ => None
+          }
+          case _ => None
+        }
+      }
+    case _ => None
+  }
+
+  /** `casts-sizeof`: the size of member `name` declared in an aggregate body's text:
+    * the ONE top-level declaration (split on `;` at brace depth 0, after
+    * `activeStructText`) whose single declarator is `name`, sized as a one-member
+    * body by `segmentSizes`. `None` if the name is not found exactly once or shares
+    * its declaration with another declarator. */
+  def memberDeclSizeInBody(rawBody: String, name: String, filePath: String): Option[Int] =
+    activeStructText(rawBody).flatMap { body =>
+      val decls = scala.collection.mutable.ListBuffer.empty[String]
+      val cur = new StringBuilder
+      var depth = 0
+      body.foreach { ch =>
+        ch match {
+          case '{' => depth += 1; cur.append(ch)
+          case '}' => depth -= 1; cur.append(ch)
+          case ';' if depth == 0 => decls += cur.toString; cur.clear()
+          case _ => cur.append(ch)
+        }
+      }
+      val fnPtrName = """\(\s*\*+\s*(?:const\s+)?([A-Za-z_]\w*)\s*\)""".r
+      val lastIdent = """([A-Za-z_]\w*)\s*$""".r
+      def declName(d0: String): Option[String] = {
+        val d = stripNestedBraces(d0).trim
+        var pd = 0; var commas = 0
+        d.foreach {
+          case '(' | '[' => pd += 1
+          case ')' | ']' => pd -= 1
+          case ','       => if (pd == 0) commas += 1
+          case _         =>
+        }
+        if (commas > 0) None
+        else fnPtrName.findFirstMatchIn(d).map(_.group(1)).orElse {
+          val noDims = d.replaceAll(""":\s*\d+\s*$""", "").replaceAll("""(\s*\[[^\]]*\])+\s*$""", "")
+          lastIdent.findFirstMatchIn(noDims).map(_.group(1))
+        }
+      }
+      decls.toList.map(_.trim).filter(_.nonEmpty).filter(d => declName(d).contains(name)) match {
+        case List(d) => segmentSizes(d + ";", filePath).collect { case List((sz, _)) => sz }
+        case _       => None
+      }
+    }
+
+  /** `casts-sizeof`: `PgHdr *pDirty, *pDirtyTail;` / `int Y, M, D;` -- one
+    * declaration, several declarators. Each declarator's type is the shared
+    * specifier part plus its OWN `*`s and `[N]`s (C11 6.7.6: pointer and array
+    * derivations belong to the declarator, not to the specifiers), laid out in
+    * source order exactly like separate declarations. Only plain declarators --
+    * `*`s, a name, literal or macro-resolved dimensions -- qualify; anything with a
+    * parenthesis, brace, bit-field or initializer makes the whole segment `None`. */
+  def multiDeclaratorSizes(seg: String, filePath: String): Option[List[(Int, Int)]] =
+    if (seg.exists("(){}:=".contains(_))) None
+    else {
+      val parts = seg.split(",").map(_.trim).toList
+      // Lazy specifier part, then at least one space or `*` before the name, so the
+      // name can never be the tail of a longer identifier (`pDirty` is not `y`).
+      val first = """^(.*?[^\s\*])(\s+\**|\s*\*+)\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*)$""".r
+      val rest  = """^(\**)\s*([A-Za-z_]\w*)\s*((?:\[[^\[\]]*\]\s*)*)$""".r
+      def dims(d: String): Option[Int] =
+        """\[([^\[\]]*)\]""".r.findAllMatchIn(d).map(_.group(1).trim).toList
+          .foldLeft(Option(1)) { (acc, e) =>
+            acc.flatMap(a => arrayBound(e, Some(filePath)).map(_ * a))
+          }
+      def one(base: String, stars: String, dimText: String): Option[(Int, Int)] =
+        for { n <- dims(dimText); sa <- memberSizeAlign(base + stars) } yield (sa._1 * n, sa._2)
+      parts match {
+        case first(base, stars0, _, dims0) :: tail if parts.size > 1 && !base.trim.endsWith(",") =>
+          val heads = one(base.trim, stars0, dims0)
+          val tails = tail.map {
+            case rest(stars, _, d) => one(base.trim, stars, d)
+            case _                 => None
+          }
+          val all = heads :: tails
+          if (all.forall(_.isDefined)) Some(all.flatten) else None
+        case _ => None
+      }
+    }
+
+  /** `casts-sizeof`: `RET (*NAME)(ARGS)` with nothing after the parameter list's own
+    * closing parenthesis -- one pointer-to-function declarator. The parameter list is
+    * matched by depth counting, so `int (*a)(int), (*b)(int)` (two declarators) and
+    * `int (*a[4])(int)` (an ARRAY of pointers) do not qualify. */
+  def isSingleFunctionPointerDecl(seg: String): Boolean = {
+    val head = """^[^(){}\[\];,:]*\(\s*\*+\s*(?:const\s+)?[A-Za-z_]\w*\s*\)\s*\(""".r
+    head.findPrefixMatchOf(seg) match {
+      case None => false
+      case Some(m) =>
+        var depth = 1; var i = m.end; var close = -1
+        while (i < seg.length && close < 0) {
+          seg.charAt(i) match {
+            case '(' => depth += 1
+            case ')' => depth -= 1; if (depth == 0) close = i
+            case _   =>
+          }
+          i += 1
+        }
+        close >= 0 && seg.substring(close + 1).trim.isEmpty
+    }
+  }
+
+  /** `casts-sizeof`: macro names `#define`d anywhere in the corpus's own source, and
+    * the ones the frontend was told to define (`cppDefines`, mirroring the parse's
+    * `CPP_DEFINES`). Anything outside both sets, and not reserved to the
+    * implementation, is undefined in every translation unit of the parsed
+    * configuration. */
+  lazy val corpusDefinedMacros: Set[String] = {
+    val pat = """^\s*#\s*define\s+([A-Za-z_]\w*)""".r
+    cpg.file.name.l.filterNot(n => n == "<empty>" || n == "<includes>").distinct.flatMap { f =>
+      fileLines(f).flatMap(l => pat.findFirstMatchIn(l).map(_.group(1)))
+    }.toSet
+  }
+  lazy val frontendDefines: Set[String] =
+    cppDefines.split(",").map(_.trim.takeWhile(_ != '=').trim).filter(_.nonEmpty).toSet
+  def macroKnownUndefined(n: String): Boolean =
+    !n.startsWith("_") && !Set("unix", "linux", "i386").contains(n) &&
+      !corpusDefinedMacros.contains(n) && !frontendDefines.contains(n)
+
+  /** `casts-sizeof`: a struct body reduced to the lines the PARSED configuration
+    * compiles, or `None` when that cannot be decided.
+    *
+    * Joern's member list for a struct is the union of EVERY `#if` branch (confirmed on
+    * a two-branch fixture: `#ifdef X int b; #else char e; #endif` lists both `b` and
+    * `e`), while the function bodies it parses take exactly one branch -- the one the
+    * TU's own macros select, with nothing predefined from the command line. Laying
+    * out every branch at once gave `sizeof(Mem)` 48 against `gcc`'s 56, `Expr` 80
+    * against 72, `Table` 120 against 104. This decides the conditionals the same way
+    * the function bodies were decided, and only where that is certain:
+    * `#ifdef N`/`#ifndef N`/`#if defined(N)`/`#if !defined(N)`/`#else`/`#endif`, for an
+    * `N` that nothing in the corpus `#define`s, the frontend was not told to define,
+    * and the compiler does not reserve (no leading `_`). Any other directive (`#if`
+    * over an expression, `#elif`, `#include`, a macro the corpus does define
+    * somewhere) makes the whole body undecidable. `#define`/`#undef` lines are dropped:
+    * they occupy no storage. Comments are blanked first, keeping line structure. */
+  def activeStructText(raw: String): Option[String] = {
+    val noComments = """/\*(?s:.*?)\*/""".r.replaceAllIn(raw,
+      m => scala.util.matching.Regex.quoteReplacement(m.matched.filter(_ == '\n'))).replaceAll("//[^\n]*", "")
+    val ifdefP  = """^#\s*ifdef\s+([A-Za-z_]\w*)\s*$""".r
+    val ifndefP = """^#\s*ifndef\s+([A-Za-z_]\w*)\s*$""".r
+    val ifDefP  = """^#\s*if\s+defined\s*\(?\s*([A-Za-z_]\w*)\s*\)?\s*$""".r
+    val ifNDefP = """^#\s*if\s+!\s*defined\s*\(?\s*([A-Za-z_]\w*)\s*\)?\s*$""".r
+    // Each open conditional: (this branch taken, an `#else` already seen).
+    var stack = List.empty[(Boolean, Boolean)]
+    var ok = true
+    val out = new StringBuilder
+    def active = stack.forall(_._1)
+    noComments.split("\n", -1).foreach { line =>
+      if (ok) {
+        val t = line.trim
+        if (!t.startsWith("#")) { if (active) out.append(line) ; out.append('\n') }
+        else t match {
+          case ifdefP(n)  if macroKnownUndefined(n) => stack = (false, false) :: stack
+          case ifndefP(n) if macroKnownUndefined(n) => stack = (true, false) :: stack
+          case ifDefP(n)  if macroKnownUndefined(n) => stack = (false, false) :: stack
+          case ifNDefP(n) if macroKnownUndefined(n) => stack = (true, false) :: stack
+          case _ if t.matches("""#\s*else\b.*""") =>
+            stack match {
+              case (taken, false) :: rest => stack = (!taken, true) :: rest
+              case _                      => ok = false
+            }
+          case _ if t.matches("""#\s*endif\b.*""") =>
+            if (stack.isEmpty) ok = false else stack = stack.tail
+          case _ if t.matches("""#\s*(define|undef)\b.*""") => out.append('\n')
+          case _ => ok = false
+        }
+      }
+    }
+    if (ok && stack.isEmpty) Some(out.toString) else None
+  }
+
+  /** `casts-sizeof`: the NAMES of the members the struct's own source declares in
+    * the parsed configuration, or `None` when they cannot be read with certainty.
+    *
+    * This is the guard the structural (`td.member`) layout path was missing, for two
+    * separate frontend behaviours:
+    *
+    *   * Joern does not record a FUNCTION-POINTER member (`u16 (*xCellSize)(MemPage*,
+    *     u8*);`) in `TypeDecl.member` at all, so a layout computed from that list
+    *     silently omits it: against `gcc` on the amalgamation, `sizeof(MemPage)` came
+    *     out 160/120 (real: 136) and `sizeof(Walker)` 24 (real: 48).
+    *   * Joern's member list is the union of every `#if` branch (`activeStructText`),
+    *     so a member the configuration does not compile was laid out anyway.
+    *
+    * The structural path is used only when its member names are exactly (as a
+    * multiset) the declarator names read from the active source text: depth-0
+    * `;`-separated declarations, one declarator per depth-0 comma, a nested aggregate
+    * collapsed to its one member, a function-pointer declarator named by its
+    * `(*NAME)`. Otherwise the text path decides (or nobody does). */
+  def textMemberNames(td: TypeDecl): Option[List[String]] =
+    structBodyText(td).flatMap(activeStructText).flatMap { body =>
+      val flat = stripNestedBraces(body)
+      val segs = flat.split(";").map(_.trim).filter(_.nonEmpty).toList
+      val fnPtrName = """\(\s*\*+\s*(?:const\s+)?([A-Za-z_]\w*)\s*\)""".r
+      val lastIdent = """([A-Za-z_]\w*)\s*$""".r
+      val names = segs.flatMap { seg =>
+        // split on depth-0 commas
+        var depth = 0; val parts = scala.collection.mutable.ListBuffer.empty[String]
+        val cur = new StringBuilder
+        seg.foreach { ch =>
+          ch match {
+            case '(' | '[' => depth += 1; cur.append(ch)
+            case ')' | ']' => depth -= 1; cur.append(ch)
+            case ',' if depth == 0 => parts += cur.toString; cur.clear()
+            case _ => cur.append(ch)
+          }
+        }
+        parts += cur.toString
+        parts.toList.map { d0 =>
+          val d = d0.trim
+          fnPtrName.findFirstMatchIn(d).map(_.group(1)).getOrElse {
+            val noBits = d.replaceAll(""":\s*\d+\s*$""", "")
+            val noDims = noBits.replaceAll("""(\s*\[[^\]]*\])+\s*$""", "")
+            lastIdent.findFirstMatchIn(noDims).map(_.group(1)).getOrElse("")
+          }
+        }
+      }
+      if (names.exists(_.isEmpty)) None else Some(names)
+    }
+
+  def aggregateSizeAlign(ty: String): Option[(Int, Int)] =
     structTypeDeclOfAny(ty).flatMap { td =>
-      if (hasPackingAttribute(td) || !sizeofInProgress.add(td.fullName)) None
+      if (hasPackingAttribute(td) || !hasUniqueDefinition(td) || aggregateIsUnion(td).isEmpty ||
+          !sizeofInProgress.add(td.fullName)) None
       else try {
-        val members = td.member.l
-        if (members.isEmpty) aggregateSizeofBytesViaText(td)
+        val joernMembers = td.member.l
+        // `casts-sizeof`: laid out in SOURCE order. Joern's member list is not in
+        // declaration order -- it puts aggregate-typed members first (`IdList` comes
+        // back as `a, nId, eU4`; `Table` with `u` first) -- and layout is order-
+        // dependent, so the old walk over that list padded members in the wrong
+        // sequence. The order is taken from the declarators in the source
+        // (`textMemberNames`); when the two lists are not the same set of distinct
+        // names, the structural path is not used at all.
+        val textNames = textMemberNames(td)
+        val members: List[Member] = textNames match {
+          case Some(ns) if ns.distinct.size == ns.size && ns.sorted == joernMembers.map(_.name).sorted =>
+            val byName = joernMembers.map(m => m.name -> m).toMap
+            ns.map(byName)
+          case _ => Nil
+        }
+        if (joernMembers.isEmpty) aggregateSizeofBytesViaText(td)
+        // `casts-sizeof`: the member list must be exactly the declarators the source
+        // compiles, or the layout below would skip what Joern left out and include
+        // what the configuration leaves out -- see `textMemberNames`. The text-only
+        // path still gets its chance, on the same active text.
+        else if (members.isEmpty) aggregateSizeofBytesViaText(td)
         else {
-          val isUnion = td.code.trim.startsWith("union")
-          var offset = 0
-          var maxSize = 0
-          var maxAlign = 1
+          val isUnion = aggregateIsUnion(td).get
           var ok = true
+          var laid = List.empty[(Int, Int)]
           members.foreach { m =>
             if (ok) {
               if (isBitfieldMember(m)) ok = false
               else {
-                val direct = memberSizeofBytes(m.typeFullName)
+                val direct = memberSizeAlign(m.typeFullName, Some(td.filename))
                 // `009-reduce-remaining-holes-4` US4: try BOTH keywords rather than
                 // gating on `bareType(m.typeFullName) == "union"/"struct"` -- confirmed
                 // live that Joern does not consistently spell an anonymous nested
@@ -3393,20 +4250,14 @@ import scala.annotation.tailrec
                   else anonymousNestedAggregateSize(td, m.name, isUnion = true)
                          .orElse(anonymousNestedAggregateSize(td, m.name, isUnion = false))
                 resolved match {
-                  case Some(sz) if sz > 0 =>
-                    if (sz > maxAlign) maxAlign = sz
-                    if (isUnion) { if (sz > maxSize) maxSize = sz }
-                    else { offset = ((offset + sz - 1) / sz) * sz; offset += sz }
+                  case Some((sz, al)) if sz > 0 && al > 0 => laid = laid :+ ((sz, al))
                   case _ => ok = false
                 }
               }
             }
           }
           if (!ok) aggregateSizeofBytesViaText(td)
-          else {
-            val raw = if (isUnion) maxSize else offset
-            Some(((raw + maxAlign - 1) / maxAlign) * maxAlign)
-          }
+          else Some(aggregateLayout(laid, isUnion))
         }
       } finally sizeofInProgress.remove(td.fullName)
     }
@@ -3779,7 +4630,54 @@ import scala.annotation.tailrec
           }
         }
       }
-    baseCase.orElse(chainCase)
+    // `(*pp)->f` / `&(*pp)->f`: `*q` where `q` is a bare `ptrIrefNames` name whose
+    // pointee type is a pointer to a known struct -- the `Type **pp` linked-list walk
+    // (`for(pp=&pTab->pTrigger; *pp; pp=&(*pp)->pNext)`). `q` holds a `Val.iref` to
+    // the cell storing that struct pointer, so `derefIref q` reads the stored pointer
+    // VALUE -- the same `Val.ref` a `p->q` field read yields in `chainCase` above, and
+    // subject to the same caveat (a null stored there makes the next hop a dynamic
+    // hole, never a value). Only ever true once `ptrIrefNames` is populated, i.e.
+    // never during `ptrIrefNames`' own classification (see `irefDerefFieldDep`).
+    def derefCase: Option[(ujson.Value, String)] = x match {
+      case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+        kidsOf(ind) match {
+          case List(q) =>
+            rawLocalOrParamName(q).map(localName).filter(ptrIrefNames.contains).flatMap { qn =>
+              val bt = bareType(staticTypeOf(ind))
+              if (bt.endsWith("*") && isClassType(bt.dropRight(1)))
+                structTypeDeclOf(bt.dropRight(1)).map(td =>
+                  (ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "name", "v" -> qn)): ujson.Value,
+                   stripDuplicateSuffix(bareType(td.fullName))))
+              else None
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+    baseCase.orElse(chainCase).orElse(derefCase)
+  }
+
+  /** For `ptrIrefNames`' classifier: `&(*q)->f` (optionally `&(*q)->arr[i]`), `q` a
+    * bare local/parameter name, `*q` a pointer to a known struct -- the shape
+    * `pointerBaseExpr`'s `derefCase` turns into `irefField (derefIref q) f` once `q`
+    * is tracked. Returns `q`: the assignment is an interior pointer PROVIDED `q` is
+    * one, which is exactly a `Some(Some(q))` dependency in that fixed point. */
+  def irefDerefFieldDep(operand: AstNode): Option[String] = {
+    val fieldPart = asIndex(operand).map(_._1).getOrElse(operand)
+    asField(fieldPart).flatMap { case (base, _) =>
+      base match {
+        case ind: Call if ind.methodFullName == "<operator>.indirection" =>
+          kidsOf(ind) match {
+            case List(q) =>
+              val bt = bareType(staticTypeOf(ind))
+              if (bt.endsWith("*") && isClassType(bt.dropRight(1)) && structTypeDeclOf(bt.dropRight(1)).isDefined)
+                rawLocalOrParamName(q).map(localName)
+              else None
+            case _ => None
+          }
+        case _ => None
+      }
+    }
   }
 
   /** `010-reach-90pct-hole-free` US3 (T024): the general form of
@@ -3953,7 +4851,7 @@ import scala.annotation.tailrec
     else {
       val callSites = allCalls.filter(_.methodFullName == fn.fullName)
       callSites.nonEmpty && callSites.forall { c =>
-        kidsOf(c).find(aidx(_) == paramIndex).map(unwrapCastLayers).exists {
+        kidsOf(c).find(aidx(_) == paramIndex).map(outParamArg).exists {
           case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
             kidsOf(addr) match {
               case List(n) if addrShape(n) == "local" =>
@@ -4025,6 +4923,27 @@ import scala.annotation.tailrec
     * on some OTHER parameter) nor uselessly strict (would have rejected all 45).
     * A parameter with zero dereferences at all is vacuously safe -- there is
     * nothing to guard. */
+  // NOTE (pointer-indirection family, measured with a fixture): as written this
+  // predicate is VACUOUS -- `fn.ast.isIdentifier.filter(_.name == paramName)` includes
+  // the `p` operand of the dereference itself, and Joern's CFG evaluates a call's
+  // operands before the call, so every `*p`/`p->f`/`p[i]` is dominated by its own
+  // `p`; an unguarded `void f(int *p){ *p = 1; }` called with `0` passes. (Dominance
+  // is also branch-insensitive: `if (p) {..} *p = 1;` would pass even without that.)
+  // A branch-sensitive rewrite was tried and REJECTED on measurement: it demotes
+  // callees whose null-safety rests on a correlated invariant rather than a local
+  // test (`sqlite3MatchEName`'s `pbRowid` is only dereferenced when
+  // `eEName==ENAME_ROWID`, which its callers only request with a non-null pointer;
+  // likewise `sqlite3PagerOpenWal`, `tableAndColumnIndex`, `wherePartIdxExpr`).
+  //
+  // Admitting a `NullLit` call site does not NEED this check for soundness: a null
+  // argument is a `Val.int 0`, and the only things a closed out-parameter is ever
+  // dereferenced with -- `derefIref`/`setDerefIref` (and, before `boxedScalarAddr`,
+  // `field`/`setField` on a box) -- all require a `Val.iref`/`Val.ref` and yield a
+  // DYNAMIC hole (`derefIref:non-iref`, `setDerefIref:non-iref`) on anything else. So
+  // a callee that really does dereference a null it was passed holes at run time on
+  // that path; it can never produce a value. What this predicate controls is only how
+  // many such paths are counted as statically hole-free, which is the ledger's
+  // documented "static hole-freedom is an upper bound" caveat, not a wrong answer.
   def calleeNullGuardsParam(fn: Method, paramName: String): Boolean = {
     val derefs: List[CfgNode] =
       (fn.ast.isCall.filter(_.methodFullName == "<operator>.indirection").l
@@ -4059,7 +4978,7 @@ import scala.annotation.tailrec
     case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
@@ -4171,11 +5090,9 @@ import scala.annotation.tailrec
     *
     * A pair (`fn`, `i`, `j`) is CLOSED when every call site of `fn`, across the
     * whole analyzed program, passes at positions `i`/`j` EITHER:
-    *   - a syntactically self-evident same-buffer shape (`sameBufferAtCallSite`:
-    *     the identical expression twice, or one argument spelled as the other
-    *     PLUS/MINUS some offset expression -- C's own `zEnd = zStart + n`
-    *     idiom, checked purely structurally, no interprocedural reasoning
-    *     needed for this case at all), or
+    *   - a syntactically self-evident same-POSITION shape (`sameBufferAtCallSite`:
+    *     the identical pure expression twice -- the `zStart, zStart + n` spelling
+    *     this also used to accept was unsound, see that def), or
     *   - a FORWARDED pair -- both arguments are bare references to two
     *     parameters of the CALLING function, and THAT pair is itself already
     *     known closed (the same `Fwd` bootstrapping `closedOutParamsTransitive`
@@ -4220,29 +5137,45 @@ import scala.annotation.tailrec
 
     def normCode(n: AstNode): String = n.code.replaceAll("\\s+", "")
 
-    // `zEnd = zStart + n` (or `n + zStart`, or the `-` spelling) -- one
-    // argument IS the other, textually, plus some offset expression. Checked
-    // BEFORE the `Fwd` case: a call site can satisfy both (a forwarded
-    // parameter that ALSO happens to be shifted, `foo(zStart, zStart+k)`
-    // where `zStart` is itself a parameter) and the syntactic case needs no
-    // recursion to trust, so it is strictly the cheaper, more direct proof.
+    // The same argument expression at both positions. Checked BEFORE the `Fwd`
+    // case, since it needs no recursion to trust. (It used to also accept one
+    // argument spelled as the other plus/minus an offset -- see the comment
+    // inside for why that was unsound.)
     def sameBufferAtCallSite(a: AstNode, b: AstNode): Boolean = {
-      def isShiftedFrom(base: AstNode, whole: AstNode): Boolean = whole match {
-        case c: Call if c.methodFullName == "<operator>.addition" || c.methodFullName == "<operator>.subtraction" =>
-          kidsOf(c) match {
-            case List(l, _) => normCode(l) == normCode(base)
-            case _ => false
-          }
-        case _ => false
-      }
-      normCode(a) == normCode(b) || isShiftedFrom(a, b) || isShiftedFrom(b, a)
+      // Pointer-arith family: ONLY the identical-expression case is sound, and
+      // only for a pure one. The consumer (`emit`) unifies the two parameters onto
+      // one `strCursorBase`, after which `zEnd - zStart` / `zEnd == zStart`
+      // compare their `$off`s -- and a parameter's `$off` starts at 0 in the
+      // callee's prologue, whatever the caller passed. So unification asserts
+      // that the two arguments are the SAME position, not merely the same
+      // buffer. `f(z, z + n)` passes two DIFFERENT positions (in Core, `z` and
+      // `strFrom z n`, both then offset 0), and the unified translation of
+      // `zEnd - zStart` answered `0` for C's `n` -- hole-free and wrong. The
+      // shifted case (one argument spelled as the other `+`/`-` an offset,
+      // previously accepted here) is therefore no longer accepted; a positional
+      // relationship across a call boundary is not representable by a shared
+      // base with per-parameter offsets that restart at 0, and needs the callee
+      // to receive the caller's offset (a Core pointer VALUE, not this
+      // per-function offset encoding) to be translated.
+      normCode(a) == normCode(b) && pureNode(a)
     }
 
     // A bare reference to a parameter of `n`'s OWN enclosing method (the call
     // site's caller) -- `(callerFullName, paramIndex)`, or `None` if `n` is not
     // such a reference at all (an expression, a local, a literal, ...).
+    //
+    // Pointer-arith family: only a parameter NEVER WRITTEN in its own method
+    // (no `=`, `op=`, `++`/`--` with it as the target) is a sound `Fwd` link --
+    // a closed pair means "the two arrived at the SAME position", and a cursor
+    // parameter that advanced before being forwarded (`zStart++; f(zStart,
+    // zEnd)`) no longer is at the position it arrived at.
+    def neverWritten(m: Method, name: String): Boolean =
+      !m.ast.isCall.exists(c =>
+        (c.methodFullName == "<operator>.assignment" || augOps.contains(c.methodFullName) ||
+         incrOps.contains(c.methodFullName)) &&
+        (kidsOf(c).headOption match { case Some(t: Identifier) => t.name == name; case _ => false }))
     def paramRefOf(n: AstNode): Option[(String, Int)] = n match {
-      case i: Identifier =>
+      case i: Identifier if neverWritten(i.method, i.name) =>
         i.method.parameter.l.find(_.name == i.name).map(p => (p.method.fullName, p.index))
       case p: MethodParameterIn => Some((p.method.fullName, p.index))
       case _ => None
@@ -4368,9 +5301,19 @@ import scala.annotation.tailrec
     * per-method var, for exactly this "whole-program check cannot trust
     * per-method state" reason). */
   def scalarAddressOfEligible(x: AstNode): Boolean = {
+    // A plain POINTER local (`Pager *pPager; f(&pPager);` -- the `T **ppOut`
+    // out-parameter idiom) qualifies exactly as a number does: `boxableName` boxes
+    // it into the same one-field cell, and `&pPager` is the same `boxedScalarAddr`
+    // interior pointer `Val.iref r (.fld "v")`, whose `derefIref`/`setDerefIref`
+    // read/write the stored pointer VALUE, never anything behind it. It used to be
+    // excluded, which left every callee whose call sites mix `&pLocal` with
+    // `&s->pField`/`&a[i]` (both already accepted here) unclosed -- `closedOutParam`
+    // takes only `&local`, this function only the other shapes. An ARRAY is still
+    // excluded (its `&arr` is not a box address), which is what the two
+    // `arrayShape` tests below are for; `isPointerType` alone would also match it.
     def isScalar(ty: String): Boolean = {
       val bt = bareType(ty)
-      !isClassType(ty) && !isPointerType(bt) &&
+      !isClassType(ty) && !(isPointerType(bt) && !bt.endsWith("*")) &&
       !arrayShape.findFirstMatchIn(bt).isDefined && !arrayShapeAny.findFirstMatchIn(bt).isDefined
     }
     x match {
@@ -4392,7 +5335,7 @@ import scala.annotation.tailrec
     * can reuse the IDENTICAL "is this argument expression, by itself, a proof
     * this parameter always receives a safe interior pointer" test without a
     * second, driftable copy. */
-  def irefCallArgStructurallyOk(c: Call, rawArg: AstNode): Boolean = unwrapCastLayers(rawArg) match {
+  def irefCallArgStructurallyOk(c: Call, rawArg: AstNode): Boolean = outParamArg(rawArg) match {
     case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
       kidsOf(addr) match {
         case List(x) =>
@@ -4521,13 +5464,35 @@ import scala.annotation.tailrec
     * passed through. See `closedOutParamsTransitive`'s own doc comment for the full
     * argument and the fixed-point's shape -- this is that same structure verbatim,
     * with only the base-case predicate swapped. */
-  lazy val closedIrefOutParamsTransitive: Set[(String, Int)] = {
+  //
+  // Pointer-indirection family: no longer a `lazy val` but recomputed at the start of
+  // every whole-program pass (the driver's priming loop, like
+  // `closedIrefOutParamViaVtableTransitive`), because its `classify` now also accepts
+  // an argument that is a name ALREADY tracked in the calling method
+  // (`irefNamesByMethod`, the previous pass's `ptrIrefNames`) -- `wideClosedIrefParam`'s
+  // own base case, which that function could not combine with forwarding: a callee
+  // whose call sites mix `&x`, a tracked local cursor, and a forwarded parameter
+  // (`sqlite3GetVarint`'s `p`) was closed by neither. The result only grows across
+  // passes, since `irefNamesByMethod` only grows.
+  def computeClosedIrefOutParamsTransitive(): Set[(String, Int)] = {
     sealed trait ArgShape
     case object Ok extends ArgShape
     case object Bad extends ArgShape
+    // A null-pointer literal argument (`f(..., 0)`, "caller does not want this
+    // output") -- the same shape, and the same admission rule, as
+    // `closedOutParamsTransitive`'s own `NullLit` (`calleeNullGuardsParam`). The
+    // soundness argument does not rest on that check (see the NOTE above it): a
+    // null argument is `Val.int 0`, and `derefIref`/`setDerefIref` on anything but a
+    // `Val.iref` is the dynamic hole `derefIref:non-iref`/`setDerefIref:non-iref`,
+    // never a value. A pair whose only non-forwarding sites are null literals is
+    // not admitted (`hasIndependentSite`).
+    // Now that `&n` of a boxed scalar is itself an interior pointer
+    // (`boxedScalarAddr`), this is the one base case the box-model fixed point had
+    // that this interior-pointer one lacked.
+    case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(x) =>
@@ -4540,6 +5505,7 @@ import scala.annotation.tailrec
             if (ok) Ok else Bad
           case _ => Bad
         }
+      case n if isNullPointerLiteral(n) => NullLit
       // `009-reduce-remaining-holes-4`: a BARE array-decay pass, checked BEFORE the
       // generic `Identifier`/`MethodParameterIn` forwarding cases below -- see
       // `closedIrefOutParam`'s own matching case for the full reasoning (a C array
@@ -4548,6 +5514,12 @@ import scala.annotation.tailrec
       // forwarded parameter).
       case bare @ (_: Identifier | _: MethodParameterIn)
           if irefArrayEligible(bare, bare.file.name.headOption.getOrElse("")) => Ok
+      // A name the calling method's own previous-pass `ptrIrefNames` tracks: it holds
+      // an interior pointer at every point of that method, so at this call too.
+      case i: Identifier
+          if irefNamesByMethod.getOrElse(i.method.fullName, Set.empty).contains(localName(i.name)) => Ok
+      case p: MethodParameterIn
+          if irefNamesByMethod.getOrElse(p.method.fullName, Set.empty).contains(localName(p.name)) => Ok
       case i: Identifier =>
         i.method.parameter.l.find(_.name == i.name) match {
           case Some(p) => Fwd(p.method.fullName, p.index)
@@ -4569,6 +5541,15 @@ import scala.annotation.tailrec
         (fn, idx) -> sites.map(c => kidsOf(c).find(aidx(_) == idx).map(classify).getOrElse(Bad))
       }.toMap
 
+    // Computed once per pair, only for pairs that actually see a `NullLit` site.
+    val nullGuarded: Map[(String, Int), Boolean] =
+      shapesByPair.collect {
+        case ((fn, idx), shapes) if shapes.exists { case NullLit => true; case _ => false } =>
+          val guarded = methodByName.get(fn).flatMap(_.parameter.find(_.index == idx))
+            .exists(p => calleeNullGuardsParam(methodByName(fn), p.name))
+          (fn, idx) -> guarded
+      }
+
     var closed  = Set.empty[(String, Int)]
     var changed = true
     var round   = 0
@@ -4583,11 +5564,13 @@ import scala.annotation.tailrec
         // independent call site establishes the actual base case).
         val hasIndependentSite = shapes.exists {
           case Fwd(cfn, ci) => (cfn, ci) != key
+          case NullLit      => false
           case _            => true
         }
         val ok = hasIndependentSite && shapes.forall {
           case Ok                               => true
           case Bad                              => false
+          case NullLit                          => nullGuarded.getOrElse(key, false)
           case Fwd(cfn, ci) if (cfn, ci) == key => true
           case Fwd(cfn, ci)                     => closed.contains((cfn, ci))
         }
@@ -4826,7 +5809,7 @@ import scala.annotation.tailrec
     case object NullLit extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case addr: Call if addr.methodFullName == "<operator>.addressOf" =>
         kidsOf(addr) match {
           case List(n) if addrShape(n) == "local" =>
@@ -4945,7 +5928,7 @@ import scala.annotation.tailrec
     case object Bad extends ArgShape
     case class Fwd(callerFn: String, callerIdx: Int) extends ArgShape
 
-    def classify(c: Call, rawArg: AstNode): ArgShape = unwrapCastLayers(rawArg) match {
+    def classify(c: Call, rawArg: AstNode): ArgShape = outParamArg(rawArg) match {
       case i: Identifier =>
         i.method.parameter.l.find(_.name == i.name) match {
           case Some(p) => Fwd(p.method.fullName, p.index)
@@ -5010,6 +5993,50 @@ import scala.annotation.tailrec
   /** `Expr.field (Expr.name nm) "v"` -- a read of a boxed local/parameter's one
     * field, i.e. the value it stands for everywhere it is read as a plain name. */
   def boxField(nm: String): ujson.Obj = ujson.Obj("k" -> "field", "a" -> boxRef(nm), "f" -> "v")
+
+  /** `&n` for a boxed scalar local/parameter `n`: `Expr.irefField (Expr.name n) "v"`,
+    * i.e. `Val.iref r (.fld "v")` for `n`'s box `r`.
+    *
+    * This used to be `boxRef(n)` -- the box's bare `Val.ref`. That was correct only for
+    * a callee that dereferenced its parameter as `Expr.field p "v"` (`closedOutParams`),
+    * and WRONG-SHAPED for every callee that trusts its parameter as an interior pointer
+    * (`ptrIrefNames` via `closedIrefOutParam`, which has accepted `&n` for a scalar `n`
+    * since `scalarAddressOfEligible`): there `*p` is `derefIref p`, and `derefIref` on a
+    * bare `Val.ref` is the runtime hole `derefIref:non-iref`. So `int n; f(&n);` with
+    * `void f(int *p){ *p = 1; }` was statically hole-free and dynamically ALWAYS a hole.
+    *
+    * With `&n` an interior pointer, the two representations coincide: by
+    * `Semantics.lean`, `derefIref (irefField (name n) "v")` evaluates `n` to `.ref r` and
+    * returns `h.getField r "v"`, which is exactly `field (name n) "v"` (`boxField n`);
+    * `setDerefIref` likewise delegates to `h.setField r "v"`, exactly `setField (name n)
+    * "v"`. Every other place that reads/writes `n` itself (`boxField`, `setField` on
+    * `boxRef`) is unchanged, so the pointer and the name still alias the one heap cell.
+    * `==`/`!=` on two such pointers compare `(ref, selector)`, i.e. which box -- the C
+    * meaning of comparing two addresses of scalars; `+`/`-`/ordering on a `.fld` selector
+    * stay the dynamic hole `iref:arith-on-field` (C only defines `&n + 0`/`+ 1`, and the
+    * latter may not be dereferenced). Callee accesses through `closedOutParams` switch to
+    * `derefIref`/`setDerefIref` in the same change (`outParamRead`/`outParamWrite`). */
+  def boxedScalarAddr(nm: String): ujson.Obj =
+    ujson.Obj("k" -> "irefField", "a" -> boxRef(nm), "f" -> "v")
+
+  /** `*p` read for `p` in `closedOutParams` -- `p` holds whatever its (closed) callers
+    * passed, which is `&n` (`boxedScalarAddr`, an interior pointer) or a forwarded
+    * parameter carrying one; see `boxedScalarAddr`. */
+  def outParamRead(p: String): ujson.Obj =
+    ujson.Obj("k" -> "derefIref", "p" -> ujson.Obj("k" -> "name", "v" -> p))
+
+  /** `*p` read for `p` a `ptrAliases` name (the only assignment to `p` is `p = &n`):
+    * read `n`'s box directly (unchanged); otherwise `p` must be a `closedOutParams`
+    * name and is read through the pointer it holds. */
+  def aliasOrOutParamRead(p: String): ujson.Obj =
+    ptrAliases.get(p).map(boxField).getOrElse(outParamRead(p))
+
+  /** The write counterpart of `aliasOrOutParamRead`. */
+  def aliasOrOutParamWrite(p: String, v: ujson.Obj): ujson.Obj =
+    ptrAliases.get(p) match {
+      case Some(target) => ujson.Obj("k" -> "setField", "r" -> boxRef(target), "f" -> "v", "v" -> v)
+      case None => ujson.Obj("k" -> "setDerefIref", "p" -> ujson.Obj("k" -> "name", "v" -> p), "v" -> v)
+    }
 
   /** `import p.q` / `from <prefix> import <name>`.
     *
@@ -5729,7 +6756,177 @@ import scala.annotation.tailrec
       val b = bareType(staticTypeOf(lhs))
       if (signedTypeNames.contains(b)) Some(">>")
       else if (unsignedTypeNames.contains(b)) Some(">>>")
-      else None
+      // `casts-sizeof`: the name tables above only know a type by its spelling. What
+      // decides C's `>>` is the type of the *promoted left operand* (C11 6.5.7p3), and
+      // that is computable from resolved types whenever `cIntExprType` can compute it
+      // -- through typedef chains (`Bitmask` -> `u64`), casts, literals and the usual
+      // arithmetic conversions of an arithmetic sub-expression (`(c - 0x10000) >> 10`,
+      // `(i + 1) >> 3`, whose own CPG node is typed `ANY`). Tried only AFTER the
+      // tables, so no site that translated before changes operator.
+      //
+      // Only a promoted type of at most 32 bits is translated. Core's `.cLike`
+      // arithmetic is 32-bit (`Dialect.toNumConfig`), so a shift of a 64-bit operand
+      // would be computed at the wrong width -- that site gets the separate
+      // `op:shiftRight:64-bit-operand` label from `shiftRightHoleLabel` instead:
+      // its signedness IS known, what is missing is 64-bit arithmetic in Core.
+      else cIntExprType(lhs).map(cPromote) match {
+        case Some((signed, bits)) if bits <= 32 => Some(if (signed) ">>" else ">>>")
+        case _                                  => None
+      }
+    }
+
+  /** The hole label for a `>>`/`>>=` that `shiftRightOp` could not translate: the
+    * signedness was not recovered, or it was and the promoted operand is wider than
+    * the 32-bit arithmetic Core's `.cLike` dialect performs. */
+  def shiftRightHoleLabel(lhs: AstNode): String =
+    cIntExprType(lhs).map(cPromote) match {
+      case Some((_, bits)) if bits > 32 => "op:shiftRight:64-bit-operand"
+      case _                            => "op:shiftRight:unknown-signedness"
+    }
+
+  /** `casts-sizeof`: C integer-expression typing, from RESOLVED types only.
+    *
+    * The (signedness, width in bits) of `n`'s C type BEFORE the integer promotions, or
+    * `None` whenever any input is unresolved. Nothing is guessed:
+    *
+    *   * a leaf's type comes from `staticTypeOf` and is resolved with `resolveIntType`
+    *     (typedef chains, `dataModel` widths for `long`/`size_t`/...). Plain `char` and
+    *     `_Bool` are accepted as "narrower than `int`": the integer promotions take both
+    *     to `int` whatever `char`'s implementation-defined signedness (C11 6.3.1.1p2),
+    *     so no sign has to be chosen for them. Enumerations are REFUSED even though
+    *     `resolveIntType` sizes them as `int`: an enum's compatible type is
+    *     implementation-defined (GCC picks `unsigned int` when no enumerator is
+    *     negative), which changes the usual arithmetic conversions of `e - 1`.
+    *   * a bit-field member is refused: a narrow `unsigned` bit-field promotes to
+    *     `int`, not `unsigned int` (6.3.1.1p2), and its member type does not say so.
+    *     Checked by NAME against every bit-field member in the CPG, so a field whose
+    *     owner is uncertain is refused rather than looked up in the wrong struct.
+    *   * an identifier with no declaration the CPG can see (no REF edge, not a known
+    *     global) is refused: its `typeFullName` is then the frontend's guess.
+    *   * an integer literal gets the first type of C11 6.4.4.1's list for its base and
+    *     suffix that holds its value, with `long`'s width from `dataModel`;
+    *   * a cast has its target's type; `+ - * / % & | ^` and `?:` the usual arithmetic
+    *     conversions of their operands (6.3.1.8); shifts and unary `- + ~` the promoted
+    *     type of their (left) operand; comparisons and `! && ||` are `int`.
+    *
+    * Depth-bounded so a pathological expression cannot recurse without limit. */
+  lazy val bitfieldMemberNames: Set[String] =
+    cpg.member.l.filter(m => """:\s*\d+\s*$""".r.findFirstIn(m.code).isDefined).map(_.name).toSet
+
+  def cPromote(t: (Boolean, Int)): (Boolean, Int) = if (t._2 < 32) (true, 32) else t
+
+  def cUsualArith(a: (Boolean, Int), b: (Boolean, Int)): (Boolean, Int) = {
+    val (pa, pb) = (cPromote(a), cPromote(b))
+    if (pa._1 == pb._1) (pa._1, pa._2 max pb._2)
+    else {
+      val (u, s) = if (pa._1) (pb, pa) else (pa, pb)
+      // The unsigned operand wins unless the signed type is strictly wider, in which
+      // case it can represent every value of the unsigned one (6.3.1.8p1). With
+      // standard widths this is exactly the rank rule, including `unsigned long` vs
+      // `long long` under LP64 (both 64 bits: unsigned).
+      if (u._2 >= s._2) (false, u._2) else (true, s._2)
+    }
+  }
+
+  def cLongBits: Option[Int] = modelInts.get("long").map(_.drop(1).toInt)
+
+  def cIntLiteralType(code0: String): Option[(Boolean, Int)] = {
+    val code = code0.trim.stripPrefix("-").trim
+    val intLit = """^(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9][0-9]*)([uUlL]*)$""".r
+    if (code.matches("""^'([^'\\]|\\[ntr0\\'"abfv?])'$""")) Some((true, 32))
+    else code match {
+      case intLit(digits, suffix) =>
+        val v =
+          if (digits.startsWith("0x") || digits.startsWith("0X")) BigInt(digits.drop(2), 16)
+          else if (digits.length > 1 && digits.startsWith("0")) BigInt(digits.drop(1), 8)
+          else BigInt(digits)
+        val sfx = suffix.toLowerCase
+        val hasU = sfx.contains("u")
+        val nL = sfx.count(_ == 'l')
+        if (sfx.count(_ == 'u') > 1 || nL > 2 || (nL == 2 && !suffix.contains("ll") && !suffix.contains("LL"))) None
+        else {
+          val decimal = !(digits.startsWith("0x") || digits.startsWith("0X")) && !(digits.length > 1 && digits.startsWith("0"))
+          // Candidate (signed?, width) list of 6.4.4.1p5; `long` is `None` when the
+          // data model is unknown, which fails any literal that would need it.
+          val lng = cLongBits
+          def c(s: Boolean, w: Option[Int]) = w.map(b => (s, b))
+          val cands: List[Option[(Boolean, Int)]] = (hasU, nL, decimal) match {
+            case (false, 0, true)  => List(c(true, Some(32)), c(true, lng), c(true, Some(64)))
+            case (false, 0, false) => List(c(true, Some(32)), c(false, Some(32)), c(true, lng), c(false, lng), c(true, Some(64)), c(false, Some(64)))
+            case (true, 0, _)      => List(c(false, Some(32)), c(false, lng), c(false, Some(64)))
+            case (false, 1, true)  => List(c(true, lng), c(true, Some(64)))
+            case (false, 1, false) => List(c(true, lng), c(false, lng), c(true, Some(64)), c(false, Some(64)))
+            case (true, 1, _)      => List(c(false, lng), c(false, Some(64)))
+            case (false, 2, true)  => List(c(true, Some(64)))
+            case (false, 2, false) => List(c(true, Some(64)), c(false, Some(64)))
+            case (true, 2, _)      => List(c(false, Some(64)))
+            case _                 => Nil
+          }
+          def fits(t: (Boolean, Int)): Boolean =
+            if (t._1) v < (BigInt(1) << (t._2 - 1)) else v < (BigInt(1) << t._2)
+          // Walk the list in order; an unknown width BEFORE the first fit makes the
+          // answer unknowable, so stop there rather than skip it.
+          cands.iterator.map(o => o.map(t => (t, fits(t))))
+            .find(o => o.isEmpty || o.get._2).flatten.map(_._1)
+        }
+      case _ => None
+    }
+  }
+
+  def cLeafIntType(ty: String): Option[(Boolean, Int)] = {
+    val raw = ty.replace("const ", "").replace("volatile ", "").trim
+    val b = bareType(ty)
+    if (raw.startsWith("enum") || b.isEmpty || b == "ANY" || isPointerType(ty)) None
+    else if (b == "char") Some((true, 8))          // promotes to `int` either way
+    else if (b == "_Bool" || b == "bool") Some((false, 8))
+    else resolveIntType(ty).map(w => (w.head == 'i', w.drop(1).toInt))
+  }
+
+  def cIntExprType(n: AstNode, depth: Int = 0): Option[(Boolean, Int)] =
+    if (depth > 24) None
+    else {
+      def rec(k: AstNode) = cIntExprType(k, depth + 1)
+      val arith = Set("<operator>.addition", "<operator>.subtraction",
+        "<operator>.multiplication", "<operator>.division", "<operator>.modulo",
+        "<operator>.and", "<operator>.or", "<operator>.xor")
+      val boolish = Set("<operator>.lessThan", "<operator>.lessEqualsThan",
+        "<operator>.greaterThan", "<operator>.greaterEqualsThan", "<operator>.equals",
+        "<operator>.notEquals", "<operator>.logicalNot", "<operator>.logicalAnd",
+        "<operator>.logicalOr")
+      n match {
+        case l: Literal => cIntLiteralType(l.code)
+        case i: Identifier =>
+          if (i._refOut.hasNext || (globalTypes.contains(i.name) && !genuineLocalNames.contains(i.name)))
+            cLeafIntType(staticTypeOf(i))
+          else None
+        case c: Call =>
+          val mfn = c.methodFullName
+          val ks = kidsOf(c)
+          if (mfn == "<operator>.cast" && ks.size == 2) {
+            val tty = staticTypeOf(ks(0))
+            if (castTargetIsPointer(ks(0), tty)) None else cLeafIntType(tty)
+          }
+          else if (arith.contains(mfn) && ks.size == 2)
+            for (a <- rec(ks(0)); b <- rec(ks(1))) yield cUsualArith(a, b)
+          else if ((mfn == "<operator>.shiftLeft" || mfn == "<operator>.arithmeticShiftRight") && ks.size == 2)
+            rec(ks(0)).map(cPromote)
+          else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus" || mfn == "<operator>.not") && ks.size == 1)
+            rec(ks(0)).map(cPromote)
+          else if (boolish.contains(mfn)) Some((true, 32))
+          else if (mfn == "<operator>.conditional" && ks.size == 3)
+            for (a <- rec(ks(1)); b <- rec(ks(2))) yield cUsualArith(a, b)
+          else if (fieldOps.contains(mfn))
+            asField(c) match {
+              case Some((_, f)) if !bitfieldMemberNames.contains(f) => cLeafIntType(staticTypeOf(c))
+              case _ => None
+            }
+          else if (indexOps.contains(mfn) || mfn == "<operator>.indirection")
+            cLeafIntType(staticTypeOf(c))
+          // An ordinary call: its declared return type, as Joern recorded it.
+          else if (!mfn.startsWith("<operator>")) cLeafIntType(c.typeFullName)
+          else None
+        case _ => None
+      }
     }
 
   /** One element of a brace initializer, classified.
@@ -5873,6 +7070,17 @@ import scala.annotation.tailrec
     *     identical "cast is a transparent pass-through" reasoning
     *     `castOperandIsPointerShaped`'s own doc comment already argues for,
     *     applied to THIS narrower question instead of the general one). */
+  /** Is `&operand` translated as `boxedScalarAddr` -- `operand` a bare boxed scalar
+    * local/parameter (`boxedLocals`, via the same `boxableName` predicate
+    * `callExpr`'s `<operator>.addressOf` case uses), and not a boxed array/struct
+    * (those have their own `irefIndex`/`irefField` shapes)? Such an `&n` evaluates to
+    * `Val.iref r (.fld "v")` -- an interior pointer -- so it is an `isIrefExpr` shape,
+    * and a pointer local assigned only such values (and other interior pointers) is
+    * `ptrIrefNames`-tracked. */
+  def isBoxedScalarAddrOperand(operand: AstNode): Boolean =
+    boxableName(operand).exists(nm => boxedLocals.contains(nm) &&
+                                      !boxedArrays.contains(nm) && !boxedStructs.contains(nm))
+
   def isIrefExpr(n: AstNode): Boolean = n match {
     case i: Identifier        => ptrIrefNames.contains(localName(i.name))
     case p: MethodParameterIn => ptrIrefNames.contains(localName(p.name))
@@ -5883,7 +7091,12 @@ import scala.annotation.tailrec
           boxedStructFieldOperand(operand).isDefined ||
           pointerStructFieldOperand(operand).isDefined ||
           boxedStructArrayIndexOperand(operand).isDefined ||
-          pointerStructArrayIndexOperand(operand).isDefined
+          pointerStructArrayIndexOperand(operand).isDefined ||
+          // `011-address-of-local-arrays`: `&p[i]`, `p` itself `isIrefExpr` --
+          // translated to `p + i` (`irefElementAddrOf`), which is exactly the
+          // `+` case just below, so it yields a `Val.iref` for the same reason.
+          irefElementAddrOperand(operand).isDefined ||
+          isBoxedScalarAddrOperand(operand)
         case _ => false
       }
     case c: Call if c.methodFullName == "<operator>.addition" =>
@@ -5905,11 +7118,270 @@ import scala.annotation.tailrec
       }
     case c: Call if c.methodFullName == "<operator>.cast" =>
       kidsOf(c) match {
-        case List(_, operand) => isIrefExpr(operand)
+        case List(_, operand) => isIrefExpr(operand) && irefCastPreservesPointee(c, operand)
         case _ => false
       }
     case _ => false
   }
+
+  /** `011-address-of-local-arrays`: `&p[i]`, `p` an expression PROVABLY holding an
+    * interior pointer VALUE (`isIrefExpr`) -- e.g. a `ptrIrefNames` local walking a
+    * boxed array, or a parameter `closedIrefOutParam` verified always receives one.
+    *
+    * Faithful because C defines `&p[i]` as `&*(p + i)`, and `&*E` as exactly `E`
+    * (C11 6.5.3.2p3: "the result is as if both were omitted") -- so `&p[i]` IS the
+    * pointer value `p + i`, with no read of `p[i]` at all. `applyBinop`'s
+    * `Val.iref + Val.int` arm (Story 5) already implements exactly that arithmetic,
+    * and it is the SAME arm `p[i]`'s own read translation (`derefIref (p + i)`, the
+    * `isIrefExpr` case of `indexOps` in `callExpr`) already relies on -- this is that
+    * translation minus its outer `derefIref`, i.e. the `&` undoing the `*`, and
+    * nothing new. The two guards are the same safeguards that read path and
+    * `isIrefExpr`'s own `+` case rely on, made explicit:
+    *   - the INDEX must not be pointer-typed: C also accepts the commuted spelling
+    *     `i[p]`, where `asIndex`'s own positional receiver would be the integer;
+    *     refusing a pointer-typed index keeps the receiver/offset roles unambiguous.
+    *   - the RECEIVER must not itself be a top-level CAST: `&((u32*)p)[1]` advances
+    *     by `sizeof(u32)` bytes of `p`'s underlying object, whereas `Sel.idx`
+    *     arithmetic counts ELEMENTS of whatever the box was allocated as -- the
+    *     two only coincide when the element type is unchanged, which a cast is
+    *     exactly the evidence against. Such a site keeps its existing hole. */
+  def irefElementAddrOperand(operand: AstNode): Option[(AstNode, AstNode)] =
+    asIndex(operand).filter { case (recv, idx) =>
+      val recvIsCast = recv match {
+        case rc: Call => rc.methodFullName == "<operator>.cast"
+        case _ => false
+      }
+      val elemTy = staticTypeOf(operand)
+      !recvIsCast && !isPointerType(staticTypeOf(idx)) && isIrefExpr(recv) &&
+      // Never a site `callExpr`'s `&` case already answers differently: a
+      // byte-cursor receiver (`cursorAddrOf`, `Val.str` model) or an aggregate
+      // ELEMENT (`aggregate` identity), so `isIrefExpr`'s claim below always
+      // agrees with the translation `expr` actually produces for the same node.
+      !rawLocalOrParamName(recv).map(localName).exists(strCursorParams.contains) &&
+      !isClassType(elemTy) && addrKind(elemTy) != "object"
+    }
+  def irefElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    irefElementAddrOperand(operand).map { case (recv, idx) =>
+      ujson.Obj("k" -> "binop", "op" -> "+", "a" -> expr(recv), "b" -> expr(idx))
+    }
+
+  /** `011-address-of-local-arrays`: `&"text"[k]` -- the address of a character
+    * inside a STRING LITERAL (SQLite's own `&LEGACY_TEMP_SCHEMA_TABLE[7]` /
+    * `&PREFERRED_SCHEMA_TABLE[7]`, a macro expanding to a literal, used to name the
+    * `temp_schema` suffix without a second literal).
+    *
+    * A C string literal already translates to `Val.str` (its text), which is this
+    * exporter's established model of a `char*` pointing at the START of that text;
+    * a `char*` pointing partway into a string is, under the SAME model,
+    * `Expr.strFrom s k` -- the suffix from position `k` -- exactly the value
+    * `cursorAddrOf` (`&z[i]` on a byte cursor, the case just above in `callExpr`)
+    * already produces for the identical `&`-of-an-element-of-a-string shape. A
+    * literal is immutable (writing through it is UB), so no aliasing a `Val.str`
+    * copy could miss arises. Two guards, both about the literal TEXT matching the
+    * program's bytes position-for-position:
+    *   - no backslash in the unquoted text: `expr`'s own `Literal` case emits the
+    *     source spelling WITHOUT escape processing (`"a\tb"` stays four
+    *     characters), so an escape before position `k` would shift every later
+    *     position -- refused rather than decoded here;
+    *   - no embedded `"`: adjacent-literal concatenation (`"ab" "cd"`) would put
+    *     the quote characters themselves into the text.
+    * Out-of-range `k` needs no guard of its own: `strFrom` holes on a negative start
+    * and yields `""` past the end, and `k == length` (the terminator's address) is
+    * genuinely `""` in C. The index must not be pointer-typed (`k["text"]`), the
+    * same role-disambiguation guard as `irefElementAddrOf`. */
+  def literalElementAddrOf(operand: AstNode): Option[ujson.Obj] =
+    asIndex(operand).flatMap { case (recv, idx) =>
+      unwrapMacro(recv) match {
+        case l: Literal if cLikeFile && !isPointerType(staticTypeOf(idx)) =>
+          val t = l.code.trim
+          val body = if (t.length >= 2 && t.head == '"' && t.last == '"') Some(t.drop(1).dropRight(1)) else None
+          body.filter(b => !b.contains('\\') && !b.contains('"')).map { _ =>
+            ujson.Obj("k" -> "strFrom", "a" -> expr(recv), "b" -> expr(idx))
+          }
+        case i: Identifier if cLikeFile && !isPointerType(staticTypeOf(idx)) && constLiteralCharArray(i) =>
+          Some(ujson.Obj("k" -> "strFrom", "a" -> expr(recv), "b" -> expr(idx)))
+        case _ => None
+      }
+    }
+
+  /** `011-address-of-local-arrays`: is `i` a LOCAL `const char x[] = "text";` --
+    * the named-array spelling of the string literal `literalElementAddrOf` covers
+    * (SQLite's `getSafetyLevel`: `static const char zText[] = "onoffalse..."`,
+    * then `&zText[iOffset[i]]`)? Such an array is not boxed (no size in its type),
+    * and its one declaration already binds the name to exactly the literal's
+    * `Val.str` (`assign zText (str ...)`, the ordinary assignment path). It stays
+    * that value for the whole activation because it is `const` (never written)
+    * and an array (never reassigned) -- both checked, not assumed: the declared
+    * text carries `const` and no `*`, the type is a `char` array, the name is not
+    * boxed, and EVERY assignment to the name in the method is that single
+    * declaration from an escape-free plain literal (same text guards as the
+    * literal case). `static` makes no difference for a `const` object. */
+  def constLiteralCharArray(i: Identifier): Boolean = {
+    val nm = localName(i.name)
+    val ty = staticTypeOf(i)
+    val decls = i.method.local.l.filter(l => localName(l.name) == nm)
+    val assigns = i.method.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+      .filter(a => kidsOf(a).headOption.exists {
+        case t: Identifier => localName(t.name) == nm
+        case _ => false
+      })
+      // The storage half of a sized declarator (`<operator>.alloc`) is not a write
+      // of a value; it translates on its own (and holes on its own if unmodelled).
+      .filterNot(a => kidsOf(a).lift(1).exists {
+        case c: Call => c.methodFullName == "<operator>.alloc"
+        case _ => false
+      })
+    isCStringType(ty) && ty.contains("[") && !boxedArrays.contains(nm) && !boxedLocals.contains(nm) &&
+    decls.size == 1 && {
+      val code = decls.head.code
+      code.split("[\\s\\[]+").contains("const") && !code.contains("*")
+    } &&
+    assigns.size == 1 && (kidsOf(assigns.head) match {
+      case List(_, l: Literal) =>
+        val t = l.code.trim
+        t.length >= 2 && t.head == '"' && t.last == '"' && {
+          val b = t.drop(1).dropRight(1)
+          !b.contains('\\') && !b.contains('"')
+        }
+      case _ => false
+    })
+  }
+
+  /** `011-address-of-local-arrays`: a more precise label for two `&`-residue shapes
+    * that are not array/field ADDRESSING at all, only spelled like it, so their
+    * generic `op:addressOf:element:*`/`op:addressOf:field:*` label pointed at the
+    * wrong remedy:
+    *   - `&((T*)0)[k]` -- SQLite's `SQLITE_INT_TO_PTR(k)`: an INTEGER smuggled
+    *     through a pointer-typed slot (thread results, `pUserData`). It is an
+    *     int-to-pointer conversion; `op:addressOf:element:int-to-pointer`.
+    *   - `&((T*)0)->f` -- the classic hand-rolled `offsetof(T, f)`: its value is a
+    *     struct-LAYOUT byte offset, which Core (no layout model) cannot know;
+    *     `op:addressOf:field:offsetof`.
+    * Both stay holes -- only the label changes. */
+  def addressOfResidueLabel(operand: AstNode): Option[String] = {
+    def isNullPtrCast(n: AstNode): Boolean = unwrapMacro(n) match {
+      case c: Call if c.methodFullName == "<operator>.cast" =>
+        kidsOf(c) match {
+          case List(_, lit: Literal) => isZeroLiteral(lit.code)
+          case List(_, inner)        => isNullPtrCast(inner)
+          case _ => false
+        }
+      case _ => false
+    }
+    asIndex(operand) match {
+      case Some((recv, _)) if isNullPtrCast(recv) => Some("op:addressOf:element:int-to-pointer")
+      case _ => asField(operand) match {
+        case Some((recv, _)) if isNullPtrCast(recv) => Some("op:addressOf:field:offsetof")
+        case _ => None
+      }
+    }
+  }
+
+  /** A pointer cast is transparent for an interior pointer only if it does not change
+    * the pointee type (modulo cv-qualifiers and scalar typedef aliases): a `Val.iref`
+    * names ONE element/field, and `derefIref` reads that element's `Val` unchanged.
+    * `*(sqlite3_uint64*)&a` with `a` an `sqlite3_int64` (libcmpp.c/series.c `add64`,
+    * found on the full corpus once `&a` became an interior pointer) reinterprets the
+    * bits as unsigned, and `*(u32*)&aByte[i]` reads four elements, not one -- reading
+    * the stored value unchanged is a wrong answer for both, so such a cast is not an
+    * interior-pointer expression and its dereference keeps its hole. A cast whose types
+    * cannot be recovered is treated the same way. */
+  def irefCastPreservesPointee(cast: AstNode, operand: AstNode): Boolean =
+    castPreservesPointee(cast, operand)
+
+  /** Pointer-arith family: `isIrefExpr`, plus a bare boxed-array name read as a
+    * value. `expr()`'s own `Identifier` case already renders such a name as
+    * `irefIndex a 0` -- C's array-to-pointer decay (see that case's comment) -- so
+    * its VALUE is a `Val.iref` exactly as surely as a tracked name's is, and its
+    * element type is the array's own declared element type. Kept local to the
+    * pointer-arithmetic/comparison sites in `callExpr` rather than folded into
+    * `isIrefExpr` itself, whose other consumers (dereference, write-through,
+    * cross-function tracking) are not this family's to widen. */
+  def isIrefOperand(n: AstNode): Boolean = isIrefExpr(n) || (n match {
+    case i: Identifier => boxedArrays.contains(localName(i.name))
+    case _ => false
+  })
+
+  /** Pointer-arith family: a C null-pointer constant -- a null literal
+    * (`isNullLiteral`: `NULL`, `nullptr`, a bare `0`), or one cast to a pointer type
+    * (`(void*)0`, what `NULL` expands to, and `(T*)0`). */
+  def isNullPointerConst(n: AstNode): Boolean = isNullLiteral(n) || (n match {
+    case c: Call if c.methodFullName == "<operator>.cast" =>
+      kidsOf(c) match {
+        case List(tref, operand) => isNullLiteral(operand) && castTargetIsPointer(tref, staticTypeOf(tref))
+        case _ => false
+      }
+    case _ => false
+  })
+
+  /** A bare integer-zero literal (`0`, `0x0`, `0L`) -- the one null spelling that is
+    * ALSO an ordinary integer, and so needs pointer evidence from the other side. */
+  def isZeroLiteralNode(n: AstNode): Boolean = n match {
+    case l: Literal => isZeroLiteral(l.code.trim)
+    case _ => false
+  }
+
+  /** Pointer-arith family: `char*`/`unsigned char*`/`char[N]` -- ONE level of
+    * indirection to a byte, unlike `isCString`, whose pattern also admits `char**`. */
+  def isSingleCharPointerType(ty: String): Boolean =
+    bareType(ty).matches("""(signed|unsigned)?char(\*|\[\d*\])""")
+  def isSingleCharPointer(n: AstNode): Boolean = isSingleCharPointerType(staticTypeOf(n))
+
+  /** Pointer-arith family: static evidence that `n` is a POINTER (so that a `0`
+    * compared against it is the null-pointer constant, not the integer zero). */
+  def hasPointerEvidence(n: AstNode): Boolean =
+    isPointerType(staticTypeOf(n)) || isCString(n) || isIrefOperand(n)
+
+  /** Pointer-arith family: the null test `v == NULL`, as ONE Core expression that is
+    * right for every representation a null pointer has in this exporter's output.
+    *
+    * There are two. `NULL`/`nullptr`/`(T*)0` render as `Val.unit` (the literal and
+    * cast cases in `expr`), but a bare `0` renders as `Val.int 0` (`intLit`), and C
+    * code writes both: `p = 0; ... if (p == NULL)`, `return 0;` from a pointer-returning
+    * function, `if (p == 0)` on a pointer that came from `(T*)0`. A plain
+    * `binop "==" v null` answers `Val.beq`, which is `false` for `.unit` vs `.int 0`
+    * -- so `p == 0` on a `NULL`-valued `p`, and `p != NULL` (which is also how the
+    * CPG spells a bare `if (p)`) on a `0`-valued one, were both silently wrong.
+    *
+    * `v in (unit, 0)` (`Expr.inOp` over a two-element `tupleE`) evaluates `v` ONCE
+    * and answers `Val.beq v .unit || Val.beq v (.int 0)` (`valIn`'s tuple case): true
+    * for either null spelling, false for every non-null pointer value Core has --
+    * `.ref`, `.iref`, `.fn`, and any `.str` INCLUDING `""` (a pointer to an empty
+    * string is not null; `Val.truthy ""` is false, which is why truthiness cannot be
+    * used here). A pointer never holds any other `.int`: integer-to-pointer casts are
+    * holes (`op:cast:pointer:int-to-pointer`). `neg` gives `!=`. */
+  /** Pointer-arith family: `c` is a null test on a pointer -- `p == NULL`,
+    * `p != 0`, `(T*)0 == p`, and the `p != NULL` the CPG writes for a bare `if (p)`
+    * -- returning the non-null operand and whether it is `!=`. A bare `0` needs
+    * pointer evidence from the other side (so `n == 0` on an integer is never
+    * touched); `NULL`/`nullptr`/`(T*)0` are their own evidence. Shared by `callExpr`
+    * and `exprV`, which translate `==`/`!=` independently and must agree. */
+  def pointerNullTest(c: Call): Option[(AstNode, Boolean)] = {
+    val kids = kidsOf(c)
+    val mfn  = c.methodFullName
+    if (!cLikeFile || kids.size != 2 ||
+        !(mfn == "<operator>.equals" || mfn == "<operator>.notEquals") ||
+        kids.count(isNullPointerConst) != 1) None
+    else {
+      val (nul, other) = if (isNullPointerConst(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+      if (hasPointerEvidence(other) || !isZeroLiteralNode(nul)) Some((other, mfn == "<operator>.notEquals"))
+      else None
+    }
+  }
+
+  /** Pointer-arith family: `!p`, `p` with pointer evidence. C defines `!E` as
+    * `(0 == E)` (C11 6.5.3.3p5), so on a pointer it is a null test -- and the generic
+    * `unop "!"` is wrong for one: it answers from `Val.truthy`, under which a
+    * `Val.str ""` (a non-null pointer to an empty string) is falsy, so `!p` came out
+    * `true`. It also inherits the `.unit`/`.int 0` split `nullTestExpr` handles. */
+  def isPointerNot(c: Call): Boolean =
+    cLikeFile && c.methodFullName == "<operator>.logicalNot" && kidsOf(c).size == 1 &&
+    hasPointerEvidence(kidsOf(c).head)
+
+  def nullTestExpr(v: ujson.Obj, neg: Boolean): ujson.Obj =
+    ujson.Obj("k" -> "inOp", "neg" -> neg, "a" -> v,
+              "b" -> ujson.Obj("k" -> "tupleE",
+                               "items" -> ujson.Arr(ujson.Obj("k" -> "unit"), intLit(0))))
 
   def callExpr(c: Call): ujson.Obj = {
     val kids = kidsOf(c)
@@ -5936,7 +7408,20 @@ import scala.annotation.tailrec
     // mechanism). Checked BEFORE the general `cStringUnsafe` guard just below,
     // which would otherwise hole this unconditionally (both operands' types
     // still look like "a char* plus an int" to that check).
-    if (cLikeFile && (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
+    //
+    // Pointer-arith family: checked FIRST, a null test on a pointer --
+    // `p == NULL`/`p != 0`/`(T*)0 == p`, and the `p != NULL` the CPG writes for a
+    // bare `if (p)` -- becomes `nullTestExpr`, which is right for both of the
+    // null representations this exporter produces (see its doc comment); a plain
+    // `==` was wrong whenever the two sides used different ones. Needs pointer
+    // evidence for a bare `0` (so `n == 0` on an integer is untouched); a
+    // `NULL`/`nullptr`/`(T*)0` operand is its own evidence. Only the non-null
+    // side is evaluated, once, so no purity condition is needed.
+    if (pointerNullTest(c).isDefined) {
+      val (other, neg) = pointerNullTest(c).get
+      nullTestExpr(expr(other), neg)
+    }
+    else if (cLikeFile && (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
              kids.size == 2 &&
              rawLocalOrParamName(kids(0)).map(localName).exists(strCursorParams.contains) &&
              !isCString(kids(1))) {
@@ -5985,7 +7470,10 @@ import scala.annotation.tailrec
              Set("<operator>.subtraction", "<operator>.lessThan", "<operator>.lessEqualsThan",
                  "<operator>.greaterThan", "<operator>.greaterEqualsThan",
                  "<operator>.equals", "<operator>.notEquals").contains(mfn) &&
-             isIrefExpr(kids(0)) && isIrefExpr(kids(1)))
+             // Pointer-arith family: `isIrefOperand`, so a decayed boxed-array
+             // name (`p - buf`, `p == buf`, `p < aBuf`) counts too -- `expr()`
+             // renders it as `irefIndex buf 0`, a `Val.iref` like any other.
+             isIrefOperand(kids(0)) && isIrefOperand(kids(1)))
       ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
     // `010-reach-90pct-hole-free` US4: `p < end` / `p == q` / ... -- TWO tracked
     // byte cursors, compared. Sound exactly when both provably measure offsets
@@ -6004,7 +7492,11 @@ import scala.annotation.tailrec
                val nmA = rawLocalOrParamName(kids(0)).map(localName).get
                val nmB = rawLocalOrParamName(kids(1)).map(localName).get
                (strCursorBase.get(nmA), strCursorBase.get(nmB)) match {
-                 case (Some(baseA), Some(baseB)) => baseA == baseB
+                 // Pointer-arith family: the shared root must also be one whose
+                 // binding cannot change between the two cursors' seedings --
+                 // see `stableCursorRoots`.
+                 case (Some(baseA), Some(baseB)) =>
+                   baseA == baseB && stableCursorRoots.contains(baseA)
                  case _ => false
                }
              }) {
@@ -6013,6 +7505,62 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "binop", "op" -> binops(mfn),
                 "a" -> ujson.Obj("k" -> "name", "v" -> (nmA + "$off")),
                 "b" -> ujson.Obj("k" -> "name", "v" -> (nmB + "$off")))
+    }
+    // Pointer-arith family: `p + n` / `n + p` / `p - n` on a `char*`, the pointer
+    // operand `isIrefExpr` (PROVABLY a `Val.iref` -- a tracked name, an interior
+    // address-of, or arithmetic/ternary/cast over one) and the other operand NOT
+    // pointer-shaped. `isIrefExpr` itself already classifies exactly this
+    // expression as an interior pointer (its `<operator>.addition`/`.subtraction`
+    // cases), and `incrStmt` already emits `p = p + 1` for the same names; only
+    // the `char*` spelling of the inline form was still refused, by the guard
+    // just below, which predates `Val.iref` and exists because a `char*` used to
+    // be a `Val.str` whose `+` concatenates. Here the left value is a `Val.iref`,
+    // whose `applyBinop` arm is element-indexed (a `char` element is one byte,
+    // so no `sizeof` scaling is being skipped), and the right one an integer:
+    // `.iref + .int` is the only arm that can answer, `.fld` selectors answer
+    // `iref:arith-on-field`, and anything unexpected (`.str + .int`) has no arm
+    // and is a dynamic hole -- never a concatenation, never a guess. `n - p` is
+    // not pointer arithmetic in C and is not admitted.
+    else if (cLikeFile && kids.size == 2 &&
+             (mfn == "<operator>.addition" || mfn == "<operator>.subtraction") &&
+             ((isIrefExpr(kids(0)) && !isPointerType(staticTypeOf(kids(1))) && !isCString(kids(1))) ||
+              (mfn == "<operator>.addition" && isIrefExpr(kids(1)) &&
+               !isPointerType(staticTypeOf(kids(0))) && !isCString(kids(0)))))
+      ujson.Obj("k" -> "binop", "op" -> binops(mfn), "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+    // Pointer-arith family: `p + n` / `n + p` on a single-level `char*` (or `char[]`)
+    // that is NEITHER a tracked byte cursor (handled above, via `$off`) NOR an
+    // interior pointer (handled just above, via `Val.iref` arithmetic): `Expr.strFrom
+    // (expr p) n`, the string from `n` bytes past `p` onward.
+    //
+    // Faithful because of what a `Val.str` in a `char*` position already MEANS in this
+    // exporter's output: the bytes at that address up to the terminator. That is the
+    // convention every string literal, every `char[]` global, and every tracked
+    // cursor's bare read (`strFrom z z$off`, `expr`'s `Identifier` case) already
+    // relies on, and `p + n` names exactly the bytes from `n` further on -- the
+    // cursor mechanism's own `z + n` translation, minus the `$off` a non-cursor does
+    // not have (its value IS its position). Every way the result can be used is either
+    // content-only (a callee reading it, `strByte`), or identity-sensitive and then
+    // already a dynamic hole under `.cLike` (`.str`/`.str` `==`, `<`, `-`:
+    // `str:pointer-*-not-modelled`, `binop:-`), or a null test, where a `Val.str` --
+    // `""` included -- is correctly non-null (`nullTestExpr`). A `Val.str` is
+    // immutable, so a stale snapshot cannot be observed either: nothing in Core can
+    // write into one (`setIndex`/`setDerefIref` on a `.str` are holes).
+    //
+    // If `p` is NOT a `Val.str` at run time (an untracked `Val.iref` buffer, `.unit`
+    // for NULL), `strFrom` answers `strFrom:non-string-receiver` -- a hole, never a
+    // guess. A start past the end is `""` (`strFrom`'s documented clamp): for the
+    // one-past-the-end pointer that is exactly right, and anything further is
+    // undefined behaviour in C. Subtraction (`p - n`) is NOT admitted: a `Val.str`
+    // has no bytes before its own start, so it keeps its static hole rather than
+    // becoming a guaranteed dynamic one. Restricted to a SINGLE-level `char` pointee
+    // (`char**` + n is an array-of-pointers step, not a byte step).
+    else if (cLikeFile && kids.size == 2 && mfn == "<operator>.addition" && {
+               val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+               isSingleCharPointer(p) && !isIrefOperand(p) &&
+               !isPointerType(staticTypeOf(n)) && !isCString(n)
+             }) {
+      val (p, n) = if (isSingleCharPointer(kids(0))) (kids(0), kids(1)) else (kids(1), kids(0))
+      ujson.Obj("k" -> "strFrom", "a" -> expr(p), "b" -> expr(n))
     }
     else if (cLikeFile && kids.size == 2 && kids.exists(isCString) &&
         cStringUnsafe.contains(mfn) && !isNullCheck)
@@ -6023,10 +7571,27 @@ import scala.annotation.tailrec
       shiftRightOp(kids(0)) match {
         case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
-        case None     => hole("op:shiftRight:unknown-signedness")
+        case None     => hole(shiftRightHoleLabel(kids(0)))
       }
+    // Pointer-arith family: `!p` on a pointer -- see `isPointerNot`.
+    else if (isPointerNot(c))
+      nullTestExpr(expr(kids(0)), neg = false)
     else if (unops.contains(mfn) && kids.size == 1)
       ujson.Obj("k" -> "unop", "op" -> unops(mfn), "a" -> expr(kids(0)))
+    // `011-control-flow-holes`: unary `+e` (`<operator>.plus`, one child) is `e`.
+    // C11 6.5.3.3p1/p2: the operand must have ARITHMETIC type (never a pointer), and
+    // the result is "the value of its (promoted) operand" -- integer promotion is
+    // value-preserving by definition (6.3.1.1p2), and a floating operand is not
+    // promoted at all, so `+0.0` is `0.0` and `+(-0.0)` stays `-0.0`. Nothing is
+    // evaluated beyond `e` itself, exactly once, so `expr(e)` is the translation, not
+    // an approximation. Measured on the amalgamation: every one of the sites is a
+    // literal sign spelling (`return +1;`, `r<0 ? -0.5 : +0.5`), which is why this
+    // used to be an `op:plus` hole for a value with no semantics of its own. Gated to
+    // C/C++ files (`cppFile`): Python/JS unary `+` performs a numeric CONVERSION
+    // (`+"3"` is 3), which is not the identity and keeps the generic hole. (In C++ an
+    // overloaded `operator+` is a named call, never `<operator>.plus`.)
+    else if (mfn == "<operator>.plus" && kids.size == 1 && cppFile)
+      expr(kids(0))
     // `009-reduce-remaining-holes-4`: `z[i]`, `z` a tracked byte cursor
     // (`strCursorParams`) -- C's own `z[i]` is exactly `*(z+i)`, so this reads the
     // byte at `z`'s CURRENT offset plus `i`, not literal position `i` from the
@@ -6199,6 +7764,12 @@ import scala.annotation.tailrec
       // represent them as.
       kids(1) match {
         case mr: MethodRef => expr(kids(1))
+        // `casts-sizeof`: a function DEFINED in this program, named by a bare
+        // identifier Joern did not bind to a `METHOD_REF`, cast to any pointer type --
+        // the same value the `MethodRef` case just above produces for it. See
+        // `definedFunctionNamedBy` for the three conditions that rule out a variable.
+        case i: Identifier if castTargetIsPointer(kids(0), tty) && definedFunctionNamedBy(i).isDefined =>
+          fnValue(definedFunctionNamedBy(i).get)
         // `010-reach-90pct-hole-free`: an EXTERNAL function referenced by BARE
         // NAME, cast to a known function-pointer typedef -- confirmed live,
         // `os_unix.c`'s own `aSyscall[]` table, `(sqlite3_syscall_ptr)close`
@@ -6266,6 +7837,17 @@ import scala.annotation.tailrec
               // this one is closed by naming a data model, not by a better frontend.
               else if (modelDependentNames.contains(bareType(tty)))
                 hole("op:cast:model-dependent")
+              // `casts-sizeof`: the two largest `op:cast:scalar` shapes on SQLite are
+              // not one problem, so they no longer share one label. A cast to a
+              // FLOATING type needs a float `Val` (blocked on wiring `Float.lean` in,
+              // exactly like `lit:float`); a cast to plain `char` needs a decision
+              // `dataModel` does not make -- `char` is signed on x86-64 System V and
+              // unsigned on AArch64 Linux, both LP64 -- so `(char)200` has no single
+              // answer to give.
+              else if (Set("float", "double", "longdouble").contains(bareType(tty)))
+                hole("op:cast:float")
+              else if (bareType(tty) == "char")
+                hole("op:cast:char-signedness")
               else hole("op:cast:" + addrKind(tty))
           }
       }
@@ -6370,6 +7952,15 @@ import scala.annotation.tailrec
       // already cover the common bare-name case.
       lazy val chainArrIref = chainedStructArrayIndexOperand(kids(0))
       lazy val chainFieldIref = chainedStructFieldOperand(kids(0))
+      // `011-address-of-local-arrays`: two more `&X[i]` shapes that are, like
+      // `cursorAddrOf` above, nothing but C's own `&X[i] == X + i` identity applied
+      // to a receiver whose value Core ALREADY represents -- see
+      // `irefElementAddrOf`/`literalElementAddrOf`'s own doc comments for the full
+      // argument. Both are tried only AFTER every pre-existing case (lazily, so
+      // they cost nothing where an earlier case already matched), so no previously
+      // translated `&` site can change shape.
+      lazy val irefElemAddr = irefElementAddrOf(kids(0))
+      lazy val literalElemAddr = literalElementAddrOf(kids(0))
       if (cursorAddrOf.isDefined) {
         cursorAddrOf.get
       } else if (arrIref.isDefined) {
@@ -6394,12 +7985,19 @@ import scala.annotation.tailrec
         ujson.Obj("k" -> "irefField", "a" -> baseJson, "f" -> f)
       }
       else if (aggregate) expr(kids(0))
-      else if (boxed.isDefined) boxRef(boxed.get)
+      // `&n`, `n` a boxed scalar local/parameter: the INTERIOR pointer to the box's
+      // one field (`Val.iref r (.fld "v")`), not the box's bare `Val.ref`. See
+      // `boxedScalarAddr`'s doc comment: this is what makes a scalar out-parameter
+      // and an `&s->f`/`&a[i]` out-parameter the SAME runtime shape, so a callee's
+      // `*p` is `derefIref` for both.
+      else if (boxed.isDefined) boxedScalarAddr(boxed.get)
       else if (fnIdentity) expr(kids(0))
+      else if (irefElemAddr.isDefined) irefElemAddr.get
+      else if (literalElemAddr.isDefined) literalElemAddr.get
       else {
         val k = if (kind == "unknown-type" && nm.exists(ptrReceivers.contains)) "pointer"
                 else kind
-        hole("op:addressOf:" + addrShape(kids(0)) + ":" + k)
+        hole(addressOfResidueLabel(kids(0)).getOrElse("op:addressOf:" + addrShape(kids(0)) + ":" + k))
       }
     }
     // `*p`. The dual of the above, and the same split — but the *identity* half is
@@ -6443,8 +8041,7 @@ import scala.annotation.tailrec
                   "b" -> ujson.Obj("k" -> "name", "v" -> (cnm + "$off")))
       }
       else {
-        val target = nm.flatMap(ptrAliases.get) orElse nm.filter(closedOutParams.contains)
-        target.map(boxField).getOrElse(hole("op:indirection:" + addrKind(staticTypeOf(kids(0)))))
+        nm.filter(n => ptrAliases.contains(n) || closedOutParams.contains(n)).map(aliasOrOutParamRead).getOrElse(hole("op:indirection:" + addrKind(staticTypeOf(kids(0)))))
       }
     }
     // `++x` / `x++` in **expression** position. In statement position these are
@@ -6612,11 +8209,45 @@ import scala.annotation.tailrec
       // tries the aggregate layout resolver above; every other shape is unchanged
       // from `005`, and an aggregate whose layout does not resolve falls through
       // to the exact same `op:sizeOf:object` hole below it always has.
-      sizeofBytes(ty).orElse(aggregateSizeofBytes(ty)) match {
+      // `casts-sizeof`: `memberSizeAlign` (not `aggregateSizeofBytes` alone) so an
+      // ARRAY of aggregates is sized too -- `sizeof(aSub)` for `struct Sublist
+      // aSub[13]` is 13 * sizeof(struct Sublist) by definition (C11 6.5.3.4p7: no
+      // padding between array elements beyond each element's own), which the
+      // scalar-only `sizeofBytes` array case could never reach -- and `char *const`
+      // (a const-qualified POINTER, the element type of `static char *const az[]`)
+      // is normalised to `char*` before `isPointerType` looks for a trailing `*`.
+      //
+      // `casts-sizeof`: a PARAMETER declared with array syntax (`u8 aBuf[16]`) has
+      // pointer type (C11 6.7.6.3p7), so its `sizeof` is the pointer width, never
+      // the array's. And a LOCAL array whose bound is a macro is sized against this
+      // method's own file's `#define`s, the table `boxedArrays` already trusts for
+      // exactly these locals.
+      val declNode = operand match {
+        case i: Identifier => i._refOut.l.headOption
+        case _             => None
+      }
+      val arrayParam = declNode.exists(_.isInstanceOf[MethodParameterIn]) && bareType(ty).contains("[")
+      val localFile = if (declNode.exists(_.isInstanceOf[Local])) Some(currentFile) else None
+      (if (arrayParam) pointerSizeofBytes
+       else sizeofBytes(ty).orElse(sizeofBytes(sizeofNormType(ty)))
+         .orElse(memberSizeAlign(ty, localFile).map(_._1))
+         .orElse(sizeofOperandFromDecl(operand))
+         .orElse(unsizedArraySize(operand, scala.util.Try(c.method).toOption))) match {
         case Some(n) => intLit(n)
         case None =>
           if (modelDependentNames.contains(bareType(ty))) hole("op:sizeOf:model-dependent")
-          else hole("op:sizeOf:" + addrKind(ty))
+          // `casts-sizeof`: an ARRAY whose bound could not be determined (a `[]`
+          // sized by an initializer this could not count, or a bound expression it
+          // could not evaluate). `addrKind` would call it `pointer`, which it is not.
+          // An array with literal bounds is labelled by its element type instead.
+          else {
+            val literalDims = """(\[\d+\])+$""".r
+            val t = bareType(ty)
+            val elem = literalDims.replaceFirstIn(t, "")
+            if (elem.contains("[")) hole("op:sizeOf:array-bound")
+            else if (elem != t) hole("op:sizeOf:" + addrKind(elem))
+            else hole("op:sizeOf:" + addrKind(ty))
+          }
       }
     }
     else if (mfn.startsWith("<operator>"))
@@ -6933,9 +8564,12 @@ import scala.annotation.tailrec
     * itself evaluating `true`. */
   def outsideLoopScope[A](f: => A): A = {
     val savedBreak = gotoAsBreak
+    val savedRestart = gotoAsRestart
     gotoAsBreak    = None
+    gotoAsRestart  = None
     val r = f
     gotoAsBreak   = savedBreak
+    gotoAsRestart = savedRestart
     r
   }
 
@@ -6998,30 +8632,139 @@ import scala.annotation.tailrec
     if (n.isEmpty || n.contains("<") || n.contains("(")) "unnamed-operator" else n
   }
 
-  def pushDoTest(v: ujson.Value, cond: ujson.Value): ujson.Value = v match {
+  def pushDoTest(v: ujson.Value, cond: ujson.Value,
+                 prelude: List[ujson.Obj] = Nil): ujson.Value = v match {
     case o: ujson.Obj =>
       o.value.get("k").map(_.str) match {
         case Some("cont") =>
-          ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
-                    "e" -> ujson.Obj("k" -> "brk"))
+          seqOf(prelude :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> ujson.Obj("k" -> "cont"),
+                                     "e" -> ujson.Obj("k" -> "brk")))
         case Some("loop") | Some("forIn") => o
         case _ =>
-          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond)) })
+          ujson.Obj.from(o.value.toList.map { case (k, x) => (k, pushDoTest(x, cond, prelude)) })
       }
-    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond)))
+    case a: ujson.Arr => ujson.Arr.from(a.value.toList.map(x => pushDoTest(x, cond, prelude)))
     case other        => other
   }
 
   def forStmt(cs: ControlStructure): ujson.Obj = {
     val ks = kidsOf(cs).filterNot(_.isInstanceOf[Local])
-    if (ks.size != 4) holeS("control:FOR:elided-clause")
-    else outsideLoopScope {
-      val step = stmt(ks(2))
-      val body = pushStep(stmt(ks(3)), step)
-      seqOf(List(stmt(ks(0)),
-                 ujson.Obj("k" -> "loop", "c" -> expr(ks(1)),
-                           "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> step))))
+    val clauses: Option[(Option[AstNode], Option[AstNode], Option[AstNode], AstNode)] =
+      if (ks.size == 4) Some((Some(ks(0)).filterNot(forInitIsBlankBlock(cs, _)), Some(ks(1)), Some(ks(2)), ks(3)))
+      else forClausesByOrder(cs, ks)
+    clauses match {
+      case None => holeS("control:FOR:elided-clause")
+      case Some((initN, condN, stepN, bodyN)) => outsideLoopScope {
+        val step = stepN.map(stmt).getOrElse(skip)
+        val body = pushStep(stmt(bodyN), step)
+        val loopBody = ujson.Obj("k" -> "seq", "a" -> body, "b" -> step)
+        // `011-control-flow-holes`: a controlling expression with a prelude
+        // (`for (; (c = *z) != 0; z++)`) -- same shape and the same argument as
+        // `while`'s own case in `stmt`: `P; if (v) skip else break` at the top of the
+        // body, re-run on every iteration. `continue` is `step; continue` (via
+        // `pushStep`, unchanged), and `Stmt.loop` then re-enters at the top, i.e.
+        // `P` and the test run after the step -- C's order (6.8.5.3). An omitted
+        // condition is "replaced by a nonzero constant" (6.8.5.3p2): `true`.
+        val (pc, cv) = condN match {
+          case None => (Nil, ujson.Obj("k" -> "bool", "v" -> true))
+          case Some(cn) => exprV(cn) match {
+            case (Nil, _) => (Nil, expr(cn))   // no prelude: plain `expr`, byte-identical to before
+            case other    => other
+          }
+        }
+        val theLoop =
+          if (pc.isEmpty) ujson.Obj("k" -> "loop", "c" -> cv, "body" -> loopBody)
+          else ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                         "body" -> seqOf(pc ++ List(
+                           ujson.Obj("k" -> "ifte", "c" -> cv, "t" -> skip, "e" -> ujson.Obj("k" -> "brk")),
+                           loopBody)))
+        seqOf(List(initN.map(stmt).getOrElse(skip), theLoop))
+      }
     }
+  }
+
+  /** `011-control-flow-holes`: a `for` with fewer than four (non-`LOCAL`) children,
+    * resolved clause-by-clause instead of holed as ambiguous.
+    *
+    * The ambiguity `forStmt`'s doc comment names is real for a POSITIONAL reading --
+    * three children could be any three of four clauses -- but the C frontend does not
+    * lose the information: it builds each clause with its fixed ORDER (init 1,
+    * condition 2, step 3, body 4) and simply emits nothing for an omitted one, so the
+    * surviving children's `order` says which clauses they are. (An omitted INIT
+    * shows up as an empty BLOCK at order 1, so in practice only the condition and the
+    * step go missing -- `for (;;)`, `for (j = i+1; ; j++)`.) Two independent
+    * confirmations are required before trusting it:
+    *
+    *  - the orders must be distinct, drawn from 1..4, and include the body (4);
+    *  - the header text itself (`cs.code`, which carries `for (A;B;C)`) must split
+    *    into exactly three top-level `;`-separated clauses whose EMPTINESS matches
+    *    the missing orders one for one -- so a clause that went missing for any
+    *    reason other than being blank in the source (a parse failure) is not
+    *    silently read as omitted.
+    *
+    * Anything else stays `control:FOR:elided-clause`. */
+  def forClausesByOrder(cs: ControlStructure, ks: List[AstNode])
+      : Option[(Option[AstNode], Option[AstNode], Option[AstNode], AstNode)] = {
+    val orders = ks.map(_.order)
+    val byOrder = ks.map(k => k.order -> k).toMap
+    val ordersOk = orders.distinct.size == orders.size && orders.forall(o => o >= 1 && o <= 4) &&
+                   byOrder.contains(4)
+    val headerOk = ordersOk && forHeaderClauses(cs.code).exists { parts =>
+      (1 to 3).forall { k =>
+        val blank = parts(k - 1).isEmpty
+        blank == !byOrder.contains(k) ||
+          // an omitted init that the frontend still materialised as an empty BLOCK
+          (k == 1 && blank && byOrder.get(1).exists {
+            case b: Block => kidsOf(b).isEmpty
+            case _        => false
+          })
+      }
+    }
+    if (!headerOk) None
+    else Some((byOrder.get(1).filterNot(forInitIsBlankBlock(cs, _)), byOrder.get(2), byOrder.get(3), byOrder(4)))
+  }
+
+  /** `011-control-flow-holes`: the three `;`-separated clauses of a `for` header's
+    * source text (`for (A;B;C)` -> `A`,`B`,`C`, comments removed), or `None` if the
+    * text does not parse as exactly that. Tracks nesting and string/char literals so a
+    * `;` inside either is not a separator. */
+  def forHeaderClauses(code: String): Option[List[String]] = {
+    val open = code.indexOf('(')
+    if (!code.trim.startsWith("for") || open < 0) None
+    else {
+      var depth = 0; var i = open; val parts = scala.collection.mutable.ListBuffer.empty[String]
+      val cur = new StringBuilder; var inStr: Char = 0; var done = false
+      while (i < code.length && !done) {
+        val ch = code.charAt(i)
+        if (inStr != 0) {
+          cur.append(ch)
+          if (ch == '\\' && i + 1 < code.length) { cur.append(code.charAt(i + 1)); i += 1 }
+          else if (ch == inStr) inStr = 0
+        } else ch match {
+          case '"' | '\'' => inStr = ch; cur.append(ch)
+          case '(' | '[' | '{' =>
+            depth += 1; if (depth > 1) cur.append(ch)
+          case ')' | ']' | '}' =>
+            depth -= 1
+            if (depth == 0) { parts += cur.toString; done = true } else cur.append(ch)
+          case ';' if depth == 1 => parts += cur.toString; cur.clear()
+          case _ => cur.append(ch)
+        }
+        i += 1
+      }
+      if (done && parts.size == 3) Some(parts.toList.map(_.replaceAll("/\\*(?s:.*?)\\*/", "").trim))
+      else None
+    }
+  }
+
+  /** `011-control-flow-holes`: is `n` the empty BLOCK the C frontend materialises
+    * for an OMITTED `for` init (`for (; c; s)`)? It carries the separator as its code,
+    * which `stmt`'s empty-block check would otherwise report as dropped content
+    * (`stmt:empty-ast-children`). Requires both no children and a blank first clause
+    * in the header text, so a genuinely unparsed init is still a hole. */
+  def forInitIsBlankBlock(cs: ControlStructure, n: AstNode): Boolean = n match {
+    case b: Block => kidsOf(b).isEmpty && forHeaderClauses(cs.code).exists(_.head.isEmpty)
+    case _        => false
   }
 
   /** Assignment, including the augmented forms, to any of the three target shapes. */
@@ -7208,6 +8951,274 @@ import scala.annotation.tailrec
     case _ => None
   }
 
+  /** `011-address-of-local-arrays`: the DECLARATION statement of a boxed array/struct
+    * local (`boxedArrays`/`boxedStructs`) -- `T a[N];`, `T a[N] = {...};`,
+    * `char a[N] = "...";`, `struct S s = {...};`.
+    *
+    * Before this, every such statement became `skip`, on the argument that the
+    * function-entry prologue already allocated the box (every slot `.unit`). That is
+    * right for a declaration WITHOUT an initializer (an uninitialized C local's value
+    * is indeterminate; nothing may read it before writing it), and it stays `skip`.
+    * It was a SILENT WRONG ANSWER for one WITH an initializer, confirmed on a tiny
+    * repro: `int a[4] = {0}; return a[2];` exported hole-free and evaluated to
+    * `.unit`, not `0` -- C11 6.7.9p21 zero-initializes every element the brace list
+    * does not name, and the listed ones get their listed values. So the initializer
+    * is now translated, and only where that translation is exact:
+    *
+    *   - ARRAY, positional brace list `{v0, v1, ...}` (no designators: Joern
+    *     Block-wraps a designated element, which is refused), at most `N` values,
+    *     scalar INTEGER element type: `a[k] = vk` for each listed `k` (the same
+    *     `setDerefIref (irefIndex a k)` a plain `a[k] = v` statement already
+    *     emits), then `a[k] = 0` for every remaining `k` -- unrolled when short,
+    *     else a counted loop over a fresh `a$zi` counter (the `$` suffix keeps it
+    *     out of C's identifier space, `strCursorParams`' own `$off` convention).
+    *   - ARRAY of `char`-like elements initialized by a STRING LITERAL: its bytes
+    *     (ASCII only; no backslash, since `expr`'s `Literal` case does not decode
+    *     escapes), then the terminating `0` and the zero fill -- exactly the byte
+    *     array C builds (6.7.9p14). A literal longer than `N` is refused.
+    *   - STRUCT, positional brace list, EVERY member a scalar integer: member
+    *     `k` (declaration order) gets `vk`, the rest `0`, via `setField` -- the
+    *     same statement `s.f = v` already emits for a boxed struct.
+    *
+    * Each listed value must provably survive the implicit conversion to the element
+    * type unchanged, because `setDerefIref`/`setField` store it unconverted: an
+    * integer (or character) literal within the element type's range, or an
+    * expression whose own static type resolves to the SAME integer type. A bare
+    * `char` element (signedness implementation-defined) accepts only `0..127`.
+    * Anything else -- pointer/float/aggregate elements, designators, nested braces,
+    * a value needing conversion, a struct with a non-integer member, and (for a
+    * boxed STRUCT) any right-hand side that is not an initializer at all -- a
+    * whole-struct copy `s = t`/`s = *p`, which `skip` ALSO silently dropped (the
+    * one exception: `s = t` from a bare same-typed name with only scalar/pointer
+    * members, translated member-wise, see its own case below) -- becomes the
+    * statement hole `op:arrayDecl:boxed-initializer`: this commit turns a silent
+    * wrong answer into an honest hole where it cannot yet give the right one. */
+  /** `011-address-of-local-arrays`: inclusive value range of a scalar INTEGER C
+    * type (`resolveIntType`'s width tag), or `None` when it is not one this can
+    * reason about. Bare `char` (signedness implementation-defined) is `0..127`,
+    * the range valid under either choice. */
+  def cIntRange(ty: String): Option[(BigInt, BigInt)] = {
+    val plain = ty.replace("const ", "").replace("volatile ", "").trim
+    if (plain == "char") Some((BigInt(0), BigInt(127)))
+    else resolveIntType(ty).flatMap { tag =>
+      scala.util.Try(tag.drop(1).toInt).toOption.map { w =>
+        if (tag.startsWith("u")) (BigInt(0), BigInt(2).pow(w) - 1)
+        else (-BigInt(2).pow(w - 1), BigInt(2).pow(w - 1) - 1)
+      }
+    }
+  }
+
+  /** `011-address-of-local-arrays`: `T a[N] = {v0, ..., vk-1};` / `T a[] = {v};` for a
+    * local array that is NOT boxed (so `a` is bound to the initializer's `Val.list`
+    * value, `arrayInit`/`classifyInitElements`, and read through `Expr.index`).
+    * Two gaps in that path, both about the array's SIZE, which the initializer
+    * alone does not carry:
+    *   - `T a[] = {v}` -- one positional element. `arrayInit` refuses a lone
+    *     non-Block child as ambiguous with an array DECLARATOR's size child
+    *     (`op:arrayDecl:size`); here it is the RIGHT-HAND SIDE of the
+    *     declaration's own assignment and the declared type has no size, so it
+    *     can only be the one-element initializer (C sizes the array from it).
+    *   - `T a[N] = {v0, ..., vk-1}` with `k < N` -- C zero-fills elements `k..N-1`
+    *     (6.7.9p21), but the `Val.list` held only `k` items, so `a[k]` raised
+    *     `IndexError` instead of reading `0`. For a scalar INTEGER element type
+    *     the list is now padded with `0` (at most `maxInitPad` of them, keeping the
+    *     rendered literal small); otherwise (pointer/aggregate/float element, or a
+    *     larger pad) it is the hole `op:arrayDecl:partial-initializer`.
+    * `None` leaves every other shape (full-length, designated, nested, a sized
+    * array whose size does not resolve) on the unchanged default path. */
+  def maxInitPad: Int = 64
+  def unboxedArrayInit(i: Identifier, rhs: AstNode): Option[ujson.Obj] = {
+    val ty = bareType(staticTypeOf(i))
+    val kids = kidsOf(rhs)
+    val plain = kids.nonEmpty && kids.forall {
+      case _: Block => false
+      case c: Call => c.methodFullName != "<operator>.arrayInitializer" &&
+                      c.methodFullName != "<operator>.assignment"
+      case _ => true
+    }
+    if (ty.endsWith("[]") && !ty.dropRight(2).contains("[")) {
+      if (plain && kids.size == 1) Some(classifyInitElements(kids)) else None
+    } else {
+      val sized: Option[(String, Int)] =
+        arrayShape.findFirstMatchIn(ty).map(mt => (mt.group(1).trim, mt.group(2).toInt))
+          .orElse(arrayShapeAny.findFirstMatchIn(ty).flatMap { mt =>
+            resolveMacroArraySize(mt.group(2), currentFile).map(mt.group(1).trim -> _)
+          })
+      sized match {
+        case Some((et, n)) if !et.contains("[") && kids.size < n =>
+          val padded =
+            if (plain && cIntRange(et).isDefined && n - kids.size <= maxInitPad)
+              Some(classifyInitElements(kids)).filter(_.value.get("k").exists(_.str == "listE")).map { l =>
+                ujson.Obj("k" -> "listE", "items" -> ujson.Arr.from(
+                  l("items").arr.toList ++ List.fill(n - kids.size)(intLit(0))))
+              }
+            else None
+          Some(padded.getOrElse(hole("op:arrayDecl:partial-initializer")))
+        case _ => None
+      }
+    }
+  }
+
+  def boxedAggregateInit(nm: String, lhs: AstNode, rhs: AstNode): ujson.Obj = {
+    val refuse = holeS("op:arrayDecl:boxed-initializer")
+    def isAlloc(n: AstNode) = n match {
+      case c: Call => c.methodFullName == "<operator>.alloc"
+      case _ => false
+    }
+    def intRange(ty: String): Option[(BigInt, BigInt)] = cIntRange(ty)
+    def literalValue(v: AstNode): Option[BigInt] = v match {
+      case l: Literal =>
+        val t = l.code.trim
+        parseIntLiteral(t).orElse(
+          if (t.length >= 3 && t.head == '\'' && t.last == '\'') charLiteralValue(t.drop(1).dropRight(1)).map(BigInt(_))
+          else None)
+      case c: Call if c.methodFullName == "<operator>.minus" =>
+        kidsOf(c) match { case List(x) => literalValue(x).map(-_); case _ => None }
+      case _ => None
+    }
+    // A POINTER-typed slot (data or function pointer; never an array member).
+    def ptrSlot(ty: String): Boolean =
+      !ty.contains("[") && (bareType(ty).endsWith("*") || ty.replace(" ", "").contains("(*)"))
+    def plainStringLiteral(v: AstNode): Boolean = v match {
+      case l: Literal =>
+        val t = l.code.trim
+        t.length >= 2 && t.head == '"' && t.last == '"' && {
+          val b = t.drop(1).dropRight(1)
+          !b.contains('\\') && !b.contains('"')
+        }
+      case _ => false
+    }
+    // An EXPLICIT pointer value is stored as exactly what `expr` makes of it -- the
+    // same value the equivalent statement `s.f = v;` already stores: a null
+    // constant (`0`/`NULL`, spelled as `s.f = 0`/`s.f = NULL` would be), a
+    // function designator (`MethodRef`, `fnValue`), or an escape-free string
+    // literal into a `char`-pointer slot (`Val.str`, this exporter's `char*`
+    // model). An IMPLICIT (omitted) pointer is refused instead -- see `zeroFor`.
+    def ptrValueOk(v: AstNode, ty: String): Boolean = v match {
+      case l: Literal if isNullLiteral(l) => true
+      case _: MethodRef => true
+      case l: Literal => plainStringLiteral(l) && isCStringType(ty)
+      case _ => false
+    }
+    def valueOk(v: AstNode, elemTy: String): Boolean = {
+      val simple = v match {
+        case _: Block => false
+        case c: Call => c.methodFullName != "<operator>.arrayInitializer" &&
+                        c.methodFullName != "<operator>.assignment"
+        case _ => true
+      }
+      simple && (intRange(elemTy) match {
+        case None => ptrSlot(elemTy) && ptrValueOk(v, elemTy)
+        case Some((lo, hi)) =>
+          literalValue(v) match {
+            case Some(x) => x >= lo && x <= hi
+            case None    => resolveIntType(staticTypeOf(v)).exists(t => resolveIntType(elemTy).contains(t))
+          }
+      })
+    }
+    val zero = intLit(0)
+    def elemWrite(k: ujson.Obj, v: ujson.Obj): ujson.Obj =
+      ujson.Obj("k" -> "setDerefIref",
+        "p" -> ujson.Obj("k" -> "irefIndex", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "i" -> k), "v" -> v)
+    def zeroFill(from: Int, n: Int): List[ujson.Obj] =
+      if (n - from <= 16) (from until n).toList.map(k => elemWrite(intLit(k), zero))
+      else {
+        val ctr = nm + "$zi"
+        val ctrE = ujson.Obj("k" -> "name", "v" -> ctr)
+        List(
+          ujson.Obj("k" -> "assign", "x" -> ctr, "e" -> intLit(from)),
+          ujson.Obj("k" -> "loop",
+            "c" -> ujson.Obj("k" -> "binop", "op" -> "<", "a" -> ctrE, "b" -> intLit(n)),
+            "body" -> seqOf(List(
+              elemWrite(ctrE, zero),
+              ujson.Obj("k" -> "assign", "x" -> ctr,
+                "e" -> ujson.Obj("k" -> "binop", "op" -> "+", "a" -> ctrE, "b" -> intLit(1)))))))
+      }
+    // A `static` local is initialized ONCE, before the program runs (6.2.4p3,
+    // 6.7.9p10), not each time its declaration is reached -- but the box is
+    // (re)allocated by the per-call prologue. For a `const` object the two are
+    // indistinguishable (nothing can write it between calls), so its initializer
+    // is translated like any other; a MUTABLE static (`static HashElem
+    // nullElement = {...}`) would silently lose writes from earlier calls, so it
+    // keeps a hole under its own label. Read from the declaration's own source
+    // text (`static ...`), the only place Joern records the storage class; every
+    // same-named local of the method is checked, so a shadowing ambiguity refuses.
+    val mutableStatic = lhs match {
+      case i: Identifier =>
+        i.method.local.l.filter(l => localName(l.name) == nm).exists { l =>
+          val toks = l.code.split("[\\s*]+").toList
+          val beforeName = l.code.takeWhile(_ != '[')
+          toks.contains("static") && !(toks.contains("const") && !beforeName.contains("*"))
+        }
+      case _ => false
+    }
+    if (isAlloc(rhs)) skip
+    else if (mutableStatic) holeS("op:arrayDecl:static-initializer")
+    else if (boxedArrays.contains(nm)) {
+      val n = boxedArrays(nm)
+      val elemTy = arrayShapeAny.findFirstMatchIn(bareType(staticTypeOf(lhs))).map(_.group(1).trim)
+      (elemTy, rhs) match {
+        case (Some(et), c: Call) if c.methodFullName == "<operator>.arrayInitializer" =>
+          val vs = kidsOf(c)
+          // Zero fill is `0` only for an INTEGER element (see the struct case's
+          // note on an omitted pointer's null): a pointer array must be listed in full.
+          if (vs.nonEmpty && vs.size <= n && vs.forall(v => valueOk(v, et)) &&
+              (vs.size == n || intRange(et).isDefined))
+            seqOf(vs.zipWithIndex.map { case (v, k) => elemWrite(intLit(k), expr(v)) } ++ zeroFill(vs.size, n))
+          else refuse
+        case (Some(et), l: Literal) if intRange(et).isDefined =>
+          val t = l.code.trim
+          val body = if (t.length >= 2 && t.head == '"' && t.last == '"') Some(t.drop(1).dropRight(1)) else None
+          body.filter(b => !b.contains('\\') && !b.contains('"') && b.forall(ch => ch >= ' ' && ch < 127) &&
+                           b.length <= n)
+            .map { b =>
+              seqOf(b.toList.zipWithIndex.map { case (ch, k) => elemWrite(intLit(k), intLit(ch.toInt)) } ++
+                    zeroFill(b.length, n))
+            }.getOrElse(refuse)
+        case _ => refuse
+      }
+    }
+    else {
+      val members: Option[List[(String, String)]] =
+        structTypeDeclOf(staticTypeOf(lhs)).map(_.member.l.sortBy(_.order).map(mm => mm.name -> mm.typeFullName))
+      (members, rhs) match {
+        case (Some(ms), c: Call) if c.methodFullName == "<operator>.arrayInitializer" &&
+                                    boxedStructs.get(nm).contains(ms.map(_._1)) =>
+          val vs = kidsOf(c)
+          // Listed members: integer or pointer (`valueOk`). OMITTED members are
+          // zero-initialized, which is `0` only for an INTEGER member -- an omitted
+          // pointer's null has two spellings in this exporter (`0` -> `.int 0`,
+          // `NULL` -> `.unit`) and picking one for it would be a guess.
+          if (vs.nonEmpty && vs.size <= ms.size && vs.zip(ms).forall { case (v, m) => valueOk(v, m._2) } &&
+              ms.drop(vs.size).forall(m => intRange(m._2).isDefined))
+            seqOf(ms.zipWithIndex.map { case ((f, _), k) =>
+              ujson.Obj("k" -> "setField", "r" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> f,
+                        "v" -> (if (k < vs.size) expr(vs(k)) else zero))
+            })
+          else refuse
+        // `s = t;` / `s = p->aFile[0];`, a side-effect-free (`pureNode`: names,
+        // field and index reads) source of the SAME struct type: C copies every
+        // member by value (6.5.16.1p2). Member-wise `s.f = SRC.f` is exactly that
+        // when no member is itself an aggregate (a nested struct/array member is a
+        // `Val.ref` in Core, so copying it would ALIAS where C copies) -- scalar
+        // integers and pointers only. `SRC` is pure, so reading it once per member
+        // repeats no side effect; it is never `s` itself.
+        case (Some(ms), src)
+            if pureNode(src) && !src.isInstanceOf[Literal] &&
+               boxedStructs.get(nm).contains(ms.map(_._1)) &&
+               !rawLocalOrParamName(src).map(localName).contains(nm) &&
+               structTypeDeclOf(staticTypeOf(src)).map(_.fullName) ==
+                 structTypeDeclOf(staticTypeOf(lhs)).map(_.fullName) &&
+               ms.forall(m => intRange(m._2).isDefined || ptrSlot(m._2)) =>
+          seqOf(ms.map { case (f, _) =>
+            ujson.Obj("k" -> "setField", "r" -> ujson.Obj("k" -> "name", "v" -> nm), "f" -> f,
+                      "v" -> ujson.Obj("k" -> "field", "a" -> expr(src), "f" -> f))
+          })
+        case _ => refuse
+      }
+    }
+  }
+
   def assignTo(lhs: AstNode, rhs: AstNode, aug: Option[String]): ujson.Obj = {
     val (prelude, rhsE) = valueOf(rhs)
     // `009-reduce-remaining-holes-4`: a PLAIN (non-augmented) `asIndex` target whose
@@ -7289,6 +9300,44 @@ import scala.annotation.tailrec
         ujson.Obj("k" -> "assign", "x" -> offNm,
                   "e" -> ujson.Obj("k" -> "binop", "op" -> aug.get,
                                    "a" -> ujson.Obj("k" -> "name", "v" -> offNm), "b" -> rhsE))
+      // Pointer-arith family: `p += n`/`p -= n`, `p` a `char*` PROVABLY holding an
+      // interior pointer for its whole lifetime (`ptrIrefNames`) and `n` not
+      // itself pointer-shaped. This is `incrStmt`'s own `ptrIrefNames` case (`p++`
+      // -> `p = p + 1`, already emitted for exactly these names) with a step of `n`
+      // instead of `1`: `applyBinop`'s `Val.iref`/`Val.int` arm is element-indexed,
+      // so no `sizeof` scaling is needed, and a `char*`'s element IS a byte. The
+      // `cStringUnsafe` guard just below exists because a `char*` used to be a
+      // `Val.str`, whose `+` would concatenate -- a `ptrIrefNames` name never holds
+      // a `Val.str` (every one of its assignments is an interior-pointer shape;
+      // `ptrIrefNames`' own doc comment), and even if it did, `.str + .int` has no
+      // `applyBinop` case and is a dynamic hole, never a concatenation. A `.fld`
+      // (struct-field) interior pointer likewise answers `iref:arith-on-field`,
+      // a hole, not a guess. Checked BEFORE that guard for the same reason the
+      // `strCursorParams` case above is.
+      case i: Identifier if cLikeFile && (aug.contains("+") || aug.contains("-")) &&
+                             ptrIrefNames.contains(localName(i.name)) &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ujson.Obj("k" -> "binop", "op" -> aug.get,
+                                   "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
+      // Pointer-arith family: `p += n` on an UNTRACKED single-level `char*` local
+      // (neither a byte cursor nor an interior pointer -- both handled above):
+      // `p = strFrom p n`, `callExpr`'s untracked `p + n` translation (see its
+      // comment for the faithfulness argument) written back to `p`. `-=` is not
+      // admitted, for the reason `p - n` is not there.
+      case i: Identifier if cLikeFile && aug.contains("+") && isSingleCharPointer(i) &&
+                             !ptrIrefNames.contains(localName(i.name)) &&
+                             !strCursorParams.contains(localName(i.name)) &&
+                             !boxedLocals.contains(localName(i.name)) &&
+                             !boxedArrays.contains(localName(i.name)) &&
+                             !isPointerType(staticTypeOf(rhs)) && !isCString(rhs) =>
+        val nm = localName(i.name)
+        val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+        ujson.Obj("k" -> k, "x" -> nm,
+                  "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> rhsE))
       // `s += n` on a `char*` advances a pointer; see `cStringUnsafe`. The augmented form
       // never reaches `callExpr`, so it is guarded here too.
       case _ if cLikeFile && aug.isDefined && (isCString(lhs) || isCString(rhs)) =>
@@ -7310,9 +9359,14 @@ import scala.annotation.tailrec
       // spec.md's own "no VLA/malloc-sized allocation" exclusion in spirit --
       // every quickstart.md Story 5 acceptance scenario only reads a
       // previously-WRITTEN element/field, never relies on this initializer).
+      // `011-address-of-local-arrays`: `skip` only for the initializer-free
+      // declaration; an initializer is now translated or holed, never dropped --
+      // see `boxedAggregateInit`'s own doc comment for the silent wrong answer
+      // this replaces.
       case i: Identifier if boxedArrays.contains(localName(i.name)) ||
                              boxedStructs.contains(localName(i.name)) =>
-        skip
+        if (aug.isEmpty) boxedAggregateInit(localName(i.name), i, rhs)
+        else holeS("op:arrayDecl:boxed-initializer")
       // `009-reduce-remaining-holes-4`: a LOCAL cursor variable's own single
       // defining assignment (`strCursorParams`'s local-variable generalization,
       // above) -- seeds BOTH halves of the pair at once, since unlike a PARAMETER
@@ -7387,6 +9441,19 @@ import scala.annotation.tailrec
                   "e" -> ujson.Obj("k" -> "irefIndex",
                                    "a" -> ujson.Obj("k" -> "boxArray", "n" -> lenE),
                                    "i" -> ujson.Obj("k" -> "int", "v" -> 0)))
+      // `011-address-of-local-arrays`: an UNBOXED local array's brace initializer --
+      // see `unboxedArrayInit`.
+      case i: Identifier if aug.isEmpty && cLikeFile && !moduleScope && !isGlobalWrite(i.name) &&
+                             (rhs match {
+                               case c: Call => c.methodFullName == "<operator>.arrayInitializer"
+                               case _ => false
+                             }) =>
+        unboxedArrayInit(i, rhs) match {
+          case Some(e) => ujson.Obj("k" -> "assign", "x" -> localName(i.name), "e" -> e)
+          // Unchanged default: exactly the generic `case i: Identifier` below.
+          case None    => ujson.Obj("k" -> "assign", "x" -> localName(i.name),
+                                    "e" -> combine(ujson.Obj("k" -> "name", "v" -> localName(i.name))))
+        }
       case i: Identifier =>
         // At module scope, for a name a `global` statement rebound, or (C-like
         // files) a name that's a recognized file-scope global and not a local/
@@ -7401,9 +9468,10 @@ import scala.annotation.tailrec
       // counterpart of the read case in `callExpr`'s `<operator>.indirection`
       // handling. Checked BEFORE the generic `<operator>`-prefixed catch-all below,
       // which still fires (unchanged `assign:lhs:indirection`) for every `*p` this
-      // cannot prove safe. `ptrAliases.getOrElse(nm, nm)` reads as: if `nm` aliases
-      // some OTHER boxed local, write through that; otherwise (must be because the
-      // guard's `closedOutParams` branch matched) `nm` itself already IS the ref.
+      // cannot prove safe. `aliasOrOutParamWrite` reads as: if `nm` aliases some
+      // OTHER boxed local, write that box's field; otherwise (the guard's
+      // `closedOutParams` branch matched) `nm` holds the caller's `&n`, an interior
+      // pointer (`boxedScalarAddr`), and is written through with `setDerefIref`.
       // `006-reduce-remaining-holes`, Story 5: `*p = v`, `p` PROVABLY holding an
       // interior pointer VALUE for its whole lifetime (`ptrIrefNames`) -- write
       // side of `callExpr`'s matching `<operator>.indirection` read case. `p`
@@ -7430,9 +9498,7 @@ import scala.annotation.tailrec
                        rawLocalOrParamName(kidsOf(c)(0)).map(localName)
                          .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
         val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
-        val target = ptrAliases.getOrElse(nm, nm)
-        ujson.Obj("k" -> "setField", "r" -> boxRef(target), "f" -> "v",
-                  "v" -> combine(boxField(target)))
+        aliasOrOutParamWrite(nm, combine(aliasOrOutParamRead(nm)))
       case fa if asField(fa).isDefined =>
         val (r, f) = asField(fa).get
         if (aug.isDefined && !pureNode(r)) holeS("assign:aug-impure-receiver")
@@ -7580,6 +9646,19 @@ import scala.annotation.tailrec
       val offNm = rawLocalOrParamName(tgt).map(localName).get + "$off"
       ujson.Obj("k" -> "assign", "x" -> offNm, "e" -> bump(ujson.Obj("k" -> "name", "v" -> offNm)))
     }
+    // Pointer-arith family: `p++`/`++p` on an UNTRACKED single-level `char*` local --
+    // `p = strFrom p 1`, `assignTo`'s untracked `p += 1` (see `callExpr`'s `p + n`
+    // case for why this is faithful). `--` stays a hole: a `Val.str` has no byte
+    // before its own start.
+    else if (cLikeFile && op == "+" && (tgt match { case _: Identifier => true; case _ => false }) &&
+             isSingleCharPointer(tgt) &&
+             rawLocalOrParamName(tgt).map(localName).exists(nm =>
+               !boxedLocals.contains(nm) && !boxedArrays.contains(nm))) {
+      val nm = rawLocalOrParamName(tgt).map(localName).get
+      val k = if (isGlobalWrite(nm)) "setGlobal" else "assign"
+      ujson.Obj("k" -> k, "x" -> nm,
+                "e" -> ujson.Obj("k" -> "strFrom", "a" -> ujson.Obj("k" -> "name", "v" -> nm), "b" -> one))
+    }
     else if (isPointerType(staticTypeOf(tgt)) || isCString(tgt)) holeS("op:" + opName + ":pointer")
     else tgt match {
       // `003-box-address-taken-locals`: `x++`/`x--` on a boxed local, same rewrite as
@@ -7602,7 +9681,36 @@ import scala.annotation.tailrec
         if (!(pureNode(a) && pureNode(b))) holeS("op:" + opName + ":impure-target")
         else ujson.Obj("k" -> "setIndex", "r" -> expr(a), "i" -> expr(b),
                        "v" -> bump(ujson.Obj("k" -> "index", "a" -> expr(a), "b" -> expr(b))))
-      // `++*p` — the target is a dereference, which is the location model Core lacks.
+      // `(*p)++` / `++*p` / `(*p)--` / `--*p` in statement position, for exactly the
+      // pointers `assignTo`'s own `*p = v` write cases already trust: this is
+      // `*p = *p ± 1` with `p` read twice, so it is admitted under the SAME two
+      // conditions `assignTo` applies to the augmented `*p += 1` spelling of the
+      // identical statement -- `p` must be an interior-pointer expression
+      // (`isIrefExpr`, read/written via `derefIref`/`setDerefIref`) or a provable
+      // alias of one boxed local / a closed out-parameter (read/written via the
+      // box's own `"v"` field), and `p` must be PURE, since it is evaluated once
+      // for the read and once for the write. The pointee itself is a scalar here,
+      // not a pointer: the `isPointerType(staticTypeOf(tgt))` guard above has
+      // already holed `(*pp)++` on a `T**` (a pointer bump, which would need
+      // `sizeof` scaling), so `± 1` is ordinary integer arithmetic on the value
+      // read, exactly as `x++` on a scalar local is. An impure `p` (`(*p++)++`)
+      // keeps a hole under this function's existing `:impure-target` label.
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      !pureNode(kidsOf(c).head) &&
+                      (isIrefExpr(kidsOf(c).head) ||
+                       rawLocalOrParamName(kidsOf(c).head).map(localName)
+                         .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n))) =>
+        holeS("op:" + opName + ":impure-target")
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      isIrefExpr(kidsOf(c).head) =>
+        val pRef = expr(kidsOf(c).head)
+        ujson.Obj("k" -> "setDerefIref", "p" -> pRef, "v" -> bump(ujson.Obj("k" -> "derefIref", "p" -> pRef)))
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 &&
+                      rawLocalOrParamName(kidsOf(c).head).map(localName)
+                        .exists(n => ptrAliases.contains(n) || closedOutParams.contains(n)) =>
+        val nm = rawLocalOrParamName(kidsOf(c).head).map(localName).get
+        aliasOrOutParamWrite(nm, bump(aliasOrOutParamRead(nm)))
+      // `++*p` on any other pointer — the location model Core lacks.
       case _ => holeS("op:" + opName + ":unsupported-target")
     }
   }
@@ -7685,7 +9793,7 @@ import scala.annotation.tailrec
         Some(ujson.Obj("k" -> "derefIref", "p" -> expr(kidsOf(c)(0))))
       else {
         val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName)
-        nm.flatMap(ptrAliases.get).orElse(nm.filter(closedOutParams.contains)).map(boxField)
+        nm.filter(n => ptrAliases.contains(n) || closedOutParams.contains(n)).map(aliasOrOutParamRead)
       }
     case _ => None
   }
@@ -7694,6 +9802,36 @@ import scala.annotation.tailrec
     * used only to carry a postfix increment/decrement's PRE-bump value across the
     * bump statement (`Env.set` binds any name; no prior declaration is needed). */
   def freshExprVTemp(): String = { val n = "$exprV$" + exprVTempCounter; exprVTempCounter += 1; n }
+
+  /** `011-control-flow-holes`: the operands of a C comma expression delivered as a
+    * BLOCK in expression position (see `exprV`'s own case for the semantics), or
+    * `None` if this block is not that shape. C/C++ files only (`pysrc2cpg`'s own
+    * expression BLOCKs are temp-binding lowerings with a different meaning, handled by
+    * `blockExpr`). Every item must itself be an expression node -- a call/operator,
+    * a name or a literal, or a nested comma block -- so a declaration (`LOCAL`, whose
+    * block scope Core's flat environment cannot express) or any statement shape keeps
+    * the existing hole. */
+  def commaItems(b: Block): Option[List[AstNode]] = {
+    val items = kidsOf(b)
+    def isExprItem(n: AstNode): Boolean = n match {
+      case _: Call | _: Identifier | _: Literal => true
+      case nb: Block                            => commaItems(nb).isDefined
+      case _                                    => false
+    }
+    if (cppFile && items.size >= 2 && items.forall(isExprItem)) Some(items) else None
+  }
+
+  /** `011-control-flow-holes`: a function-like macro invocation (`dispatchType ==
+    * "INLINED"`) whose expansion BLOCK has MORE than one child -- the case
+    * `unwrapMacro` deliberately leaves alone -- returned as that expansion block when
+    * it is a pure comma expression (`commaItems`). The macro's own argument children
+    * are NOT evaluated: a preprocessor substitutes them textually into the expansion,
+    * which is exactly the block this returns, so reading the expansion is what the
+    * compiler itself sees. */
+  def macroCommaBlock(c: Call): Option[Block] =
+    if (c.dispatchType != "INLINED") None
+    else c.astChildren.collect { case b: Block => b }.headOption
+           .filter(b => b.astChildren.size > 1 && commaItems(b).isDefined)
 
   /** FR-005/FR-008: an assignment (plain or augmented) reached in expression
     * position. On a provably pure target, the write is `assignTo` verbatim and the
@@ -7791,6 +9929,13 @@ import scala.annotation.tailrec
       case ia if asIndex(ia).isDefined =>
         val (a, b) = asIndex(ia).get
         if (pureNode(a) && pureNode(b)) proceed() else (Nil, hole("op:" + opName + ":impure-target"))
+      // `(*p)++` used AS A VALUE -- `incrStmt`'s own `*p` cases do the bump (or
+      // hole, whose label `proceed()` propagates unchanged), and `targetReadExpr`
+      // already has the matching `*p` read, so the pre-/post-bump value is read
+      // from the same location exactly as for `x++`. Pure `p` only: it is read
+      // for the value AND inside the bump.
+      case c: Call if c.methodFullName == "<operator>.indirection" && kidsOf(c).size == 1 =>
+        if (pureNode(kidsOf(c).head)) proceed() else (Nil, hole("op:" + opName + ":impure-target"))
       case _ => (Nil, hole(genericLabel))
     }
   }
@@ -7834,6 +9979,73 @@ import scala.annotation.tailrec
         val realArgs = kidsOf(c).filter(aidx(_) >= 1)
         pointerCallFieldDynamic(c, realArgs).getOrElse((Nil, baseline))
       }
+    // `011-control-flow-holes`: `a && b` / `a || b` -- a SOUNDNESS fix, not only a
+    // coverage one. These fell to the generic `binops` pass-through below, which
+    // concatenates `pa ++ pb` ahead of the value -- so `b`'s prelude (an assignment,
+    // `x++`, a hoisted pointer call, ...) ran UNCONDITIONALLY, before `a` was even
+    // evaluated. C's `&&`/`||` (6.5.13/6.5.14) evaluate `b` ONLY when `a` did not
+    // decide the result, with a sequence point between them. Confirmed live on a
+    // fixture: `if (a && (c = f(a)) != 0)` exported as `c = f(a); if (a && c != 0)`,
+    // calling `f` even when `a == 0` -- and SQLite spells exactly this all over
+    // (`pBt->pPage1==0 && SQLITE_OK==(rc = lockBtree(pBt))`).
+    //
+    // The faithful shape, when `b` needs a prelude:
+    //
+    //     pa;  L := a;  if (L) { pb; R := b }          (for `||`: `if (L) skip else ...`)
+    //     value:  L && R                                 (resp. `L || R`)
+    //
+    // `a` is evaluated exactly once, after its own prelude and before anything of
+    // `b`'s -- the sequence point. `pb`/`b` run exactly when Core's own `evalExpr`
+    // short-circuit (Semantics.lean, the `op == "&&" && !x.truthy` test) would have
+    // evaluated `b`: `ifte` branches on `.truthy` of the same value. The final
+    // `binop` re-reads only the two fresh temporaries (pure reads): when `L` decides
+    // the result `R` is never read (it may be unbound -- exactly as unevaluated as the
+    // original `b`), otherwise it applies the identical `applyBinop` to the identical
+    // two values, so the 0/1-vs-value dialect rule is untouched too. When `b` has NO
+    // prelude nothing changes at all (`pa` was already safe to hoist: `a` is always
+    // evaluated first).
+    case c: Call if (c.methodFullName == "<operator>.logicalAnd" ||
+                     c.methodFullName == "<operator>.logicalOr") && kidsOf(c).size == 2 =>
+      val List(a, b) = kidsOf(c)
+      val op = binops(c.methodFullName)
+      val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+      if (pb.isEmpty) (pa, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+      else {
+        val lt = freshExprVTemp(); val rt = freshExprVTemp()
+        val runRight = seqOf(pb :+ ujson.Obj("k" -> "assign", "x" -> rt, "e" -> be))
+        val guard =
+          if (op == "&&") ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> lt),
+                                    "t" -> runRight, "e" -> skip)
+          else ujson.Obj("k" -> "ifte", "c" -> ujson.Obj("k" -> "name", "v" -> lt),
+                         "t" -> skip, "e" -> runRight)
+        (pa ++ List(ujson.Obj("k" -> "assign", "x" -> lt, "e" -> ae), guard),
+         ujson.Obj("k" -> "binop", "op" -> op, "a" -> ujson.Obj("k" -> "name", "v" -> lt),
+                   "b" -> ujson.Obj("k" -> "name", "v" -> rt)))
+      }
+    // `011-control-flow-holes`: unary `+e` -- see `callExpr`'s own matching case for
+    // why it is exactly `e`; threaded here so `+(x = v)` keeps `e`'s prelude.
+    case c: Call if c.methodFullName == "<operator>.plus" && kidsOf(c).size == 1 && cppFile =>
+      exprV(kidsOf(c).head)
+    // `011-control-flow-holes`: a C comma expression `(e1, e2, ..., en)`, which the
+    // C frontend delivers as a BLOCK in expression position -- either written
+    // directly or as the expansion of a function-like macro whose body is one
+    // (`UNUSED_PARAMETER2(x,y)` -> `(void)(x),(void)(y)`; SQLite's `putVarint32`
+    // -> `(v<0x80) ? (*(p)=(u8)(v)), 1 : f(p,v)`). C11 6.5.17p2: the left operand
+    // is evaluated as a void expression, then a sequence point, then the right
+    // operand, whose value is the result. So `e1..e(n-1)` become statements run in
+    // order (`stmt`, which evaluates an expression for its effects and discards the
+    // value -- the same translation the same node would get as a statement of its
+    // own), and `en` is the value, its own prelude threaded after theirs: exactly the
+    // source order. Only the pure comma shape qualifies (`commaItems`: every item an
+    // expression node -- no declaration, which could shadow an outer name in Core's
+    // flat environment, and no statement, which a GNU statement-expression could
+    // carry); anything else keeps `blockExpr`'s own `expr:BLOCK-*` hole.
+    case b: Block if commaItems(b).isDefined =>
+      val items = commaItems(b).get
+      val (pl, v) = exprV(items.last)
+      (items.init.map(stmt) ++ pl, v)
+    case c: Call if macroCommaBlock(c).isDefined =>
+      exprV(macroCommaBlock(c).get)
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
@@ -7842,13 +10054,24 @@ import scala.annotation.tailrec
         case Some(op) =>
           val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
-        case None => (Nil, hole("op:shiftRight:unknown-signedness"))
+        case None => (Nil, hole(shiftRightHoleLabel(a)))
       }
+    // Pointer-arith family: a pointer null test, prelude-aware -- the same
+    // translation `callExpr` gives it (`pointerNullTest`/`nullTestExpr`), with the
+    // one evaluated operand's prelude threaded as every other operand's is here.
+    case c: Call if pointerNullTest(c).isDefined =>
+      val (other, neg) = pointerNullTest(c).get
+      val (po, oe) = exprV(other)
+      (po, nullTestExpr(oe, neg))
     case c: Call if binops.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     !(cLikeFile && kidsOf(c).exists(isCString) && cStringUnsafe.contains(c.methodFullName)) =>
       val List(a, b) = kidsOf(c)
       val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
       (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> binops(c.methodFullName), "a" -> ae, "b" -> be))
+    // Pointer-arith family: `!p` on a pointer is `p == 0` (see `callExpr`).
+    case c: Call if isPointerNot(c) =>
+      val (pa, ae) = exprV(kidsOf(c).head)
+      (pa, nullTestExpr(ae, neg = false))
     case c: Call if unops.contains(c.methodFullName) && kidsOf(c).size == 1 =>
       val (pa, ae) = exprV(kidsOf(c).head)
       (pa, ujson.Obj("k" -> "unop", "op" -> unops(c.methodFullName), "a" -> ae))
@@ -7863,6 +10086,29 @@ import scala.annotation.tailrec
     // doc comment for the full bug report and reasoning) for the identical
     // `exprV`-never-routes-through-`callExpr` reason the `boxedArrays` case just
     // below already documents for itself.
+    // `011-control-flow-holes`: `z[i]`, `z` a tracked byte cursor -- `callExpr`'s
+    // own matching case (`strByte z (z$off + i)`), which this function lacked: the
+    // generic `index` case below read position `i` from the ORIGINAL string start,
+    // silently wrong once `z` has advanced. Found by diffing loop conditions after
+    // they started going through `exprV` (`sqlite3StrIHash`'s `while (z[0])`); the
+    // same gap affected `if` conditions, which have used `exprV` since
+    // `006-reduce-remaining-holes`. Checked first, exactly as in `callExpr`.
+    // Deliberately NARROWER than `callExpr`'s case: only a receiver whose static type
+    // is a single-level `char *` (one `*`, no array). `isCStringType` also accepts
+    // `char **` (`argv`, `azResult`), for which `strByte` would read a BYTE where C
+    // reads a `char *` element -- `callExpr` has that problem today (reported, not
+    // fixed here: it belongs to the pointer-arithmetic family); this case must not
+    // spread it into positions that currently read the element with `index`.
+    case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
+                    rawLocalOrParamName(kidsOf(c)(0)).map(localName).exists(strCursorParams.contains) &&
+                    { val t = staticTypeOf(kidsOf(c)(0)).replace(" ", "")
+                      t.count(_ == '*') == 1 && !t.contains("[") && isCStringType(t) } =>
+      val nm = rawLocalOrParamName(kidsOf(c)(0)).map(localName).get
+      val (pb, be) = exprV(kidsOf(c)(1))
+      (pb, ujson.Obj("k" -> "strByte", "a" -> ujson.Obj("k" -> "name", "v" -> nm),
+                     "b" -> ujson.Obj("k" -> "binop", "op" -> "+",
+                                      "a" -> ujson.Obj("k" -> "name", "v" -> (nm + "$off")),
+                                      "b" -> be)))
     case c: Call if indexOps.contains(c.methodFullName) && kidsOf(c).size == 2 &&
                     isIrefExpr(kidsOf(c)(0)) =>
       val List(a, b) = kidsOf(c)
@@ -8125,7 +10371,22 @@ import scala.annotation.tailrec
       // on the floor": on the SQLite CPG, 15%+ of core-file functions hit the
       // latter, each exporting as a hole-free `skip` that in fact translated
       // nothing of the function's real body.
-      if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
+      //
+      // `011-control-flow-holes`: one sub-shape of the ambiguity IS decidable -- a
+      // body whose entire source is invocations of function-like macros that the
+      // parse expanded to NOTHING (`{ testcase( page0!=0 ); }`, `{ VdbeComment((v,
+      // "...")); }`, `{ PAGERTRACE(("...")); }` -- SQLite's debug/coverage hooks,
+      // `#define testcase(X)` with an empty body in the configuration the CPG was
+      // built under). The preprocessor removed them, so the compiler sees `{ }` too
+      // and `skip` is exactly right. `onlyEmptiedMacroCalls` requires each invoked
+      // name to leave NO trace anywhere in the CPG (no CALL, no METHOD of that name
+      // -- any macro that ever expands to something is an `INLINED` call, and any real
+      // function is called or defined somewhere): measured on the amalgamation, every
+      // qualifying name (17 of them) is `#define`d empty in `sqlite3.c`, while the
+      // genuine parse-failure bodies (`{ width = va_arg(ap,int); }`,
+      // `#if`-guarded bodies) fail the shape test and keep this hole.
+      if (kids.isEmpty && stripBlockCode(b.code).nonEmpty && onlyEmptiedMacroCalls(b.code)) skip
+      else if (kids.isEmpty && stripBlockCode(b.code).nonEmpty) holeS("stmt:empty-ast-children")
       else forPattern(kids).getOrElse(seqOf(stmts(kids)))
     case l: Local => skip   // declarations carry no behaviour here
     case td: TypeDecl => skip   // a struct/union/typedef/class decl carries no behaviour either
@@ -8171,7 +10432,7 @@ import scala.annotation.tailrec
         case lhs :: rhs :: Nil =>
           shiftRightOp(lhs) match {
             case Some(op) => assignTo(lhs, rhs, Some(op))
-            case None     => holeS("op:shiftRight:unknown-signedness")
+            case None     => holeS(shiftRightHoleLabel(lhs))
           }
         case _ => holeS("assign:arity")
       }
@@ -8240,8 +10501,34 @@ import scala.annotation.tailrec
           // A `while` whose condition is the frontend's synthetic iterator probe only
           // makes sense inside the `for` shape above; on its own it is not a condition.
           if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
-          else ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
-                         "body" -> outsideLoopScope(stmt(kids(1))))
+          else {
+            // `011-control-flow-holes`: the "real, separate increment" the comment
+            // above defers -- `while ((c = next()) != 0)`, `while (n-- > 0)`. With a
+            // prelude `P` and value `v`, the faithful shape is
+            //
+            //     while (true) { P; if (v) skip else break; B }
+            //
+            // which evaluates `P` then tests `v` before EVERY iteration, including
+            // the first, exactly once per test -- C's `while` (6.8.5.1). A `continue`
+            // in `B` needs no rewriting: `Stmt.loop` re-runs its body from the top,
+            // i.e. re-runs `P` and the test, which is exactly where C's `continue`
+            // goes. `break` leaves the loop either way. `P` itself never contains a
+            // `brk`/`cont` (it is built by `exprV` from expression nodes only), so the
+            // synthetic test's `break` is the only new jump, and it belongs to this
+            // loop. With no prelude, the unchanged shape.
+            // With no prelude the condition stays plain `expr` -- byte-identical to
+            // before (`exprV`'s value for a prelude-free node is not guaranteed to be
+            // `expr`'s own; see its `strCursorParams` index case).
+            val (pc, cv) = exprV(kids(0))
+            if (pc.isEmpty)
+              ujson.Obj("k" -> "loop", "c" -> expr(kids(0)),
+                        "body" -> outsideLoopScope(stmt(kids(1))))
+            else
+              ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                        "body" -> seqOf(pc ++ List(
+                          ujson.Obj("k" -> "ifte", "c" -> cv, "t" -> skip, "e" -> ujson.Obj("k" -> "brk")),
+                          outsideLoopScope(stmt(kids(1))))))
+          }
 
         // `do B while (C)` is NOT `while (C) B`, and translating it as one was a silent
         // mistranslation: a do-while runs its body at least once, so with `C` initially
@@ -8257,13 +10544,41 @@ import scala.annotation.tailrec
         // loops keep their own `continue` (`pushDoTest` stops at `loop`/`forIn`), and `C`
         // may be evaluated more than once per source iteration only on paths where the
         // original would have evaluated it too.
+        //
+        // `011-control-flow-holes`: WHICH child is the condition is read from the
+        // CPG's own CONDITION edge, not assumed to be `kids(0)`. The C frontend emits
+        // a do-while's children in SOURCE order -- body first (order 1), condition
+        // second (order 2), confirmed on all 83 do-whiles of the SQLite amalgamation
+        // -- so the positional reading translated the BODY as the condition and the
+        // CONDITION as the body: `do { ... } while ((p = p->pNext) != 0)` exported
+        // as `loop { p = p->pNext; (p != 0); if <hole: expr:BLOCK-prelude> ... }`,
+        // the whole real body gone. With a braced body that surfaced only as an
+        // `expr:BLOCK-prelude` hole; with a single-statement body (`do x = f(x);
+        // while (c);`) it was silently wrong. `kids(0)` stays the fallback only when
+        // the graph carries no single CONDITION edge (a frontend that does not
+        // record it), which is the old behaviour. The condition may also carry a
+        // prelude (`while ((p = p->pNext) != 0)`): both the trailing test and every
+        // `continue`'s test become `P; if (v) ...` -- `P` evaluated exactly where
+        // C evaluates the controlling expression (6.8.5.2: after each execution of
+        // the body, and a `continue` jumps to "the end of the loop body").
         case "DO" if kids.size >= 2 =>
-          if (kids(0).isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
+          val rawKids = cs.astChildren.l
+          val condIdx = cs.condition.l match {
+            case List(cn) => rawKids.indexWhere(_ eq cn)
+            case _        => -1
+          }
+          val (condN, bodyN) =
+            if (kids.size == 2 && condIdx >= 0 && condIdx < 2) (kids(condIdx), kids(1 - condIdx))
+            else (kids(0), kids(1))
+          if (condN.isInstanceOf[Unknown]) holeS("control:WHILE-iterator")
           else {
-            val cond = expr(kids(0))
-            val test = ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
-                                 "e" -> ujson.Obj("k" -> "brk"))
-            val body = pushDoTest(outsideLoopScope(stmt(kids(1))), cond)
+            val (pc, cond) = exprV(condN) match {
+              case (Nil, _) => (Nil, expr(condN))   // no prelude: plain `expr`, as `while`
+              case other    => other
+            }
+            val test = seqOf(pc :+ ujson.Obj("k" -> "ifte", "c" -> cond, "t" -> skip,
+                                             "e" -> ujson.Obj("k" -> "brk")))
+            val body = pushDoTest(outsideLoopScope(stmt(bodyN)), cond, pc)
             ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
                       "body" -> ujson.Obj("k" -> "seq", "a" -> body, "b" -> test))
           }
@@ -8285,7 +10600,47 @@ import scala.annotation.tailrec
                        !expandingGotoLabels.contains(kids.head.code.trim) =>
           val label = kids.head.code.trim
           expandingGotoLabels += label
-          val result = seqOf(stmts(gotoTailStmts(label)))
+          // `011-control-flow-holes`: a tail that ends by falling off the function's
+          // end gets that implicit exit made explicit -- see `resolvedTailStmts`.
+          val exitS = if (gotoTailFallsOff.contains(label))
+                        List(ujson.Obj("k" -> "ret", "e" -> ujson.Obj("k" -> "unit"))) else Nil
+          val result = seqOf(stmts(gotoTailStmts(label)) ++ exitS)
+          expandingGotoLabels -= label
+          result
+        // `011-control-flow-holes`: `goto L`, `L` a top-level restart label this
+        // function's body from `L` onward is wrapped in a one-shot loop for (see
+        // `methodBody`), and this site is not inside any nested loop/switch
+        // (`outsideLoopScope` clears `gotoAsRestart`).
+        case "GOTO" if gotoAsRestart.isDefined && kids.map(_.code.trim) == List(gotoAsRestart.get) =>
+          ujson.Obj("k" -> "cont")
+        // `011-control-flow-holes`: `goto L`, `L` a direct child of the body of this
+        // site's innermost enclosing loop/switch -- the rest of that body from `L`,
+        // then `continue` (loop) / `break` (switch). See `methodBody`'s
+        // `blockExitLabels`; a re-entrant expansion keeps the hole.
+        //
+        // Bounded: a `goto` inside a large `switch` (SQLite's `sqlite3VdbeExec` opcode
+        // dispatch) would otherwise copy most of the switch body at every site, nested
+        // copies multiplying -- confirmed to exhaust the JVM heap, and even when it
+        // fits, every copy duplicates the tail's own unrelated holes into the ledger.
+        // So a tail is spliced only if it is small (<= 400 AST nodes), contains no
+        // `goto` of its own (no chained expansion), and fits the per-function
+        // `blockExitSpliceBudget`; otherwise the site keeps the `control:GOTO` hole --
+        // a size limit, never a different translation.
+        case "GOTO" if kids.size == 1 && gotoAsBlockExit.contains(kids.head.code.trim) &&
+                       !expandingGotoLabels.contains(kids.head.code.trim) && {
+                         val tl = gotoAsBlockExit(kids.head.code.trim)._1
+                         val sz = tl.map(_.ast.size).sum
+                         sz <= 400 && sz <= blockExitSpliceBudget &&
+                           !tl.exists(_.ast.exists {
+                             case g: ControlStructure => g.controlStructureType == "GOTO"
+                             case _                   => false
+                           })
+                       } =>
+          val label = kids.head.code.trim
+          val (tail, exit) = gotoAsBlockExit(label)
+          blockExitSpliceBudget -= tail.map(_.ast.size).sum
+          expandingGotoLabels += label
+          val result = seqOf(stmts(tail) :+ ujson.Obj("k" -> exit))
           expandingGotoLabels -= label
           result
         case "BREAK"    => ujson.Obj("k" -> "brk")
@@ -8325,6 +10680,23 @@ import scala.annotation.tailrec
     // "cause". The parser type is a closed set and says the same thing about the remedy:
     // `CASTProblemDeclaration` means the C preprocessor was not run.
     case u: Unknown if isKernelMeta(u.code) => metaElided += 1; skip
+    // `casts-sizeof`: an unparsed `extern` DECLARATION -- `extern int SQLITE_TCLAPI
+    // sqlite3BtreeSharedCacheReport(void*, Tcl_Interp*, int, Tcl_Obj*CONST*);` inside
+    // a Tcl test's init function, unparseable only because `SQLITE_TCLAPI`/`CONST`
+    // were not expanded. An `extern` declaration only names something defined
+    // elsewhere: it allocates nothing and executes nothing, and at block scope it may
+    // not even carry an initializer (C11 6.7.9p5). `Stmt.skip` is therefore its exact
+    // translation. Recognised only when the text is ONE declaration -- starts with
+    // `extern`, ends with its single `;`, no `{` (a definition) and no `=` -- so an
+    // unparsed statement that merely begins with the word is never swallowed.
+    case u: Unknown if isParserProblem(u) && isBareExternDecl(u.code) => skip
+    // `casts-sizeof`: `x = va_arg(ap, int);`. `va_arg`'s second argument is a TYPE, so
+    // without `<stdarg.h>`'s builtin the frontend cannot parse the statement at all.
+    // Even parsed it would stay a hole -- Core has no C variadic calling convention
+    // to read the next argument from -- so it gets a label that says exactly that,
+    // instead of the generic "the preprocessor was not run" bucket.
+    case u: Unknown if isParserProblem(u) && """\bva_arg\s*\(""".r.findFirstIn(u.code).isDefined =>
+      holeS("stmt:va_arg")
     case u: Unknown    =>
       val kind = Option(u.parserTypeName).map(_.trim).filter(_.nonEmpty).getOrElse("node")
       holeS("stmt:UNKNOWN:" + kind)
@@ -8487,10 +10859,10 @@ import scala.annotation.tailrec
   def methodBody(m: Method): ujson.Obj = {
     val body   = m.body
     val ks     = kidsOf(body)
-    val labels = body.ast.collect {
+    val allLabels = body.ast.collect {
       case j: JumpTarget if j.parserTypeName == "CASTLabelStatement" => j
     }.l
-    val jumps  = body.ast.collect {
+    val allJumps  = body.ast.collect {
       case c: ControlStructure if c.controlStructureType == "GOTO" => c
     }.l
     val idx = ks.indexWhere {
@@ -8516,6 +10888,88 @@ import scala.annotation.tailrec
       }
       ks.indexWhere(_ eq cur)
     }
+    /** `011-control-flow-holes`: labels in the body block (directly, or via plain `{}` blocks) of a
+      * loop or switch `S`, every `goto` to which has `S` itself as its innermost
+      * enclosing `for`/`while`/`do`/`switch`:
+      *
+      *     for (...) { ...; if (c) goto next; ...; next: T; }
+      *     switch (op) { case A: if (v) goto dflt; ...; default: dflt: T; }
+      *
+      * Such a jump means "run the rest of `S`'s body from the label, `T`, then leave
+      * the body the way reaching its end does" -- and each `S` has a Core statement
+      * for exactly that exit: the end of a LOOP body is `continue` (C11 6.8.6.2p2
+      * defines `continue` as a jump to just before the end of the body; `pushStep` /
+      * `pushDoTest` then give a `for` its step and a `do` its test, exactly as for a
+      * written `continue`), and the end of a SWITCH body is `break` (the switch is
+      * done; `Stmt.breakBlock` catches it). So the `goto` is replaced by a copy of `T`
+      * followed by that exit -- the same tail-splice `gotoTailStmts` uses at function
+      * level, with the loop/switch exit playing the role of its trailing `return`:
+      * the copy can never complete `.normal`, so nothing after the `goto` site runs.
+      * A `break`/`continue` inside `T` binds to `S` in the copy exactly as in the
+      * original (the copy sits inside `S` too, and the site has no nearer
+      * loop/switch). `case`/`default` markers inside `T` are dropped (falling past a
+      * case label is a no-op; the value node after a `case` marker is not a
+      * statement). A `goto` inside a nested loop/switch is rejected (the exit would
+      * bind to that inner construct). A `goto` from within `T` itself to the same
+      * label would re-expand forever; `expandingGotoLabels` turns that into the
+      * ordinary `control:GOTO` hole. These labels and their jumps are removed from
+      * what the function-level mechanisms below consider, since this one fully
+      * accounts for them. Values: (tail nodes, exit statement kind). */
+    val blockExitLabels: Map[String, (List[AstNode], String)] = {
+      def innermost(n: AstNode): Option[AstNode] = ancestorsTo(n).reverse.collectFirst {
+        case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) => cs
+      }
+      def dropCaseMarkers(ns: List[AstNode]): List[AstNode] = ns match {
+        case (j: JumpTarget) :: _ :: rest if j.parserTypeName == "CASTCaseStatement" => dropCaseMarkers(rest)
+        case (j: JumpTarget) :: rest if j.parserTypeName == "CASTDefaultStatement"   => dropCaseMarkers(rest)
+        case n :: rest => n :: dropCaseMarkers(rest)
+        case Nil       => Nil
+      }
+      // The label may also sit inside PLAIN nested blocks within that body
+      // (`default: { dflt: ...; }`, SQLite's `sqlite3ExprIfTrue`): a plain `{ }`
+      // block is not a control construct, so when it ends control simply continues
+      // with the statements after it in its own enclosing block. The tail is then
+      // the rest of the innermost block after the label, followed by the rest of each
+      // enclosing plain block after the block it contains, up to the loop/switch
+      // body -- exactly the statements C executes, in order. Only `Block`-in-`Block`
+      // nesting is walked; any other construct in between (an `if` branch, ...)
+      // disqualifies the label.
+      def climb(n: AstNode, acc: List[AstNode]): Option[(Block, List[AstNode], AstNode)] =
+        parentOf(n) match {
+          case Some(blk: Block) =>
+            val sibs = kidsOf(blk)
+            val at = sibs.indexWhere(_ eq n)
+            if (at < 0) None
+            else {
+              val acc2 = acc ++ sibs.drop(at + 1)
+              parentOf(blk) match {
+                case Some(outer: Block) => climb(blk, acc2)
+                case _                  => Some((blk, acc2, n))
+              }
+            }
+          case _ => None
+        }
+      allLabels.flatMap { l =>
+        val sameName = allLabels.count(_.name == l.name) == 1
+        climb(l, Nil) match {
+          case Some((blk, tailNodes, _)) if sameName =>
+            val ownerOpt = parentOf(blk).collect {
+              case cs: ControlStructure if Set("FOR", "WHILE", "DO", "SWITCH").contains(cs.controlStructureType) &&
+                                           !cs.condition.l.exists(_ eq blk) &&
+                                           (cs.controlStructureType != "FOR" || blk.order == 4) => cs
+            }
+            val myJumps = allJumps.filter(g => kidsOf(g).map(_.code.trim) == List(l.name))
+            if (ownerOpt.isDefined && myJumps.nonEmpty &&
+                myJumps.forall(g => innermost(g).exists(_ eq ownerOpt.get))) {
+              val exit = if (ownerOpt.get.controlStructureType == "SWITCH") "brk" else "cont"
+              Some(l.name -> (dropCaseMarkers(tailNodes), exit))
+            } else None
+          case _ => None
+        }
+      }.toMap
+    }
+    val labels = allLabels.filterNot(l => blockExitLabels.contains(l.name))
+    val jumps  = allJumps.filterNot(g => kidsOf(g).size == 1 && blockExitLabels.contains(kidsOf(g).head.code.trim))
     /** `010-reach-90pct-hole-free` US6: generalizes `tailAlwaysExits` below from
       * "is `ks.last` a bare `Return`" to "does a forward scan from this label's
       * own position reach a bare `Return` (truncate there -- everything after is
@@ -8558,8 +11012,22 @@ import scala.annotation.tailrec
       * contains no unresolved `goto` to a label this same resolution pass
       * covers, and re-translating it via the ordinary `stmt()`/`gotoTailStmts`
       * dispatch can never recurse back into this computation. */
-    val resolvedTailCache = scala.collection.mutable.Map.empty[String, Option[List[AstNode]]]
-    def resolvedTailStmts(labelName: String, depth: Int): Option[List[AstNode]] =
+    //
+    // `011-control-flow-holes`: the second component says whether the resolved tail
+    // ends by FALLING OFF THE END of the function body (the scan ran out of `ks`
+    // without meeting a `return` or a `goto`) -- previously `None`, which left every
+    // `void` function's `goto cleanup;` whose cleanup simply ends at the closing
+    // brace (`attachFunc`, `sqlite3FinishTrigger`, `sqlite3AddGenerated`, ...) a
+    // `control:GOTO` hole. Falling off the end of a function body IS an exit: Core's
+    // `applyFunc` maps a body that finishes `.normal` to the value `unit`, and maps
+    // `.ret unit` to the identical `unit`. So the splice site appends an explicit
+    // `return` (of `unit`) after such a tail (`gotoTailFallsOff`), which (a) is
+    // observationally identical to reaching the end of the function, and (b) restores
+    // exactly the property the splice's soundness rests on -- the spliced copy never
+    // completes `.normal`, so nothing after the `goto` site can run. A tail reached
+    // through a chain of `goto`s inherits the flag of the tail it ends in.
+    val resolvedTailCache = scala.collection.mutable.Map.empty[String, Option[(List[AstNode], Boolean)]]
+    def resolvedTailStmts(labelName: String, depth: Int): Option[(List[AstNode], Boolean)] =
       if (depth > labels.size) None
       else resolvedTailCache.getOrElseUpdate(labelName + "@" + depth, {
         val labelIdx = ks.indexWhere { case j: JumpTarget => j.name == labelName; case _ => false }
@@ -8567,12 +11035,12 @@ import scala.annotation.tailrec
         else {
           val start = labelIdx + 1
           var i = start
-          var result: Option[List[AstNode]] = None
+          var result: Option[(List[AstNode], Boolean)] = None
           var done = false
           while (!done && i < ks.size) {
             ks(i) match {
               case _: Return =>
-                result = Some(ks.slice(start, i + 1))
+                result = Some((ks.slice(start, i + 1), false))
                 done = true
               case g: ControlStructure if g.controlStructureType == "GOTO" =>
                 kidsOf(g) match {
@@ -8580,7 +11048,8 @@ import scala.annotation.tailrec
                     val targetName = t.code.trim
                     val targetIdx = ks.indexWhere { case j: JumpTarget => j.name == targetName; case _ => false }
                     if (targetIdx >= 0)
-                      result = resolvedTailStmts(targetName, depth + 1).map(inner => ks.slice(start, i) ++ inner)
+                      result = resolvedTailStmts(targetName, depth + 1).map { case (inner, fo) =>
+                        (ks.slice(start, i) ++ inner, fo) }
                   case _ =>
                 }
                 done = true
@@ -8588,6 +11057,7 @@ import scala.annotation.tailrec
                 i += 1
             }
           }
+          if (!done) result = Some((ks.slice(start, ks.size), true))
           result
         }
       })
@@ -8723,26 +11193,73 @@ import scala.annotation.tailrec
         kidsOf(g).size == 1 && labels.exists(_.name == kidsOf(g).head.code.trim)
       }
 
-    if (singleLabelOk) {
-      val saved = gotoAsBreak
-      gotoAsBreak = Some(labels.head.name)
-      val prefix = seqOf(stmts(ks.take(idx)))
-      gotoAsBreak = saved
-      val suffix = seqOf(stmts(ks.drop(idx + 1)))
-      ujson.Obj("k" -> "seq",
-        "a" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
-                         "body" -> ujson.Obj("k" -> "seq", "a" -> prefix,
-                                             "b" -> ujson.Obj("k" -> "brk"))),
-        "b" -> suffix)
-    }
-    else if (multiLabelOk) {
-      val saved = gotoTailStmts
-      gotoTailStmts = labels.map(l => l.name -> resolvedTailStmts(l.name, 0).get).toMap
-      val result = stmt(body)
-      gotoTailStmts = saved
-      result
-    }
-    else stmt(body)
+    /** `011-control-flow-holes`: a BACKWARD jump to a "restart" label --
+      *
+      *     A;  again:  B;  if (e) goto again;  C;
+      *
+      * is exactly
+      *
+      *     A;  while (true) { B; if (e) continue; C; break }
+      *
+      * The one-shot loop runs `B..C` once; `continue` re-enters it at the top, i.e.
+      * at `again`, which is precisely where the `goto` lands; the trailing `break`
+      * leaves once the body completes normally, which is the function falling off its
+      * end after `C` exactly as before (nothing follows the loop). `return` passes
+      * straight through `Stmt.loop`. Conditions, each load-bearing in the same way as
+      * `singleLabelOk`'s: exactly one (remaining) label, a direct child of the body;
+      * every jump targets it, sits AFTER it (a backward jump -- a forward one would
+      * enter the loop body from outside) and is not inside any loop or switch (a
+      * `continue` there binds to that inner construct -- `outsideLoopScope` also
+      * clears `gotoAsRestart` as defence in depth). SQLite: `sqlite3ExprDeleteNN`'s
+      * `exprDeleteRestart`, `vdbeRecordCompareString`'s `vrcs_restart`. */
+    val restartOk =
+      jumps.nonEmpty && labels.size == 1 && idx >= 0 && (labels.head eq ks(idx)) &&
+      targets == List(labels.head.name) &&
+      jumps.forall(g => !insideLoop(g) && { val i = topIndex(g); i > idx })
+
+    val savedBlockExit = gotoAsBlockExit
+    val savedBudget = blockExitSpliceBudget
+    gotoAsBlockExit = blockExitLabels
+    blockExitSpliceBudget = 4000
+    val out =
+      if (singleLabelOk) {
+        val saved = gotoAsBreak
+        gotoAsBreak = Some(labels.head.name)
+        val prefix = seqOf(stmts(ks.take(idx)))
+        gotoAsBreak = saved
+        val suffix = seqOf(stmts(ks.drop(idx + 1)))
+        ujson.Obj("k" -> "seq",
+          "a" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                           "body" -> ujson.Obj("k" -> "seq", "a" -> prefix,
+                                               "b" -> ujson.Obj("k" -> "brk"))),
+          "b" -> suffix)
+      }
+      else if (restartOk) {
+        val prefix = seqOf(stmts(ks.take(idx)))
+        val saved = gotoAsRestart
+        gotoAsRestart = Some(labels.head.name)
+        val tail = seqOf(stmts(ks.drop(idx + 1)))
+        gotoAsRestart = saved
+        ujson.Obj("k" -> "seq", "a" -> prefix,
+          "b" -> ujson.Obj("k" -> "loop", "c" -> ujson.Obj("k" -> "bool", "v" -> true),
+                           "body" -> ujson.Obj("k" -> "seq", "a" -> tail,
+                                               "b" -> ujson.Obj("k" -> "brk"))))
+      }
+      else if (multiLabelOk) {
+        val saved = gotoTailStmts
+        val savedFo = gotoTailFallsOff
+        val resolved = labels.map(l => l.name -> resolvedTailStmts(l.name, 0).get).toMap
+        gotoTailStmts = resolved.map { case (k, v) => k -> v._1 }
+        gotoTailFallsOff = resolved.collect { case (k, (_, true)) => k }.toSet
+        val result = stmt(body)
+        gotoTailStmts = saved
+        gotoTailFallsOff = savedFo
+        result
+      }
+      else stmt(body)
+    gotoAsBlockExit = savedBlockExit
+    blockExitSpliceBudget = savedBudget
+    out
   }
 
   /** Translate one method with the right scope/dialect state installed. `isModule` marks
@@ -9273,8 +11790,43 @@ import scala.annotation.tailrec
                    boxedStructFieldOperand(operand).isDefined ||
                    pointerStructFieldOperand(operand).isDefined ||
                    boxedStructArrayIndexOperand(operand).isDefined ||
-                   pointerStructArrayIndexOperand(operand).isDefined =>
+                   pointerStructArrayIndexOperand(operand).isDefined ||
+                   // `p = &n`, `n` a boxed scalar: an interior pointer to `n`'s
+                   // box (`boxedScalarAddr`). Lets a pointer assigned the
+                   // addresses of SEVERAL boxed locals (`q = &a; ... q = &b;`,
+                   // which `ptrAliases`' single-assignment rule refuses) be
+                   // read/written with `derefIref`/`setDerefIref`, which follow
+                   // whichever box `q` holds at that moment.
+                   isBoxedScalarAddrOperand(operand) =>
               Some(None)
+            // `&(*q)->f`: interior pointer iff `q` is (see `irefDerefFieldDep`).
+            // Checked BEFORE the chain shapes: those cannot see through `*q` while
+            // `ptrIrefNames` is being computed (it is empty here), but the order
+            // makes that independence explicit rather than incidental.
+            case List(operand) if irefDerefFieldDep(operand).isDefined =>
+              Some(irefDerefFieldDep(operand))
+            // `&p->q->f` / `&p->q->arr[i]`: the chain forms `callExpr`'s
+            // `<operator>.addressOf` case already translates to `irefField`/
+            // `irefIndex` over `pointerBaseExpr` (`chainFieldIref`/`chainArrIref`),
+            // so the assigned value is an interior pointer exactly as for the
+            // single-hop shapes above.
+            case List(operand)
+                if chainedStructFieldOperand(operand).isDefined ||
+                   chainedStructArrayIndexOperand(operand).isDefined =>
+              Some(None)
+            // `011-address-of-local-arrays`: `t = &p[i]` -- `p + i` in C
+            // (`irefElementAddrOf`), so sound PROVIDED `p` is itself tracked,
+            // exactly the `<operator>.addition` case below. The structural half
+            // of `irefElementAddrOperand`'s guards is re-checked here (that
+            // helper itself reads `ptrIrefNames`, which is what is being computed):
+            // a bare, uncast receiver, a non-pointer index, a non-aggregate
+            // element, and never a `char*` receiver, which could instead be a
+            // `strCursorParams` byte cursor (`Val.str` model, computed later).
+            case List(operand) if asIndex(operand).exists { case (r, i) =>
+                  rawLocalOrParamName(r).isDefined && !isPointerType(staticTypeOf(i)) &&
+                  !isCStringType(staticTypeOf(r)) &&
+                  !isClassType(staticTypeOf(operand)) && addrKind(staticTypeOf(operand)) != "object" } =>
+              Some(rawLocalOrParamName(asIndex(operand).get._1).map(localName))
             case _ => None
           }
         case src: Identifier if boxedArrays.contains(localName(src.name)) =>
@@ -9348,6 +11900,21 @@ import scala.annotation.tailrec
                        !boxedLocals.contains(localName(p.name)))
           .map(p => localName(p.name)).toSet
 
+      // A dependency on the name ITSELF (`p = p + n`, `pp = &(*pp)->pNext`) is
+      // satisfied inductively: every value `p` is ever assigned is then either
+      // self-sufficient, derived from another tracked name, or derived from `p`'s
+      // own PREVIOUS value, which was one of those. Two conditions keep the base
+      // case real rather than vacuous: `p` must have at least one assignment that
+      // does NOT depend on itself, and a PARAMETER must itself be trusted
+      // (`paramTracked`) -- its incoming value is the unassigned "previous value",
+      // and nothing else says the caller passed an interior pointer. (A local read
+      // before any assignment is `unit`, which only makes `derefIref`/arithmetic a
+      // dynamic hole.)
+      val paramNames: Set[String] = m.parameter.l.map(pp => localName(pp.name)).toSet
+      def selfDepOk(nm: String, cs: List[Option[Option[String]]]): Boolean =
+        cs.exists(_.exists(dep => !dep.contains(nm))) &&
+        (!paramNames.contains(nm) || paramTracked.contains(nm))
+
       var tracked: Set[String] = paramTracked ++ ptrIrefAllocNames.keySet ++
         classified.collect {
           case (nm, cs) if !disqualified(nm) && cs.forall(_.exists(_.isEmpty)) => nm
@@ -9365,7 +11932,8 @@ import scala.annotation.tailrec
         for (_ <- 1 to 4) {
           val newlyQualified = classified.collect {
             case (nm, cs) if !disqualified(nm) && !tracked(nm) &&
-                             cs.forall(c => c.exists(dep => dep.isEmpty || tracked(dep.get))) => nm
+                             cs.forall(c => c.exists(dep => dep.isEmpty || tracked(dep.get) ||
+                                                              (dep.get == nm && selfDepOk(nm, cs)))) => nm
           }.toSet
           tracked = tracked ++ newlyQualified
         }
@@ -9381,8 +11949,31 @@ import scala.annotation.tailrec
     // byte-cursor tracking -- see `strCursorParams`'s own doc comment. Restricted to
     // an actual `char*`/`char[]`-typed parameter (`isCString`) so this can never fire
     // on an ordinary pointer already served by `ptrIrefNames`/`closedOutParams` above.
+    //
+    // Pointer-arith family: a name ALREADY in `ptrIrefNames` is excluded from
+    // byte-cursor tracking outright (here, and in the local-candidate rounds
+    // below). The two representations are mutually exclusive by construction --
+    // a cursor keeps its ORIGINAL value in `z` and its position in `z$off`,
+    // while an interior pointer carries its position INSIDE its own
+    // `Val.iref` value -- but nothing previously stopped one name from
+    // entering both sets, and then the two halves of the translation
+    // disagreed: its defining assignment was rendered by the cursor seed
+    // (`zEnd = z; zEnd$off = 0 + n`, `assignTo`'s cursor case), while its
+    // reads went through the `isIrefExpr` comparison/subtraction branch in
+    // `callExpr`, which reads the bare `zEnd` binding -- silently dropping
+    // the `+ n`. Reproduced on `char *z = sqlite3_malloc(n); char *zEnd = z
+    // + n; while (z < zEnd) ...`: the loop test compared `z` against the
+    // UNADVANCED base and was false on entry -- a hole-free, wrong
+    // translation. The interior-pointer reading is the one that is right for
+    // every occurrence (its arithmetic lives in the value), so it wins.
+    //
+    // Also restricted to a SINGLE-level `char` pointer (`isSingleCharPointer`,
+    // here and for locals below) rather than `isCString`, whose pattern admits
+    // `char**`: a byte cursor models a pointer to BYTES, and `argv[i]` on a
+    // `char **argv` was being read as `strByte argv (argv$off + i)` -- one byte
+    // of a string, where C reads the i-th POINTER.
     strCursorParams = (if (moduleScope) Nil else m.parameter.l)
-      .filter(p => isCString(p) && strCursorEligible(m, p.name))
+      .filter(p => isSingleCharPointer(p) && !ptrIrefNames.contains(localName(p.name)) && strCursorEligible(m, p.name))
       .map(p => localName(p.name)).toSet
     // `009-reduce-remaining-holes-4`: LOCAL variables, generalizing the mechanism
     // above beyond parameters -- SQLite's own extremely common `char *zTail = zStr +
@@ -9457,7 +12048,7 @@ import scala.annotation.tailrec
     // couple of hops deep, and a candidate that still doesn't resolve after
     // the round bound simply stays excluded, never guessed into membership.
     val localCandidates = (if (moduleScope) Nil else m.local.l)
-      .filter(l => isCStringType(l.typeFullName) && strCursorEligible(m, l.name, allowDefiningAssign = true))
+      .filter(l => isSingleCharPointerType(l.typeFullName) && strCursorEligible(m, l.name, allowDefiningAssign = true))
       .filter { l =>
         m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
           .count(c => kidsOf(c) match { case (i: Identifier) :: _ :: Nil => i.name == l.name; case _ => false }) == 1
@@ -9470,7 +12061,8 @@ import scala.annotation.tailrec
     }.toMap
     for (_ <- 1 to 4) {
       val newlyQualified = candidateRhs.collect {
-        case (nm, rhs) if !strCursorParams.contains(nm) && cursorBaseAndOffset(rhs).isDefined => nm
+        case (nm, rhs) if !strCursorParams.contains(nm) && !ptrIrefNames.contains(nm) &&
+                          cursorBaseAndOffset(rhs).isDefined => nm
       }.toSet
       strCursorParams = strCursorParams ++ newlyQualified
     }
@@ -9567,6 +12159,42 @@ import scala.annotation.tailrec
       } {
         strCursorBase = strCursorBase + (nameI -> nameI) + (nameJ -> nameI)
       }
+    }
+    // Pointer-arith family: `stableCursorRoots` -- see its declaration.
+    stableCursorRoots = if (moduleScope) Set.empty else {
+      // Every write to a bare name: `(name, isPlainAssign, the write node)`. A
+      // cursor's `++`/`op=` moves only its `$off`, never its binding, so for a
+      // cursor only plain `=` counts as rebinding it.
+      val writes: List[(String, Boolean, Call)] = m.ast.isCall.filter(c =>
+          c.methodFullName == "<operator>.assignment" || augOps.contains(c.methodFullName) ||
+          incrOps.contains(c.methodFullName)).l
+        .flatMap(c => kidsOf(c).headOption.collect {
+          case t: Identifier => (localName(t.name), c.methodFullName == "<operator>.assignment", c)
+        })
+      def rebinds(nm: String): List[Call] =
+        writes.collect { case (n, plain, c) if n == nm && (plain || !strCursorParams.contains(nm)) => c }
+      def inLoop(c: Call): Boolean =
+        c.inAstMinusLeaf.collectAll[ControlStructure]
+          .exists(cs => Set("WHILE", "FOR", "DO").contains(cs.controlStructureType))
+      // The plain `=` that seed a cursor local rooted at `root`.
+      def seeds(root: String): List[Call] =
+        writes.collect { case (n, true, c) if n != root && strCursorParams.contains(n) && strCursorBase.get(n).contains(root) => c }
+      // Every rebind of the root is outside any loop, and textually precedes every
+      // seeding of a cursor rooted at it (`if (zIn == 0) zIn = ""; z = zIn; zEnd =
+      // &z[n];`) -- so, absent backward jumps (a backward `goto` is itself a hole),
+      // all seedings observe the root's one final binding.
+      def stable(root: String): Boolean = {
+        val rb = rebinds(root)
+        rb.isEmpty || (rb.forall(c => !inLoop(c)) && {
+          val rbLines = rb.map(_.lineNumber)
+          val sdLines = seeds(root).map(_.lineNumber)
+          (rbLines ++ sdLines).forall(_.isDefined) &&
+          sdLines.flatten.forall(s => rbLines.flatten.forall(r => r < s))
+        })
+      }
+      val params = m.parameter.l.map(p => localName(p.name)).toSet
+      val locals = m.local.l.map(l => localName(l.name)).toSet -- params
+      (params ++ locals).filter(nm => !boxedLocals.contains(nm) && stable(nm))
     }
     val body0 = methodBody(m)
     // `003-box-address-taken-locals`: allocate every boxed local's/parameter's cell
@@ -9680,6 +12308,7 @@ import scala.annotation.tailrec
     ptrIrefAllocNames = Map.empty
     strCursorParams = Set.empty
     strCursorBase = Map.empty
+    stableCursorRoots = Set.empty
     // `self` is stripped ONLY for a method of a class, where `applyFunc` binds the
     // receiver itself. A MODULE-LEVEL function whose first parameter happens to be named
     // `self` is not a method and its `self` is an ordinary positional: cachetools defines
@@ -9838,10 +12467,12 @@ import scala.annotation.tailrec
   // behind, converges over repeated passes" discipline `wideClosedIrefParam`
   // itself already accepts implicitly by reading `irefNamesByMethod` live.
   for (_ <- 1 to 2) {
+    closedIrefOutParamsTransitive = computeClosedIrefOutParamsTransitive()
     closedIrefOutParamViaVtableTransitive = computeClosedIrefOutParamViaVtableTransitive()
     methods.foreach(emit(_, false))
     moduleMethods.foreach(emit(_, true))
   }
+  closedIrefOutParamsTransitive = computeClosedIrefOutParamsTransitive()
   closedIrefOutParamViaVtableTransitive = computeClosedIrefOutParamViaVtableTransitive()
   val funcs = methods.map(emit(_, false))
   val inits = moduleMethods.map(emit(_, true))

@@ -81,8 +81,15 @@ echo "==> [2/6] cartographer: formalization graph"
   | grep -E "^wrote|^pure" || true
 
 echo "==> [3/6] transpiler: CPG -> neutral AST"
+# The exporter decides struct-body `#ifdef`s (for `sizeof`) against the SAME
+# configuration the parse used, so it is told the defines too -- only when there are
+# some, since an empty `--param` value is not something to rely on.
+EXPORT_ARGS=()
+if [ -n "${CPP_DEFINES:-}" ]; then
+  EXPORT_ARGS+=(--param "cppDefines=$CPP_DEFINES")
+fi
 EXPORT_OUT="$("$JOERN/joern" --script "$ROOT/cartographer/export_ast.sc" \
-  --param cpgPath="$WORK/cpg.bin" --param out="$WORK/ast.json" 2>&1)" && EXPORT_STATUS=0 || EXPORT_STATUS=$?
+  --param cpgPath="$WORK/cpg.bin" --param out="$WORK/ast.json" "${EXPORT_ARGS[@]}" 2>&1)" && EXPORT_STATUS=0 || EXPORT_STATUS=$?
 if [ "$EXPORT_STATUS" -ne 0 ] || ! grep -qE "^exported" <<<"$EXPORT_OUT"; then
   echo "$EXPORT_OUT" >&2
   echo "==> [3/6] FAILED: export_ast.sc did not report success (see output above)" >&2
