@@ -138,7 +138,10 @@ original measurement, not re-run.
 | 3 | JS `5 / 0` | `Infinity` | `float +inf` | **fixed** (`jsIntDiv`; `5 % 0` is `NaN`) |
 | 3 | JS `-7 % 3` | `-1` | `int (-1)` | **fixed** (`jsIntMod` truncates) |
 | 3 | JS `-5.5 % 2.0` | `-1.5` (JS `%` truncates) | `-1.5` | **fixed** under `.javascript` (truncated `fmod`); `.cLike` float `%` still uses Python's floored `pyMod` |
-| 4 | JS `1 == "1"` | `true` | `bool false` | **still wrong** (`==`/`===` are not distinguished) |
+| 4 | JS `1 == "1"` | `true` | `hole "js:==:cross-type-coercion"` | **hole** (was `bool false`): JS `==` is now loose equality, exact on same-type operands, a hole across types except `null`/`undefined` |
+| 4 | JS `1 === "1"` | `false` | `bool false` | **fixed** — `===`/`!==` are Core operators of their own, recovered by the exporter from source text (jssrc2cpg erases them) |
+| 4 | JS `null == 0` | `false` | `bool false` | **fixed** (was `true` by reading the exporter, not measured on a JS CPG: `pointerNullTest` keys on `cLikeFile`, which includes `.js`/`.ts`, and rewrote `x == null` to `x in (None, 0)`) |
+| 7 | JS `1 << 32`, `-1 >>> 0`, `~2147483648` | `1`, `4294967295`, `2147483647` | same | **fixed** (`jsBitwise`/`jsBitNot`: ToInt32/ToUint32; operands beyond 2^53 are a hole). Was `4294967296`, a `ub` hole, `-2147483649` |
 | 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
 | 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |
 
@@ -208,6 +211,31 @@ Both compile to `<operator>.equals` in jssrc2cpg and to Core `binop "=="`, evalu
 principle, because the distinction is erased before Core sees it. Verdict: **wrong**, and
 not fixable inside the semantics; it needs an exporter change.
 
+**Status (2026-10-02): fixed or holed, in both halves.** jssrc2cpg v4.0.606 still maps
+`==`/`===` to `<operator>.equals` and `!=`/`!==` to `<operator>.notEquals` (and, worse,
+`>>`/`>>>` both to `<operator>.arithmeticShiftRight`; read from
+`AstForExpressionsCreator.astForBinaryExpression` at tag `v4.0.606`). The exporter now
+recovers the token from the call's source span (`jsAmbiguousBinop` in
+`cartographer/export_ast.sc`) and emits `"==="`/`"!=="`/`"=="`/`"!="`/`">>"`/`">>>"`; a
+span it cannot parse is the hole `op:js-token-unrecovered:<op>`. In Core (`jsEqE` in
+`Semantics.lean`), under `.javascript`:
+
+| input | Node | Core |
+|---|---|---|
+| `1 === "1"` / `1 !== "1"` | `false` / `true` | `false` / `true` ✅ |
+| `1 == "1"`, `0 == false`, `[1] == 1` | `true` | hole `js:==:cross-type-coercion` |
+| `null == undefined`, `null == 0` | `true`, `false` | `true`, `false` ✅ (`.unit` is both) |
+| `null === undefined` | `false` | hole `js:===:null-vs-undefined` (Core has one `.unit`) |
+| `NaN === NaN`, `-0 === 0`, `1 === 1.0` | `false`, `true`, `true` | same ✅ |
+| `o == o`, `[1] == [1]` (heap objects) | `true`, `false` | same ✅ (identity, not Python's `__eq__`) |
+
+Every row is an `example … := rfl` or `#eval` in `Semantics.lean`; the Node column is
+from `node -e` (v22). **Not verified end to end:** jssrc2cpg is not installed on the
+machine this was done on, so the exporter change is checked on synthetic source spans
+(not a JS CPG), and the tracked `ast-LangJS.json` was not re-exported — its 21 `"=="`
+nodes are therefore read as LOOSE equality, which is exact on same-type operands and a
+hole otherwise, never a wrong answer.
+
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
 
 `.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
@@ -259,7 +287,11 @@ inverse of the C case, and it shows that `.cLike` is not one dialect.
   logical shift; `NumConfig.java32` models both correctly but is unreachable. As shipped
   these are holes, which is safe. **hole**.
 * Go integer overflow is *defined* to wrap; Core wraps, but at the wrong width (item 5).
-* JS `<<` coerces to int32 first; Core holes it. **hole**.
+* JS `<<` coerces to int32 first. *Correction (2026-10-02):* this line said Core holes
+  it; it did not — `.javascript` used `NumConfig.python`, so `1 << 32` was `4294967296`
+  (Node: `1`) and `-1 >>> 0` a `ub` hole (Node: `4294967295`). Now `jsBitwise`
+  applies ToInt32/ToUint32 and masks the count to 5 bits; `~` likewise (`jsBitNot`).
+  Float operands (`1.5 | 0`) and integers beyond 2^53 are holes. **fixed**.
 
 ### 8. Predicted, unverified
 

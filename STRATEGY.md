@@ -3473,3 +3473,71 @@ make the one-argument re-application hit `param:default-nonliteral`; they are no
 `= false` with `¬` of the obligation. `check_specs_fresh --record` was run only after both
 modules elaborated against the new AST: `synth_specs.py` would regenerate `C_tfFree`, which
 `C_not_tfFree` refutes, so it cannot regenerate `SpecsGen/Cachetools.lean` as-is.
+
+## 61. CI was red on every fresh checkout, at three steps; and JS `==`, `===`, `>>>` were one operator each
+
+### `check_render` exit 3, by policy rather than by accident
+
+§55/§56 left `Ansible`, `LinuxCrypto` and `LinuxLib` pinned in `artifact-manifest.json`
+with no AST in git, so `check_render.py` reported them UNVERIFIABLE and exited 3 on
+every CI run. Measured in a fresh clone of `86a161b`: `14 verified, 0 mismatched, 3
+unverifiable (of 17)`, exit 3. Tracking them was the first option considered and is not
+available: no copy of any of the three exists on this machine (searched the filesystem),
+neither the corpus commit nor the exporter version that produced the pinned hashes was
+recorded, so a re-export cannot reproduce them, and Ansible's 136.6 MB exceeds GitHub's
+100 MB per-file limit.
+
+A gate that is red on every run is a gate nobody reads, and exit 3 would have meant
+nothing the day a *new* AST went missing. So the absence became a fourth verdict,
+NOT-TRACKED, granted only by a hand-edited `untracked_by_policy` entry (non-empty
+`reason` and `reviewed`) and only when the tree confirms it: `git check-ignore` says the
+AST is ignored, `git ls-files` that it is untracked, the manifest says `ast_tracked:
+false`, and no spec module is pinned to the corpus (the §55 case cannot be allowlisted).
+NOT-TRACKED is named on every run, counted separately, never counted as verified; an
+allowlisted AST that is present is fully checked; `--strict` ignores the list, and CI's
+"for the log" step now runs `--strict`. Measured in the worktree: default `14 verified, 0
+mismatched, 0 unverifiable, 3 NOT checked (untracked by reviewed policy: Ansible,
+LinuxCrypto, LinuxLib)`, exit 0; `--strict` exit 3. Eight tests in
+`tests/test_check_render.py` pin each refusal (`pytest`: 211 passed, 1 xfailed).
+
+### The proof-inventory step could not pass either
+
+`grep -c '^ *theorem ' Autoform/SpecsGen/V8Base.lean` is 0: since `e36b8f1` that file only
+imports `V8Base/Part1..Part73`, and under `set -e` a zero `grep -c` killed the step. It
+now counts the umbrella plus its parts (285, floor 229) and fails on a missing file.
+
+### Steps not fully simulated
+
+Each `run:` block was executed in a fresh clone (`runstep.py`, bash `-e`). Passing:
+V8Base render, `check_specs_fresh` (0), proof inventory, FuelMono guard, the
+`C_not_tfFree` grep, the pinned cachetools clone. `taskset -c 0 lake build` was attempted
+in the clone and one `SpecsGen/V8Base/Part*` was OOM-killed (exit 137) with the shared
+4-core/15 GB box at 13 GB used by other builds — an environment limit here, not a
+verdict on the 7 GB runner, which the existing `taskset` comment addresses (nine
+`V8Base/Part*` jobs were killed this way before the attempt was stopped). On the partial
+build: ledger regeneration exit 0, `check_docs` exit 0 (10 figures match),
+`check_specs.py Basis` exit 0 (21 theorems), conformance oracle `60 COMPARED` (passes the
+`> 0` gate). Not run here: the trust audit (`audit_all.py --strict` replays every
+`.olean`) and the demo, which imports the root `Autoform` module and so needs the full
+build. These were simulated on `86a161b` content plus this branch's scripts, before the
+merge of round-1 item G, whose `Ledger`/`HoleContracts` build failures are being fixed
+separately.
+
+### JavaScript: three erased operator pairs
+
+jssrc2cpg v4.0.606 (`AstForExpressionsCreator.astForBinaryExpression`, read at that tag)
+maps `==`/`===` to `<operator>.equals`, `!=`/`!==` to `notEquals`, and **`>>`/`>>>` both
+to `arithmeticShiftRight`**. The exporter now recovers the token from the call's source
+span (`jsAmbiguousBinop`; anything unparseable is `op:js-token-unrecovered:<op>`), ahead
+of the C null-test rewrite, which had been turning JS `x == null` into `x in (None, 0)`
+(`0 == null` is `false` in Node). Core's `.javascript` arms: `===` is strict equality;
+`==` is exact on same-type operands and on `null`/`undefined`, a hole for cross-type
+coercion; heap objects compare by identity, not Python `__eq__`; the bitwise operators
+apply ToInt32/ToUint32 with a 5-bit count, and operands beyond 2^53 hole. 43 `example`/`#eval`
+checks in `Semantics.lean`, each against `node -e` (v22.22.2); `docs/languages.md` §4/§7.
+Not done: jssrc2cpg is not installed here, so the exporter change is checked on 15
+synthetic spans through Joern (and a C export is byte-identical before and after), not on
+a JS CPG; `ast-LangJS.json` was not re-exported. `.unit` is both `null` and `undefined`,
+so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
+(`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
+new Core operator.

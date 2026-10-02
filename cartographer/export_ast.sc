@@ -1199,6 +1199,10 @@ import scala.annotation.tailrec
     * includes Java, Go, JS, TS and Kotlin). The constructor spelling `Cls::Cls`, the
     * implicit `this`, and stack object construction are C++ facts, not `cLike` facts. */
   var cppFile         = false
+  /** JavaScript/TypeScript (the extensions `render_lean.py` maps to `.javascript`). The
+    * jssrc2cpg frontend erases `==`/`===`, `!=`/`!==` and `>>`/`>>>`; see
+    * `jsAmbiguousBinop`. */
+  var jsFile          = false
   /** `010-reach-90pct-hole-free`: is a single-quoted literal in THIS file a numeric
     * character/rune constant (C/C++/Java/Kotlin/Go: `'x'` is an integer, its codepoint)
     * rather than an alternative string-quoting style (JS/TS: `'x'` and `"x"` are the
@@ -7187,8 +7191,69 @@ import scala.annotation.tailrec
     * the missing *type* rather than pretending to a semantics.
     *
     * A `char*` operand cannot reach here (shifting a pointer is not C). */
+  /** JS/TS: the binary-operator token jssrc2cpg erased, recovered from source text.
+    *
+    * jssrc2cpg (`AstForExpressionsCreator.astForBinaryExpression`, Joern v4.0.606) maps
+    * `==` and `===` both to `<operator>.equals`, `!=` and `!==` both to
+    * `<operator>.notEquals`, and `>>` and `>>>` both to `<operator>.arithmeticShiftRight`.
+    * Those pairs differ in JS (`1 == "1"` is `true`, `1 === "1"` is `false`; `-1 >> 0` is
+    * `-1`, `-1 >>> 0` is `4294967295`), so the operator name alone cannot be translated.
+    * What survives is the call's CODE, Babel's source span of the whole expression, and
+    * each operand's span. The token is what lies between them: `full` = (parens) `left`
+    * (parens/space) TOKEN (space/parens) `right`. Anything that does not have exactly
+    * that shape -- a comment between operand and operator, truncated code, a span that
+    * does not start with the left operand -- yields `None`, and the caller emits a hole
+    * naming the lost token rather than guessing either operator.
+    *
+    * Returns `None` when the call is not one of the three ambiguous operators in a JS/TS
+    * file, else `Some(Right(coreOp))` or `Some(Left(holeLabel))`. */
+  def jsAmbiguousBinop(c: Call): Option[Either[String, String]] = {
+    val mfn = c.methodFullName
+    val allowed: Map[String, Set[String]] = Map(
+      "<operator>.equals"               -> Set("==", "==="),
+      "<operator>.notEquals"            -> Set("!=", "!=="),
+      "<operator>.arithmeticShiftRight" -> Set(">>", ">>>"))
+    val kids = kidsOf(c)
+    if (!jsFile || !allowed.contains(mfn) || kids.size != 2) None
+    else {
+      val tok = jsOperatorToken(c.code, kids(0).code, kids(1).code, allowed(mfn).toList)
+      Some(tok.toRight("op:js-token-unrecovered:" + mfn.stripPrefix("<operator>.")))
+    }
+  }
+
+  /** Which of `candidates` sits between two operand spans in a binary expression's
+    * source text. Longest candidate first (`===` before `==`), and a candidate only
+    * counts if the RIGHT operand's span follows it, so `a === !b` is `===`, not `===!`.
+    * Pure string function, so it can be checked without a CPG. */
+  def jsOperatorToken(full: String, left: String, right: String,
+                      candidates: List[String]): Option[String] = {
+    def skip(s: String, i: Int, cs: String): Int = {
+      var j = i
+      while (j < s.length && (cs.contains(s(j)) || s(j).isWhitespace)) j += 1
+      j
+    }
+    if (full == null || left == null || right == null || left.isEmpty || right.isEmpty) None
+    else {
+      // The left operand's span starts the expression, possibly after opening parens
+      // that belong to it (Babel spans exclude a parenthesised operand's parens).
+      val starts = (0 to skip(full, 0, "(")).filter(i => full.startsWith(left, i))
+      starts.headOption.flatMap { i =>
+        val t0 = skip(full, i + left.length, ")")
+        candidates.sortBy(-_.length).find { tok =>
+          full.startsWith(tok, t0) && {
+            val r = skip(full, t0 + tok.length, "(")
+            full.startsWith(right, r) &&
+              // the right operand must END the expression (modulo closing parens)
+              skip(full, r + right.length, ")") == full.length
+          }
+        }
+      }
+    }
+  }
+
   def shiftRightOp(lhs: AstNode): Option[String] =
-    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, JS, Python: the token is unambiguous
+    if (!cppFile) Some(">>")     // Java `>>`/`>>>`, Python: the token is unambiguous; JS
+                                 // never reaches here (`jsAmbiguousBinop` runs first)
     else {
       val b = bareType(staticTypeOf(lhs))
       if (signedTypeNames.contains(b)) Some(">>")
@@ -7854,7 +7919,16 @@ import scala.annotation.tailrec
     // evidence for a bare `0` (so `n == 0` on an integer is untouched); a
     // `NULL`/`nullptr`/`(T*)0` operand is its own evidence. Only the non-null
     // side is evaluated, once, so no purity condition is needed.
-    if (pointerNullTest(c).isDefined) {
+    // JS/TS `==`/`===`/`!=`/`!==`/`>>`/`>>>`: FIRST, before the C-family null test
+    // below, which would turn `x == null` into `x in (None, 0)` -- `0 == null` is
+    // `false` in JS. See `jsAmbiguousBinop`; Core's `.javascript` arms decide `null`.
+    if (jsAmbiguousBinop(c).isDefined)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) => ujson.Obj("k" -> "binop", "op" -> op,
+                                    "a" -> expr(kids(0)), "b" -> expr(kids(1)))
+        case Left(lbl) => hole(lbl)
+      }
+    else if (pointerNullTest(c).isDefined) {
       val (other, neg) = pointerNullTest(c).get
       nullTestExpr(expr(other), neg)
     }
@@ -10517,6 +10591,15 @@ import scala.annotation.tailrec
       exprV(macroCommaBlock(c).get)
     // Compound-expression pass-through (research.md §3, point 2): thread and
     // concatenate sub-preludes left-to-right, matching source evaluation order.
+    // JS/TS: the erased token, recovered (see `callExpr`'s matching branch).
+    case c: Call if jsAmbiguousBinop(c).isDefined =>
+      val List(a, b) = kidsOf(c)
+      jsAmbiguousBinop(c).get match {
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
+        case Left(lbl) => (Nil, hole(lbl))
+      }
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)
       shiftRightOp(a) match {
@@ -11285,6 +11368,7 @@ import scala.annotation.tailrec
   // below as initializers, so they never inflate the function count either.
   lazy val cLikeExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".js", ".ts", ".kt", ".go")
   lazy val cppExts   = List(".c", ".h", ".cpp", ".cc", ".hpp")
+  lazy val jsExts    = List(".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs")
   // `010-reach-90pct-hole-free`: `cLikeExts` minus `.js`/`.ts` -- see
   // `charLiteralIsNumeric`'s own doc comment for why those two are excluded.
   lazy val charLiteralExts = List(".c", ".h", ".cpp", ".cc", ".hpp", ".java", ".kt", ".go")
@@ -11768,6 +11852,7 @@ import scala.annotation.tailrec
     currentClass = enclosingClassOf(m.fullName)
     cLikeFile    = cLikeExts.exists(e => m.filename.toLowerCase.endsWith(e))
     cppFile      = cppExts.exists(e => m.filename.toLowerCase.endsWith(e))
+    jsFile       = jsExts.exists(e => m.filename.toLowerCase.endsWith(e))
     charLiteralIsNumeric = charLiteralExts.exists(e => m.filename.toLowerCase.endsWith(e))
     def fieldReceiverNames(op: String): Set[String] =
       m.body.ast.isCall.filter(_.methodFullName == op).l.flatMap { c =>

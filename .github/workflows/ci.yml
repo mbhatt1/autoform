@@ -135,6 +135,16 @@ jobs:
       # byte-for-byte with the committed module. This is the check that
       # caught a mutation-gate mutant which had survived four commits with
       # every proof still passing (STRATEGY.md 17/30/31).
+      #
+      # Ansible, LinuxCrypto and LinuxLib have pinned hashes but no AST in git (gitignored
+      # by policy; no source commit or exporter version was recorded, so they cannot be
+      # re-exported to the pinned hash). This step was red on EVERY run because of them
+      # (exit 3), which made exit 3 meaningless. They are now reported NOT-TRACKED --
+      # printed and named in the summary, never counted as verified -- but only because
+      # `untracked_by_policy` in artifact-manifest.json lists each with a reason and a
+      # review, `git check-ignore` confirms the ignore, and no spec is pinned to them.
+      # Any OTHER absent AST is still UNVERIFIABLE, exit 3. `--strict` ignores the
+      # allowlist (run it locally to see the full gap). See STRATEGY.md 59.
       - name: check_render — committed modules are renders of committed ASTs
         run: python3 scripts/check_render.py
 
@@ -244,11 +254,15 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          check() {  # name file floor
-            n=$(grep -c '^ *theorem ' "$2")
-            echo "$1: $n theorems (floor $3)"
-            if [ "$n" -lt "$3" ]; then
-              echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
+          check() {  # name floor file...   (counts across every file given)
+            name=$1; floor=$2; shift 2
+            for f in "$@"; do
+              test -f "$f" || { echo "MISSING: $f -- this floor stopped counting"; fail=1; }
+            done
+            n=$(cat "$@" 2>/dev/null | grep -c '^ *theorem ' || true)
+            echo "$name: $n theorems (floor $floor)"
+            if [ "$n" -lt "$floor" ]; then
+              echo "REGRESSION: $name lost proofs ($n < $floor)"; fail=1
             fi
           }
           # A floor here is a floor on TEXT. SpecsGen/V8Base still does not elaborate --
@@ -259,11 +273,16 @@ jobs:
           # are now Prop-valued open obligations (the fuel transport is refuted, not
           # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
           # its text count is higher than the old floor and the floor stays where it was.
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
-          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
-          check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
-          check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
-          check Refine              Autoform/Refine.lean             113
+          #
+          # SpecsGen/V8Base.lean has been an import-only umbrella since e36b8f1 split it
+          # into Autoform/SpecsGen/V8Base/Part*.lean, so grepping the umbrella alone
+          # counted 0 and failed this step on every fresh checkout; the floor now counts
+          # the umbrella plus its parts (285 theorems at 86a161b).
+          check SpecsGen-Cachetools 79  Autoform/SpecsGen/Cachetools.lean
+          check SpecsGen-V8Base     229 Autoform/SpecsGen/V8Base.lean Autoform/SpecsGen/V8Base/*.lean
+          check SpecsGen-Basis      21  Autoform/SpecsGen/Basis.lean
+          check SpecsGen-LinuxLib   12  Autoform/SpecsGen/LinuxLib.lean
+          check Refine              113 Autoform/Refine.lean
           exit $fail
 
       # ...and the count is only meaningful for a module that proves. This is the
@@ -306,10 +325,12 @@ jobs:
       # render a build product. check_render verifies both halves against
       # artifact-manifest.json and reports UNVERIFIABLE (non-zero) when an AST is
       # absent rather than passing on an empty comparison.
+      # --strict: the same check with the untracked_by_policy allowlist ignored, so the
+      # log always shows exactly which pinned corpora a clone cannot verify.
       - name: check_specs / check_render report, for the log
         if: always()
         run: |
-          python3 scripts/check_render.py || true
+          python3 scripts/check_render.py --strict || true
 
       # Demo.lean deliberately contains a `sorry`-admitted theorem and two
       # deliberately-failing audits, to demonstrate that the audit catches them.
