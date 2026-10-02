@@ -213,8 +213,9 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 Boxed mutable containers (`Stmt.setIndex` is still a hole — design in
 `docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
-contracts at holes, so partially-translated functions can be reasoned about under stated
-assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
+contract *inference* at holes (the mechanism for reasoning about partially-translated
+functions under named assumptions, the ledger's separate conditional count and a worked
+example exist — `docs/contracts.md` — but every hole contract is hand-written); `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
 is **not yet wired into the semantics**, so floats still hole). `op:starredUnpack` is
 **closed** (STRATEGY.md §35) — Core now has a variadic calling convention; what is left of
 it is default parameter values, keyword-only parameters, and starred *destructuring*.

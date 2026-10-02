@@ -12,9 +12,13 @@ import json, os, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DRIVER = '''import Autoform.Contracts
+# `Autoform.HoleContracts` re-exports `Contracts.Demo.contractRecords` (expression-hole
+# contracts, about the historical `keysProgramHoled` slice) together with its own
+# statement-hole records (about the generated module), each tagged with `program` and
+# `function` so sacm.py can count conditionally *verified* functions of this module.
+DRIVER = '''import Autoform.HoleContracts
 def main : IO Unit :=
-  IO.println (Autoform.Contracts.Demo.contractRecordsJson %s).compress
+  IO.println (Autoform.HoleContracts.Demo.allContractRecordsJson %s).compress
 '''
 
 
