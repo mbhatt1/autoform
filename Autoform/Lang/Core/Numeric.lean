@@ -703,8 +703,9 @@ invisible because nothing in the build ever named a language.
 
 `Lang` names it. `javascript`/`typescript` now route to the real `Dialect.javascript`
 (see `Syntax.lean`) instead of `.cLike`, which fixes the measured `&&`/`||` and integer-
-overflow bugs; `Lang.approximated` still marks them `true` because the bitwise/shift-op
-gap documented on `Dialect` itself remains open. Java and Go stay on `.cLike`, which is
+overflow bugs. `Lang.approximated` still marks them `true`, now because integer arithmetic
+past 2^53 is unbounded here rather than IEEE (see `Dialect`'s doc comment); the
+bitwise/shift gap that used to be the reason is closed (`jsBitwise`). Java and Go stay on `.cLike`, which is
 still the correct call for their boolean operators.
 
 Why constructor-per-language for the *other* under-provisioned languages (Java, Go) is
@@ -746,12 +747,12 @@ def dialect : Lang → Dialect
 
 /-- Does this language's real behaviour disagree with the dialect it is run under, in a
 way the semantics can currently express? Each `true` is a known-wrong answer, not an
-unknown one. JS/TS's `&&`/`||`/overflow bugs are fixed by `.javascript`; `true` here now
-tracks the *narrower*, still-open gap: real JS truncates bitwise/shift operands to
-Int32, and `.javascript`'s one `NumConfig` (unbounded, chosen to fix arithmetic) does not
-model that separately — see `Dialect`'s doc comment in `Syntax.lean`. -/
+unknown one. JS/TS's `&&`/`||`/overflow bugs are fixed by `.javascript`, and so are the
+bitwise/shift operators (ToInt32/ToUint32, `jsBitwise`); `true` here tracks the remaining
+gap: `.javascript`'s `NumConfig` is unbounded, so integer arithmetic past 2^53 is not
+what Node's IEEE doubles compute — see `Dialect`'s doc comment in `Syntax.lean`. -/
 def approximated : Lang → Bool
-  | .javascript | .typescript => true   -- bitwise/shift ops still truncate wrong
+  | .javascript | .typescript => true   -- integers past 2^53 are unbounded, not IEEE
   | _ => false
 
 /-- The integer model. `java64` and `go64` were written months ago and never wired to
@@ -763,7 +764,7 @@ def numConfig : Lang → NumConfig
   | .go                       => NumConfig.go64
   -- JS/TS numbers are IEEE doubles, not integers at all; `.javascript`'s `NumConfig` is
   -- `NumConfig.python` (unbounded) — exact up to `Number.MAX_SAFE_INTEGER`, a named
-  -- approximation beyond it and for bitwise/shift ops. See `Dialect.toNumConfig`.
+  -- approximation beyond it. See `Dialect.toNumConfig`.
   | .javascript | .typescript => Dialect.javascript.toNumConfig
 
 /-- Languages whose semantics are currently known to be wrong. -/
