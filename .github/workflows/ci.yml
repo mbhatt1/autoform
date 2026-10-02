@@ -254,11 +254,15 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          check() {  # name file floor
-            n=$(grep -c '^ *theorem ' "$2")
-            echo "$1: $n theorems (floor $3)"
-            if [ "$n" -lt "$3" ]; then
-              echo "REGRESSION: $2 lost proofs ($n < $3)"; fail=1
+          check() {  # name floor file...   (counts across every file given)
+            name=$1; floor=$2; shift 2
+            for f in "$@"; do
+              test -f "$f" || { echo "MISSING: $f -- this floor stopped counting"; fail=1; }
+            done
+            n=$(cat "$@" 2>/dev/null | grep -c '^ *theorem ' || true)
+            echo "$name: $n theorems (floor $floor)"
+            if [ "$n" -lt "$floor" ]; then
+              echo "REGRESSION: $name lost proofs ($n < $floor)"; fail=1
             fi
           }
           # A floor here is a floor on TEXT. SpecsGen/V8Base still does not elaborate --
@@ -269,11 +273,16 @@ jobs:
           # are now Prop-valued open obligations (the fuel transport is refuted, not
           # assumed) with their FUEL-instantiated content kept as *_at_FUEL theorems, so
           # its text count is higher than the old floor and the floor stays where it was.
-          check SpecsGen-Cachetools Autoform/SpecsGen/Cachetools.lean 79
-          check SpecsGen-V8Base     Autoform/SpecsGen/V8Base.lean    229   # DOES NOT PROVE
-          check SpecsGen-Basis      Autoform/SpecsGen/Basis.lean      21
-          check SpecsGen-LinuxLib   Autoform/SpecsGen/LinuxLib.lean   12
-          check Refine              Autoform/Refine.lean             113
+          #
+          # SpecsGen/V8Base.lean has been an import-only umbrella since e36b8f1 split it
+          # into Autoform/SpecsGen/V8Base/Part*.lean, so grepping the umbrella alone
+          # counted 0 and failed this step on every fresh checkout; the floor now counts
+          # the umbrella plus its parts (285 theorems at 86a161b).
+          check SpecsGen-Cachetools 79  Autoform/SpecsGen/Cachetools.lean
+          check SpecsGen-V8Base     229 Autoform/SpecsGen/V8Base.lean Autoform/SpecsGen/V8Base/*.lean
+          check SpecsGen-Basis      21  Autoform/SpecsGen/Basis.lean
+          check SpecsGen-LinuxLib   12  Autoform/SpecsGen/LinuxLib.lean
+          check Refine              113 Autoform/Refine.lean
           exit $fail
 
       # ...and the count is only meaningful for a module that proves. This is the
