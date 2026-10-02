@@ -7,11 +7,11 @@
  ],
  "source": "tests/fixtures/pyscoping/pyscoping_cases.py",
  "source_sha256": "4f0d9aaa5f6ca3dadf01e860c1e5cfa0da7ee28d1f02ec5002494e094c9e24cc",
- "ast_sha256": "9b5278de042a6e8245b70f88c3f268500a6c17737cf35b85919aabb1b1cc2cb7",
+ "ast_sha256": "c5308b32b7178a91b702d7ab0071b5780915de3b72321c538611be4c8982da54",
  "joern_version": "4.0.606",
  "frontend": "io.joern:pysrc2cpg_3:4.0.606 (Maven Central), run through io.joern.joerncli.JoernParse --language pythonsrc",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "1227f616a23c7b893d67199df8d6388711129777f0d6423c2dd07d538984d329",
+ "exporter_sha256": "d67aea125ff0e7791949926b47823734053087736130b6988a86b75eef52e186",
  "command": [
   "joern-parse tests/fixtures/pyscoping --language pythonsrc --output pyscoping.cpg",
   "joern --script cartographer/export_ast.sc --param cpgPath=pyscoping.cpg --param out=tests/fixtures/pyscoping/ast.json",

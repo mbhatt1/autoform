@@ -677,6 +677,26 @@ def Func.isMethod (fn : Func) : Bool :=
   | [_, rest] => rest.any (· == '.')
   | _         => false
 
+/-- One Python class as the exporter recorded it, for method resolution along the MRO
+(`Ctx.lookupMethod` in `Semantics.lean`).
+
+* `name` is the **short** class name, the one `Expr.alloc` and `Obj.cls` carry.
+* `bases` are the class's bases **in source order** (`class D(B, C)` is `["B", "C"]`;
+  `object` is omitted). A base that is a class of this corpus is its short name; a base
+  from outside the corpus (`collections.abc.MutableMapping`, `tuple`) is `<ext>` followed
+  by its dotted name as written. A base the exporter could not resolve either way is not
+  representable, so the exporter drops the whole class rather than guess -- and a class
+  missing from the table is *unknown*, which makes every lookup through it a hole.
+* `attrs` are the names the class body binds to anything other than a plain `def` of
+  the same name (or `staticmethod` of one): constants, aliases (`get = __getitem__`),
+  `property(...)`, `classmethod(...)`. Lookup of such a name stops at this class with a
+  hole, because the function table does not hold what the attribute is. -/
+structure PyClass where
+  name  : String
+  bases : List String
+  attrs : List String := []
+  deriving Repr, Inhabited
+
 /-- A whole translated codebase, tagged with the dialect it came from. -/
 structure Program where
   funcs   : List Func
@@ -690,6 +710,13 @@ structure Program where
   represented; the exporter drops such a name entirely rather than guessing, which
   degrades to the pre-existing opaque-reference behaviour. -/
   builtinBases : List (String × BuiltinBase) := []
+  /-- The Python class table, when the exporter recorded one (STRATEGY.md §62). `none`
+  for every program exported before it did, and for every non-Python program: those keep
+  the name-suffix method resolution and name lookup they always had, so no existing
+  corpus changes meaning. `some` switches a Python program to Python's own rules --
+  method lookup along the C3 MRO, `super()`, and bare-name lookup local → global →
+  builtin -- with a hole wherever the table does not determine the answer. -/
+  pyClasses : Option (List PyClass) := none
   deriving Repr, Inhabited
 
 namespace Expr

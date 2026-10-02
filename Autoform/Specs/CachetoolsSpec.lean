@@ -503,10 +503,17 @@ in §4. -/
 /-- Evaluating a bare name never holes and never consumes the heap: every branch of the
 `Expr.name` case — local, global, function value, unbound — returns a value. Needed
 because `NotImplementedError` is an unbound builtin, and `Ctx.resolve` on a 233-entry
-table does not reduce in the kernel. -/
-theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String) :
+table does not reduce in the kernel. Only under the legacy rules (`hs`): with a class
+table, an unbound identifier is the hole `name:unbound:x` (STRATEGY.md §62). -/
+theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String)
+    (hs : ctx.scopedName x = false) :
     ∃ v, evalExpr ctx (n + 1) h ρ (.name x) = (h, .val v) := by
-  simp only [evalExpr]
+  obtain ⟨v, hv⟩ : ∃ v, ctx.unboundName x = .inl v := by
+    unfold Ctx.unboundName
+    rw [hs]
+    simp only [Bool.false_eq_true, if_false]
+    split <;> exact ⟨_, rfl⟩
+  simp only [evalExpr, hv]
   repeat' split
   all_goals exact ⟨_, rfl⟩
 
@@ -514,7 +521,7 @@ theorem TimedCache_expire_raises (t : Val) (fuel : Nat) (hf : 10 ≤ fuel) :
     ∃ v, runFunc P fuel "cachetools/__init__.py:<module>._TimedCache.expire" [t] = .exn v := by
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 10 := ⟨fuel - 10, by omega⟩
   rw [runFunc_of_resolve _ _ _ _ f_cachetools___init___py__module___TimedCache_expire rfl]
-  obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError"
+  obtain ⟨v, hv⟩ := evalExpr_name_isVal (ctxOf P) (k + 6) [] _ "NotImplementedError" rfl
   refine ⟨v, ?_⟩
   have hne : ((none : Option String) != some "time") = true := rfl
   -- `time=None` is a default now (the exporter records defaults); the call supplies `time`,
