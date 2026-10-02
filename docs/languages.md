@@ -30,7 +30,7 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 
 | Language | Parses | Translates | Lean compiles | Dialect inferred | Functions | Hole-free | Verifiable core | Holes / nodes | Differential oracle |
 |---|---|---|---|---|---|---|---|---|---|
-| Python | yes | yes | yes | `.python` ✅ | 209 | 88% | 105 (50%) | 0.5% | **yes** (CPython) |
+| Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%) | 0.8% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
 | Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
@@ -55,7 +55,8 @@ maps to the single `.cLike` constructor, which is 32-bit truncating C. See below
 > `.kt` and `.go` still map to `.cLike`. An unknown extension is now a hard error
 > (`infer_dialect` raises), not a silent `.python`. The Python row was regenerated from
 > `ast-Cachetools.json` + `Autoform/Generated/Cachetools.lean` with
-> `scripts/ledger.lean.tmpl` (26 holes over 5,574 nodes). Note that
+> `scripts/ledger.lean.tmpl` (26 holes over 5,574 nodes at `46c65fc`; 46 over 5,661 after
+> the item-L re-export of `ast-Cachetools.json`, which is what the row now shows). Note that
 > `scripts/lang_matrix.py` carries its own copy of the extension table, which still says
 > `.js`/`.ts` → `cLike` and does not know `.cc`, so its *dialect* column is stale even
 > though its counts are recomputed.

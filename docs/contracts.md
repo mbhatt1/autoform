@@ -11,8 +11,8 @@ superlinearly with program size. Hence: **verified core + contracts**, never
 whole-repo."* `Autoform/Refine.lean` built the verified-core half. This file is the
 other half.
 
-On `cachetools`, 184 of 209 functions are
-hole-free and 105 are call-closed. A single untranslated construct anywhere in a function
+On `cachetools`, 168 of 209 functions are
+hole-free and 99 are call-closed. A single untranslated construct anywhere in a function
 makes the whole function unanalysable, because `Expr.hole l` evaluates to
 `EResult.hole l`, `Refine.Outcome` has no `hole` constructor, and `refines_not_hole`
 turns that into a theorem: *a refined function never reaches a hole.* That default is
@@ -278,9 +278,10 @@ never added to it**:
 
 On `cachetools` (`lake env lean` on `scripts/ledger.lean.tmpl` instantiated for
 `Cachetools`, then `scripts/emit_contracts.py Cachetools` and
-`scripts/sacm.py --module Cachetools`): 15 of 209 functions are conditionally
-verifiable, resting on 15 named hole assumptions; 1 is conditionally verified
-(`Cache.__delitem__`); 26 hole occurrences are named in all. The `methodkey` theorems are
+`scripts/sacm.py --module Cachetools`): 19 of 209 functions are conditionally
+verifiable, resting on 23 named hole assumptions; 1 is conditionally verified
+(`Cache.__delitem__`, as of `46c65fc`: item G's boxed containers closed the hole that example
+rests on, and `Autoform/HoleContracts.lean` is being retargeted); 46 hole occurrences are named in all. The `methodkey` theorems are
 about the historical slice `keysProgramHoled`, so their registry records carry
 `program: Autoform.Contracts.Demo.keysProgramHoled` and sacm.py labels them "NOT about the
 current module" and does not count them.
@@ -352,8 +353,8 @@ What `scripts/sacm.py` should do with it:
 
 > **Figures for `cachetools` are regenerated, not typed.** The authoritative source is
 > `ledger-Cachetools.json`; `scripts/check_docs.py` compares this document against it and
-> fails on a mismatch. Current: 209 functions, 184 hole-free, 105 call-closed, 26 holes,
-> 15 conditionally verifiable.
+> fails on a mismatch. Current: 209 functions, 168 hole-free, 99 call-closed, 46 holes,
+> 19 conditionally verifiable.
 > Historical figures elsewhere in this repository (238 functions, 208 functions, cores of
 > 45, 69, 74) are superseded snapshots taken before the exporter changes that removed
 > `<metaClassCallHandler>` synthetics and closed `op:starredUnpack`.

@@ -2194,9 +2194,24 @@ Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
 whose reachable bodies are `tryFinally`-free), not a change to this file. -/
 def idempotent_cachetools___init___py__module__cached : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C fuel f_cachetools___init___py__module__cached)) = true
 
-/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
-`idempotent_cachetools___init___py__module__cached` that is proved; the quantifier over larger budgets is not. -/
-theorem idempotent_cachetools___init___py__module__cached_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C FUEL f_cachetools___init___py__module__cached)) = true := by rfl
+/-- **The mined law is FALSE for the current translation, and this states so.** It held
+when this module was generated, because a call that left a parameter unsupplied
+bound it to `unit`. The exporter now records defaults, and `cached`'s `key`
+default (`keys.hashkey` / `keys.methodkey`, a non-literal) is the hole
+`param:default-nonliteral`; the law's second application, `cached(v)` with the
+returned decorator as its only argument, leaves `key` unsupplied and so reaches that
+hole instead of returning. In CPython that call returns a *new* decorator, so the
+old `true` was itself an artefact of the `unit` binding, not a property of
+`cachetools`. Restated rather than deleted (STRATEGY.md: a law the translation made
+false must say so). -/
+theorem idempotent_cachetools___init___py__module__cached_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cached).all (lawIdempotent C FUEL f_cachetools___init___py__module__cached)) = false := by rfl
+
+/-- Hence the open obligation `idempotent_cachetools___init___py__module__cached` is refuted, not open. -/
+theorem not_idempotent_cachetools___init___py__module__cached : ¬ idempotent_cachetools___init___py__module__cached := by
+  intro h
+  have h1 := h FUEL (Nat.le_refl _)
+  rw [idempotent_cachetools___init___py__module__cached_at_FUEL] at h1
+  exact Bool.false_ne_true h1
 
 /-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
 domain, so every case actually ran. -/
@@ -2254,9 +2269,24 @@ Closing it needs a reachability-restricted fuel-monotonicity lemma (or a corpus
 whose reachable bodies are `tryFinally`-free), not a change to this file. -/
 def idempotent_cachetools___init___py__module__cachedmethod : Prop := ∀ fuel, FUEL ≤ fuel → ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C fuel f_cachetools___init___py__module__cachedmethod)) = true
 
-/-- The law holds at `FUEL` itself, by kernel computation. This is the part of
-`idempotent_cachetools___init___py__module__cachedmethod` that is proved; the quantifier over larger budgets is not. -/
-theorem idempotent_cachetools___init___py__module__cachedmethod_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod)) = true := by rfl
+/-- **The mined law is FALSE for the current translation, and this states so.** It held
+when this module was generated, because a call that left a parameter unsupplied
+bound it to `unit`. The exporter now records defaults, and `cachedmethod`'s `key`
+default (`keys.hashkey` / `keys.methodkey`, a non-literal) is the hole
+`param:default-nonliteral`; the law's second application, `cachedmethod(v)` with the
+returned decorator as its only argument, leaves `key` unsupplied and so reaches that
+hole instead of returning. In CPython that call returns a *new* decorator, so the
+old `true` was itself an artefact of the `unit` binding, not a property of
+`cachetools`. Restated rather than deleted (STRATEGY.md: a law the translation made
+false must say so). -/
+theorem idempotent_cachetools___init___py__module__cachedmethod_at_FUEL : ((dom_idempotent_cachetools___init___py__module__cachedmethod).all (lawIdempotent C FUEL f_cachetools___init___py__module__cachedmethod)) = false := by rfl
+
+/-- Hence the open obligation `idempotent_cachetools___init___py__module__cachedmethod` is refuted, not open. -/
+theorem not_idempotent_cachetools___init___py__module__cachedmethod : ¬ idempotent_cachetools___init___py__module__cachedmethod := by
+  intro h
+  have h1 := h FUEL (Nat.le_refl _)
+  rw [idempotent_cachetools___init___py__module__cachedmethod_at_FUEL] at h1
+  exact Bool.false_ne_true h1
 
 /-- ...and it does not hold vacuously: the `≠ outOfFuel` guard holds over the same
 domain, so every case actually ran. -/
@@ -2517,8 +2547,10 @@ def obligations : List OpenObligation :=
 #audit_depends idempotent_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
 #audit_depends const_cachetools___init___py__module__TLRUCache___contains_at_FUEL on f_cachetools___init___py__module__TLRUCache___contains__
 #audit_depends idempotent_cachetools___init___py__module__cached_at_FUEL on f_cachetools___init___py__module__cached
+#audit_depends not_idempotent_cachetools___init___py__module__cached on f_cachetools___init___py__module__cached
 #audit_depends commutes_cachetools___init___py__module__cached_at_FUEL on f_cachetools___init___py__module__cached
 #audit_depends idempotent_cachetools___init___py__module__cachedmethod_at_FUEL on f_cachetools___init___py__module__cachedmethod
+#audit_depends not_idempotent_cachetools___init___py__module__cachedmethod on f_cachetools___init___py__module__cachedmethod
 #audit_depends commutes_cachetools___init___py__module__cachedmethod_at_FUEL on f_cachetools___init___py__module__cachedmethod
 #audit_depends idempotent_cachetools_func_py__module___cache_at_FUEL on f_cachetools_func_py__module___cache
 #audit_depends commutes_cachetools_func_py__module___cache_at_FUEL on f_cachetools_func_py__module___cache

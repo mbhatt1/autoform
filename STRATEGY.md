@@ -3434,3 +3434,42 @@ this change: the 25 newly-holed functions would move the theorems in
 * `del x` on a cell (`scope:del-cell`), `global` rebinding from a function, starred
   targets outside an assignment statement, and plain unpacking's missing length check
   (`a, b = [1, 2, 3]` binds without the `ValueError`).
+
+## 59. Generators are holes; a call through a local name is called by that name
+
+*(Item L. The number is provisional; the merger renumbers.)*
+
+Two wrong translations from the round-1 differential (docs/conformance.md findings 1, 2),
+both in `cartographer/export_ast.sc`, both of the kind CONTRIBUTING rule 1 is about: the
+function looked translated and computed something else.
+
+**`yield` was `return`.** pysrc2cpg has no YIELD node; it emits a RETURN whose code is
+the yield text. A generator function now starts with `gen:generator` and each yield is
+`gen:yield`. Modelling generators faithfully needs a suspended-computation value in Core;
+eager materialisation was rejected (wrong for infinite generators, early-stopping
+consumers, and `TTLCache.__iter__`, which reads mutable state between yields).
+
+**A call through a local name was bound by short name.** pysrc2cpg resolves `cache(self)`
+to whatever function is called `cache`, here a property of an unrelated class. The
+exporter now applies Python's scope rule to a bare callee (`pyBindingScope`: the caller's
+own bindings, then enclosing `def`/`lambda` scopes, skipping class bodies and `<module>`,
+stopping at `global`) and, if a function scope binds the name, emits the call by that
+name unless Joern's target is provably the one function that scope binds it to. The
+pyscoping fixture re-exports byte-identically; that check is what made the "provably"
+include `x = lambda …` and not only nested `def`s.
+
+**Measured.** Re-export of cachetools `01af8e5` (first committed export with provenance).
+L alone: 10 functions change, hole-free 170 → 168, holes 42 → 46, divergences unchanged
+(12 under H+G and under H+G+L). The 11 closure divergences survive because Core's
+`Expr.call` resolves a name against the function table before a non-closure local, and
+`cache` is a unique suffix. The exporter cannot fix that without inventing a value-call
+form; the bare-name rule in Core is the place (see conformance.md).
+
+**Specs restated, not weakened.** `CachetoolsSpec` §3's negative result was about
+`_uncached_info.cache_clear` reaching `scope:nonlocal-write`; cell conversion translated
+it, so the theorem is now about `TTLCache.__iter__` reaching `gen:generator`. Two mined
+`SpecsGen` laws (`idempotent_…cached`, `…cachedmethod`) became false because H's defaults
+make the one-argument re-application hit `param:default-nonliteral`; they are now stated as
+`= false` with `¬` of the obligation. `check_specs_fresh --record` was run only after both
+modules elaborated against the new AST: `synth_specs.py` would regenerate `C_tfFree`, which
+`C_not_tfFree` refutes, so it cannot regenerate `SpecsGen/Cachetools.lean` as-is.

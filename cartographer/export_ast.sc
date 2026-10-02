@@ -225,6 +225,18 @@ import scala.annotation.tailrec
 
   def hole(label: String): ujson.Obj  = ujson.Obj("k" -> "hole", "label" -> label)
   def holeS(label: String): ujson.Obj = ujson.Obj("k" -> "holeS", "label" -> label)
+
+  /** A Python `yield` / `yield from`. pysrc2cpg has no YIELD node: it emits a RETURN
+    * whose code is the yield's own text (`yield curr.key`, `yield from xs`, `yield`),
+    * and a plain `return` never starts with that keyword. Callers check `.py` first. */
+  def isYield(r: Return): Boolean =
+    r.code.trim.stripPrefix("(").trim.matches("""(?s)yield\b.*""")
+
+  /** A Python generator function: one whose OWN body contains a `yield` (a yield inside a
+    * nested `def`/`lambda` makes that function the generator, not this one). */
+  def isGeneratorFunction(m: Method): Boolean =
+    m.filename.toLowerCase.endsWith(".py") &&
+      m.body.ast.isReturn.l.exists(r => isYield(r) && r.method.fullName == m.fullName)
   val skip = ujson.Obj("k" -> "skip")
 
   /** Kernel synchronisation primitives, which a SEQUENTIAL semantics cannot observe.
@@ -897,6 +909,43 @@ import scala.annotation.tailrec
                boundOf.getOrElse(fn, Set.empty)
     free.filter(x => bindingScopeOf(fn, x).exists(o => cellsOwnedBy.getOrElse(o, Set.empty).contains(x)))
   }
+
+  val bindingCountCache = scala.collection.mutable.Map.empty[(String, String), Int]
+
+  /** Python's scope rule for a bare name `x` read in function `fn`: the function scope
+    * that binds it -- `fn` itself, else the nearest enclosing FUNCTION (a lambda counts;
+    * class bodies and `<module>` do not, as in Python) -- or `None` when it is a global or
+    * a builtin. A `global x` in any scope on the way out ends the search at the globals. */
+  def pyBindingScope(fn: String, x: String): Option[String] = {
+    def isFnScope(f: String): Boolean =
+      methodByName.get(f).exists(p => !p.name.startsWith("<") || p.name.startsWith("<lambda>"))
+    // `boundOf` is not used here: `m.body.ast` reaches into nested definitions, so it
+    // also counts names a NESTED function assigns (and un-localises a name a nested
+    // function declares `nonlocal`). `bindingCount`, `globalDeclOf` and `nonlocalOf`
+    // (the cell-conversion section above) look at `cur`'s own body only; a
+    // `nonlocal x` in `cur` defers to the enclosing scopes, as in Python.
+    def go(cur: String): Option[String] =
+      if (globalDeclOf.getOrElse(cur, Set.empty).contains(x)) None
+      else if (isFnScope(cur) && bindingCount(cur, x) > 0 &&
+               !nonlocalOf.getOrElse(cur, Set.empty).contains(x)) Some(cur)
+      else {
+        val i = cur.lastIndexOf('.')
+        if (i < 0) None else go(cur.substring(0, i))
+      }
+    go(fn)
+  }
+
+  /** How many times scope `fn` binds `x`: once per parameter of that name and once per
+    * identifier assignment to it (a nested `def x` is one, an import `x` is one). */
+  def bindingCount(fn: String, x: String): Int = bindingCountCache.getOrElseUpdate((fn, x),
+    methodByName.get(fn).map { m =>
+      m.parameter.name.l.count(_ == x) +
+        m.body.ast.isCall.filter(c => c.methodFullName.startsWith("<operator>.assignment")).l
+          .count(c => kidsOf(c).headOption.exists {
+            case i: Identifier => i.name == x && i.method.fullName == fn
+            case _             => false
+          })
+    }.getOrElse(0))
 
   // ---- module objects ---------------------------------------------------------
   //
@@ -6367,6 +6416,40 @@ import scala.annotation.tailrec
   }
   def localName(n: String): String = if (cppFile && n == "this") "self" else n
 
+  /** The function `x = <function>` binds in scope `fn`'s own body, when that assignment
+    * (a nested `def x`, or `x = lambda ...`) has a bare function reference as its value. */
+  def singleFunctionBinding(fn: String, x: String): Option[String] =
+    methodByName.get(fn).toList.flatMap { m =>
+      m.body.ast.isCall.filter(_.methodFullName == "<operator>.assignment").l
+        .flatMap(c => kidsOf(c) match {
+          case (i: Identifier) :: (r: MethodRef) :: Nil
+              if i.name == x && i.method.fullName == fn => Some(r.methodFullName)
+          case _ => None
+        })
+    } match {
+      case List(one) => Some(one)
+      case _         => None
+    }
+
+  /** The callee of a Python call, when it must be called THROUGH a local or captured
+    * variable rather than by the function Joern resolved: `Some(name)` when the callee is
+    * a bare identifier that some function scope binds (`pyBindingScope`) and Joern's
+    * `mfn` is not provably that binding. `mfn` is accepted only when the binding scope
+    * binds the name exactly once, and that one binding assigns `mfn` itself (a nested
+    * `def`, or `x = lambda ...`); then the existing paths (full name, or the variable for a
+    * capturing closure) are already right, and `None` leaves them in charge. A global or
+    * builtin name is `None` too: those resolve by module, which is a different question.
+    * Reads the per-method `currentMethodFull`, so it is only meaningful inside `emit`. */
+  def pyLocalCallee(callee: Option[AstNode], mfn: String): Option[String] = callee match {
+    case Some(i: Identifier) =>
+      pyBindingScope(currentMethodFull, i.name).flatMap { scope =>
+        val isItsOwnDef = methodByName.contains(mfn) && bindingCount(scope, i.name) == 1 &&
+          singleFunctionBinding(scope, i.name).contains(mfn)
+        if (isItsOwnDef) None else Some(i.name)
+      }
+    case _ => None
+  }
+
   // ---- expressions ----------------------------------------------------------
   /** Parse a C/C++/Java integer literal.
     *
@@ -6830,6 +6913,9 @@ import scala.annotation.tailrec
     // frontend fix (`DO`, a macro body) or a real language feature Core lacks, so the
     // label carries it instead of merging them all under one count.
     case cs: ControlStructure => controlStructureExpr(cs)
+    // `y = yield v`: a yield used as a value (what `send` delivers). Same reason as the
+    // statement case: Core has no suspension.
+    case r: Return if pyFile && isYield(r) => hole("gen:yield")
     case other                => hole("expr:" + other.label)
   }
 
@@ -8689,6 +8775,22 @@ import scala.annotation.tailrec
               // WITH its captured frame. Calling it by its full name reached the right
               // `Func` with no environment at all: every captured read unbound, every
               // `nonlocal` write a hole. Non-capturing targets keep the full name.
+              // A call through a LOCAL or CAPTURED Python name (`cache(self)` where `cache`
+              // is a parameter of `_locked`; `_wrapper(...)` after a function-local
+              // `from ._cached import _wrapper`). Python resolves the name in the scope
+              // that binds it; pysrc2cpg resolves it by NAME, to whatever function has
+              // that short name -- `_WrapperBase.cache`, a property of another class, or
+              // `_cachedmethod.py`'s `_wrapper` for an import from `_cached.py`
+              // (docs/conformance.md, finding 2). Its `methodFullName` is trusted only
+              // when it is the one `def` that binds the name in that very scope; anything
+              // else is called through the variable, whose value is what Python calls.
+              // A `nonlocal` cell holds the function one field down, and `Expr.call` takes
+              // a name, not a value: that shape is a hole rather than a call of the cell.
+              else if (pyFile && !moduleScope && pyLocalCallee(callee, mfn).isDefined) {
+                val v = pyLocalCallee(callee, mfn).get
+                if (boxedLocals.contains(v) || pyCellRefs.contains(v)) hole("call:through-cell")
+                else ujson.Obj("k" -> "call", "f" -> v, "args" -> argExprs(args, kwArgs))
+              }
               else if (methodByName.contains(mfn) && pyFile && capturesEnv.getOrElse(mfn, false) &&
                        callee.exists { case i: Identifier => true; case _ => false })
                 ujson.Obj("k" -> "call", "f" -> callee.collect { case i: Identifier => i.name }.get,
@@ -10776,6 +10878,13 @@ import scala.annotation.tailrec
     // ANY(1)`), checked BEFORE any other Call case so the synthetic expansion
     // Block is never even looked at.
     case c: Call if c.name == "UNUSED_PARAMETER" || c.name == "UNUSED_PARAMETER2" => skip
+    // `yield` / `yield from`. pysrc2cpg lowers each to a RETURN node whose code is the
+    // `yield` text, and the case below translated it as `return` -- "return the first
+    // element" for `TTLCache.__iter__`, which agreed with an equally wrong recorder and
+    // so read as conformance (docs/conformance.md, finding 1). A generator suspends;
+    // Core has no suspension. Each yield is a hole, and `emit` holes the whole function
+    // (`gen:generator`), because calling a generator runs none of its body at all.
+    case r: Return if pyFile && isYield(r) => holeS("gen:yield")
     case r: Return =>
       kidsOf(r).headOption match {
         case Some(e) =>
@@ -12696,7 +12805,16 @@ import scala.annotation.tailrec
       ujson.Obj("k" -> "assign", "x" -> (nm + "$off"), "e" -> ujson.Obj("k" -> "int", "v" -> 0))
     }
     val allPrologues = prologues ++ aggPrologues ++ strCursorPrologues
-    val body = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    val body1 = if (allPrologues.isEmpty) body0 else seqOf(allPrologues :+ body0)
+    // Calling a generator function runs NONE of its body: it returns a generator object,
+    // and the body runs lazily, one `next()` at a time, interleaved with the consumer.
+    // Core has no suspension and no generator value, so the call itself is a hole. The
+    // translated body is kept after it (its yields are `gen:yield` holes) so the shape
+    // stays readable, exactly as `param:signature-unparsed` keeps it; nothing past the
+    // leading hole ever runs. Eagerly materialising the yields into a list was rejected:
+    // it is wrong for an infinite generator, for one whose consumer stops early, and for
+    // `TTLCache.__iter__`, which reads the timer and the linked list between yields.
+    val body = if (isGeneratorFunction(m)) seqOf(List(holeS("gen:generator"), body1)) else body1
     moduleScope = false
     localTypes = Map.empty
     genuineLocalNames = Set.empty

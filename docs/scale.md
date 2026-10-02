@@ -66,13 +66,14 @@ below).
 
 ### Coverage, from the ledger
 
-The `cachetools` row was regenerated on 2026-10-02 at `46c65fc` (`scripts/ledger.lean.tmpl`
-over the tracked `ast-Cachetools.json`); `scripts/check_docs.py` checks it. The other rows
+The `cachetools` row was regenerated on 2026-10-02 on the item-L branch (after merging `8d3a970`),
+from a fresh re-export of `ast-Cachetools.json` at cachetools `01af8e5` (`scripts/ledger.lean.tmpl`
+over the tracked AST; provenance in `provenance/ast-Cachetools.json.prov.json`); `scripts/check_docs.py` checks it. The other rows
 predate the exporter changes described below and were not re-run.
 
 | repo | functions | hole-free | call-closed (verifiable core) | holes | AST nodes | dynamic-hole risk |
 |---|--:|--:|--:|--:|--:|--:|
-| `cachetools` (published) | 209 | 184 (88%) | 105 (50%) | 26 | 5,574 | 890 |
+| `cachetools` (published) | 209 | 168 (80%) | 99 (47%) | 46 | 5,661 | 915 |
 | `sqlparse` | 700    | 295 (42%) | 163 (23%) | 1,163  | 25,072  | 4,387 |
 | `requests` | 847    | 342 (40%) | 117 (14%) | 1,512  | 27,039  | 4,658 |
 | `flask`    | 1,731  | 1,005 (58%) | 624 (36%) | 2,200 | 39,284 | 6,557 |
@@ -88,8 +89,9 @@ was read as evidence that call closure is largely an artifact of corpus *size*: 
 library calls mostly outward into an unmodelled stdlib, while a large framework calls
 mostly inward and its callees resolve inside the translated program.
 
-**That reading no longer follows from these two numbers.** `cachetools` is now 105/209 =
-50%, against Django's 52%. The change came from exporter work — emitting Joern's resolved
+**That reading no longer follows from these two numbers.** `cachetools` was 105/209 =
+50% at `46c65fc` (99/209 = 47% after the re-export that made generators, defaults and
+local-name calls honest), against Django's 52%. The change came from exporter work — emitting Joern's resolved
 `fullName` so `Ctx.resolve`'s exact match fires, closing `op:starredUnpack`, and dropping
 `<metaClassCallHandler>` synthetics — not from the corpus getting larger. So most of the
 original gap was a resolution defect in the exporter, not a property of corpus size.
