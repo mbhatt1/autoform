@@ -211,8 +211,10 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
 
 ## Not yet built
 
-Boxed mutable containers (`Stmt.setIndex` is still a hole — design in
-`docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
+The rest of boxed mutable containers (Python list/dict displays are heap objects and
+`e[i] = v`, `del e[i]`, `append`/`pop`/... write through every alias; what is still a
+hole -- slices, live dict views, mutation during iteration, the oracle's encoder -- is
+listed in `docs/boxed-containers.md`); cross-scope *writes* (`nonlocal`; reads and closures work);
 contracts at holes, so partially-translated functions can be reasoned about under stated
 assumptions; `Val.float` (an IEEE-754 model exists in `Autoform/Lang/Core/Float.lean` and
 is **not yet wired into the semantics**, so floats still hole). `op:starredUnpack` is

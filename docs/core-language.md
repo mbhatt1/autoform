@@ -23,7 +23,7 @@ ends have already normalized to a common vocabulary, so Core only has to be fait
 | `str : String → Val` | A string *or* a C `char*`. One constructor: see §7, where the operators are dialect-split instead. |
 | `bool : Bool → Val` | A boolean. |
 | `unit : Val` | The absence of a value: an unbound name, a function that fell off the end, an absent field. |
-| `list : List Val → Val` | A list. **Immutable** — Core has no boxed containers, which is why `Stmt.setIndex` is a hole. |
+| `list : List Val → Val` | A list VALUE. Immutable: a Python list *display* is not one of these but a `ref` to a heap object whose `Payload` is the list (`Expr.boxContainer`, see `docs/boxed-containers.md`). A `Val.list` still arises from C aggregate initializers, `dict.keys()`-style results and the oracle's encoder, and a write to one is the hole `setIndex:immutable-containers`. |
 | `tuple : List Val → Val` | A tuple. Same immutability. |
 | `dict : List (Val × Val) → Val` | An association list, *not* a hash map. Key order is observable in real languages and differs between them, so imposing one language's iteration order would be an invented answer. |
 | `ref : Ref → Val` | A reference to a heap object. Reference identity is what `is` compares. |
@@ -40,6 +40,10 @@ Three derived functions:
   not a list, tuple or dict (or a `bobj` over one); `forIn` over anything else is a hole.
 * `Val.unbuiltin` — strips one layer of builtin-base wrapping. Non-recursive, so the
   functions that use it stay plain matchers that reduce by `rfl`.
+
+The interpreter applies the first two to `Heap.view h v`, not to `v`: a reference to a
+boxed list/dict (a Python display) is seen as its current contents, one level deep, so
+`if []:` is false and `for x in xs` iterates the object's elements.
 
 `Val.beq` is hand-written structural equality (the nested `List`/`Prod` occurrences block
 `deriving DecidableEq`). Closures and class closures compare by *name only*, ignoring
@@ -116,7 +120,8 @@ structure Ctx where dialect : Dialect; table : FuncTable; globals : Ref
 | `expr : Expr → Stmt` | Evaluate for effect; discard the value (but not exceptions or holes). |
 | `assign : String → Expr → Stmt` | Local binding — unless a `declGlobal` marker for that name is in scope, in which case it writes the globals frame. |
 | `setField : Expr → String → Expr → Stmt` | `e.f = v`. Non-object receiver: `setField:<f>:non-object`. |
-| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`. **Always** the hole `setIndex:immutable-containers` — see §8. |
+| `setIndex : Expr → Expr → Expr → Stmt` | `e[i] = v`, Python only (every other dialect: `setIndex:immutable-containers`). Evaluates `v`, `e`, `i` (CPython's order); a boxed list/dict is written with `Heap.setPayload` on the reference, so every alias sees it; a plain object runs its class's own `__setitem__`; a tuple/str/scalar is `TypeError`; an unboxed list/dict value stays the hole. |
+| `delIndex : Expr → Expr → Stmt` | `del e[i]`, Python only. Mirrors `setIndex`: `KeyError`/`IndexError`/`TypeError` as CPython, a class's own `__delitem__`, otherwise a hole. |
 | `seq : Stmt → Stmt → Stmt` | Sequencing. Only a `normal` outcome continues. |
 | `ifte` / `loop` | Conditional and `while`. |
 | `forIn : String → Expr → Stmt → Stmt` | Iterate over an already-computed sequence (`Val.iterable`); a non-iterable is `forIn:non-iterable`. The CPG for Python has no `FOR` node — the front end desugars every `for` and comprehension into an iterator protocol plus a `WHILE`, and the exporter reconstructs `forIn` from that shape. |
@@ -266,7 +271,7 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `op:sizeOf:<kind>` | A `sizeof` that could not be folded to a constant. Folding uses the exporter's `dataModel` for pointer and `long`-family widths and standard C layout for aggregates (members in source order, each at the next multiple of its own alignment; an array has its element's alignment; an aggregate the maximum of its members'; 8-byte scalars are refused under ILP32, where their in-struct alignment is ABI-dependent). An aggregate is refused (`object`) when a member is a bit-field, when the struct is packed, when its tag has more than one distinct definition, when a `#if` in its body cannot be decided for the parsed configuration (only `#ifdef`/`#ifndef`/`defined()` of macros the corpus never defines and the frontend was not given are decided; see `cppDefines`), or when Joern's member list is not exactly the declarators of the source (it omits function-pointer members and lists every `#if` branch). `array-bound`: an array whose bound is neither a literal, an integer constant expression over literals, a resolvable `NAME±N` macro, nor (for `T x[] = {...}`) a countable initializer. `model-dependent`, `opaque-type`, `unknown-type`, `pointer` as for casts. | Not yet implemented beyond the shapes named. |
 | `op:shiftRight:unknown-signedness`, `op:shiftRight:64-bit-operand` | C `>>` is arithmetic or logical depending on the promoted left operand's signedness, which is taken from resolved types only (typedef chains, casts, literals, the usual arithmetic conversions; enums and bit-fields are refused). `unknown-signedness`: that type did not resolve. `64-bit-operand`: it did, and it is wider than the 32-bit arithmetic Core's `.cLike` dialect performs. | `64-bit-operand` needs width-typed arithmetic in Core. |
 | `stmt:va_arg` | A statement reading a variadic argument with `va_arg(ap, T)`. The frontend cannot parse it (the second argument is a type), and Core has no C variadic calling convention to read from. | Needs a variadic-argument model in Core. |
-| `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]`, slice deletion, attribute deletion. | Blocked on boxed containers (index/slice); the rest not yet implemented. |
+| `op:delete-index`, `op:delete-slice`, `op:delete-field`, `op:delete-shape` | `del d[k]` outside Python (Python's is `Stmt.delIndex`), slice deletion, attribute deletion. | Slices need a slice value (`docs/boxed-containers.md` §9); the rest not yet implemented. |
 | `op:dictLiteral-nonempty`, `op:stringExpressionList`, `op:fieldAccess-shape` | CPG node shapes the exporter does not recognise. | Not yet implemented. |
 | `op:raise-bare` | A bare `raise` re-raising the in-flight exception; Core has no ambient current-exception. | Not yet implemented. |
 | `control:TRY-finally-escaping` | `try/finally` whose body can `return`/`break`. The non-escaping case *is* translated; when control escapes, `ret` would bypass the trailing finalizer. | Design-limited; needs a richer `Ctl` interaction than one `tryCatch` can express. |
@@ -309,7 +314,15 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
 | `in:non-container`, `in:non-str-in-str` | Membership on a value that cannot be searched. |
 | `forIn:non-iterable` | Iterating a non-iterable. |
-| `setIndex:immutable-containers` | *Any* `e[i] = v`. Containers are values, so a write cannot be observed by anything else holding the container. |
+| `setIndex:immutable-containers`, `delIndex:immutable-containers` | `e[i] = v` / `del e[i]` on an UNBOXED list/dict value (or in a non-Python dialect). Core does not know who else holds a value, so a write through it cannot be honoured. |
+| `setIndex:<Cls>:no-own-__setitem__`, `delIndex:<Cls>:no-own-__delitem__`, `setIndex:<Cls>`, `delIndex:<Cls>` | Subscript write/delete on a plain object whose class does not itself define the dunder (an inherited one needs the MRO Core does not have), or whose dunder did not resolve. |
+| `setIndex:list:index-shape`, `delIndex:list:index-shape` | A boxed list subscripted by something that is neither an integer nor a value CPython rejects outright (a reference, which may define `__index__`). |
+| `forIn:container-mutated-during-iteration` | The loop wrote to the boxed container it iterates. Core iterates a snapshot, which is only right if nothing changed (CPython's list iterator would see the write; its dict iterator raises). |
+| `mcall:dict.<m>:live-view-not-modelled` | `keys()`/`values()`/`items()` on a boxed dict: a snapshot list would go stale at the next write. |
+| `mcall:<m>:boxed-element-equality`, `call:<f>:boxed-key` | A stdlib method/builtin that compares elements with the heap-free `Val.beq` (`count`, `index`, `remove`, `dict(pairs)`), handed a boxed container inside what it compares. |
+| `field:<f>:builtin-container`, `setField:<f>:builtin-container` | Attribute read (absent) / write on a boxed list or dict. CPython: `AttributeError`. |
+| `boxContainer:non-container`, `boxContainer:non-python`, `mcall:<m>:payload-shape`, `setIndex:dangling-ref`, `delIndex:dangling-ref` | Shapes the exporter never produces; a hole rather than a guess if one ever does. |
+| `index:negative` | A negative index into a sequence outside Python (C: undefined behaviour). Under Python it counts from the end. |
 | `binop:<op>`, `unop:<op>` | An operator name with no case, or with no case for those operand types (e.g. arithmetic on a string). |
 | `ub:<reason>` | The configured integer arithmetic says the source language does not define this operation. |
 | `str:pointer-arithmetic-not-modelled`, `str:pointer-compare-not-modelled`, `str:pointer-equality-not-modelled` | A C string operation under `.cLike`. |
@@ -339,8 +352,10 @@ The distinction tells you whether a hole is work or a boundary.
 
 **Work** (a known design would close them):
 
-* `setIndex:immutable-containers`, `mcall:*:unboxed-container`, `op:delete-index/slice` —
-  all one feature: boxed mutable containers. See `docs/boxed-containers.md`.
+* `setIndex:immutable-containers`, `mcall:*:unboxed-container` on what remains unboxed,
+  `op:delete-slice`, `forIn:container-mutated-during-iteration`,
+  `mcall:dict.*:live-view-not-modelled` — the rest of boxed mutable containers. Python
+  displays are boxed; what remains is listed in `docs/boxed-containers.md`.
 * `lit:float` and the float skips in the differential oracle — wiring `Float.lean` into
   `Val`.
 * `control:TRY-*` beyond the translated shapes — a richer control-flow encoding.
