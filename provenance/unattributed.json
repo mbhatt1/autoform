@@ -92,9 +92,9 @@
    "reproduced": false
   },
   "ast-Stress.json": {
-   "artifact_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+   "artifact_sha256": "fa088b83e8835042a3b61681eb18f95fdee2a48a8fc857514e1a7cc60f970799",
    "source_hint": "/private/tmp/claude-501/-Users-mbhatt-autoform/fe14c605-b751-436f-9e19-b975f87f18e5/scratchpad/stress",
-   "reason": "scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`.",
+   "reason": "HAND-PATCHED, then verified, not re-exported: item Q changed `<operator>.floorDiv` from \"/\" to \"//\" in cartographer/export_ast.sc, and the one `\"/\"` in this artifact (ops.py `fdiv`, which is `a // b`) was edited to `\"//\"` by hand because the original ops.py is not in the repository (the source_hint scratch directory is gone). The edit was checked against a real export: ops.py was reconstructed from this AST, exported with the new exporter by pysrc2cpg 4.0.606, and the `fdiv` entry is byte-identical to the patched one (and `fmod`, `poly`, `absval`, `gcdish` match modulo the integer-literal quoting that predates this artifact). Before the patch: scripts/reproduce_ast.py, Joern 4.0.606, committed export_ast.sc: DIFFERS. Fresh export has 8 entries to the committed 6; the extra two are the module initializers `ops.py:<module>` and `<module-objects>:<module>`. Attribution still requires a tracked ops.py and a re-export, which would also add the two module initializers and change the function count the README quotes.",
    "reproduction_attempted": true,
    "reproduced": false
   },

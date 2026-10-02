@@ -1,0 +1,4575 @@
+[
+ {
+  "name": "pyarith_cases.py:<module>.case_div_7_2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_neg7_2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "7"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_7_neg2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "-",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_exact_is_float",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "6"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_zero",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "1"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_zero_numerator_negative_divisor",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "0"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "-",
+       "a": {
+        "k": "int",
+        "v": "3"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_one_third",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "1"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_exactly_2pow53",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "9007199254740992"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_beyond_2pow53",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "9007199254740993"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_big_int",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "1000000000000000000000000000000"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "7"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_big_divisor",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "1"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "9007199254740993"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_int_float",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "float",
+       "v": "2.0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_float_float",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "float",
+     "v": "7.5"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "float",
+       "v": "2.5"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_floordiv_7_2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "//",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_floordiv_neg7_2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "7"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "//",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_floordiv_7_neg2",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "-",
+       "a": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "//",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_floordiv_zero",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "1"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "//",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_mod_neg7_3",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "unop",
+     "op": "-",
+     "a": {
+      "k": "int",
+      "v": "7"
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_div_and_floordiv_together",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "a",
+    "e": {
+     "k": "int",
+     "v": "7"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "/",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "//",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "%",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_eq_int",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "one",
+      "e": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "one"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "one"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "!=",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "one"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_ne_int",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "two",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "!=",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_false_eq_zero",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "f",
+    "e": {
+     "k": "bool",
+     "v": false
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "zero",
+      "e": {
+       "k": "int",
+       "v": "0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "f"
+          },
+          "b": {
+           "k": "name",
+           "v": "zero"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "zero"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_eq_float",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "float",
+       "v": "1.0"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "x"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "==",
+          "a": {
+           "k": "name",
+           "v": "x"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_add_int",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "one",
+      "e": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "one"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "name",
+           "v": "one"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_add_bool",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "+",
+      "a": {
+       "k": "name",
+       "v": "t"
+      },
+      "b": {
+       "k": "name",
+       "v": "t"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_sub",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "-",
+          "a": {
+           "k": "name",
+           "v": "f"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "-",
+          "a": {
+           "k": "int",
+           "v": "2"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "-",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "int",
+           "v": "1"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_mul",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "five",
+        "e": {
+         "k": "int",
+         "v": "5"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "ret",
+         "e": {
+          "k": "tupleE",
+          "items": [
+           {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "name",
+             "v": "t"
+            },
+            "b": {
+             "k": "name",
+             "v": "five"
+            }
+           },
+           {
+            "k": "binop",
+            "op": "*",
+            "a": {
+             "k": "name",
+             "v": "five"
+            },
+            "b": {
+             "k": "name",
+             "v": "f"
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_neg",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-",
+      "a": {
+       "k": "name",
+       "v": "t"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_invert",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "unop",
+          "op": "~",
+          "a": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "unop",
+          "op": "~",
+          "a": {
+           "k": "name",
+           "v": "f"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_lt",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "two",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "<",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         },
+         {
+          "k": "binop",
+          "op": ">",
+          "a": {
+           "k": "name",
+           "v": "two"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "<=",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "int",
+           "v": "1"
+          }
+         },
+         {
+          "k": "binop",
+          "op": ">=",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "int",
+           "v": "2"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_div",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "two",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "/",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "/",
+          "a": {
+           "k": "name",
+           "v": "two"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_div_zero",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/",
+        "a": {
+         "k": "name",
+         "v": "t"
+        },
+        "b": {
+         "k": "name",
+         "v": "f"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_floordiv_mod",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "two",
+      "e": {
+       "k": "int",
+       "v": "2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "//",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "//",
+          "a": {
+           "k": "name",
+           "v": "two"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "%",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "two"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "%",
+          "a": {
+           "k": "name",
+           "v": "two"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_shift",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "three",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "<<",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "three"
+          }
+         },
+         {
+          "k": "binop",
+          "op": ">>",
+          "a": {
+           "k": "name",
+           "v": "three"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_and_stays_bool",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "&",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "&",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "&",
+          "a": {
+           "k": "name",
+           "v": "f"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_or_stays_bool",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "|",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "|",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "|",
+          "a": {
+           "k": "name",
+           "v": "f"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_xor_stays_bool",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "f",
+      "e": {
+       "k": "bool",
+       "v": false
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "^",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "^",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "^",
+          "a": {
+           "k": "name",
+           "v": "f"
+          },
+          "b": {
+           "k": "name",
+           "v": "f"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_bitwise_with_int",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "three",
+      "e": {
+       "k": "int",
+       "v": "3"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "&",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "three"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "|",
+          "a": {
+           "k": "name",
+           "v": "three"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "^",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "three"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_plus_float",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "float",
+       "v": "1.5"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "binop",
+          "op": "+",
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "x"
+          }
+         },
+         {
+          "k": "binop",
+          "op": "*",
+          "a": {
+           "k": "name",
+           "v": "x"
+          },
+          "b": {
+           "k": "name",
+           "v": "t"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_not_bool",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "tupleE",
+      "items": [
+       {
+        "k": "unop",
+        "op": "!",
+        "a": {
+         "k": "name",
+         "v": "t"
+        }
+       },
+       {
+        "k": "unop",
+        "op": "!",
+        "a": {
+         "k": "int",
+         "v": "0"
+        }
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_dict_key_lookup",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "int",
+       "v": "1"
+      },
+      "v": {
+       "k": "str",
+       "v": "a"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setIndex",
+       "r": {
+        "k": "name",
+        "v": "tmp0"
+       },
+       "i": {
+        "k": "int",
+        "v": "0"
+       },
+       "v": {
+        "k": "str",
+        "v": "b"
+       }
+      },
+      "b": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "name",
+        "v": "tmp0"
+       }
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "t",
+      "e": {
+       "k": "bool",
+       "v": true
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "f",
+        "e": {
+         "k": "bool",
+         "v": false
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "skip"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "ret",
+          "e": {
+           "k": "tupleE",
+           "items": [
+            {
+             "k": "index",
+             "a": {
+              "k": "name",
+              "v": "d"
+             },
+             "b": {
+              "k": "name",
+              "v": "t"
+             }
+            },
+            {
+             "k": "index",
+             "a": {
+              "k": "name",
+              "v": "d"
+             },
+             "b": {
+              "k": "name",
+              "v": "f"
+             }
+            }
+           ]
+          }
+         },
+         "b": {
+          "k": "skip"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_int_dict_key_lookup_by_bool_key",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "tmp0",
+     "e": {
+      "k": "boxContainer",
+      "e": {
+       "k": "dictE",
+       "pairs": []
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setIndex",
+      "r": {
+       "k": "name",
+       "v": "tmp0"
+      },
+      "i": {
+       "k": "bool",
+       "v": true
+      },
+      "v": {
+       "k": "str",
+       "v": "x"
+      }
+     },
+     "b": {
+      "k": "assign",
+      "x": "d",
+      "e": {
+       "k": "name",
+       "v": "tmp0"
+      }
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "one",
+      "e": {
+       "k": "int",
+       "v": "1"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "ret",
+        "e": {
+         "k": "index",
+         "a": {
+          "k": "name",
+          "v": "d"
+         },
+         "b": {
+          "k": "name",
+          "v": "one"
+         }
+        }
+       },
+       "b": {
+        "k": "skip"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_in_list",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "xs",
+    "e": {
+     "k": "boxContainer",
+     "e": {
+      "k": "listE",
+      "items": [
+       {
+        "k": "int",
+        "v": "1"
+       },
+       {
+        "k": "int",
+        "v": "2"
+       }
+      ]
+     }
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "t",
+      "e": {
+       "k": "bool",
+       "v": true
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "skip"
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "tupleE",
+        "items": [
+         {
+          "k": "inOp",
+          "neg": false,
+          "a": {
+           "k": "name",
+           "v": "t"
+          },
+          "b": {
+           "k": "name",
+           "v": "xs"
+          }
+         },
+         {
+          "k": "inOp",
+          "neg": false,
+          "a": {
+           "k": "int",
+           "v": "1"
+          },
+          "b": {
+           "k": "boxContainer",
+           "e": {
+            "k": "listE",
+            "items": [
+             {
+              "k": "name",
+              "v": "t"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "k": "inOp",
+          "neg": false,
+          "a": {
+           "k": "int",
+           "v": "2"
+          },
+          "b": {
+           "k": "boxContainer",
+           "e": {
+            "k": "listE",
+            "items": [
+             {
+              "k": "name",
+              "v": "t"
+             }
+            ]
+           }
+          }
+         },
+         {
+          "k": "inOp",
+          "neg": false,
+          "a": {
+           "k": "bool",
+           "v": false
+          },
+          "b": {
+           "k": "boxContainer",
+           "e": {
+            "k": "listE",
+            "items": [
+             {
+              "k": "int",
+              "v": "0"
+             }
+            ]
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_tuple_eq",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "tupleE",
+      "items": [
+       {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "tupleE",
+         "items": [
+          {
+           "k": "name",
+           "v": "t"
+          },
+          {
+           "k": "int",
+           "v": "2"
+          }
+         ]
+        },
+        "b": {
+         "k": "tupleE",
+         "items": [
+          {
+           "k": "int",
+           "v": "1"
+          },
+          {
+           "k": "int",
+           "v": "2"
+          }
+         ]
+        }
+       },
+       {
+        "k": "binop",
+        "op": "==",
+        "a": {
+         "k": "tupleE",
+         "items": [
+          {
+           "k": "int",
+           "v": "1"
+          },
+          {
+           "k": "int",
+           "v": "2"
+          }
+         ]
+        },
+        "b": {
+         "k": "tupleE",
+         "items": [
+          {
+           "k": "name",
+           "v": "t"
+          },
+          {
+           "k": "int",
+           "v": "3"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>.case_bool_list_eq",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "assign",
+    "x": "t",
+    "e": {
+     "k": "bool",
+     "v": true
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "skip"
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "==",
+      "a": {
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "name",
+          "v": "t"
+         },
+         {
+          "k": "int",
+          "v": "0"
+         }
+        ]
+       }
+      },
+      "b": {
+       "k": "boxContainer",
+       "e": {
+        "k": "listE",
+        "items": [
+         {
+          "k": "int",
+          "v": "1"
+         },
+         {
+          "k": "bool",
+          "v": false
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "<module-objects>:<module>",
+  "file": "",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "setGlobal",
+    "x": "<module>pyarith_cases.py",
+    "e": {
+     "k": "alloc",
+     "cls": "<module>pyarith_cases.py",
+     "args": []
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setField",
+     "r": {
+      "k": "name",
+      "v": "<module>pyarith_cases.py"
+     },
+     "f": "case_bool_add_bool",
+     "v": {
+      "k": "fnref",
+      "v": "pyarith_cases.py:<module>.case_bool_add_bool"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setField",
+      "r": {
+       "k": "name",
+       "v": "<module>pyarith_cases.py"
+      },
+      "f": "case_bool_add_int",
+      "v": {
+       "k": "fnref",
+       "v": "pyarith_cases.py:<module>.case_bool_add_int"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setField",
+       "r": {
+        "k": "name",
+        "v": "<module>pyarith_cases.py"
+       },
+       "f": "case_bool_and_stays_bool",
+       "v": {
+        "k": "fnref",
+        "v": "pyarith_cases.py:<module>.case_bool_and_stays_bool"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setField",
+        "r": {
+         "k": "name",
+         "v": "<module>pyarith_cases.py"
+        },
+        "f": "case_bool_bitwise_with_int",
+        "v": {
+         "k": "fnref",
+         "v": "pyarith_cases.py:<module>.case_bool_bitwise_with_int"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setField",
+         "r": {
+          "k": "name",
+          "v": "<module>pyarith_cases.py"
+         },
+         "f": "case_bool_dict_key_lookup",
+         "v": {
+          "k": "fnref",
+          "v": "pyarith_cases.py:<module>.case_bool_dict_key_lookup"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setField",
+          "r": {
+           "k": "name",
+           "v": "<module>pyarith_cases.py"
+          },
+          "f": "case_bool_div",
+          "v": {
+           "k": "fnref",
+           "v": "pyarith_cases.py:<module>.case_bool_div"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setField",
+           "r": {
+            "k": "name",
+            "v": "<module>pyarith_cases.py"
+           },
+           "f": "case_bool_div_zero",
+           "v": {
+            "k": "fnref",
+            "v": "pyarith_cases.py:<module>.case_bool_div_zero"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setField",
+            "r": {
+             "k": "name",
+             "v": "<module>pyarith_cases.py"
+            },
+            "f": "case_bool_eq_float",
+            "v": {
+             "k": "fnref",
+             "v": "pyarith_cases.py:<module>.case_bool_eq_float"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setField",
+             "r": {
+              "k": "name",
+              "v": "<module>pyarith_cases.py"
+             },
+             "f": "case_bool_eq_int",
+             "v": {
+              "k": "fnref",
+              "v": "pyarith_cases.py:<module>.case_bool_eq_int"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setField",
+              "r": {
+               "k": "name",
+               "v": "<module>pyarith_cases.py"
+              },
+              "f": "case_bool_floordiv_mod",
+              "v": {
+               "k": "fnref",
+               "v": "pyarith_cases.py:<module>.case_bool_floordiv_mod"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setField",
+               "r": {
+                "k": "name",
+                "v": "<module>pyarith_cases.py"
+               },
+               "f": "case_bool_in_list",
+               "v": {
+                "k": "fnref",
+                "v": "pyarith_cases.py:<module>.case_bool_in_list"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setField",
+                "r": {
+                 "k": "name",
+                 "v": "<module>pyarith_cases.py"
+                },
+                "f": "case_bool_invert",
+                "v": {
+                 "k": "fnref",
+                 "v": "pyarith_cases.py:<module>.case_bool_invert"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setField",
+                 "r": {
+                  "k": "name",
+                  "v": "<module>pyarith_cases.py"
+                 },
+                 "f": "case_bool_list_eq",
+                 "v": {
+                  "k": "fnref",
+                  "v": "pyarith_cases.py:<module>.case_bool_list_eq"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setField",
+                  "r": {
+                   "k": "name",
+                   "v": "<module>pyarith_cases.py"
+                  },
+                  "f": "case_bool_lt",
+                  "v": {
+                   "k": "fnref",
+                   "v": "pyarith_cases.py:<module>.case_bool_lt"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setField",
+                   "r": {
+                    "k": "name",
+                    "v": "<module>pyarith_cases.py"
+                   },
+                   "f": "case_bool_mul",
+                   "v": {
+                    "k": "fnref",
+                    "v": "pyarith_cases.py:<module>.case_bool_mul"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setField",
+                    "r": {
+                     "k": "name",
+                     "v": "<module>pyarith_cases.py"
+                    },
+                    "f": "case_bool_ne_int",
+                    "v": {
+                     "k": "fnref",
+                     "v": "pyarith_cases.py:<module>.case_bool_ne_int"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setField",
+                     "r": {
+                      "k": "name",
+                      "v": "<module>pyarith_cases.py"
+                     },
+                     "f": "case_bool_neg",
+                     "v": {
+                      "k": "fnref",
+                      "v": "pyarith_cases.py:<module>.case_bool_neg"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setField",
+                      "r": {
+                       "k": "name",
+                       "v": "<module>pyarith_cases.py"
+                      },
+                      "f": "case_bool_or_stays_bool",
+                      "v": {
+                       "k": "fnref",
+                       "v": "pyarith_cases.py:<module>.case_bool_or_stays_bool"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setField",
+                       "r": {
+                        "k": "name",
+                        "v": "<module>pyarith_cases.py"
+                       },
+                       "f": "case_bool_plus_float",
+                       "v": {
+                        "k": "fnref",
+                        "v": "pyarith_cases.py:<module>.case_bool_plus_float"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setField",
+                        "r": {
+                         "k": "name",
+                         "v": "<module>pyarith_cases.py"
+                        },
+                        "f": "case_bool_shift",
+                        "v": {
+                         "k": "fnref",
+                         "v": "pyarith_cases.py:<module>.case_bool_shift"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setField",
+                         "r": {
+                          "k": "name",
+                          "v": "<module>pyarith_cases.py"
+                         },
+                         "f": "case_bool_sub",
+                         "v": {
+                          "k": "fnref",
+                          "v": "pyarith_cases.py:<module>.case_bool_sub"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setField",
+                          "r": {
+                           "k": "name",
+                           "v": "<module>pyarith_cases.py"
+                          },
+                          "f": "case_bool_tuple_eq",
+                          "v": {
+                           "k": "fnref",
+                           "v": "pyarith_cases.py:<module>.case_bool_tuple_eq"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setField",
+                           "r": {
+                            "k": "name",
+                            "v": "<module>pyarith_cases.py"
+                           },
+                           "f": "case_bool_xor_stays_bool",
+                           "v": {
+                            "k": "fnref",
+                            "v": "pyarith_cases.py:<module>.case_bool_xor_stays_bool"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setField",
+                            "r": {
+                             "k": "name",
+                             "v": "<module>pyarith_cases.py"
+                            },
+                            "f": "case_div_7_2",
+                            "v": {
+                             "k": "fnref",
+                             "v": "pyarith_cases.py:<module>.case_div_7_2"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setField",
+                             "r": {
+                              "k": "name",
+                              "v": "<module>pyarith_cases.py"
+                             },
+                             "f": "case_div_7_neg2",
+                             "v": {
+                              "k": "fnref",
+                              "v": "pyarith_cases.py:<module>.case_div_7_neg2"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setField",
+                              "r": {
+                               "k": "name",
+                               "v": "<module>pyarith_cases.py"
+                              },
+                              "f": "case_div_and_floordiv_together",
+                              "v": {
+                               "k": "fnref",
+                               "v": "pyarith_cases.py:<module>.case_div_and_floordiv_together"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setField",
+                               "r": {
+                                "k": "name",
+                                "v": "<module>pyarith_cases.py"
+                               },
+                               "f": "case_div_beyond_2pow53",
+                               "v": {
+                                "k": "fnref",
+                                "v": "pyarith_cases.py:<module>.case_div_beyond_2pow53"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setField",
+                                "r": {
+                                 "k": "name",
+                                 "v": "<module>pyarith_cases.py"
+                                },
+                                "f": "case_div_big_divisor",
+                                "v": {
+                                 "k": "fnref",
+                                 "v": "pyarith_cases.py:<module>.case_div_big_divisor"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setField",
+                                 "r": {
+                                  "k": "name",
+                                  "v": "<module>pyarith_cases.py"
+                                 },
+                                 "f": "case_div_big_int",
+                                 "v": {
+                                  "k": "fnref",
+                                  "v": "pyarith_cases.py:<module>.case_div_big_int"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setField",
+                                  "r": {
+                                   "k": "name",
+                                   "v": "<module>pyarith_cases.py"
+                                  },
+                                  "f": "case_div_exact_is_float",
+                                  "v": {
+                                   "k": "fnref",
+                                   "v": "pyarith_cases.py:<module>.case_div_exact_is_float"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setField",
+                                   "r": {
+                                    "k": "name",
+                                    "v": "<module>pyarith_cases.py"
+                                   },
+                                   "f": "case_div_exactly_2pow53",
+                                   "v": {
+                                    "k": "fnref",
+                                    "v": "pyarith_cases.py:<module>.case_div_exactly_2pow53"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setField",
+                                    "r": {
+                                     "k": "name",
+                                     "v": "<module>pyarith_cases.py"
+                                    },
+                                    "f": "case_div_float_float",
+                                    "v": {
+                                     "k": "fnref",
+                                     "v": "pyarith_cases.py:<module>.case_div_float_float"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setField",
+                                     "r": {
+                                      "k": "name",
+                                      "v": "<module>pyarith_cases.py"
+                                     },
+                                     "f": "case_div_int_float",
+                                     "v": {
+                                      "k": "fnref",
+                                      "v": "pyarith_cases.py:<module>.case_div_int_float"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setField",
+                                      "r": {
+                                       "k": "name",
+                                       "v": "<module>pyarith_cases.py"
+                                      },
+                                      "f": "case_div_neg7_2",
+                                      "v": {
+                                       "k": "fnref",
+                                       "v": "pyarith_cases.py:<module>.case_div_neg7_2"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setField",
+                                       "r": {
+                                        "k": "name",
+                                        "v": "<module>pyarith_cases.py"
+                                       },
+                                       "f": "case_div_one_third",
+                                       "v": {
+                                        "k": "fnref",
+                                        "v": "pyarith_cases.py:<module>.case_div_one_third"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setField",
+                                        "r": {
+                                         "k": "name",
+                                         "v": "<module>pyarith_cases.py"
+                                        },
+                                        "f": "case_div_zero",
+                                        "v": {
+                                         "k": "fnref",
+                                         "v": "pyarith_cases.py:<module>.case_div_zero"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setField",
+                                         "r": {
+                                          "k": "name",
+                                          "v": "<module>pyarith_cases.py"
+                                         },
+                                         "f": "case_div_zero_numerator_negative_divisor",
+                                         "v": {
+                                          "k": "fnref",
+                                          "v": "pyarith_cases.py:<module>.case_div_zero_numerator_negative_divisor"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setField",
+                                          "r": {
+                                           "k": "name",
+                                           "v": "<module>pyarith_cases.py"
+                                          },
+                                          "f": "case_false_eq_zero",
+                                          "v": {
+                                           "k": "fnref",
+                                           "v": "pyarith_cases.py:<module>.case_false_eq_zero"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setField",
+                                           "r": {
+                                            "k": "name",
+                                            "v": "<module>pyarith_cases.py"
+                                           },
+                                           "f": "case_floordiv_7_2",
+                                           "v": {
+                                            "k": "fnref",
+                                            "v": "pyarith_cases.py:<module>.case_floordiv_7_2"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setField",
+                                            "r": {
+                                             "k": "name",
+                                             "v": "<module>pyarith_cases.py"
+                                            },
+                                            "f": "case_floordiv_7_neg2",
+                                            "v": {
+                                             "k": "fnref",
+                                             "v": "pyarith_cases.py:<module>.case_floordiv_7_neg2"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setField",
+                                             "r": {
+                                              "k": "name",
+                                              "v": "<module>pyarith_cases.py"
+                                             },
+                                             "f": "case_floordiv_neg7_2",
+                                             "v": {
+                                              "k": "fnref",
+                                              "v": "pyarith_cases.py:<module>.case_floordiv_neg7_2"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setField",
+                                              "r": {
+                                               "k": "name",
+                                               "v": "<module>pyarith_cases.py"
+                                              },
+                                              "f": "case_floordiv_zero",
+                                              "v": {
+                                               "k": "fnref",
+                                               "v": "pyarith_cases.py:<module>.case_floordiv_zero"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setField",
+                                               "r": {
+                                                "k": "name",
+                                                "v": "<module>pyarith_cases.py"
+                                               },
+                                               "f": "case_int_dict_key_lookup_by_bool_key",
+                                               "v": {
+                                                "k": "fnref",
+                                                "v": "pyarith_cases.py:<module>.case_int_dict_key_lookup_by_bool_key"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setField",
+                                                "r": {
+                                                 "k": "name",
+                                                 "v": "<module>pyarith_cases.py"
+                                                },
+                                                "f": "case_mod_neg7_3",
+                                                "v": {
+                                                 "k": "fnref",
+                                                 "v": "pyarith_cases.py:<module>.case_mod_neg7_3"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "setField",
+                                                 "r": {
+                                                  "k": "name",
+                                                  "v": "<module>pyarith_cases.py"
+                                                 },
+                                                 "f": "case_not_bool",
+                                                 "v": {
+                                                  "k": "fnref",
+                                                  "v": "pyarith_cases.py:<module>.case_not_bool"
+                                                 }
+                                                },
+                                                "b": {
+                                                 "k": "skip"
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "pyarith_cases.py:<module>",
+  "file": "pyarith_cases.py",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "exprS",
+    "e": {
+     "k": "str",
+     "v": "Differential fixture for Python `/`, `//` and `bool`-is-an-`int` (STRATEGY.md item Q).\n\nEvery `case_*` function takes no arguments. `tests/test_pyarith_cpython.py` runs each one\nunder CPython and compares the result with the value Core computes for the SAME source\nafter the whole pipeline -- `pysrc2cpg` -> `cartographer/export_ast.sc` ->\n`cartographer/render_lean.py` -> `Autoform/PyArithProgram.lean` -- pinned by\n`#guard_msgs` in `Autoform/PyArith.lean`.\n\nOperands are bound to locals first (`a = 7`) so that no frontend constant-folds the\noperator away, and so the operator under test is the one the exporter emits.\n"
+    }
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "setGlobal",
+     "x": "case_div_7_2",
+     "e": {
+      "k": "fnref",
+      "v": "pyarith_cases.py:<module>.case_div_7_2"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "setGlobal",
+      "x": "case_div_neg7_2",
+      "e": {
+       "k": "fnref",
+       "v": "pyarith_cases.py:<module>.case_div_neg7_2"
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "setGlobal",
+       "x": "case_div_7_neg2",
+       "e": {
+        "k": "fnref",
+        "v": "pyarith_cases.py:<module>.case_div_7_neg2"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "setGlobal",
+        "x": "case_div_exact_is_float",
+        "e": {
+         "k": "fnref",
+         "v": "pyarith_cases.py:<module>.case_div_exact_is_float"
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "setGlobal",
+         "x": "case_div_zero",
+         "e": {
+          "k": "fnref",
+          "v": "pyarith_cases.py:<module>.case_div_zero"
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "setGlobal",
+          "x": "case_div_zero_numerator_negative_divisor",
+          "e": {
+           "k": "fnref",
+           "v": "pyarith_cases.py:<module>.case_div_zero_numerator_negative_divisor"
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "setGlobal",
+           "x": "case_div_one_third",
+           "e": {
+            "k": "fnref",
+            "v": "pyarith_cases.py:<module>.case_div_one_third"
+           }
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "setGlobal",
+            "x": "case_div_exactly_2pow53",
+            "e": {
+             "k": "fnref",
+             "v": "pyarith_cases.py:<module>.case_div_exactly_2pow53"
+            }
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "setGlobal",
+             "x": "case_div_beyond_2pow53",
+             "e": {
+              "k": "fnref",
+              "v": "pyarith_cases.py:<module>.case_div_beyond_2pow53"
+             }
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "setGlobal",
+              "x": "case_div_big_int",
+              "e": {
+               "k": "fnref",
+               "v": "pyarith_cases.py:<module>.case_div_big_int"
+              }
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "setGlobal",
+               "x": "case_div_big_divisor",
+               "e": {
+                "k": "fnref",
+                "v": "pyarith_cases.py:<module>.case_div_big_divisor"
+               }
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "setGlobal",
+                "x": "case_div_int_float",
+                "e": {
+                 "k": "fnref",
+                 "v": "pyarith_cases.py:<module>.case_div_int_float"
+                }
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "setGlobal",
+                 "x": "case_div_float_float",
+                 "e": {
+                  "k": "fnref",
+                  "v": "pyarith_cases.py:<module>.case_div_float_float"
+                 }
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "setGlobal",
+                  "x": "case_floordiv_7_2",
+                  "e": {
+                   "k": "fnref",
+                   "v": "pyarith_cases.py:<module>.case_floordiv_7_2"
+                  }
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "setGlobal",
+                   "x": "case_floordiv_neg7_2",
+                   "e": {
+                    "k": "fnref",
+                    "v": "pyarith_cases.py:<module>.case_floordiv_neg7_2"
+                   }
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "setGlobal",
+                    "x": "case_floordiv_7_neg2",
+                    "e": {
+                     "k": "fnref",
+                     "v": "pyarith_cases.py:<module>.case_floordiv_7_neg2"
+                    }
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "setGlobal",
+                     "x": "case_floordiv_zero",
+                     "e": {
+                      "k": "fnref",
+                      "v": "pyarith_cases.py:<module>.case_floordiv_zero"
+                     }
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "setGlobal",
+                      "x": "case_mod_neg7_3",
+                      "e": {
+                       "k": "fnref",
+                       "v": "pyarith_cases.py:<module>.case_mod_neg7_3"
+                      }
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "setGlobal",
+                       "x": "case_div_and_floordiv_together",
+                       "e": {
+                        "k": "fnref",
+                        "v": "pyarith_cases.py:<module>.case_div_and_floordiv_together"
+                       }
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "setGlobal",
+                        "x": "case_bool_eq_int",
+                        "e": {
+                         "k": "fnref",
+                         "v": "pyarith_cases.py:<module>.case_bool_eq_int"
+                        }
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "setGlobal",
+                         "x": "case_bool_ne_int",
+                         "e": {
+                          "k": "fnref",
+                          "v": "pyarith_cases.py:<module>.case_bool_ne_int"
+                         }
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "setGlobal",
+                          "x": "case_false_eq_zero",
+                          "e": {
+                           "k": "fnref",
+                           "v": "pyarith_cases.py:<module>.case_false_eq_zero"
+                          }
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "setGlobal",
+                           "x": "case_bool_eq_float",
+                           "e": {
+                            "k": "fnref",
+                            "v": "pyarith_cases.py:<module>.case_bool_eq_float"
+                           }
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "setGlobal",
+                            "x": "case_bool_add_int",
+                            "e": {
+                             "k": "fnref",
+                             "v": "pyarith_cases.py:<module>.case_bool_add_int"
+                            }
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "setGlobal",
+                             "x": "case_bool_add_bool",
+                             "e": {
+                              "k": "fnref",
+                              "v": "pyarith_cases.py:<module>.case_bool_add_bool"
+                             }
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "setGlobal",
+                              "x": "case_bool_sub",
+                              "e": {
+                               "k": "fnref",
+                               "v": "pyarith_cases.py:<module>.case_bool_sub"
+                              }
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "setGlobal",
+                               "x": "case_bool_mul",
+                               "e": {
+                                "k": "fnref",
+                                "v": "pyarith_cases.py:<module>.case_bool_mul"
+                               }
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "setGlobal",
+                                "x": "case_bool_neg",
+                                "e": {
+                                 "k": "fnref",
+                                 "v": "pyarith_cases.py:<module>.case_bool_neg"
+                                }
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "setGlobal",
+                                 "x": "case_bool_invert",
+                                 "e": {
+                                  "k": "fnref",
+                                  "v": "pyarith_cases.py:<module>.case_bool_invert"
+                                 }
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "setGlobal",
+                                  "x": "case_bool_lt",
+                                  "e": {
+                                   "k": "fnref",
+                                   "v": "pyarith_cases.py:<module>.case_bool_lt"
+                                  }
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "setGlobal",
+                                   "x": "case_bool_div",
+                                   "e": {
+                                    "k": "fnref",
+                                    "v": "pyarith_cases.py:<module>.case_bool_div"
+                                   }
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "setGlobal",
+                                    "x": "case_bool_div_zero",
+                                    "e": {
+                                     "k": "fnref",
+                                     "v": "pyarith_cases.py:<module>.case_bool_div_zero"
+                                    }
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "setGlobal",
+                                     "x": "case_bool_floordiv_mod",
+                                     "e": {
+                                      "k": "fnref",
+                                      "v": "pyarith_cases.py:<module>.case_bool_floordiv_mod"
+                                     }
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "setGlobal",
+                                      "x": "case_bool_shift",
+                                      "e": {
+                                       "k": "fnref",
+                                       "v": "pyarith_cases.py:<module>.case_bool_shift"
+                                      }
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "setGlobal",
+                                       "x": "case_bool_and_stays_bool",
+                                       "e": {
+                                        "k": "fnref",
+                                        "v": "pyarith_cases.py:<module>.case_bool_and_stays_bool"
+                                       }
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "setGlobal",
+                                        "x": "case_bool_or_stays_bool",
+                                        "e": {
+                                         "k": "fnref",
+                                         "v": "pyarith_cases.py:<module>.case_bool_or_stays_bool"
+                                        }
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "setGlobal",
+                                         "x": "case_bool_xor_stays_bool",
+                                         "e": {
+                                          "k": "fnref",
+                                          "v": "pyarith_cases.py:<module>.case_bool_xor_stays_bool"
+                                         }
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "setGlobal",
+                                          "x": "case_bool_bitwise_with_int",
+                                          "e": {
+                                           "k": "fnref",
+                                           "v": "pyarith_cases.py:<module>.case_bool_bitwise_with_int"
+                                          }
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "setGlobal",
+                                           "x": "case_bool_plus_float",
+                                           "e": {
+                                            "k": "fnref",
+                                            "v": "pyarith_cases.py:<module>.case_bool_plus_float"
+                                           }
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "setGlobal",
+                                            "x": "case_not_bool",
+                                            "e": {
+                                             "k": "fnref",
+                                             "v": "pyarith_cases.py:<module>.case_not_bool"
+                                            }
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "setGlobal",
+                                             "x": "case_bool_dict_key_lookup",
+                                             "e": {
+                                              "k": "fnref",
+                                              "v": "pyarith_cases.py:<module>.case_bool_dict_key_lookup"
+                                             }
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "setGlobal",
+                                              "x": "case_int_dict_key_lookup_by_bool_key",
+                                              "e": {
+                                               "k": "fnref",
+                                               "v": "pyarith_cases.py:<module>.case_int_dict_key_lookup_by_bool_key"
+                                              }
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "setGlobal",
+                                               "x": "case_bool_in_list",
+                                               "e": {
+                                                "k": "fnref",
+                                                "v": "pyarith_cases.py:<module>.case_bool_in_list"
+                                               }
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "setGlobal",
+                                                "x": "case_bool_tuple_eq",
+                                                "e": {
+                                                 "k": "fnref",
+                                                 "v": "pyarith_cases.py:<module>.case_bool_tuple_eq"
+                                                }
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "setGlobal",
+                                                 "x": "case_bool_list_eq",
+                                                 "e": {
+                                                  "k": "fnref",
+                                                  "v": "pyarith_cases.py:<module>.case_bool_list_eq"
+                                                 }
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "skip"
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "skip"
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "skip"
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "skip"
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "skip"
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "skip"
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "skip"
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "skip"
+                                                        },
+                                                        "b": {
+                                                         "k": "seq",
+                                                         "a": {
+                                                          "k": "skip"
+                                                         },
+                                                         "b": {
+                                                          "k": "seq",
+                                                          "a": {
+                                                           "k": "skip"
+                                                          },
+                                                          "b": {
+                                                           "k": "seq",
+                                                           "a": {
+                                                            "k": "skip"
+                                                           },
+                                                           "b": {
+                                                            "k": "seq",
+                                                            "a": {
+                                                             "k": "skip"
+                                                            },
+                                                            "b": {
+                                                             "k": "seq",
+                                                             "a": {
+                                                              "k": "skip"
+                                                             },
+                                                             "b": {
+                                                              "k": "seq",
+                                                              "a": {
+                                                               "k": "skip"
+                                                              },
+                                                              "b": {
+                                                               "k": "seq",
+                                                               "a": {
+                                                                "k": "skip"
+                                                               },
+                                                               "b": {
+                                                                "k": "seq",
+                                                                "a": {
+                                                                 "k": "skip"
+                                                                },
+                                                                "b": {
+                                                                 "k": "seq",
+                                                                 "a": {
+                                                                  "k": "skip"
+                                                                 },
+                                                                 "b": {
+                                                                  "k": "seq",
+                                                                  "a": {
+                                                                   "k": "skip"
+                                                                  },
+                                                                  "b": {
+                                                                   "k": "seq",
+                                                                   "a": {
+                                                                    "k": "skip"
+                                                                   },
+                                                                   "b": {
+                                                                    "k": "seq",
+                                                                    "a": {
+                                                                     "k": "skip"
+                                                                    },
+                                                                    "b": {
+                                                                     "k": "seq",
+                                                                     "a": {
+                                                                      "k": "skip"
+                                                                     },
+                                                                     "b": {
+                                                                      "k": "seq",
+                                                                      "a": {
+                                                                       "k": "skip"
+                                                                      },
+                                                                      "b": {
+                                                                       "k": "seq",
+                                                                       "a": {
+                                                                        "k": "skip"
+                                                                       },
+                                                                       "b": {
+                                                                        "k": "seq",
+                                                                        "a": {
+                                                                         "k": "skip"
+                                                                        },
+                                                                        "b": {
+                                                                         "k": "seq",
+                                                                         "a": {
+                                                                          "k": "skip"
+                                                                         },
+                                                                         "b": {
+                                                                          "k": "seq",
+                                                                          "a": {
+                                                                           "k": "skip"
+                                                                          },
+                                                                          "b": {
+                                                                           "k": "seq",
+                                                                           "a": {
+                                                                            "k": "skip"
+                                                                           },
+                                                                           "b": {
+                                                                            "k": "seq",
+                                                                            "a": {
+                                                                             "k": "skip"
+                                                                            },
+                                                                            "b": {
+                                                                             "k": "seq",
+                                                                             "a": {
+                                                                              "k": "skip"
+                                                                             },
+                                                                             "b": {
+                                                                              "k": "seq",
+                                                                              "a": {
+                                                                               "k": "skip"
+                                                                              },
+                                                                              "b": {
+                                                                               "k": "seq",
+                                                                               "a": {
+                                                                                "k": "skip"
+                                                                               },
+                                                                               "b": {
+                                                                                "k": "seq",
+                                                                                "a": {
+                                                                                 "k": "skip"
+                                                                                },
+                                                                                "b": {
+                                                                                 "k": "seq",
+                                                                                 "a": {
+                                                                                  "k": "skip"
+                                                                                 },
+                                                                                 "b": {
+                                                                                  "k": "seq",
+                                                                                  "a": {
+                                                                                   "k": "skip"
+                                                                                  },
+                                                                                  "b": {
+                                                                                   "k": "seq",
+                                                                                   "a": {
+                                                                                    "k": "skip"
+                                                                                   },
+                                                                                   "b": {
+                                                                                    "k": "seq",
+                                                                                    "a": {
+                                                                                     "k": "skip"
+                                                                                    },
+                                                                                    "b": {
+                                                                                     "k": "seq",
+                                                                                     "a": {
+                                                                                      "k": "skip"
+                                                                                     },
+                                                                                     "b": {
+                                                                                      "k": "seq",
+                                                                                      "a": {
+                                                                                       "k": "skip"
+                                                                                      },
+                                                                                      "b": {
+                                                                                       "k": "seq",
+                                                                                       "a": {
+                                                                                        "k": "skip"
+                                                                                       },
+                                                                                       "b": {
+                                                                                        "k": "seq",
+                                                                                        "a": {
+                                                                                         "k": "skip"
+                                                                                        },
+                                                                                        "b": {
+                                                                                         "k": "seq",
+                                                                                         "a": {
+                                                                                          "k": "skip"
+                                                                                         },
+                                                                                         "b": {
+                                                                                          "k": "seq",
+                                                                                          "a": {
+                                                                                           "k": "skip"
+                                                                                          },
+                                                                                          "b": {
+                                                                                           "k": "seq",
+                                                                                           "a": {
+                                                                                            "k": "skip"
+                                                                                           },
+                                                                                           "b": {
+                                                                                            "k": "seq",
+                                                                                            "a": {
+                                                                                             "k": "skip"
+                                                                                            },
+                                                                                            "b": {
+                                                                                             "k": "skip"
+                                                                                            }
+                                                                                           }
+                                                                                          }
+                                                                                         }
+                                                                                        }
+                                                                                       }
+                                                                                      }
+                                                                                     }
+                                                                                    }
+                                                                                   }
+                                                                                  }
+                                                                                 }
+                                                                                }
+                                                                               }
+                                                                              }
+                                                                             }
+                                                                            }
+                                                                           }
+                                                                          }
+                                                                         }
+                                                                        }
+                                                                       }
+                                                                      }
+                                                                     }
+                                                                    }
+                                                                   }
+                                                                  }
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             }
+                                                            }
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "pyClasses": {}
+ }
+]

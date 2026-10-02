@@ -122,15 +122,14 @@ integers are 32-bit and always convertible), and `FConfig.ofInt` reproduces that
 genuinely differ here and `flCmp` splits on the dialect. Promoting under `.python` would
 be a silent wrong answer of the `floorDiv` family.
 
-**`/` on two integers is still floor division, and that is now a known wrong answer for
-Python.** CPython's `/` is *true* division (`7 / 2 == 3.5`) and `//` floors. The
-transpiler currently maps Python's `//` onto the `"/"` operator string (see the note above
-`applyBinop_py_div` and `Refine.lean`'s discussion of `op:floorDiv`), so `"/"` on two
-`.int`s is left exactly as it was — changing it would silently break every `//` in the
-corpora. `"//"` is now a distinct operator with the floor semantics, so the fix is in
-`cartographer/render_lean.py`: emit `"//"` for floor division and `"/"` for true division,
-after which `"/"` on two `.int`s under `.python` must become `flBinop`. Until then this is
-a recorded silent mistranslation, not an accident.
+**`/` on two integers is TRUE division under Python (`pyIntTrueDiv`).** CPython's `/`
+returns a correctly rounded `float` (`7 / 2 == 3.5`, `6 / 3 == 2.0`) and `//` floors. This
+used to be a recorded silent mistranslation: the exporter spelled both `<operator>.division`
+and `<operator>.floorDiv` as `"/"`, and `"/"` floored. `floorDiv` is now exported as `"//"`
+(floor division, `Int.fdiv`), and `"/"` on two `.int`s under `.python` is one IEEE division
+in binary64 when both operands are exact doubles (`|n| ≤ 2^53`), a named hole beyond that
+(the double conversion would round before the division does), and `ZeroDivisionError` for a
+zero divisor. `Autoform/PyArith.lean` checks it against CPython.
 
 **NaN is unordered.** `flCmp` returns `none`, and `ordToE` turns that into `false` for
 `<`, `<=`, `>`, `>=` and `==`, and `true` for `!=`. That is CPython's behaviour and it is
@@ -298,6 +297,25 @@ def jsBitwise (op : String) (x y : Int) : EResult :=
     | ">>>" => .val (.int ((ux / 2 ^ s : Nat) : Int))
     | _     => .hole s!"binop:{op}"
 
+/-! ### Python `int / int` is TRUE division
+
+CPython's `int.__truediv__` returns a `float`, and it is CORRECTLY ROUNDED for every pair
+of integers, however large (`long_true_divide`): `7 / 2 == 3.5`, `-7 / 2 == -3.5`,
+`6 / 3 == 2.0` (a float, not `2`), `0 / -3 == -0.0`, and `1 / 0` is `ZeroDivisionError`.
+Converting each operand to binary64 and dividing once is the same single rounding exactly
+when both operands are themselves exact binary64s, i.e. `|n| ≤ 2^53` (`jsExactInt`);
+beyond that the conversion rounds first and the division rounds again, and the answer can
+differ from CPython's by an ulp (`10**16 + 1`, say). So a larger operand is a NAMED HOLE,
+never a double-rounded number. Before this, `applyBinop .python "/" (.int 7) (.int 2)` was
+the integer `3` -- the exporter spelled `//` and `/` alike, and the shared operator floored. -/
+
+/-- Python `x / y` on two integers. Zero divisor first (CPython raises before it looks at
+sizes), then the exactness guard, then one IEEE division in binary64. -/
+def pyIntTrueDiv (x y : Int) : EResult :=
+  if y == 0 then .exn (.str "ZeroDivisionError")
+  else if !(jsExactInt x && jsExactInt y) then .hole "binop:/:int-true-division-beyond-2^53"
+  else flBinop .python "/" (.int x) (.int y)
+
 /-- JS `~x` on an `.int`: `-ToInt32(x) - 1`, always in int32 range. -/
 def jsBitNot (x : Int) : EResult :=
   if jsExactInt x then .val (.int (-(jsToInt32 x) - 1))
@@ -386,7 +404,9 @@ def binopNeedsHeap (op : String) (x y : Val) : Bool :=
     (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, beq_iff_eq, h, h2]
 
-/-! ### `bool` in integer contexts under `.cLike`
+/-! ### `bool` in integer contexts under `.cLike` (and `.python`)
+
+(`.python` is covered at the end of this comment.)
 
 C has no boolean results: `a < b`, `a == b`, `!a`, `a && b` are `int` 0 or 1 (C11
 6.5.8p6, 6.5.9p3, 6.5.3.3p5, 6.5.13p3, 6.5.14p3), and a `_Bool` promotes to `int`
@@ -408,6 +428,14 @@ later integer context promotes), and two `bool`s under `==`/`!=`/`&&`/`||` take 
 existing path, whose truth value is the same either way. Every other operator on two
 `bool`s promotes both (C/C++ only; a compile error elsewhere).
 
+**Python** is the other promoting dialect, for a different reason: `bool` is a SUBCLASS of
+`int`, so `True == 1`, `True + True == 2`, `-True == -1`, `~True == -2`, `True < 2` and
+`True / 2 == 0.5` all hold. `bool & bool`, `bool | bool` and `bool ^ bool` stay a `bool`
+(`bool.__and__` etc.), exactly as for C. The integer rule is `pyIntBinop`, not `cIntBinop`:
+the width is unbounded and `/` is true division. Equality inside containers and dict keys
+(`{1: 'a'}[True]`, `True in [1]`) goes through `Val.beq`, which now identifies a `bool` with
+the `int`/`float` of the same value.
+
 What is NOT done here: the RETURN conversion. `int f(void) { return a < b; }` returns
 `Val.bool`, which every integer context above reads as `0`/`1`; the C oracle
 (`scripts/differential.py`) compares a `bool` result against an integer-typed C result as
@@ -415,7 +443,7 @@ What is NOT done here: the RETURN conversion. `int f(void) { return a < b; }` re
 
 /-- Does this dialect promote `bool` to `0`/`1` in integer contexts? See above. -/
 def Dialect.promotesBool : Dialect → Bool
-  | .python     => false
+  | .python     => true
   | .cLike      => true
   | .javascript => false
 
@@ -451,6 +479,48 @@ def cIntBinop (op : String) (x y : Int) : EResult :=
   | "!="  => .val (.bool (!(x == y)))
   | _     => .hole s!"binop:{op}"
 
+/-- The operators a promoted `bool` takes part in as an integer under `.python`: the C list
+plus floor division. (`>>>` is not a Python operator; `**` on integers is not modelled at
+all, so `True ** 2` stays the hole it is for `2 ** 2`.) -/
+def pyIntOps : List String :=
+  ["+", "-", "*", "/", "//", "%", "&", "|", "^", "<<", ">>", "<", "<=", ">", ">=", "==", "!="]
+
+/-- `applyBinop .python op (.int x) (.int y)` for `op ∈ pyIntOps`, restated so the promoted
+`bool` arms can use it without recursion; `pyIntBinop_eq` (below `applyBinop`) proves they
+agree. `bool` is an `int` subclass in Python (`True == 1`, `True + True == 2`,
+`True / 2 == 0.5`), so it takes the integer rule for the operator, true division included. -/
+def pyIntBinop (op : String) (x y : Int) : EResult :=
+  let nc := Dialect.python.toNumConfig
+  match op with
+  | "+"   => numToE (nc.add x y)
+  | "-"   => numToE (nc.sub x y)
+  | "*"   => numToE (nc.mul x y)
+  | "/"   => pyIntTrueDiv x y
+  | "//"  => numToE (nc.div x y)
+  | "%"   => numToE (nc.mod x y)
+  | "&"   => numToE (nc.band x y)
+  | "|"   => numToE (nc.bor x y)
+  | "^"   => numToE (nc.bxor x y)
+  | "<<"  => numToE (nc.shl x y)
+  | ">>"  => numToE (nc.shr x y)
+  | "<"   => .val (.bool (x < y))
+  | "<="  => .val (.bool (x ≤ y))
+  | ">"   => .val (.bool (x > y))
+  | ">="  => .val (.bool (x ≥ y))
+  | "=="  => .val (.bool (x == y))
+  | "!="  => .val (.bool (!(x == y)))
+  | _     => .hole s!"binop:{op}"
+
+/-- The integer operators a promoted `bool` takes part in, per dialect. -/
+def intBoolOps : Dialect → List String
+  | .python => pyIntOps
+  | _       => cIntOps
+
+/-- The integer rule a promoted `bool` follows, per dialect (`.javascript` never promotes). -/
+def intBoolBinop : Dialect → String → Int → Int → EResult
+  | .python, op, x, y => pyIntBinop op x y
+  | _,       op, x, y => cIntBinop op x y
+
 /-- What `applyBinop` answers for operands no typed arm claims: the generic tail of its
 match (structural `==`/`!=`, value-or-bool `&&`/`||`, otherwise a hole). -/
 def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
@@ -474,10 +544,10 @@ operator lemmas below. -/
 def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
   match a, b with
   | .bool p, .int y =>
-      if d.promotesBool && cIntOps.contains op then cIntBinop op (boolToInt p) y
+      if d.promotesBool && (intBoolOps d).contains op then intBoolBinop d op (boolToInt p) y
       else binopTail d op a b
   | .int x, .bool q =>
-      if d.promotesBool && cIntOps.contains op then cIntBinop op x (boolToInt q)
+      if d.promotesBool && (intBoolOps d).contains op then intBoolBinop d op x (boolToInt q)
       else binopTail d op a b
   | .bool p, .float _ =>
       if d.promotesBool then flBinop d op (.int (boolToInt p)) b else binopTail d op a b
@@ -490,7 +560,7 @@ def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
         | "|" => .val (.bool (p || q))
         | "^" => .val (.bool (p != q))
         | "==" | "!=" | "&&" | "||" => binopTail d op a b
-        | _ => if cIntOps.contains op then cIntBinop op (boolToInt p) (boolToInt q)
+        | _ => if (intBoolOps d).contains op then intBoolBinop d op (boolToInt p) (boolToInt q)
                else binopTail d op a b
       else binopTail d op a b
   | _, _ => binopTail d op a b
@@ -537,7 +607,8 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | "/",  .int x, .int y =>
       match d with
       | .javascript => jsIntDiv x y
-      | _           => numToE (nc.div x y)
+      | .python     => pyIntTrueDiv x y
+      | .cLike      => numToE (nc.div x y)
   | "%",  .int x, .int y =>
       match d with
       | .javascript => jsIntMod x y
@@ -609,10 +680,12 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
   | op, .float _, .int _   => flBinop d op a b
   | op, .int _,   .float _ => flBinop d op a b
   -- Floor division. Distinct from `/` on purpose: Python's `/` is *true* division and
-  -- `//` floors. The transpiler currently maps `//` onto `"/"` (see the note on
-  -- `applyBinop_py_div`), so `"//"` is unreachable from the present corpora and exists so
-  -- that the transpiler can start emitting the two separately.
-  | "//", .int x, .int y => numToE (nc.div x y)
+  -- `//` floors. The exporter emits `//` (`<operator>.floorDiv`) as `"//"` and `/` as `"/"`;
+  -- under `.python` the latter is true division (`pyIntTrueDiv`).
+  | "//", .int x, .int y =>
+      match d with
+      | .python => numToE (nc.div x y)
+      | _       => .hole "binop://:non-python"
   -- `006-reduce-remaining-holes`, Story 5: interior-pointer arithmetic and
   -- comparison. Placed BEFORE the generic `"==",x,y`/`"!=",x,y` catch-all just
   -- below, deliberately: those would otherwise route an `.iref`/`.iref` pair
@@ -702,10 +775,22 @@ mathematical model where nothing overflows.
     applyBinop .python "-" (.int x) (.int y) = .val (.int (x - y)) := rfl
 @[simp] theorem applyBinop_py_mul (x y : Int) :
     applyBinop .python "*" (.int x) (.int y) = .val (.int (x * y)) := rfl
-@[simp] theorem applyBinop_py_div (x y : Int) (h : y ≠ 0) :
-    applyBinop .python "/" (.int x) (.int y) = .val (.int (Int.fdiv x y)) := by
+/-- `//` on two integers is floor division: `Int.fdiv`, for a nonzero divisor. -/
+@[simp] theorem applyBinop_py_floordiv (x y : Int) (h : y ≠ 0) :
+    applyBinop .python "//" (.int x) (.int y) = .val (.int (Int.fdiv x y)) := by
   simp [applyBinop, numToE, Dialect.toNumConfig, NumConfig.div, NumConfig.quot,
         NumConfig.finish, NumConfig.python, IntType.inRange, IntType.wrap_unbounded, h]
+/-- `/` on two integers is TRUE division (it was `Int.fdiv`, which was wrong: CPython's
+`7 / 2` is `3.5`). When both operands are exact binary64s and the divisor is nonzero it is
+one IEEE division in binary64; see `pyIntTrueDiv`. -/
+theorem applyBinop_py_div (x y : Int) (h : y ≠ 0) (hx : jsExactInt x = true)
+    (hy : jsExactInt y = true) :
+    applyBinop .python "/" (.int x) (.int y) = flBinop .python "/" (.int x) (.int y) := by
+  simp [applyBinop, pyIntTrueDiv, h, hx, hy]
+/-- Beyond `2^53` it is a hole, never a double-rounded float. -/
+theorem applyBinop_py_div_big (x y : Int) (h : y ≠ 0) (hxy : (jsExactInt x && jsExactInt y) = false) :
+    applyBinop .python "/" (.int x) (.int y) = .hole "binop:/:int-true-division-beyond-2^53" := by
+  simp [applyBinop, pyIntTrueDiv, h, hxy]
 @[simp] theorem applyBinop_py_mod (x y : Int) (h : y ≠ 0) :
     applyBinop .python "%" (.int x) (.int y) = .val (.int (Int.fmod x y)) := by
   simp [applyBinop, numToE, Dialect.toNumConfig, NumConfig.mod, NumConfig.quot,
@@ -908,8 +993,9 @@ example : applyBinop .cLike "+" (.bool true) (.bool false) = .val (.int 1) := rf
 example : applyBinop .cLike "*" (.int 7) (.bool true) = .val (.int 7) := rfl
 -- Java's logical `&` on two `boolean`s stays a `boolean`.
 example : applyBinop .cLike "&" (.bool true) (.bool false) = .val (.bool false) := rfl
--- Python is untouched by this change (its own `True == 1` is a separate matter).
-example : applyBinop .python "+" (.bool true) (.int 1) = .hole "binop:+" := rfl
+-- Python promotes too (`bool` is an `int` subclass): `True + 1 == 2`, `True == 1`.
+example : applyBinop .python "+" (.bool true) (.int 1) = .val (.int 2) := rfl
+example : applyBinop .python "==" (.bool true) (.int 1) = .val (.bool true) := rfl
 
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=

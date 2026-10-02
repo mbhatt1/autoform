@@ -349,11 +349,14 @@ a root module that has only imports, which is `Autoform.lean`'s shape.
   `.javascript`), unary `-`, truthiness and `==` (NaN ≠ NaN, `-0.0 == 0.0`). Still holes:
   float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), casts to a floating
   type in C (`op:cast:float`), and `float()`/`str()`/`repr()` conversions (the Python
-  stdlib model has no float builtins). Two known gaps that are *not* holes: Python's `/`
-  on two ints still floors, because the exporter maps `//` onto `/`
-  (`Semantics.lean`, "Floating point"); and float `%` uses Python's floored remainder under
+  stdlib model has no float builtins). One known gap that is *not* a hole: float `%` uses Python's floored remainder under
   `.cLike` as well as `.python`, so Java's `-5.5 % 2.0` (`-1.5`) is mis-modelled
-  (`.javascript` uses the truncated remainder and matches Node). The differential harness
+  (`.javascript` uses the truncated remainder and matches Node). Python `/` on two ints is
+  true division (a correctly rounded float when both operands are at most 2^53 in magnitude,
+  the hole `binop:/:int-true-division-beyond-2^53` beyond that, `ZeroDivisionError` for a zero
+  divisor), `//` is its own operator, and `bool` is an `int` under `.python` (`True == 1`,
+  `True + True == 2`; `bool & bool` stays `bool`): `Autoform/PyArith.lean`,
+  `tests/test_pyarith_cpython.py`, STRATEGY.md section 64. The differential harness
   now encodes float arguments recorded from the test suite (`docs/conformance.md`).
 - **Contract *inference* at holes.** The mechanism for reasoning about partially translated
   functions under named assumptions exists (`Autoform/Contracts.lean` for expression holes,

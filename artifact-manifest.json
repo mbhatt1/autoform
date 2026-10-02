@@ -105,11 +105,11 @@
    "render_sha256": "fafaff9de5ca5c603a98fe9c98c883022adf7529946470fd3b2a2156c6967aed"
   },
   "Stress": {
-   "ast_bytes": 4324,
-   "ast_sha256": "ab50e9b0e8537b8b26ce1b0dc6e5635ade809addc03145296b61a7cf765409f6",
+   "ast_bytes": 4325,
+   "ast_sha256": "fa088b83e8835042a3b61681eb18f95fdee2a48a8fc857514e1a7cc60f970799",
    "ast_tracked": true,
-   "render_bytes": 4942,
-   "render_sha256": "7a37d691a93225662c46024b8308969147b4365bfd71e36e37376cb9bc0cff27"
+   "render_bytes": 4943,
+   "render_sha256": "49d6e4895be5da4796b6a46c773d0a0849cbcf7404a3fa17d34dff30f564f563"
   },
   "V8Base": {
    "ast_bytes": 3198007,

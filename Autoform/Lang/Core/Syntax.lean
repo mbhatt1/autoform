@@ -978,6 +978,13 @@ def Val.beq : Val → Val → Bool
   -- which is why it goes through `Fl.cmpIntv` rather than converting either side.
   | .int a,   .float b => Fl.cmpIntv a b == some .eq
   | .float a, .int b   => Fl.cmpIntv b a == some .eq
+  -- `bool` is an `int` subclass in Python: `True == 1`, `True == 1.0`, `{1: 'a'}[True]`
+  -- (equal hashes too), `True in [1]`. C promotes `_Bool` to `int` and Java/Go/Kotlin never
+  -- compare the two, so the identification is right wherever it can be reached.
+  | .bool a,  .int b   => (if a then 1 else 0) == b
+  | .int a,   .bool b  => a == (if b then 1 else 0)
+  | .bool a,  .float b => Fl.cmpIntv (if a then 1 else 0) b == some .eq
+  | .float a, .bool b  => Fl.cmpIntv (if b then 1 else 0) a == some .eq
   | .unit,    .unit    => true
   | .ref a,   .ref b   => a == b
   | .fn a,    .fn b    => a == b
