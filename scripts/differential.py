@@ -1801,19 +1801,22 @@ LANG_BY_EXT = {".py": "python", ".pyi": "python",
                ".ts": "ts", ".tsx": "ts", ".mts": "ts",
                ".kt": "kotlin", ".kts": "kotlin"}
 
-# The Core dialect each language *should* have. Java, Go and Kotlin have no constructor
-# of their own yet, so they necessarily run under an approximation (`.cLike`). JS/TS now
-# have their own `Autoform.Core.Dialect.javascript` (fixes the measured `&&`/`||` and
-# 32-bit-overflow bugs, `docs/languages.md`), so they are no longer flagged inexact for
-# those — but `.javascript`'s bitwise/shift operators still truncate wrong (real JS
-# converts them to Int32; `.javascript`'s one `NumConfig` does not model that
-# separately), so a divergence traceable to `&`/`|`/`^`/`<<`/`>>`/`>>>` is still a named
-# dialect gap, not a transpiler bug — see `Dialect`'s doc comment in `Syntax.lean`.
+# The Core dialect each language *should* have, and whether Core runs it exactly.
+# Java, Go and Kotlin have no dialect constructor of their own: they run under `.cLike`, so
+# everything that is not integer arithmetic (strings, boxing, `char`, division by zero,
+# shifts that C leaves undefined) is an approximation. Their INTEGER arithmetic is not:
+# the exporter names the operand type inside each operator and `TypedInt.lean` gives each
+# language its own width, overflow, shift and division rules (STRATEGY.md sections 63 and
+# 66; fixtures pinned against `java`, `go` and the Kotlin compiler). JS/TS have their own
+# `Autoform.Core.Dialect.javascript`, with `==`/`===` distinct, ToInt32/ToUint32 bitwise
+# operators (`jsBitwise`), `??` and a null that is not undefined (sections 61 and 65;
+# `tests/test_jsnode_node.py` compares 55 cases with Node), so they are exact for what
+# that fixture covers. `docs/languages.md` has the per-language status.
 DIALECT_FOR = {"python": ("python", True), "c": ("cLike", True),
-               "java": ("cLike", False),      # java64 NumConfig exists but is unused
-               "go": ("cLike", False),        # go64 likewise
-               "js": ("javascript", True),    # bitwise/shift ops remain an approximation
-               "ts": ("javascript", True),    # (see comment above); everything else fixed
+               "java": ("cLike", False),      # integer arithmetic is typed (TypedInt.lean)
+               "go": ("cLike", False),        # likewise; strings etc. are the `.cLike` approximation
+               "js": ("javascript", True),
+               "ts": ("javascript", True),
                "kotlin": ("cLike", False)}
 
 TOOLCHAIN = {"python": [], "c": ["cc"], "java": ["javac", "java"], "go": ["go"],
@@ -2226,9 +2229,10 @@ def main():
           % (lang, ", ".join("%s x%d" % (e, n) for e, n in sorted(exts.items())),
              runtime, "" if not missing else "  [MISSING: %s]" % ", ".join(missing)))
     if not exact:
-        print("  dialect note: Core has no %s-specific dialect yet (only .python, "
-              ".cLike, .javascript exist), so %s runs under an approximation "
-              "(java64/go64 NumConfigs exist but are unwired)." % (lang, lang))
+        print("  dialect note: Core has no %s-specific dialect (only .python, "
+              ".cLike, .javascript exist), so %s runs under `.cLike`: integer arithmetic "
+              "is width-typed per language (TypedInt.lean), everything else is an "
+              "approximation." % (lang, lang))
 
     holefree = [f for f in funcs if not has_hole([f["body"], f.get("defaults")])]
     # NOTE ON MEASUREMENT BASIS. `skip_varargs` used to exist here and was removed
