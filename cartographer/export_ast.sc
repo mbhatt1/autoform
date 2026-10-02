@@ -11628,8 +11628,15 @@ import scala.annotation.tailrec
     // reused by BOTH `boxedStructs` below and `boxedStructArrayMembers` just
     // after it, so a struct's member list is only ever read from the CPG once
     // per candidate name.
+    // NOT for Python. A Python local whose static type is a CLASS -- `LFUCache` read as a
+    // value inside `LFUCache.__setitem__` -- is a reference to that class, not a struct
+    // held by value, and boxing it rebinds the name to a fresh `<local>` object: the
+    // class value disappears (`LFUCache._Link(1)` then dispatches on the box). Measured on
+    // cachetools 7.1.7: 43 of 209 methods gained such a prologue. Value-typed aggregates
+    // are a C/C++ notion; Python has none.
+    val pyMethod = m.filename.toLowerCase.endsWith(".py")
     val structCandidateDecls: Map[String, TypeDecl] =
-      if (moduleScope) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
+      if (moduleScope || pyMethod) Map.empty else (m.local.l ++ m.parameter.l).flatMap { l =>
         val (name, isParam, ty) = l match {
           case ll: Local             => (ll.name, false, localTypes.get(ll.name))
           case pp: MethodParameterIn => (pp.name, true, localTypes.get(pp.name))
