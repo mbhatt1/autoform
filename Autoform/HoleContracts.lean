@@ -491,6 +491,73 @@ theorem boxed_clear_list (h : Heap) (a : Ref) (vs : List Val) :
   simp [boxedMethod, Payload.toVal, methodRefusal, methodKeyError, Stdlib.method,
     Val.toPayload, elementEqMethods, Stdlib.knowsMethod, Stdlib.methodNames, Stdlib.methodCore]
 
+/-! ### Method resolution under a class table
+
+`ast-Cachetools.json` records the class table (STRATEGY.md §62), so `P` resolves methods
+along the MRO (`Ctx.resolveMethodPy`). The lemmas below are that path's counterparts of
+`resolveMethod_of_unique` and `resolveMethod_onProgram`: a lookup the table answers with a
+qualified name resolves to the function stored under it, and filling holes changes no
+lookup, because a lookup reads only the class table and the function table's *keys*. -/
+
+theorem resolveMethod_of_lookup (ctx : Ctx) (cls m q : String) (f : Func)
+    (hs : ctx.pyStrict = true) (hc : cls.startsWith "<" = false)
+    (hl : ctx.lookupMethod cls m = .found q) (hr : ctx.resolve q = some f) :
+    ctx.resolveMethod cls m = some f := by
+  simp [Ctx.resolveMethod, hs, Ctx.resolveMethodPy, hc, hl, hr]
+
+theorem mroAux_congr {c₁ c₂ : Ctx} (h : c₁.pyClasses = c₂.pyClasses) :
+    ∀ n c, c₁.mroAux n c = c₂.mroAux n c := by
+  intro n
+  induction n with
+  | zero => intro c; rfl
+  | succ n ih =>
+    intro c
+    have hf : c₁.mroAux n = c₂.mroAux n := funext ih
+    simp only [Ctx.mroAux, Ctx.pyClass?, h, hf]
+
+theorem mroWalk_congr {c₁ c₂ : Ctx} (m : String) (h : c₁.pyClasses = c₂.pyClasses)
+    (hk : ∀ c, c₁.ownMethodKeys c m = c₂.ownMethodKeys c m) :
+    ∀ l, c₁.mroWalk m l = c₂.mroWalk m l := by
+  intro l
+  induction l with
+  | nil => rfl
+  | cons c cs ih => simp only [Ctx.mroWalk, Ctx.pyClass?, h, hk, ih]
+
+theorem ownMethodKeys_onProgram (τ : SImpl) (p : Program) (c m : String) :
+    (ctxOf (τ.onProgram p)).ownMethodKeys c m = (ctxOf p).ownMethodKeys c m := by
+  simp [Ctx.ownMethodKeys, ctxOf, table_onProgram, List.filter_map, Function.comp_def]
+
+theorem lookupMethod_onProgram (τ : SImpl) (p : Program) (c m : String) :
+    (ctxOf (τ.onProgram p)).lookupMethod c m = (ctxOf p).lookupMethod c m := by
+  have hp : (ctxOf (τ.onProgram p)).pyClasses = (ctxOf p).pyClasses := rfl
+  have hmro : (ctxOf (τ.onProgram p)).mro c = (ctxOf p).mro c := by
+    simp only [Ctx.mro, hp]; exact mroAux_congr hp _ _
+  simp only [Ctx.lookupMethod, hmro]
+  split
+  · rfl
+  · exact mroWalk_congr m hp (fun c => ownMethodKeys_onProgram τ p c m) _
+
+theorem pyStrict_onProgram (τ : SImpl) (p : Program) :
+    (ctxOf (τ.onProgram p)).pyStrict = (ctxOf p).pyStrict := rfl
+
+/-- The class-table counterpart of `resolveMethod_onProgram`, for a lookup the table
+answers with a function. -/
+theorem resolveMethod_onProgram_found (τ : SImpl) (p : Program) (cls m q : String) (f : Func)
+    (hs : (ctxOf p).pyStrict = true) (hc : cls.startsWith "<" = false)
+    (hl : (ctxOf p).lookupMethod cls m = .found q) (hr : (ctxOf p).resolve q = some f) :
+    (ctxOf (τ.onProgram p)).resolveMethod cls m = some (τ.onFunc f) := by
+  apply resolveMethod_of_lookup _ _ _ q
+  · rw [pyStrict_onProgram]; exact hs
+  · exact hc
+  · rw [lookupMethod_onProgram]; exact hl
+  · rw [resolve_onProgram, hr]; rfl
+
+theorem classResponds_onProgram (τ : SImpl) (p : Program) (c m : String) :
+    (ctxOf (τ.onProgram p)).classResponds c m = (ctxOf p).classResponds c m := by
+  unfold Ctx.classResponds
+  rw [pyStrict_onProgram, lookupMethod_onProgram]
+  simp [ctxOf, table_onProgram]
+
 /-! ### Name resolution on the full program (by evaluation, not by unfolding) -/
 
 def delitemName : String := "cachetools/__init__.py:<module>.Cache.__delitem__"
@@ -507,21 +574,21 @@ theorem resolve_rrclear :
 theorem resolveMethod_pop :
     (ctxOf P).resolveMethod "_DefaultSize" "pop"
       = some f_cachetools___init___py__module___DefaultSize_pop := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop" _ rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.pop" _ rfl rfl
   · decide +kernel
   · rfl
 
 theorem resolveMethod_sizeclear :
     (ctxOf P).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear" _ rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>._DefaultSize.clear" _ rfl rfl
   · decide +kernel
   · rfl
 
 theorem resolveMethod_cacheclear :
     (ctxOf P).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-  apply resolveMethod_of_unique _ _ _ "cachetools/__init__.py:<module>.Cache.clear" _ rfl
+  apply resolveMethod_of_lookup _ _ _ "cachetools/__init__.py:<module>.Cache.clear" _ rfl rfl
   · decide +kernel
   · rfl
 
@@ -543,6 +610,20 @@ theorem className_Cache :
 theorem classDefines_cacheclear : (ctxOf P).classDefines "Cache" "clear" = true := by
   decide +kernel
 
+theorem lookup_pop : (ctxOf P).lookupMethod "_DefaultSize" "pop"
+    = .found "cachetools/__init__.py:<module>._DefaultSize.pop" := by decide +kernel
+theorem lookup_sizeclear : (ctxOf P).lookupMethod "_DefaultSize" "clear"
+    = .found "cachetools/__init__.py:<module>._DefaultSize.clear" := by decide +kernel
+theorem lookup_cacheclear : (ctxOf P).lookupMethod "Cache" "clear"
+    = .found "cachetools/__init__.py:<module>.Cache.clear" := by decide +kernel
+
+/-- `Cache.clear(self)` through the class value: under the class table the guard is that
+the lookup reaches something, and it reaches `Cache.clear` itself. -/
+theorem classResponds_cacheclear : (ctxOf P).classResponds "Cache" "clear" = true := by
+  unfold Ctx.classResponds
+  rw [show (ctxOf P).pyStrict = true from rfl, lookup_cacheclear]
+  rfl
+
 /-! ### `Cache.__delitem__`, unconditionally
 
 ```python
@@ -555,7 +636,13 @@ def __delitem__(self, key):
 
 /-- The receiver: an ordinary `Cache` object whose size table is a `_DefaultSize` instance
 (the default when no `getsizeof` is given) and whose data is a boxed `dict` at a different
-address. -/
+address.
+
+**Restated for the class table (STRATEGY.md §62).** The size table must have no instance
+attribute named `pop`. Without that conjunct `delitem_refines` is false: an instance
+attribute shadows the class's method in CPython, and Core now holes
+(`mcall:_DefaultSize.pop:instance-attribute`) where it used to call `_DefaultSize.pop`
+regardless. `delHeap` still satisfies the shape. -/
 def DelShape (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × Val)) : Prop :=
   ∃ o od oa, h.get r = some o
     ∧ o.fields.find? (·.1 == "_Cache__size") = some ("_Cache__size", .ref d)
@@ -563,6 +650,7 @@ def DelShape (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × Val)) : Prop
     ∧ o.fields.find? (·.1 == "_Cache__currsize") = some ("_Cache__currsize", .int c)
     ∧ o.captured = [] ∧ o.payload = .none
     ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
+    ∧ od.fields.any (·.1 == "pop") = false
     ∧ h.get a = some oa ∧ oa.payload = .dict kvs ∧ r ≠ a
 
 /-- The specification, as a total function: an unhashable key raises `TypeError`, an
@@ -581,14 +669,14 @@ theorem delitem_refines (h : Heap) (r d a : Ref) (c : Int) (kvs : List (Val × V
     (key : Val) (hs : DelShape h r d a c kvs) (fuel : Nat) (hf : 12 ≤ fuel) :
     runMethodIn P fuel h delitemName (.ref r) [key]
       = ((delitemSpec h r a c kvs key).1, (delitemSpec h r a c kvs key).2.toEResult) := by
-  obtain ⟨o, od, oa, hro, hsz, hdat, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay, hao, hapay,
-    hne⟩ := hs
+  obtain ⟨o, od, oa, hro, hsz, hdat, hcur, hcap, hpay, hdo, hdcls, hdcap, hdpay, hdpop, hao,
+    hapay, hne⟩ := hs
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   have hdial : (ctxOf P).dialect = .python := rfl
   -- `obj.pop(…)` resolves through `resolveMethodOn`, which is `resolveMethod` on the
-  -- object's class for a program without a class table (`pyClasses = none`).
-  have hOn : ∀ o m, (ctxOf P).resolveMethodOn o m = (ctxOf P).resolveMethod o.cls m :=
-    fun _ _ => Ctx.resolveMethodOn_of_none rfl
+  -- object's class when the object has no instance attribute `pop` (the domain says so).
+  have hOn : (ctxOf P).resolveMethodOn od "pop" = (ctxOf P).resolveMethod od.cls "pop" :=
+    Ctx.resolveMethodOn_of_not_field hdpop
   unfold runMethodIn
   rw [resolve_delitem]
   simp only [delitemSpec]
@@ -614,7 +702,7 @@ def delHeap : Heap :=
   , { cls := "dict", fields := [], payload := .dict [(.int 7, .str "v")] } ]
 
 theorem delHeap_shape : DelShape delHeap 0 1 2 5 [(.int 7, .str "v")] :=
-  ⟨_, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, by decide⟩
+  ⟨_, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, by decide⟩
 
 /-- Unconditional means `Γ = []`: the same statement through the contract wrapper, with
 nothing assumed (`underS_nil_iff`). -/
@@ -651,6 +739,8 @@ theorem satisfiable_sliceContract : SatisfiableS Γslice P :=
 class `Cache`, which `initGlobals` binds in the globals frame (address `0`) to the class
 value `cachetools/__init__.py:<module>.Cache<meta>`; the domain states that binding rather
 than running the module initialisers. -/
+/- `RRShape` gains `od` has no instance attribute `clear`, for the reason `DelShape`
+gains `pop`: `Cache.clear` calls `self.__size.clear()`. -/
 def RRShape (h : Heap) (r d a i : Ref) : Prop :=
   ∃ g o od oa oi kvs vs, h.get 0 = some g
     ∧ g.fields.find? (·.1 == "Cache")
@@ -661,6 +751,7 @@ def RRShape (h : Heap) (r d a i : Ref) : Prop :=
     ∧ o.fields.find? (·.1 == "_RRCache__index") = some ("_RRCache__index", .ref i)
     ∧ o.captured = [] ∧ o.payload = .none
     ∧ h.get d = some od ∧ od.cls = "_DefaultSize" ∧ od.captured = [] ∧ od.payload = .none
+    ∧ od.fields.any (·.1 == "clear") = false
     ∧ h.get a = some oa ∧ oa.payload = .dict kvs
     ∧ h.get i = some oi ∧ oi.payload = .list vs
     ∧ r ≠ a ∧ r ≠ i ∧ d ≠ a ∧ i ≠ a
@@ -678,26 +769,26 @@ theorem rrclear_under : UnderS Γslice P RRPost := by
   intro τ hc ht h r d a i hshape fuel hfuel
   obtain ⟨s, hlk, hpost⟩ := filled_hole hc ht (c := sliceContract) (by simp [Γslice])
   obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
-    hdcap, hdpay, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
+    hdcap, hdpay, hdclr, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 30 := ⟨fuel - 30, by omega⟩
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
-  have hOn : ∀ o m, (ctxOf (τ.onProgram P)).resolveMethodOn o m
-      = (ctxOf (τ.onProgram P)).resolveMethod o.cls m :=
-    fun _ _ => Ctx.resolveMethodOn_of_none rfl
+  have hOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "clear"
+      = (ctxOf (τ.onProgram P)).resolveMethod od.cls "clear" :=
+    Ctx.resolveMethodOn_of_not_field hdclr
   have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
     rw [classDefines_onProgram]; exact classDefines_cacheclear
-  -- Calling through the class value `Cache` is guarded by `classResponds`, which for a
-  -- program without a class table is the same table test as `classDefines`.
+  -- Calling through the class value `Cache` is guarded by `classResponds`: under the class
+  -- table, the MRO lookup of `clear` on `Cache` reaches `Cache.clear` itself.
   have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
-    rw [Ctx.classResponds_of_none rfl]; exact hcd
+    rw [classResponds_onProgram]; exact classResponds_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_cacheclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_sizeclear]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_sizeclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
@@ -749,25 +840,25 @@ theorem rrclear_reaches_hole_of (τ : SImpl)
     (runMethodIn (τ.onProgram P) (k + 30) h rrClearName (.ref r) []).2
       = .hole "op:delete-slice" := by
   obtain ⟨g, o, od, oa, oi, kvs, vs, hg0, hgC, hro, hdat, hsz, hidx, hcap, hpay, hdo, hdcls,
-    hdcap, hdpay, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
+    hdcap, hdpay, hdclr, hao, hapay, hio, hipay, hra, hri, hda, hia⟩ := hshape
   have hdial : (ctxOf (τ.onProgram P)).dialect = .python := rfl
   have hglob : (ctxOf (τ.onProgram P)).globals = 0 := rfl
-  have hOn : ∀ o m, (ctxOf (τ.onProgram P)).resolveMethodOn o m
-      = (ctxOf (τ.onProgram P)).resolveMethod o.cls m :=
-    fun _ _ => Ctx.resolveMethodOn_of_none rfl
+  have hOn : (ctxOf (τ.onProgram P)).resolveMethodOn od "clear"
+      = (ctxOf (τ.onProgram P)).resolveMethod od.cls "clear" :=
+    Ctx.resolveMethodOn_of_not_field hdclr
   have hcd : (ctxOf (τ.onProgram P)).classDefines "Cache" "clear" = true := by
     rw [classDefines_onProgram]; exact classDefines_cacheclear
-  -- Calling through the class value `Cache` is guarded by `classResponds`, which for a
-  -- program without a class table is the same table test as `classDefines`.
+  -- Calling through the class value `Cache` is guarded by `classResponds`: under the class
+  -- table, the MRO lookup of `clear` on `Cache` reaches `Cache.clear` itself.
   have hcr : (ctxOf (τ.onProgram P)).classResponds "Cache" "clear" = true := by
-    rw [Ctx.classResponds_of_none rfl]; exact hcd
+    rw [classResponds_onProgram]; exact classResponds_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_cacheclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_sizeclear]
+    rw [resolveMethod_onProgram_found τ P _ _ _ _ rfl rfl lookup_sizeclear rfl]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
@@ -808,7 +899,7 @@ def rrHeap : Heap :=
 
 theorem rrHeap_shape : RRShape rrHeap 1 3 2 4 :=
   ⟨_, _, _, _, _, _, _, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl,
-    rfl, rfl, by decide, by decide, by decide, by decide⟩
+    rfl, rfl, rfl, by decide, by decide, by decide, by decide⟩
 
 /-- The site filled with itself. Legal under `topSContract`, which is the point. -/
 def idImplS : SImpl := [((rrClearName, "op:delete-slice"), .hole "op:delete-slice")]

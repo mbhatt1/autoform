@@ -74,8 +74,12 @@ def cachetoolsWithBases : Program :=
 `Autoform/Generated/Cachetools.lean` has since been re-rendered *with* the `_HashedTuple`
 base in it, so `Generated.program` is no longer the "before" picture and this fixture has
 to clear the field explicitly. Reading it as the before-state again would make every
-divergence guard below vacuous. -/
-def cachetoolsBefore : Program := { Autoform.Generated.Cachetools.program with builtinBases := [] }
+divergence guard below vacuous. The class table (STRATEGY.md §62) is cleared for the same
+reason: the before-state measured here predates it, and under Python's lookup rules a
+`_HashedTuple` with no builtin base is not an opaque object but a lookup that reaches its
+external base `tuple` (`mro:external-base`). -/
+def cachetoolsBefore : Program :=
+  { Autoform.Generated.Cachetools.program with builtinBases := [], pyClasses := none }
 
 /-- `hashkey` applied to a varargs tuple, then compared with a plain `Val`. -/
 private def hashkeyEq (p : Program) (args : List Val) (res : Val) : Bool :=
@@ -447,7 +451,8 @@ private def intOf : EResult -> Option Int
 private def lenOfHashkey : Program :=
   { cachetoolsWithBases with funcs := cachetoolsWithBases.funcs ++
       [{ name := "t.py:<module>.lenkey", params := ["x", "y"],
-         body := .ret (.call "len" [.call "hashkey" [.name "x", .name "y"]]) }] }
+         body := .ret (.call "len" [.call "cachetools/keys.py:<module>.hashkey"
+                                      [.name "x", .name "y"]]) }] }
 
 -- End to end through the committed `hashkey`: CPython `len(hashkey(1, 2))` is `2`.
 #guard intOf (runFunc lenOfHashkey 400 "lenkey" [.int 1, .int 2]) = some 2

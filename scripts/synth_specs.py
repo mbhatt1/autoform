@@ -814,7 +814,7 @@ def h0 : Heap := %s
 /-- Address of the globals frame. -/
 def gref : Ref := %s
 def base : Nat := h0.length
-def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
+def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref, pyClasses := P.pyClasses }
 def FUEL : Nat := %d
 open Autoform.Generated.%s
 

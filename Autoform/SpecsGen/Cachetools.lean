@@ -22,7 +22,7 @@ def h0 : Heap := [{ cls := "<globals>", fields := [("typedmethodkey", Autoform.C
 /-- Address of the globals frame. -/
 def gref : Ref := 0
 def base : Nat := h0.length
-def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref }
+def C : Ctx := { dialect := P.dialect, table := P.table, globals := gref, pyClasses := P.pyClasses }
 def FUEL : Nat := 400
 open Autoform.Generated.Cachetools
 

@@ -1496,6 +1496,13 @@ def Ctx.resolveMethodOn (ctx : Ctx) (o : Obj) (meth : String) : Option Func :=
     some (holeFunc s!"mcall:{o.cls}.{meth}:instance-attribute")
   else ctx.resolveMethod o.cls meth
 
+/-- With no instance attribute of that name, `obj.m` is the class's method, under either
+rule. -/
+theorem Ctx.resolveMethodOn_of_not_field {ctx : Ctx} {o : Obj} {m : String}
+    (h : o.fields.any (·.1 == m) = false) :
+    ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
+  simp [Ctx.resolveMethodOn, h]
+
 theorem Ctx.resolveMethodOn_of_none {ctx : Ctx} {o : Obj} {m : String}
     (h : ctx.pyClasses = none) : ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
   simp [Ctx.resolveMethodOn, Ctx.pyStrict, h]

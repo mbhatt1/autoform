@@ -1,14 +1,14 @@
 {
  "artifact": "ast-Cachetools.json",
- "artifact_bytes": 588720,
- "artifact_sha256": "9c0e04b839b6ae06b28ae039289f560cb47bc3e5cf03b095a6eb441cd985b639",
+ "artifact_bytes": 591573,
+ "artifact_sha256": "a3a2267aa09169fbf6e8132abe15b1d00385d95ca5f2b8f91c04c2e3e79ac852",
  "command": "git clone https://github.com/tkem/cachetools && git -C cachetools checkout 01af8e5 (v7.1.7); joern-parse cachetools/src --language pythonsrc --output <cpg>; joern --script cartographer/export_ast.sc --param cpgPath=<cpg> --param out=ast-Cachetools.json. Joern 4.0.606 from Maven Central (io.joern:joern-cli_3:4.0.606, io.joern:pysrc2cpg_3:4.0.606, codepropertygraph_3:1.7.70), run as io.joern.joerncli.JoernParse / io.joern.joerncli.console.ReplBridge --script; joern_version was detected from those jars.",
  "cpg_schema_version": "1.7.70",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "9f21ef6117f0051f10ce1b23945a0d875776e438c7f40ccf6fb610db4ef82411",
+ "exporter_sha256": "105421dbf218d7138bdd7ed0cd16b2032ae0792328fdc35aab33e8d377b8a30f",
  "joern_version": "4.0.606",
  "recorded_by": "scripts/provenance.py record",
  "schema_version": 1,
- "source_path": "/tmp/claude-0/-home-user-autoform/50aed7c6-e1a7-5570-8335-131f3caffbc5/scratchpad/L/cachetools/src",
+ "source_path": "/tmp/claude-0/-home-user-autoform/50aed7c6-e1a7-5570-8335-131f3caffbc5/scratchpad/itemC/cachetools/src",
  "source_revision": "git:01af8e5b7ce44432b357e26c7d67eb7fa055ae72"
 }
