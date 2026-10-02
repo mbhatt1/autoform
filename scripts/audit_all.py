@@ -35,6 +35,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -338,6 +339,37 @@ def _leanchecker_exe() -> str | None:
     return None
 
 
+# How long the kernel replay may run before the audit gives up on it. The replay of every
+# constant reachable from `Autoform` is single-threaded and, since the V8Base specs (73
+# parts of `rfl`-by-computation laws) joined the import graph, takes hours rather than the
+# ~1.5 minutes it took when this script was written: a local run was still going after 62
+# minutes. Override with $AUTOFORM_LEANCHECKER_TIMEOUT (seconds).
+LEANCHECKER_TIMEOUT_S = int(os.environ.get("AUTOFORM_LEANCHECKER_TIMEOUT", 4 * 3600))
+
+
+def run_in_group(cmd, *, timeout, **kw) -> "subprocess.CompletedProcess[str]":
+    """`subprocess.run(..., capture_output=True, text=True, timeout=...)`, except that on a
+    timeout the WHOLE process group is killed.
+
+    `subprocess.run` kills only the direct child. Here that child is `lake env`, which runs
+    `leanchecker` as ITS child, so a timeout used to leave a 4-6 GB `leanchecker` running
+    unsupervised and unreported (observed: still alive, parented to init, an hour after the
+    audit had printed "leanchecker timed out"). A leaked replay competes with whatever runs
+    next for memory, which on a CI runner is how a later step gets OOM-killed."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True, **kw)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.communicate()
+        raise
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
 def lean4checker(fresh: bool = True) -> dict:
     """Externally re-verify the .olean files, or report the gap honestly.
 
@@ -347,7 +379,8 @@ def lean4checker(fresh: bool = True) -> dict:
     `--fresh` replays every constant -- imported ones included -- into an empty
     environment.  That is the mode we rely on: it is the one demonstrated to reject a
     tampered `.olean` anywhere in the transitive import graph, at the cost of being
-    single-threaded (~1.5 min for `Autoform`).  Without `--fresh` the checker can
+    single-threaded (about 1.5 minutes for `Autoform` when this was written; hours now that
+    the V8Base specs are in the graph -- see `LEANCHECKER_TIMEOUT_S`).  Without `--fresh` the checker can
     silently check almost nothing when the named module is a bare re-export list, which
     is exactly the shape `Autoform.lean` has; see STRATEGY.md 19 on silent oracles.
     """
@@ -369,16 +402,16 @@ def lean4checker(fresh: bool = True) -> dict:
 
     cmd = ["lake", "env", exe] + (["--fresh"] if fresh else []) + ["Autoform"]
     try:
-        proc = subprocess.run(
-            cmd, cwd=str(REPO), env=elan_env(),
-            capture_output=True, text=True, timeout=3600,
-        )
+        proc = run_in_group(cmd, cwd=str(REPO), env=elan_env(),
+                            timeout=LEANCHECKER_TIMEOUT_S)
     except FileNotFoundError as e:
         return {"status": "ERROR", "available": True, "exe": exe,
                 "command": " ".join(cmd), "detail": f"could not run: {e}"}
     except subprocess.TimeoutExpired:
         return {"status": "ERROR", "available": True, "exe": exe,
-                "command": " ".join(cmd), "detail": "leanchecker timed out"}
+                "command": " ".join(cmd),
+                "detail": f"leanchecker timed out after {LEANCHECKER_TIMEOUT_S} s "
+                          "(set $AUTOFORM_LEANCHECKER_TIMEOUT to allow longer)"}
 
     return {
         "status": "VERIFIED" if proc.returncode == 0 else "FAILED",
