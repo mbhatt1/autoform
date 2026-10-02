@@ -206,9 +206,14 @@ def flBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
                    -- JS `%` on a `Number` is the remainder of TRUNCATED division
                    -- (sign of the dividend): Node's `-7.5 % 2` is `-1.5`, CPython's
                    -- is `0.5`. That is C's `fmod`, which IEEE makes exact.
+                   -- `.cLike` likewise: the only `.cLike` languages in which `%`
+                   -- accepts a floating operand at all are Java and Kotlin (C, C++ and
+                   -- Go reject it at compile time), and both define it as the
+                   -- truncated remainder (JLS 15.17.3: `-5.5 % 2.0` is `-1.5`). It was
+                   -- Python's floored `pyMod` here, which answered `0.5`.
                    | _   => match d with
-                            | .javascript => fc.fmod x y
-                            | _           => fc.pyMod x y)
+                            | .javascript | .cLike => fc.fmod x y
+                            | .python              => fc.pyMod x y)
         -- a failed promotion (Python's `OverflowError` on a huge int) is the answer
       | some r, some (.ok _) => fresToE r
       | some (.ok _), some r => fresToE r
@@ -261,6 +266,110 @@ def binopNeedsHeap (op : String) (x y : Val) : Bool :=
 @[simp] theorem binopNeedsHeap_arith (x y : Val) (op : String)
     (h : op ≠ "==") (h2 : op ≠ "!=") : binopNeedsHeap op x y = false := by
   simp [binopNeedsHeap, beq_iff_eq, h, h2]
+
+/-! ### `bool` in integer contexts under `.cLike`
+
+C has no boolean results: `a < b`, `a == b`, `!a`, `a && b` are `int` 0 or 1 (C11
+6.5.8p6, 6.5.9p3, 6.5.3.3p5, 6.5.13p3, 6.5.14p3), and a `_Bool` promotes to `int`
+(6.3.1.1p2). C++ does have `bool`, and integral promotion turns it into `int` 0/1 in
+arithmetic, comparison and bitwise contexts ([conv.prom]/6). Java, Go and Kotlin share
+`.cLike` too, and there `a < b` is a `boolean` and mixing it with an integer is a
+**compile error** — so no well-typed program of theirs ever reaches the cases below.
+
+Core keeps producing `Val.bool` for comparisons under `.cLike` (Java's `boolean` and
+C++'s `bool` need it, and `Refine.applyBinop_int_lt` & co. state it for every dialect),
+and instead PROMOTES a `bool` operand to `0`/`1` wherever it meets an integer or a float:
+the C++ rule, which under C is the same arithmetic with the 0/1 already applied. Before
+this, `int t = (a < b); if (t == 1) ...` compared `Val.bool true` with `Val.int 1` via
+`Val.beq` and answered **false** (cc: true) — a silent wrong answer measured on SQLite
+(`docs/scale.md`), and `(a<b) + (b<a)` was a hole.
+
+Two `bool`s under `&`, `|`, `^` stay a `bool` (Java's logical `&`; in C the 0/1 that a
+later integer context promotes), and two `bool`s under `==`/`!=`/`&&`/`||` take the
+existing path, whose truth value is the same either way. Every other operator on two
+`bool`s promotes both (C/C++ only; a compile error elsewhere).
+
+What is NOT done here: the RETURN conversion. `int f(void) { return a < b; }` returns
+`Val.bool`, which every integer context above reads as `0`/`1`; the C oracle
+(`scripts/differential.py`) compares a `bool` result against an integer-typed C result as
+`0`/`1` for the same reason. -/
+
+/-- Does this dialect promote `bool` to `0`/`1` in integer contexts? See above. -/
+def Dialect.promotesBool : Dialect → Bool
+  | .python     => false
+  | .cLike      => true
+  | .javascript => false
+
+/-- `false`/`true` as the integers C gives them. -/
+def boolToInt (b : Bool) : Int := if b then 1 else 0
+
+/-- The operators a promoted `bool` takes part in as an integer. -/
+def cIntOps : List String :=
+  ["+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>", ">>>", "<", "<=", ">", ">=", "==", "!="]
+
+/-- `applyBinop .cLike op (.int x) (.int y)` for `op ∈ cIntOps`, restated so the promoted
+`bool` arms of `applyBinop` can use it without recursion. `cIntBinop_eq` (below
+`applyBinop`) proves the two agree, so they cannot drift apart. -/
+def cIntBinop (op : String) (x y : Int) : EResult :=
+  let nc := Dialect.cLike.toNumConfig
+  match op with
+  | "+"   => numToE (nc.add x y)
+  | "-"   => numToE (nc.sub x y)
+  | "*"   => numToE (nc.mul x y)
+  | "/"   => numToE (nc.div x y)
+  | "%"   => numToE (nc.mod x y)
+  | "&"   => numToE (nc.band x y)
+  | "|"   => numToE (nc.bor x y)
+  | "^"   => numToE (nc.bxor x y)
+  | "<<"  => numToE (nc.shl x y)
+  | ">>"  => numToE (nc.shr x y)
+  | ">>>" => numToE ({ nc with negRightShift := .logical }.shr x y)
+  | "<"   => .val (.bool (x < y))
+  | "<="  => .val (.bool (x ≤ y))
+  | ">"   => .val (.bool (x > y))
+  | ">="  => .val (.bool (x ≥ y))
+  | "=="  => .val (.bool (x == y))
+  | "!="  => .val (.bool (!(x == y)))
+  | _     => .hole s!"binop:{op}"
+
+/-- What `applyBinop` answers for operands no typed arm claims: the generic tail of its
+match (structural `==`/`!=`, value-or-bool `&&`/`||`, otherwise a hole). -/
+def binopTail (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match op with
+  | "==" => .val (.bool (Val.beq a b))
+  | "!=" => .val (.bool (!Val.beq a b))
+  | "&&" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  | "||" => .val (if d.boolOpsAreValues then b else .bool b.truthy)
+  | _    => .hole s!"binop:{op}"
+
+/-- The tail of `applyBinop`: operand pairs no typed arm there claims. A `bool` meeting a
+number is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`); everything else is
+`binopTail`. A separate function, not more arms of `applyBinop`'s match, because every
+extra arm there multiplies the string-literal tests `simp` has to discharge in the
+operator lemmas below. -/
+def binopFallback (d : Dialect) (op : String) (a b : Val) : EResult :=
+  match a, b with
+  | .bool p, .int y =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op (boolToInt p) y
+      else binopTail d op a b
+  | .int x, .bool q =>
+      if d.promotesBool && cIntOps.contains op then cIntBinop op x (boolToInt q)
+      else binopTail d op a b
+  | .bool p, .float _ =>
+      if d.promotesBool then flBinop d op (.int (boolToInt p)) b else binopTail d op a b
+  | .float _, .bool q =>
+      if d.promotesBool then flBinop d op a (.int (boolToInt q)) else binopTail d op a b
+  | .bool p, .bool q =>
+      if d.promotesBool then
+        match op with
+        | "&" => .val (.bool (p && q))
+        | "|" => .val (.bool (p || q))
+        | "^" => .val (.bool (p != q))
+        | "==" | "!=" | "&&" | "||" => binopTail d op a b
+        | _ => if cIntOps.contains op then cIntBinop op (boolToInt p) (boolToInt q)
+               else binopTail d op a b
+      else binopTail d op a b
+  | _, _ => binopTail d op a b
 
 /-- Built-in binary operators. Unknown operators are holes, not guesses.
 
@@ -408,13 +517,10 @@ def applyBinop (d : Dialect) (op : String) (a b : Val) : EResult :=
            | _,      _      => .hole "iref:cmp-non-index"
   | "==", .iref r1 s1, .iref r2 s2 => .val (.bool (r1 == r2 && s1 == s2))
   | "!=", .iref r1 s1, .iref r2 s2 => .val (.bool !(r1 == r2 && s1 == s2))
-  | "==", x, y           => .val (.bool (Val.beq x y))
-  | "!=", x, y           => .val (.bool (!Val.beq x y))
-  -- Reached only when the left operand did not decide the result, so the value
-  -- of the expression is the RIGHT operand under value semantics.
-  | "&&", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | "||", _, y           => .val (if d.boolOpsAreValues then y else .bool y.truthy)
-  | _, _, _              => .hole s!"binop:{op}"
+  -- Everything else: structural `==`/`!=`, `&&`/`||` (reached only when the left
+  -- operand did not decide the result, so the value is the RIGHT operand under value
+  -- semantics), a `bool` promoted under `.cLike`, or a hole. See `binopFallback`.
+  | _, _, _              => binopFallback d op a b
 
 /-!
 ### Operator equations
@@ -480,6 +586,23 @@ example : applyBinop .javascript "/" (.int 6) (.int (-3)) = .val (.int (-2)) := 
 #eval applyBinop .javascript "||" (.float (Fl.ofBits (Float.toBits 0.0).toNat)) (.int 2)
   -- val (int 2), matches Node's `0.0 || 2` (was `bool true`)
 
+/-! Java `%` on doubles is the TRUNCATED remainder (JLS 15.17.3): `-5.5 % 2.0` is `-1.5`.
+`.cLike` used CPython's floored `pyMod` and answered `0.5`. Pinned by `#guard`, which
+compares the IEEE bits, so a regression fails the build. -/
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                     (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits (-1.5)).toNat
+        | _ => false)
+#guard (match applyBinop .cLike "%" (.float (Fl.ofBits (Float.toBits 5.5).toNat))
+                                     (.int (-2)) with
+        | .val (.float f) => f.bits == (Float.toBits 1.5).toNat
+        | _ => false)
+-- CPython is unchanged: `-5.5 % 2.0 == 0.5`.
+#guard (match applyBinop .python "%" (.float (Fl.ofBits (Float.toBits (-5.5)).toNat))
+                                      (.float (Fl.ofBits (Float.toBits 2.0).toNat)) with
+        | .val (.float f) => f.bits == (Float.toBits 0.5).toNat
+        | _ => false)
+
 /-! ### Float equations, and the two that must not regress
 
 `Val.beq` on floats is the place where a plausible-looking implementation is wrong. Both
@@ -530,6 +653,38 @@ abbrev Fits32 (x : Int) : Prop := IntType.inRange (.signed .w32) x = true
 @[simp] theorem applyBinop_c_divZero (x : Int) :
     applyBinop .cLike "/" (.int x) (.int 0) = .exn (.str "ZeroDivisionError") := rfl
 
+/-! `binopFallback` on operands it does not promote is `binopTail`, and `binopTail` on a
+literal operator is one line. Stated as `simp` lemmas so that proofs which `simp` through
+`applyBinop` (`Specs/V8Spec.lean`) see the same terms as before the fallback was split
+out. -/
+@[simp] theorem binopFallback_int_int (d : Dialect) (op : String) (x y : Int) :
+    binopFallback d op (.int x) (.int y) = binopTail d op (.int x) (.int y) := rfl
+@[simp] theorem binopTail_eq (d : Dialect) (a b : Val) :
+    binopTail d "==" a b = .val (.bool (Val.beq a b)) := rfl
+@[simp] theorem binopTail_ne (d : Dialect) (a b : Val) :
+    binopTail d "!=" a b = .val (.bool (!Val.beq a b)) := rfl
+@[simp] theorem binopTail_and (d : Dialect) (a b : Val) :
+    binopTail d "&&" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+@[simp] theorem binopTail_or (d : Dialect) (a b : Val) :
+    binopTail d "||" a b = .val (if d.boolOpsAreValues then b else .bool b.truthy) := rfl
+
+/-- The promoted arms of `applyBinop` compute exactly what the integer arms do. -/
+theorem cIntBinop_eq (op : String) (x y : Int) (h : op ∈ cIntOps) :
+    cIntBinop op x y = applyBinop .cLike op (.int x) (.int y) := by
+  simp only [cIntOps, List.mem_cons, List.not_mem_nil, or_false] at h
+  rcases h with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl <;> rfl
+
+/-! The SQLite fixture of `docs/scale.md`, at the operator level: `(a < b) == 1` is true
+and `(a < b) + (b < a)` is `1` under `.cLike`, as `cc` computes. -/
+example : applyBinop .cLike "==" (.bool true) (.int 1) = .val (.bool true) := rfl
+example : applyBinop .cLike "+" (.bool true) (.bool false) = .val (.int 1) := rfl
+example : applyBinop .cLike "*" (.int 7) (.bool true) = .val (.int 7) := rfl
+-- Java's logical `&` on two `boolean`s stays a `boolean`.
+example : applyBinop .cLike "&" (.bool true) (.bool false) = .val (.bool false) := rfl
+-- Python is untouched by this change (its own `True == 1` is a separate matter).
+example : applyBinop .python "+" (.bool true) (.int 1) = .hole "binop:+" := rfl
+
 /-- Built-in unary operators. -/
 def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   match op, a with
@@ -547,6 +702,12 @@ def applyUnop (d : Dialect) (op : String) (a : Val) : EResult :=
   -- onto `"!"`, so `~0` translated to `false`. `bnot` is `-x-1` wrapped to the dialect's
   -- width, which is two's complement at every width and never overflows.
   | "~", .int x => numToE ((d.toNumConfig).bnot x)
+  -- A `bool` operand is promoted to 0/1 under `.cLike` (see `Dialect.promotesBool`):
+  -- `-(a < b)` is `-1` in C. Elsewhere it stays the hole it was.
+  | "-", .bool b => if d.promotesBool then numToE ((d.toNumConfig).neg (boolToInt b))
+                    else .hole s!"unop:{op}"
+  | "~", .bool b => if d.promotesBool then numToE ((d.toNumConfig).bnot (boolToInt b))
+                    else .hole s!"unop:{op}"
   -- **Width conversions.** `static_cast<uint8_t>(e)` in C++ is a unary operator whose
   -- meaning is completely determined: since C++20, conversion to any integer type is
   -- two's-complement reduction modulo `2^width`, which is exactly `IntType.wrap`. So it
