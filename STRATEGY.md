@@ -3910,9 +3910,9 @@ compared with `cc -O0 -fwrapv` / `javac`+`java` by pytest. With the integration-
 exporter: C 4 agree, 16 silent wrong answers, 2 holes, 1 `outOfFuel`; Java 7 agree, 11
 wrong, 4 holes. Now 23/23 and 22/22.
 
-**Not done.** Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
+**Not done.** ~~Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
 is 64-bit, so Go arithmetic is still §29 item 5's wrong answer (no Go frontend here to
-test against). Argument conversion at call sites. Nested/anonymous aggregate members
+test against).~~ (Done in §66.) Argument conversion at call sites. Nested/anonymous aggregate members
 (the bulk of the remaining unresolved types) need the struct text parsed, as
 `activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor
 `$off` bookkeeping and pointer-index arithmetic, whose values are offsets. Java `(char)`
@@ -4050,3 +4050,112 @@ top-level function is the hole `call:f` (`Ctx.resolve` matches `.f`, jssrc2cpg n
 (`Math`, `Promise`, `Symbol`) is still read as `Val.unit` by the legacy unbound-name rule. The
 lowered `??` is exact for a pure or temp-able left operand; in plain `expr` position (a call
 argument, a condition) an impure left operand is the hole `op:js-nullish-impure-lhs`.
+
+## 66. Go and Kotlin integer arithmetic at their own widths
+
+§63's "Not done": Go and Kotlin (`.go`, `.kt`) kept the untyped `.cLike` operators, i.e.
+32-bit signed wrapping, whatever the type. Go `int` is 64 bits on amd64/arm64 (the stated
+data model) and Kotlin `Long` is 64, so `100000 * 100000` was 1410065408 where both give
+10000000000, and every `uint8`/`uint64`/`int8` operation was a silent wrong answer or a
+shift-count hole. Reproduced first, on the head: gosrc2cpg and kotlin2cpg 4.0.606 (below)
+exported `m := 100000; return m * m` / `val m = 100000L; return m * m` as a bare `"*"`,
+which Core evaluated to 1410065408.
+
+**Frontends and oracles.** `io.joern:gosrc2cpg_3:4.0.606` and `kotlin2cpg_3:4.0.606` were
+assembled from Maven Central like `javasrc2cpg` (§63). gosrc2cpg shells out to `goastgen`
+(v0.1.0, the GitHub release asset `goastgen-linux`; it must be on PATH and the working
+directory needs `./bin/astgen/goastgen-linux`, otherwise it exits 2 without a message).
+`go` 1.24.7 is installed: the Go fixture is checked against the real toolchain. `kotlinc` is
+not, but kotlin2cpg's own runtime dependencies include `kotlin-compiler-embeddable` 2.3.21,
+which compiles the Kotlin fixture (`org.jetbrains.kotlin.cli.jvm.K2JVMCompiler`, then
+`java`): both fixtures are oracle-checked, nothing is pinned from memory of the specs.
+
+**Design** (§63's, extended; `Lang/Core/TypedInt.lean`). The exporter names the type in the
+operator. Go: `g08 g16 g32 g64` signed, `w08 w16 w32 w64` unsigned, because Go has no
+integer promotion (the spec's "Arithmetic operators": both operands have the same type, an
+untyped constant converts to the other's), so an operation is performed AT its operands'
+type; `int`/`uint`/`uintptr` are as wide as a pointer under the stated `dataModel` (an
+unknown model leaves them unresolved). Kotlin: `k32 k64` / `q32 q64`; `Byte`/`Short`
+(`UByte`/`UShort`) promote to `Int` (`UInt`), `Int` meeting `Long` is `Long`, and signed
+meeting unsigned has no operator, so it is a hole. Semantics, each checked against the
+runtime and not reused from C or Java where they differ:
+
+| | C | Java / Kotlin | Go |
+|---|---|---|---|
+| signed overflow | policy (wrap) | wraps | wraps |
+| `MIN / -1`, `MIN % -1` | UB hole | `MIN`, `0` | `MIN`, `0` (spec: "equal to x") |
+| `/`, `%` by zero | UB hole | `ArithmeticException` | panic (an exception here) |
+| shift count `>=` width | UB hole | masked | `0`, or `-1` for `>>` of a negative |
+| negative shift count | UB hole | masked | panic |
+
+New: `IntLang.go`/`.kotlin`, the twelve tag spellings above, `goShift` (Go's shift is not a
+`NumConfig` policy), `&^` (AND NOT). **`NumConfig.go64` was wrong** and is corrected:
+it had `onSignedOverflow := .trap`, i.e. `MinInt / -1` panicked, and the table in
+`Numeric.lean` said so; the specification and `go run` say it is `MinInt`. (It was dead code
+until now; its `#eval` comment is updated.) 39 new `#guard`s in `TypedInt.lean`; no existing
+statement changed. Built unmodified: `Refine`, `Overflow`, `FuelMono`, `CallingConvention`,
+`PyScoping`, `PyMro`, `CBoolInt`, `CIntWidth`, `JavaIntWidth`, `BoxedContainers`,
+`SpecsGen.Basis`, `V8Spec`, `CppCastSpec`, `CachetoolsSpec`, `DoWhileSpec`, `AddressSpec`,
+`Ledger`, `Harness.Conformance`.
+
+**Exporter.** `goTypedBinop`/`goTypedAug`/`goTypedUnop`, `ktTypedBinop`/... behind the same
+`cTypedBinop` dispatch as Java; increments and compound assignments typed too (Kotlin
+`Byte++` narrows back with `cast:i8`, as `Byte.inc()` wraps). Type sources: a Go
+`Identifier`'s `typeFullName`; `byte`/`rune` arrive already as `uint8`/`int32`; a
+package-level named type (`type Level uint8`, `type Flags = uint32`) through its TYPE_DECL's
+declaration text; operators computed structurally from their operands (Joern's own type for
+`a += 2` on an `int16` is `int`, and for `a > b` on `UInt`s is `int`). Go constant
+expressions are evaluated EXACTLY and emitted as the literal (`1<<64 - 1` is
+18446744073709551615; the constant is arbitrary precision, no width computes it), rune
+literals, `0o17` and `1_000` parse. Integer conversions `T(x)` (Go, an external call named
+after the type) and Kotlin's `toInt()`/`toLong()`/`toByte()`/`toUInt()`/... and `inv()`
+are `cast:*` (value-preserving or modular, the same rule as C's). Anything that does not
+resolve stays `op:int:unresolved-type`: a struct field reached through a pointer (Joern's
+type for `s.n` is the garbage string `*main.S.n.<FieldAccess>.<unknown>`), a map element,
+a call result Joern left `ANY`, a named type from another package, a Kotlin `Char`.
+`1 << n` with an untyped constant left operand takes its type from the context (`var x
+int64 = 1 << n`), which the exporter cannot see: `op:int:untyped-constant-shift`.
+
+**Three frontend quirks worked around, each found by the oracle or by reading the CPG.**
+(1) gosrc2cpg types the later uses of a `for i := 0; ...; i++` variable `ANY` with no
+`REF`; the method's locals of that name decide when they all agree, and a local whose
+declared type is `ANY` because its initializer is a conversion (`s := uint8(n)`) takes the
+type every other assignment agrees on. (2) gosrc2cpg types an *untyped named constant*
+`int` (`const m = 1<<64 - 1` is "int"), so an operand spelled `int` meeting another integer
+type adopts it: a valid Go program cannot mix a genuine `int` with `uint64`. A floating or
+string operand decides the result only when no integer is involved. (3) `x &^= y` is a
+call Joern names `<operator>.unknown`, indistinguishable by name from the binary `x &^ y`;
+the first version translated it as that binary expression with its value discarded, so
+`x` kept its value and **nothing marked the function a hole** (`0xFFFF &^= 0x0F0F` stayed
+65535, Go: 61680). The oracle caught it; it is now an assignment operator. Kotlin and Go
+files now get the plural-spelling normalization that C and Java already had (`x %= 7` was an
+unresolved call to a function named `<operators>.assignmentModulo`).
+
+**Measured against the runtimes.** `tests/fixtures/gointwidth` (56 cases, `go` 1.24.7) and
+`tests/fixtures/kotlinintwidth` (61 cases, Kotlin 2.3.21): exported, rendered, pinned with
+`#guard_msgs`, compared by pytest. With the base-head exporter (the same CPGs): Go 15
+agree, 20 wrong, 21 holes; Kotlin 20 agree, 20 wrong, 21 holes. Now: Go 55 agree and one
+hole, the `1 << n` case above, which Go computes as 1099511627776 and Core refuses;
+Kotlin 61 of 61. Go's divide-by-zero and negative-shift panics are pinned as exceptions
+(the old Core raised Python's `ZeroDivisionError` for the first and holed the second).
+`ast-LangGo.json` (kelseyhightower/envconfig `7834011`, 82 functions) and
+`ast-LangKt.json` (the toy, now with a recorded source) were re-exported with provenance;
+`ast-CAddr.json` and `ast-Cachetools.json` re-exported with the new exporter and compared
+byte-identical, so only their recorded `exporter_sha256` moved. A Go stdlib sample (`math/bits`,
+`hash/fnv`, `hash/adler32`, go1.24.7; 121 functions) is the only multi-package check:
+base exporter 267 untyped arithmetic operators and 61 functions with a hole; now 244
+typed integer operators, the 4 string `+` untyped, 10 `op:int:unresolved-type`, 58
+functions with a hole (conversions, `^x` and `&^` now translate). That is a measurement, not
+a fixture: no oracle was run on it.
+
+**Not done.** (a) Real Kotlin end to end: kotlin2cpg parses `kotlinx-datetime`'s
+`core/common/src`, but Joern's default `ReachingDefPass` overlay crashes on it before the
+exporter runs (`key not found: MethodRef`; identical at the base exporter), so the Kotlin
+change is exercised on fixtures only. (b) Go package-level constants are field accesses
+Core cannot read (`field:mask:non-object`, a different gap); named *untyped* constants
+inside a constant sub-expression are computed at `int` before the enclosing operation's
+type is known, which is exact for `+ - * & | ^ <<` (the result is reduced at the enclosing
+width) and not for `/ % >>` of values beyond `int64`. (c) Named integer types from other
+packages (`time.Duration`), Kotlin `typealias`es and `Char` arithmetic are holes. (d)
+Floating-point arithmetic is untouched; the dialect is still `.cLike` for both. (e) Go `int`
+under `ilp32` would be `g32` by construction and was not exercised.

@@ -56,12 +56,32 @@ import scala.annotation.tailrec
   // `x op= e` is `x = (T)(x op e)` (JLS 15.26.2) -- which `assignTo` now emits, the
   // narrowing cast included (`jArithStore`), and the shift token read from the source
   // (`jTypedAug`) rather than from the swapped operator names.
-  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C" || l == "JAVASRC")) {
+  if (cpg.metaData.language.l.exists(l => l == "NEWC" || l == "C" || l == "JAVASRC" || l == "GOLANG" || l == "KOTLIN")) {
     val diff = Cpg.newDiffGraphBuilder
     cpg.call.filter(_.methodFullName.startsWith("<operators>.")).l.foreach { c =>
       val n = "<operator>." + c.methodFullName.stripPrefix("<operators>.")
       diff.setNodeProperty(c, "METHOD_FULL_NAME", n)
       diff.setNodeProperty(c, "NAME", n)
+    }
+    flatgraph.DiffGraphApplier.applyDiff(cpg.graph, diff)
+  }
+
+  // Item S: Go's `x &^= y` (AND NOT assignment) is a call Joern names `<operator>.unknown`,
+  // exactly like the binary `x &^ y`; left alone it was exported as the binary operator
+  // with its value discarded -- a statement with no effect and no hole (`x` unchanged).
+  // Renamed to an assignment operator so the `augOps` machinery handles it.
+  if (cpg.metaData.language.l.contains("GOLANG")) {
+    val diff = Cpg.newDiffGraphBuilder
+    cpg.call.filter(_.methodFullName == "<operator>.unknown").l.filter { c =>
+      val args = c.argument.l
+      args.size == 2 && {
+        val lc = args.head.code
+        val i  = c.code.indexOf(lc)
+        i >= 0 && c.code.substring(i + lc.length).dropWhile(ch => ch == ')' || ch.isWhitespace).startsWith("&^=")
+      }
+    }.foreach { c =>
+      diff.setNodeProperty(c, "METHOD_FULL_NAME", "<operator>.assignmentAndNot")
+      diff.setNodeProperty(c, "NAME", "<operator>.assignmentAndNot")
     }
     flatgraph.DiffGraphApplier.applyDiff(cpg.graph, diff)
   }
@@ -150,6 +170,7 @@ import scala.annotation.tailrec
     "<operator>.assignmentModulo" -> "%",
     "<operator>.assignmentAnd" -> "&", "<operator>.assignmentOr" -> "|",
     "<operator>.assignmentXor" -> "^", "<operator>.assignmentShiftLeft" -> "<<",
+    "<operator>.assignmentAndNot" -> "&^",     // Go `&^=` (renamed from `<operator>.unknown`)
     "<operator>.assignmentLogicalShiftRight" -> ">>>"
   )
 
@@ -6684,6 +6705,7 @@ import scala.annotation.tailrec
     */
   def parseIntLiteral(raw: String): Option[BigInt] = {
     var t = raw.trim.replace("'", "")            // C++14 digit separators
+    if (goktFile) t = t.replace("_", "")         // Go/Kotlin `1_000_000`
     if (t.isEmpty) return None
     var neg = false
     if (t.startsWith("-")) { neg = true; t = t.drop(1) }
@@ -6697,6 +6719,8 @@ import scala.annotation.tailrec
           Some(BigInt(body.drop(2), 16))
         else if (body.length > 2 && (body.startsWith("0b") || body.startsWith("0B")))
           Some(BigInt(body.drop(2), 2))
+        else if (goFile && body.length > 2 && (body.startsWith("0o") || body.startsWith("0O")))
+          Some(BigInt(body.drop(2), 8))
         // A leading zero is octal in C, but plain "0" is zero, and a decimal point or an
         // exponent means this is a float and not ours to claim.
         else if (body.length > 1 && body.head == '0' && body.forall(_.isDigit))
@@ -7925,6 +7949,8 @@ import scala.annotation.tailrec
     * an operand is provably floating/pointer, or outside C/C++), `Left(holeLabel)`. */
   def cTypedBinop(c: Call, base: String): Either[String, String] =
     if (javaFile) jTypedBinop(c, base)
+    else if (goFile) goTypedBinop(c, base)
+    else if (ktFile) ktTypedBinop(c, base)
     else if (!cppFile || base == "&&" || base == "||") Right(base)
     else {
       val ks = kidsOf(c)
@@ -7941,6 +7967,8 @@ import scala.annotation.tailrec
     * augmented-assignment target and value). */
   def cTypedAug(lhs: AstNode, rhs: AstNode, base: String): Either[String, String] =
     if (javaFile) jTypedAug(lhs, rhs, base)
+    else if (goFile) goTypedAug(lhs, rhs, base)
+    else if (ktFile) ktTypedAug(lhs, rhs, base)
     else if (!cppFile || base.contains(":")) Right(base)
     else {
       val t = base match {
@@ -7964,6 +7992,8 @@ import scala.annotation.tailrec
         case k :: Nil => jTyped(base, jExprType(k))
         case _        => Left("op:int:unresolved-type")
       }
+    else if (goFile) goTypedUnop(c, base)
+    else if (ktFile) ktTypedUnop(c, base)
     else if (!cppFile || base == "!") Right(base)
     else kidsOf(c) match {
       case k :: Nil => typedOrHole(base, cIntExprType(k).map(cPromote), List(k))
@@ -8015,6 +8045,7 @@ import scala.annotation.tailrec
     * Untyped `op` (floating/pointer arithmetic) is stored as it was. */
   def cArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj =
     if (javaFile && !isHoleObj(v)) jArithStore(lhs, op, v)
+    else if (ktFile && !isHoleObj(v)) ktArithStore(lhs, op, v)
     else if (!cppFile || isHoleObj(v)) v
     else tagType(op) match {
       case None => v
@@ -8172,6 +8203,471 @@ import scala.annotation.tailrec
       case _                              => hole("op:int:unresolved-type")
     }
   }
+
+  // ---- item S: Go and Kotlin ---------------------------------------------------------
+  //
+  // Go and Kotlin shared `.cLike`'s untyped 32-bit operators, so Go `int` (64 bits under
+  // the stated data model) and Kotlin `Long` computed at the wrong width: `100000*100000`
+  // was 1410065408 where both give 10000000000 (STRATEGY §29 item 5, §63 "Not done"). The
+  // operator now names the type it is performed at, as for C and Java (`TypedInt.lean`):
+  //
+  //   Go      `g08 g16 g32 g64` signed, `w08 w16 w32 w64` unsigned. Go has no integer
+  //           promotion: an operation is performed AT its operands' type (spec,
+  //           "Arithmetic operators"; both operands have the same type, or one is an
+  //           untyped constant that converts to the other's). Overflow wraps; shifts of a
+  //           count >= the width give 0/-1; division by zero panics.
+  //   Kotlin  `k32 k64` signed, `q32 q64` unsigned. `Byte`/`Short` (`UByte`/`UShort`)
+  //           promote to `Int` (`UInt`) as in Java; `Int`+`Long` is `Long`; signed meeting
+  //           unsigned has no operator at all (a hole). Overflow wraps, shift counts are
+  //           masked, `/` by zero throws `ArithmeticException`.
+  //
+  // A type that does not resolve is the hole `op:int:unresolved-type`, never a width.
+  // Two Go-specific refusals: a constant expression is evaluated EXACTLY (Go does it at
+  // arbitrary precision, `1<<64 - 1` is 2^64-1) and emitted as the resulting literal; a
+  // non-constant shift of an untyped constant (`1 << n`) takes its type from the context
+  // the exporter cannot see, so it is `op:int:untyped-constant-shift`.
+
+  def ktFile: Boolean = { val f = currentFile.toLowerCase; f.endsWith(".kt") || f.endsWith(".kts") }
+  def goktFile: Boolean = goFile || ktFile
+
+  /** An identifier's type. gosrc2cpg leaves some references untyped (`ANY`, no `REF` edge):
+    * the loop variable's later uses in `for i := 0; i < n; i++` are the common case. Then
+    * the method's locals of that name decide, but only when every one of them agrees --
+    * a name declared with two types in different scopes stays unresolved. */
+  def goktIdentType(i: Identifier): String =
+    if (i.typeFullName != "ANY" && i.typeFullName.nonEmpty) i.typeFullName
+    else {
+      val ts = i.method.local.nameExact(i.name).typeFullName.l.distinct
+      if (ts.size == 1) ts.head else i.typeFullName
+    }
+
+  /** What is known about the type of a Go/Kotlin expression. */
+  sealed trait IK
+  /** `dflt`: spelled `int` -- which gosrc2cpg also reports for an UNTYPED named constant
+    * (`const m = 1<<64 - 1` is `int`, though it is no int at all), so a `dflt` operand
+    * meeting another integer type adopts that type: a valid Go program cannot mix a
+    * genuine `int` with another integer type. */
+  case class IInt(signed: Boolean, bits: Int, dflt: Boolean = false) extends IK
+  /** Go: an untyped integer constant expression (literals only). */
+  case object IConst extends IK
+  /** Go: an untyped floating constant (`2.5`, `1e3`): converts to int or float by context. */
+  case object IFloatConst extends IK
+  /** Provably not an integer: floating point, bool, ... The untyped operator is then the
+    * right one (Core's float arms decide). */
+  case object IOther extends IK
+  /** Go: a `string`. `+` on it is concatenation, whatever the other operand's type is
+    * known to be (an integer cannot be added to a string). */
+  case object IStr extends IK
+
+  def goTag(signed: Boolean, bits: Int): String = (if (signed) "g" else "w") + f"$bits%02d"
+  def ktTag(signed: Boolean, bits: Int): String = (if (signed) "k" else "q") + bits.toString
+
+  /** Go's integer types; `int`/`uint`/`uintptr` are as wide as a pointer under the model. */
+  def goIntType(name: String): Option[(Boolean, Int)] = name match {
+    case "int8"            => Some((true, 8))
+    case "int16"           => Some((true, 16))
+    case "int32" | "rune"  => Some((true, 32))
+    case "int64"           => Some((true, 64))
+    case "uint8" | "byte"  => Some((false, 8))
+    case "uint16"          => Some((false, 16))
+    case "uint32"          => Some((false, 32))
+    case "uint64"          => Some((false, 64))
+    case "int"             => pointerSizeofBytes.map(b => (true, b * 8))
+    case "uint" | "uintptr" => pointerSizeofBytes.map(b => (false, b * 8))
+    case _                 => None
+  }
+
+  lazy val goNonIntTypes = Set("float32", "float64", "complex64", "complex128", "string", "bool")
+
+  /** The underlying builtin type of a package-level named type: `type Level uint8` and
+    * `type Flags = uint32` (gosrc2cpg records only the declaration text, `Level uint8`,
+    * as the TYPE_DECL's code). Exactly one declaration must carry the name, and its
+    * underlying type must be a builtin (or itself such a named type): a struct, a slice,
+    * a generic or an external type stays unresolved. */
+  lazy val goNamedDeclRe = """^\w+\s*=?\s*([\w.]+)\s*$""".r
+  /** The program's type declarations by full name (a name declared twice is dropped). */
+  lazy val goTypeDeclCode: Map[String, String] =
+    cpg.typeDecl.isExternal(false).l.groupBy(_.fullName).collect { case (k, List(t)) => k -> t.code.trim }
+
+  def goNamedUnderlying(full: String, depth: Int = 0): Option[String] =
+    if (depth > 6 || goIntType(full).isDefined || goNonIntTypes.contains(full)) None
+    else goTypeDeclCode.get(full).flatMap(code => goNamedDeclRe.findFirstMatchIn(code)).map(_.group(1)).flatMap { u =>
+      if (goIntType(u).isDefined || goNonIntTypes.contains(u)) Some(u)
+      else goNamedUnderlying(full.take(full.lastIndexOf('.') + 1) + u, depth + 1)
+    }
+
+  def goTypeKind(t: String): Option[IK] =
+    goIntType(t).map(x => IInt(x._1, x._2, t == "int"))
+      .orElse(if (t == "string") Some(IStr) else if (goNonIntTypes.contains(t)) Some(IOther) else None)
+      .orElse(if (t.contains(".")) goNamedUnderlying(t).flatMap(u => goTypeKind(u)) else None)
+
+  /** The value of a Go rune literal (`'a'`, `'\n'`, `'\x41'`, `'é'`). */
+  def goRuneValue(c: String): Option[BigInt] =
+    if (!(c.length >= 3 && c.startsWith("'") && c.endsWith("'"))) None
+    else {
+      val b = c.substring(1, c.length - 1)
+      def hex(s: String): Option[BigInt] = try Some(BigInt(s, 16)) catch { case _: NumberFormatException => None }
+      if (b.isEmpty) None
+      else if (!b.startsWith("\\")) (if (b.codePointCount(0, b.length) == 1) Some(BigInt(b.codePointAt(0))) else None)
+      else b.drop(1) match {
+        case "n" => Some(BigInt(10)); case "t" => Some(BigInt(9)); case "r" => Some(BigInt(13))
+        case "a" => Some(BigInt(7));  case "b" => Some(BigInt(8)); case "f" => Some(BigInt(12))
+        case "v" => Some(BigInt(11)); case "\\" => Some(BigInt(92)); case "'" => Some(BigInt(39))
+        case s if s.length == 3 && s.startsWith("x") => hex(s.drop(1))
+        case s if s.length == 5 && s.startsWith("u") => hex(s.drop(1))
+        case s if s.length == 9 && s.startsWith("U") => hex(s.drop(1))
+        case s if s.length == 3 && s.forall(ch => ch >= '0' && ch <= '7') =>
+          try Some(BigInt(s, 8)) catch { case _: NumberFormatException => None }
+        case _ => None
+      }
+    }
+
+  lazy val goFloatLit = """[-+]?(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)([eE][-+]?\d+)?i?""".r
+
+  /** Go's `x &^ y` and unary `^x` are calls Joern names `<operator>.unknown`; the token is
+    * read from the source text, as for Java's shifts. */
+  def goAndNot(c: Call): Boolean = {
+    val ks = kidsOf(c)
+    c.methodFullName == "<operator>.unknown" && ks.size == 2 && {
+      val lc = ks.head match { case e: Expression => e.code; case _ => "" }
+      val i = c.code.indexOf(lc)
+      lc.nonEmpty && i >= 0 && {
+        val rest = c.code.substring(i + lc.length).dropWhile(ch => ch == ')' || ch.isWhitespace)
+        rest.startsWith("&^") && !rest.startsWith("&^=")
+      }
+    }
+  }
+  def goComplement(c: Call): Boolean =
+    c.methodFullName == "<operator>.unknown" && kidsOf(c).size == 1 && c.code.trim.startsWith("^")
+
+  lazy val goArithOps = Set("<operator>.addition", "<operator>.subtraction",
+    "<operator>.multiplication", "<operator>.division", "<operator>.modulo",
+    "<operator>.and", "<operator>.or", "<operator>.xor")
+  lazy val goShiftOps = Set("<operator>.shiftLeft", "<operator>.arithmeticShiftRight")
+  lazy val goCmpOps = Set("<operator>.lessThan", "<operator>.lessEqualsThan",
+    "<operator>.greaterThan", "<operator>.greaterEqualsThan", "<operator>.equals",
+    "<operator>.notEquals", "<operator>.logicalNot", "<operator>.logicalAnd",
+    "<operator>.logicalOr")
+
+  /** Full names of the methods the program itself defines (not external stubs), computed
+    * once: asking the CPG per call would be quadratic on a large package. */
+  lazy val goDefinedMethods: Set[String] = cpg.method.isExternal(false).fullName.toSet
+
+  /** A Go conversion `T(x)` to an integer type: Joern spells it a call to an external
+    * method named `<pkg>.T`. A user function that happens to be called `int32` is not one. */
+  def goConvTarget(c: Call): Option[(Boolean, Int)] = {
+    val ks = kidsOf(c)
+    val mfn = c.methodFullName
+    val last = mfn.substring(mfn.lastIndexOf('.') + 1)
+    if (ks.size != 1 || mfn.startsWith("<operator>") || last == mfn) None
+    else if (goDefinedMethods.contains(mfn)) None
+    else goIntType(last)
+  }
+
+  /** Combine two operand kinds of a Go binary arithmetic operator. */
+  def goBin(a: Option[IK], b: Option[IK]): Option[IK] = (a, b) match {
+    // A floating/string operand decides the result only when no integer is involved: an
+    // integer variable meeting a (possibly named, untyped) floating constant is an
+    // integer operation, and an unresolved operand might be that integer.
+    case (Some(IStr), _) | (_, Some(IStr)) => Some(IStr)
+    case (Some(IOther), Some(IOther | IConst | IFloatConst)) | (Some(IConst | IFloatConst), Some(IOther)) => Some(IOther)
+    case (Some(IOther), _) | (_, Some(IOther)) => None
+    case (Some(IInt(s1, w1, d1)), Some(IInt(s2, w2, d2))) =>
+      if (s1 == s2 && w1 == w2) Some(IInt(s1, w1, d1 && d2))
+      else if (d1 && !d2) b
+      else if (d2 && !d1) a
+      else None
+    case (Some(i: IInt), Some(IConst)) => Some(i)
+    case (Some(IConst), Some(i: IInt)) => Some(i)
+    case (Some(IConst), Some(IConst)) => Some(IConst)
+    case (Some(IFloatConst), Some(IFloatConst) | Some(IConst)) => Some(IFloatConst)
+    case (Some(IConst), Some(IFloatConst)) => Some(IFloatConst)
+    case _ => None            // unresolved, or an int meeting a float constant
+  }
+
+  /** A local whose declared type gosrc2cpg left `ANY` (`s := uint(n)`: the initializer is a
+    * conversion call it does not type): the integer type every assignment to it agrees on. */
+  def goLocalKind(i: Identifier, depth: Int): Option[IK] = {
+    val rhss = i.method.call.nameExact("<operator>.assignment").l.flatMap { a =>
+      kidsOf(a) match {
+        // A self-referential `s = s + 250` has the type of `s` by Go's typing rules, so it
+        // neither says nor contradicts anything (and would recurse).
+        case (l: Identifier) :: r :: Nil if l.name == i.name && !r.ast.isIdentifier.nameExact(i.name).nonEmpty => List(r)
+        case _ => Nil
+      }
+    }
+    val ks = rhss.map(r => goKind(r, depth + 1))
+    if (ks.nonEmpty && ks.forall(_.isDefined) && ks.distinct.size == 1) ks.head.filter(_.isInstanceOf[IInt])
+    else None
+  }
+
+  def goKind(n0: AstNode, depth: Int = 0): Option[IK] =
+    if (depth > 24) None
+    else unwrapMacro(n0) match {
+      case l: Literal =>
+        val c = l.code.trim
+        if (c.startsWith("\"") || c.startsWith("`")) Some(IStr)
+        else if (c == "true" || c == "false") Some(IOther)
+        else if (c.startsWith("'")) goRuneValue(c).map(_ => IConst)
+        else if (parseIntLiteral(c).isDefined) Some(IConst)
+        else if (goFloatLit.matches(c)) Some(IFloatConst)
+        else None
+      case i: Identifier =>
+        goTypeKind(goktIdentType(i)).orElse(
+          if (goktIdentType(i) == "ANY" || goktIdentType(i).isEmpty) goLocalKind(i, depth) else None)
+      case c: Call =>
+        val ks = kidsOf(c)
+        val mfn = c.methodFullName
+        if (goArithOps.contains(mfn) && ks.size == 2) goBin(goKind(ks(0), depth + 1), goKind(ks(1), depth + 1))
+        else if (goAndNot(c)) goBin(goKind(kidsOf(c)(0), depth + 1), goKind(kidsOf(c)(1), depth + 1))
+        else if (goShiftOps.contains(mfn) && ks.size == 2)
+          (goKind(ks(0), depth + 1), goKind(ks(1), depth + 1)) match {
+            case (Some(i: IInt), _) => Some(i)
+            case (Some(IConst), Some(IConst)) => Some(IConst)
+            case _ => None                          // `1 << n`: type from context
+          }
+        else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus" || goComplement(c)) && ks.size == 1)
+          goKind(ks(0), depth + 1)
+        else if (goCmpOps.contains(mfn)) Some(IOther)
+        else goConvTarget(c).map(t => IInt(t._1, t._2))
+          .orElse(goTypeKind(c.typeFullName))
+      case _ => None
+    }
+
+  /** The exact value of a Go constant expression made of integer/rune literals. */
+  def goConstValue(n0: AstNode, depth: Int = 0): Option[BigInt] =
+    if (depth > 64) None
+    else unwrapMacro(n0) match {
+      case l: Literal =>
+        val c = l.code.trim
+        if (c.startsWith("'")) goRuneValue(c) else parseIntLiteral(c)
+      case c: Call =>
+        val ks = kidsOf(c)
+        def v(i: Int) = goConstValue(ks(i), depth + 1)
+        val mfn = c.methodFullName
+        if (ks.size == 2 && (goArithOps.contains(mfn) || goShiftOps.contains(mfn) || goAndNot(c)))
+          for (a <- v(0); b <- v(1); r <- {
+            if (goAndNot(c)) Some(a & ~b)
+            else mfn match {
+              case "<operator>.addition"       => Some(a + b)
+              case "<operator>.subtraction"    => Some(a - b)
+              case "<operator>.multiplication" => Some(a * b)
+              case "<operator>.division"       => if (b == 0) None else Some(a / b)
+              case "<operator>.modulo"         => if (b == 0) None else Some(a % b)
+              case "<operator>.and"            => Some(a & b)
+              case "<operator>.or"             => Some(a | b)
+              case "<operator>.xor"            => Some(a ^ b)
+              case "<operator>.shiftLeft"      => if (b < 0 || b > 4096) None else Some(a << b.toInt)
+              case _                           => if (b < 0 || b > 4096) None else Some(a >> b.toInt)
+            }
+          }) yield r
+        else if (ks.size == 1 && mfn == "<operator>.minus") v(0).map(x => -x)
+        else if (ks.size == 1 && mfn == "<operator>.plus") v(0)
+        else if (ks.size == 1 && goComplement(c)) v(0).map(x => -x - 1)
+        else None
+      case _ => None
+    }
+
+  def goOpResult(k: Option[IK], base: String): Either[String, String] = k match {
+    case Some(IInt(s, b, _))              => Right(base + ":" + goTag(s, b))
+    case Some(IOther) | Some(IFloatConst) | Some(IStr) => Right(base)
+    case Some(IConst)                     => Left("op:int:constant-expression")
+    case None                             => Left("op:int:unresolved-type")
+  }
+
+  def goTypedBinop(c: Call, base: String): Either[String, String] = {
+    val ks = kidsOf(c)
+    if (ks.size != 2) Right(base)
+    else base match {
+      // Comparison and logic need no conversion: both operands have the same type, whose
+      // values are canonical.
+      case "&&" | "||" | "<" | "<=" | ">" | ">=" | "==" | "!=" => Right(base)
+      case "<<" | ">>" =>
+        (goKind(ks(0)), goKind(ks(1))) match {
+          case (Some(IConst), Some(IConst)) => Left("op:int:constant-expression")
+          case (Some(IConst), _)            => Left("op:int:untyped-constant-shift")
+          case (l, _)                       => goOpResult(l, base)
+        }
+      case _ => goOpResult(goBin(goKind(ks(0)), goKind(ks(1))), base)
+    }
+  }
+
+  def goTypedAug(lhs: AstNode, rhs: AstNode, base0: String): Either[String, String] =
+    goOpResult(goKind(lhs), base0.takeWhile(_ != ':'))
+
+  def goTypedUnop(c: Call, base: String): Either[String, String] =
+    if (base == "!") Right(base)
+    else kidsOf(c) match {
+      case k :: Nil => goOpResult(goKind(k), base)
+      case _        => Left("op:int:unresolved-type")
+    }
+
+  // ---- Kotlin ----
+
+  /** Kotlin's integer types, as the (signed, bits) they promote to for arithmetic. */
+  def ktTypeKind(t: String): Option[IK] = t match {
+    case "int" | "kotlin.Int" | "java.lang.Integer" | "short" | "kotlin.Short" | "java.lang.Short" |
+         "byte" | "kotlin.Byte" | "java.lang.Byte"          => Some(IInt(true, 32))
+    case "long" | "kotlin.Long" | "java.lang.Long"          => Some(IInt(true, 64))
+    case "kotlin.UInt" | "kotlin.UShort" | "kotlin.UByte"   => Some(IInt(false, 32))
+    case "kotlin.ULong"                                     => Some(IInt(false, 64))
+    case "float" | "double" | "kotlin.Float" | "kotlin.Double" | "boolean" | "kotlin.Boolean" |
+         "java.lang.String" | "kotlin.String" | "java.lang.Double" | "java.lang.Float" |
+         "java.lang.Boolean" => Some(IOther)
+    case _ => None
+  }
+
+  def ktKind(n0: AstNode, depth: Int = 0): Option[IK] =
+    if (depth > 24) None
+    else unwrapMacro(n0) match {
+      case l: Literal =>
+        val c = l.code.trim
+        if (c.startsWith("\"") || c == "true" || c == "false" || c == "null") Some(IOther)
+        else if (c.startsWith("'")) None                          // Char
+        else parseIntLiteral(c) match {
+          case Some(v) =>
+            val suffix = c.toLowerCase.reverse.takeWhile(ch => ch == 'u' || ch == 'l').reverse
+            val unsigned = suffix.contains('u')
+            val long = suffix.contains('l')
+            if (unsigned) Some(IInt(false, if (long || v > BigInt(2).pow(32) - 1) 64 else 32))
+            else Some(IInt(true, if (long || v > BigInt(2).pow(31) - 1) 64 else 32))
+          case None =>
+            if (c.matches("""[-+]?(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)([eE][-+]?\d+)?[fF]?""")) Some(IOther) else None
+        }
+      case i: Identifier => ktTypeKind(goktIdentType(i))
+      case c: Call =>
+        val ks = kidsOf(c)
+        val mfn = c.methodFullName
+        if (jArithOps.contains(mfn) && ks.size == 2) ktBin(ktKind(ks(0), depth + 1), ktKind(ks(1), depth + 1))
+        else if (goShiftOps.contains(mfn) && ks.size == 2 || mfn == "<operator>.logicalShiftRight" && ks.size == 2)
+          ktKind(ks(0), depth + 1)
+        else if ((mfn == "<operator>.minus" || mfn == "<operator>.plus") && ks.size == 1) ktKind(ks(0), depth + 1)
+        else if (mfn == "<operator>.conditional" && ks.size == 3) {
+          val a = ktKind(ks(1), depth + 1); val b = ktKind(ks(2), depth + 1)
+          if (a == b) a else None
+        }
+        else if (jBoolOps.contains(mfn)) Some(IOther)
+        else ktTypeKind(c.typeFullName)
+      case _ => None
+    }
+
+  /** Kotlin binary promotion: a floating or String operand decides; two integers of the
+    * same signedness widen to the wider; signed meeting unsigned has no operator. */
+  def ktBin(a: Option[IK], b: Option[IK]): Option[IK] = (a, b) match {
+    case (Some(IOther), _) | (_, Some(IOther)) => Some(IOther)
+    case (Some(IInt(s1, w1, _)), Some(IInt(s2, w2, _))) if s1 == s2 => Some(IInt(s1, math.max(w1, w2)))
+    case _ => None
+  }
+
+  def ktOpResult(k: Option[IK], base: String): Either[String, String] = k match {
+    case Some(IInt(s, b, _)) => Right(base + ":" + ktTag(s, b))
+    case Some(_)          => Right(base)
+    case None             => Left("op:int:unresolved-type")
+  }
+
+  def ktTypedBinop(c: Call, base: String): Either[String, String] = {
+    val ks = kidsOf(c)
+    if (ks.size != 2) Right(base)
+    else base match {
+      case "&&" | "||" | "<" | "<=" | ">" | ">=" | "==" | "!=" => Right(base)
+      case "<<" | ">>" | ">>>" => ktOpResult(ktKind(ks(0)), base)
+      case _ => ktOpResult(ktBin(ktKind(ks(0)), ktKind(ks(1))), base)
+    }
+  }
+
+  def ktTypedAug(lhs: AstNode, rhs: AstNode, base0: String): Either[String, String] = {
+    val base = base0.takeWhile(_ != ':')
+    base match {
+      case "<<" | ">>" | ">>>" => ktOpResult(ktKind(lhs), base)
+      case _ => ktOpResult(ktBin(ktKind(lhs), ktKind(rhs)), base)
+    }
+  }
+
+  def ktTypedUnop(c: Call, base: String): Either[String, String] =
+    if (base == "!") Right(base)
+    else kidsOf(c) match {
+      case k :: Nil => ktOpResult(ktKind(k), base)
+      case _        => Left("op:int:unresolved-type")
+    }
+
+  /** `x++`, `x += e` and friends narrow back to the target's type: `Byte.inc()` wraps at 8
+    * bits (a compound assignment on a `Byte` is a compile error, so only `++`/`--` occur). */
+  def ktArithStore(lhs: AstNode, op: String, v: ujson.Obj): ujson.Obj = {
+    val tag = op.split(":").lift(1)
+    if (!tag.exists(t => t.length == 3 && (t(0) == 'k' || t(0) == 'q'))) v
+    else staticTypeOf(lhs) match {
+      case "byte" | "kotlin.Byte" | "java.lang.Byte"        => castObj((true, 8), v)
+      case "short" | "kotlin.Short" | "java.lang.Short"     => castObj((true, 16), v)
+      case "kotlin.UByte"                                   => castObj((false, 8), v)
+      case "kotlin.UShort"                                  => castObj((false, 16), v)
+      case "int" | "kotlin.Int" | "java.lang.Integer"       => if (tag.contains("k32")) v else castObj((true, 32), v)
+      case "long" | "kotlin.Long" | "java.lang.Long"        => v
+      case "kotlin.UInt"                                    => if (tag.contains("q32")) v else castObj((false, 32), v)
+      case "kotlin.ULong"                                   => v
+      case _                                                => hole("op:int:unresolved-type")
+    }
+  }
+
+  /** The expressions Go and Kotlin translate by themselves rather than as a plain call or
+    * operator: a Go constant expression (evaluated exactly), Go `x &^ y` / `^x`, a Go
+    * integer conversion `T(x)`, and Kotlin's integer conversions and `inv()`. */
+  def goktPre(c: Call): Option[ujson.Obj] =
+    if (goFile) {
+      val ks = kidsOf(c)
+      val mfn = c.methodFullName
+      val isOp = ((goArithOps.contains(mfn) || goShiftOps.contains(mfn)) && ks.size == 2) ||
+                 ((mfn == "<operator>.minus" || mfn == "<operator>.plus") && ks.size == 1) ||
+                 goAndNot(c) || goComplement(c)
+      if (isOp && goKind(c) == Some(IConst))
+        Some(goConstValue(c).map(intLit).getOrElse(hole("op:int:constant-expression")))
+      else if (goAndNot(c)) Some(typedBinopObj(goOpResult(goBin(goKind(ks(0)), goKind(ks(1))), "&^"), expr(ks(0)), expr(ks(1))))
+      else if (goComplement(c)) Some(typedUnopObj(goOpResult(goKind(ks(0)), "~"), expr(ks(0))))
+      else goConvTarget(c).flatMap { t =>
+        goKind(ks(0)) match {
+          case Some(_: IInt) | Some(IConst) => Some(castObj(t, expr(ks(0))))
+          case _                            => None
+        }
+      }
+    }
+    else if (ktFile) {
+      val ks = kidsOf(c)
+      val m = ktConvRe.findFirstMatchIn(c.methodFullName)
+      // `Int.toUInt()`, `Long.toULong()`, ... are extension functions in the `kotlin`
+      // package, so the receiver type is in the signature, not the method's owner.
+      val ext = ktExtConvRe.findFirstMatchIn(c.methodFullName)
+      if (ks.size == 1 && ext.isDefined)
+        Some(castObj(ext.get.group(1) match {
+          case "toUByte" => (false, 8); case "toUShort" => (false, 16)
+          case "toUInt" => (false, 32); case _ => (false, 64)
+        }, expr(ks(0))))
+      else if (ks.size != 1 || m.isEmpty) None
+      else {
+        val recv = "kotlin." + m.get.group(1); val fn = m.get.group(2)
+        val rk = ktTypeKind(recv)
+        def target(n: String): Option[(Boolean, Int)] = n match {
+          case "toByte" => Some((true, 8)); case "toShort" => Some((true, 16))
+          case "toInt" => Some((true, 32)); case "toLong" => Some((true, 64))
+          case "toUByte" => Some((false, 8)); case "toUShort" => Some((false, 16))
+          case "toUInt" => Some((false, 32)); case "toULong" => Some((false, 64))
+          case _ => None
+        }
+        if (fn == "inv") rk.collect { case IInt(s, b, _) =>
+          val small = Set("kotlin.Byte", "kotlin.Short", "kotlin.UByte", "kotlin.UShort").contains(recv)
+          val r = typedUnopObj(Right("~:" + ktTag(s, b)), expr(ks(0)))
+          if (!small) r
+          else castObj(recv match { case "kotlin.Byte" => (true, 8); case "kotlin.Short" => (true, 16)
+                                    case "kotlin.UByte" => (false, 8); case _ => (false, 16) }, r)
+        }
+        else target(fn).map(t => castObj(t, expr(ks(0))))
+      }
+    }
+    else None
+
+  lazy val ktExtConvRe =
+    """^kotlin\.(toUByte|toUShort|toUInt|toULong):kotlin\.U\w+\((int|long|short|byte)\)$""".r
+
+  lazy val ktConvRe =
+    """^kotlin\.(Int|Long|Short|Byte|UInt|ULong|UShort|UByte)\.(toByte|toShort|toInt|toLong|toUByte|toUShort|toUInt|toULong|inv):""".r
 
   /** One element of a brace initializer, classified.
     *
@@ -8846,7 +9342,8 @@ import scala.annotation.tailrec
     // JS/TS `==`/`===`/`!=`/`!==`/`>>`/`>>>`: FIRST, before the C-family null test
     // below, which would turn `x == null` into `x in (None, 0)` -- `0 == null` is
     // `false` in JS. See `jsAmbiguousBinop`; Core's `.javascript` arms decide `null`.
-    if (jsAmbiguousBinop(c).isDefined)
+    if (goktPre(c).isDefined) goktPre(c).get
+    else if (jsAmbiguousBinop(c).isDefined)
       jsAmbiguousBinop(c).get match {
         case Right(op) => ujson.Obj("k" -> "binop", "op" -> op,
                                     "a" -> expr(kids(0)), "b" -> expr(kids(1)))
@@ -9044,6 +9541,10 @@ import scala.annotation.tailrec
     // Item O: Java reads `>>`/`>>>` from the source token (see `javaShiftToken`).
     else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2 && javaFile)
       typedBinopObj(jTypedBinop(c, ">>"), expr(kids(0)), expr(kids(1)))
+    // Item S: Go's and Kotlin's `>>` / `shr` is unambiguous (arithmetic on a signed type;
+    // the tag's signedness makes it logical on an unsigned one).
+    else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2 && goktFile)
+      typedBinopObj(cTypedBinop(c, ">>"), expr(kids(0)), expr(kids(1)))
     else if (mfn == "<operator>.arithmeticShiftRight" && kids.size == 2)
       shiftRightOp(kids(0)) match {
         case Some(op) => ujson.Obj("k" -> "binop", "op" -> op,
@@ -11213,6 +11714,15 @@ import scala.annotation.tailrec
         case Right(top)  =>
           cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
       }
+      else if (goFile) goOpResult(goKind(tgt), op) match {
+        case Left(label) => hole(label)
+        case Right(top)  => ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one)
+      }
+      else if (ktFile) ktOpResult(ktKind(tgt), op) match {
+        case Left(label) => hole(label)
+        case Right(top)  =>
+          cArithStore(tgt, top, ujson.Obj("k" -> "binop", "op" -> top, "a" -> cur, "b" -> one))
+      }
       else if (!cppFile) bump(cur)
       else typedOrHole(op, cIntExprType(tgt).map(a => cUsualArith(a, (true, 32))), List(tgt)) match {
         case Left(label) => hole(label)
@@ -11698,6 +12208,16 @@ import scala.annotation.tailrec
           val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
           (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
         case Left(lbl) => (Nil, hole(lbl))
+      }
+    // Item S: Go constant expressions, `&^`, `^x`, integer conversions, Kotlin conversions.
+    case c: Call if goktFile && goktPre(c).isDefined => (Nil, goktPre(c).get)
+    case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 && goktFile =>
+      val List(a, b) = kidsOf(c)
+      cTypedBinop(c, ">>") match {
+        case Left(label) => (Nil, hole(label))
+        case Right(op) =>
+          val (pa, ae) = exprV(a); val (pb, be) = exprV(b)
+          (pa ++ pb, ujson.Obj("k" -> "binop", "op" -> op, "a" -> ae, "b" -> be))
       }
     case c: Call if c.methodFullName == "<operator>.arithmeticShiftRight" && kidsOf(c).size == 2 =>
       val List(a, b) = kidsOf(c)

@@ -38,11 +38,11 @@
    "render_sha256": "2135c3a723e8aa804323777fecfbaece00a3436b09d20da2bba1a033c1fd5f64"
   },
   "LangGo": {
-   "ast_bytes": 408379,
-   "ast_sha256": "084b27291874f42262ee38f1399d93e81b66883a6d8a1e841011a853e1187968",
+   "ast_bytes": 591127,
+   "ast_sha256": "48964b0a20f3f8b9db01e96f763808427e466a87c6b80dc6c1a5b806f76a7a9e",
    "ast_tracked": true,
-   "render_bytes": 179221,
-   "render_sha256": "9852bb0d7e9f90af648e2452c1ab6ad4ac8c7307505e9cc820b77a9b92cf5648"
+   "render_bytes": 291581,
+   "render_sha256": "4bad57e055e1117e702fc65bf61dbb49c624e51fb9a9ea38290f97a69cdd8aa0"
   },
   "LangJS": {
    "ast_bytes": 118082,
@@ -59,11 +59,11 @@
    "render_sha256": "254148b08771e9b605428d706c77dfc5904cc964be85690524cae1f0c4b0e213"
   },
   "LangKt": {
-   "ast_bytes": 3550,
-   "ast_sha256": "0a04deb8c963336bb44c3985d959e55ccdfc6284b51c07687154fc7ea3994a6c",
+   "ast_bytes": 3570,
+   "ast_sha256": "0826b109503371401250b46471b24d5e1b3b02f935a1a691d9d89da4f4fce8da",
    "ast_tracked": true,
-   "render_bytes": 4398,
-   "render_sha256": "0f3a6d3e30dcb8936e7c317c470f6c81de82377634ce2327d968586ac6fa23f9"
+   "render_bytes": 4410,
+   "render_sha256": "67d2e9c8ec3da403e30407b33b19d82d2e07678fc2dad4d2146b6ca90a5013d1"
   },
   "LangTS": {
    "ast_bytes": 240270,
