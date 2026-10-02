@@ -144,6 +144,19 @@ claiming something false. -/
 def HasField (h : Heap) (r : Ref) (f : String) (v : Val) : Prop :=
   ∃ o, h.get r = some o ∧ o.fields.find? (·.1 == f) = some (f, v)
 
+/-- `r` is a plain object, not a boxed Python list/dict (`docs/boxed-containers.md`). An
+attribute WRITE to a boxed container is a hole (CPython: `AttributeError`), so every
+specification below that writes an attribute of `self` states this about its receiver.
+It is a precondition CPython imposes too: a `list` has no `_Timer__nesting`. -/
+def Plain (h : Heap) (r : Ref) : Prop := (h.payload r).toVal = none
+
+/-- A field write does not touch any object's payload. -/
+@[simp] theorem payload_setField (h : Heap) (r s : Ref) (f : String) (v : Val) :
+    (h.setField s f v).payload r = h.payload r := by
+  simp only [Heap.payload, Heap.get, Heap.setField, List.getElem?_mapIdx]
+  cases h[r]? <;> simp
+  split <;> rfl
+
 theorem readField_of_has {h r f v} (hv : HasField h r f v) : readField h r f = v := by
   obtain ⟨o, hg, hf⟩ := hv; simp [readField, hg, hf]
 
@@ -299,7 +312,7 @@ refutes on any dict receiver. -/
 
 theorem Cache_contains_mrefines :
     MRefines "cachetools/__init__.py:<module>.Cache.__contains__" 12
-      (fun h self args => ∃ r k kvs, self = .ref r ∧ args = [k]
+      (fun h self args => ∃ r k kvs, self = .ref r ∧ args = [k] ∧ h.unhashable k = false
                             ∧ HasField h r "_Cache__data" (.dict kvs))
       (fun h self args => (h, match self, args with
                               | .ref r, [k] =>
@@ -307,13 +320,13 @@ theorem Cache_contains_mrefines :
                                   | .dict kvs => .ret (.bool (kvs.any (fun kv => Val.beq k kv.1)))
                                   | _         => .ret .unit
                               | _, _ => .ret .unit)) := by
-  rintro h _ _ ⟨r, k, kvs, rfl, rfl, o, hg, hfld⟩
+  rintro h _ _ ⟨r, k, kvs, rfl, rfl, hk, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro n
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, valIn, readField,
-        hg, hfld]
+        f_cachetools___init___py__module__Cache___contains__, ctxOf, P, P_dialect, valInH,
+        Heap.view, Dialect.isPython, readField, hg, hfld, hk]
 
 /-- Membership is not constant: it answers `true` for a present key and `false` for an
 absent one. This is the anti-vacuity witness for `Cache_contains_mrefines` — a
@@ -327,7 +340,8 @@ theorem Cache_contains_discriminates (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__Cache___contains__ rfl] <;>
-    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, valIn, Val.beq, Heap.get,
+    simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, valInH, Heap.view,
+          Heap.unhashable, Dialect.isPython, Val.beq, Heap.get,
           f_cachetools___init___py__module__Cache___contains__]
 
 /-! ### `TLRUCache._Item.__lt__` — a strict order, and it must stay strict
@@ -373,7 +387,7 @@ on `Heap.setField`, so `-` → `+` and `1` → `2` are both refuted. -/
 
 theorem Timer_exit_mrefines :
     MRefines "cachetools/__init__.py:<module>._TimedCache._Timer.__exit__" 12
-      (fun h self args => ∃ r n e, self = .ref r ∧ args = [e]
+      (fun h self args => ∃ r n e, self = .ref r ∧ args = [e] ∧ Plain h r
                             ∧ HasField h r "_Timer__nesting" (.int n))
       (fun h self _ => match self with
                        | .ref r =>
@@ -381,13 +395,14 @@ theorem Timer_exit_mrefines :
                            | .int n => (h.setField r "_Timer__nesting" (.int (n - 1)), .ret .unit)
                            | _      => (h, .ret .unit)
                        | _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, n, e, rfl, rfl, o, hg, hfld⟩
+  rintro h _ _ ⟨r, n, e, rfl, rfl, hpl, o, hg, hfld⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
+  simp [Plain] at hpl
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
         f_cachetools___init___py__module___TimedCache__Timer___exit__, ctxOf, P,
-        P_dialect, readField, hg, hfld]
+        P_dialect, readField, hg, hfld, hpl]
 
 /-- The decrement is a decrement: on a concrete timer at nesting 1, exit leaves 0. -/
 theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
@@ -397,6 +412,7 @@ theorem Timer_exit_decrements (fuel : Nat) (hf : 12 ≤ fuel) :
   obtain ⟨k, rfl⟩ : ∃ k, fuel = k + 12 := ⟨fuel - 12, by omega⟩
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___exit__ rfl]
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, P_dialect, readField, Heap.get, Heap.setField,
+        Heap.payload, Payload.toVal,
         f_cachetools___init___py__module___TimedCache__Timer___exit__]
 
 /-! ### `_TimedCache._Timer.__init__` — both assignments happen
@@ -407,18 +423,20 @@ something to break here. -/
 
 theorem Timer_init_mrefines :
     MRefines "cachetools/__init__.py:<module>._TimedCache._Timer.__init__" 12
-      (fun _ self args => ∃ r t, self = .ref r ∧ args = [t])
+      (fun h self args => ∃ r t, self = .ref r ∧ args = [t] ∧ Plain h r)
       (fun h self args => match self, args with
                           | .ref r, [t] =>
                               (((h.setField r "_Timer__timer" t).setField r "_Timer__nesting" (.int 0)),
                                .ret .unit)
                           | _, _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, t, rfl, rfl⟩
+  rintro h _ _ ⟨r, t, rfl, rfl, hpl⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl]
+  simp [Plain] at hpl
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P]
+        f_cachetools___init___py__module___TimedCache__Timer___init__, ctxOf, P, hpl,
+        payload_setField]
 
 /-- Both fields are actually written, with the right values in the right places. -/
 theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
@@ -432,23 +450,26 @@ theorem Timer_init_sets_both (fuel : Nat) (hf : 12 ≤ fuel) :
   refine ⟨?_, ?_⟩ <;>
     rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module___TimedCache__Timer___init__ rfl] <;>
     simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set, ctxOf, P, readField, Heap.get, Heap.setField,
+          Heap.payload, Payload.toVal,
           f_cachetools___init___py__module___TimedCache__Timer___init__]
 
 /-! ### `TTLCache._Link.__init__` — the same shape, a different pair of fields -/
 
 theorem TTLLink_init_mrefines :
     MRefines "cachetools/__init__.py:<module>.TTLCache._Link.__init__" 12
-      (fun _ self args => ∃ r k e, self = .ref r ∧ args = [k, e])
+      (fun h self args => ∃ r k e, self = .ref r ∧ args = [k, e] ∧ Plain h r)
       (fun h self args => match self, args with
                           | .ref r, [k, e] =>
                               (((h.setField r "key" k).setField r "expires" e), .ret .unit)
                           | _, _ => (h, .ret .unit)) := by
-  rintro h _ _ ⟨r, k, e, rfl, rfl⟩
+  rintro h _ _ ⟨r, k, e, rfl, rfl, hpl⟩
   refine forall_ge_of_forall_add (N := 12) ?_
   intro m
   rw [runMethod_of_resolve _ _ _ _ _ f_cachetools___init___py__module__TTLCache__Link___init__ rfl]
+  simp [Plain] at hpl
   simp [applyFunc, bindParams, Func.posParams, kwargsRejected, posRejected, Val.unbuiltin, execStmt, evalExpr, Env.set,
-        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P]
+        f_cachetools___init___py__module__TTLCache__Link___init__, ctxOf, P, hpl,
+        payload_setField]
 
 /-! ### `TTLCache.__setstate__.<lambda>0` — a projection out of an *argument*, not `self` -/
 

@@ -1018,10 +1018,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       match evalExpr ctx n h ρ a with
       | (h₁, .val (.ref r)) =>
         match h₁.get r with
-        -- A list or dict has no instance attributes; its methods are reached through
-        -- `mcall`. `unit` here would be a silent wrong answer.
         | some o =>
-          if (o.payload).toVal.isSome then (h₁, .hole s!"field:{f}:builtin-container") else
           match o.fields.find? (·.1 == f) with
           | some (_, v) => (h₁, .val v)
           | none        => match o.captured.find? (·.1 == f) with
@@ -1039,6 +1036,13 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                            | none        =>
                              if o.cls.startsWith "<module>" then
                                (h₁, .hole s!"module-attr:{f}")
+                             -- A boxed list or dict has no instance attributes (its fields
+                             -- are always empty: it is allocated with none and
+                             -- `Stmt.setField` refuses it), so an attribute read always lands
+                             -- here. CPython raises `AttributeError`; `unit` would be a silent
+                             -- wrong answer, so it is a hole.
+                             else if ctx.dialect.isPython && (o.payload).toVal.isSome then
+                               (h₁, .hole s!"field:{f}:builtin-container")
                              else (h₁, .val .unit)
         | none => (h₁, .val .unit)
       -- A C aggregate initializer is a `Val.dict` keyed by field name (see
@@ -1062,6 +1066,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
   -- repeated key keeps its first position and its last value, and an unhashable key is
   -- CPython's `TypeError`.
   | n+1, h, ρ, .boxContainer e =>
+      -- Only Python has boxed containers; the exporter emits this node for `.py` only, and
+      -- refusing it elsewhere keeps "a payload object exists" a Python-only fact.
+      if !ctx.dialect.isPython then (h, .hole "boxContainer:non-python") else
       match evalExpr ctx n h ρ e with
       | (h₁, .val (.list vs)) =>
           let (h₂, r) := h₁.alloc { cls := "list", fields := [], payload := .list vs }

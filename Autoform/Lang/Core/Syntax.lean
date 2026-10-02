@@ -267,10 +267,10 @@ end BuiltinBase
 
 /-- The mutable container payload an object carries, if any.
 
-**Step 1 of `docs/boxed-containers.md`, and deliberately inert.** Nothing constructs a
-payload other than `.none` yet, so no behaviour changes and no corpus needs regeneration.
-The point of landing it separately is that the oracle numbers move at step 3, and a number
-that moves two steps after the field appeared cannot be attributed to the field. -/
+Landed inert as step 1 of `docs/boxed-containers.md`; since steps 3-4, a Python list or
+dict DISPLAY (`Expr.boxContainer`) allocates an object of class `list`/`dict` with a
+`.list`/`.dict` payload, and `Stmt.setIndex`/`Stmt.delIndex`/the mutating methods write it
+with `Heap.setPayload`. Nothing constructs `.tuple` yet. -/
 inductive Payload where
   /-- An ordinary instance: no builtin container behind it. -/
   | none  : Payload
@@ -287,12 +287,12 @@ structure Obj where
   /-- Bindings captured by the class that produced this object, if it was defined inside
   a function. Resolved after the object's own fields and before globals. -/
   captured : List (String × Val) := []
-  /-- The builtin container this object IS, if it is one. `.none` for every object Core
-  currently builds. -/
+  /-- The builtin container this object IS, if it is one: `.none` for an ordinary
+  instance, `.list`/`.dict` for a boxed Python list/dict (`Expr.boxContainer`). -/
   payload  : Payload := .none
   /-- Bumped by every mutation. Iterators record it, so that a change during iteration can
-  become CPython's `RuntimeError` rather than a silently different answer. Inert until
-  step 4. -/
+  become CPython's `RuntimeError` rather than a silently different answer: `Stmt.forIn`
+  over a boxed container holes if it moved during the loop. -/
   version  : Nat := 0
   deriving Repr, Inhabited
 
@@ -965,10 +965,10 @@ containers can be cyclic (`a = []; a.append(a)`), and running out of fuel is IGN
 it must be `none` and become `outOfFuel`, never `false` -- a `false` there would be a
 manufactured divergence on deeply nested values.
 
-**At this step it agrees with `Val.beq` everywhere**, because every payload is `.none`, so
-two distinct refs are two distinct plain objects and compare `false` exactly as before. The
-ref case is written out now so that step 3 of `docs/boxed-containers.md` -- container
-literals allocating -- needs no change here.
+Since step 3 of `docs/boxed-containers.md` (Python list/dict displays allocate) it differs
+from `Val.beq` exactly where it must: two distinct boxed lists with equal contents are
+equal, a boxed list equals an unboxed one with the same contents, and dict equality is
+order-insensitive. On scalars it still IS `Val.beq` (`eqPy_agrees_with_beq_on_scalars`).
 
 Note this does NOT re-type `applyBinop`. The design note proposed threading a heap through
 it, which is 155 call sites and every reducible scalar lemma in `Refine.lean`. Diverting at
@@ -1050,26 +1050,33 @@ def Val.eqPyL (h : Heap) : Nat → List Val → List Val → Option Bool
       | none       => none
   | _,   _,       _       => some false
 
+/-- Python `dict == dict`: the same number of keys, and every key of the left maps to an
+equal value on the right. ORDER-INSENSITIVE -- `{'a': 1, 'b': 2} == {'b': 2, 'a': 1}` is
+`True` in CPython, and the positional comparison this replaced answered `False`. Keys are
+matched with `Val.beq`, which is exact for hashable keys: a hashable key contains no boxed
+container (`Heap.unhashable`), so there is no reference whose address `Val.beq` could
+mistake for its contents. Values are compared with `Val.eqPy`. -/
 def Val.eqPyP (h : Heap) : Nat → List (Val × Val) → List (Val × Val) → Option Bool
-  | _,   [],      []      => some true
-  | 0,   _,       _       => none
-  | n+1, a :: as, b :: bs =>
-      match Val.eqPy h n a.1 b.1 with
-      | some true  =>
-          match Val.eqPy h n a.2 b.2 with
-          | some true  => Val.eqPyP h n as bs
+  | 0,   _, _ => none
+  | n+1, u, v => if u.length != v.length then some false else Val.eqPyD h n u v
+
+/-- Every pair of `u` is matched, by key, in `v`. -/
+def Val.eqPyD (h : Heap) : Nat → List (Val × Val) → List (Val × Val) → Option Bool
+  | _,   [],            _ => some true
+  | 0,   _,             _ => none
+  | n+1, (k, x) :: rest, v =>
+      match v.find? (fun kv => Val.beq kv.1 k) with
+      | none        => some false
+      | some (_, y) =>
+          match Val.eqPy h n x y with
+          | some true  => Val.eqPyD h n rest v
           | some false => some false
           | none       => none
-      | some false => some false
-      | none       => none
-  | _,   _,       _       => some false
 
 end
 
-/-- At this step every payload is `.none`, so the heap-aware relation and the structural one
-agree on everything Core can currently build. Stated as a theorem so that step 3 has to
-break it deliberately rather than silently: when container literals start allocating, this
-becomes false for two equal lists, and that is the intended change. -/
+/-- On every kind except the containers (5, 6, 7, 12) and references (8) -- scalars and
+functions -- the heap-aware relation IS the structural one. Containers are excluded because they are exactly where step 3 made the two differ. -/
 theorem eqPy_agrees_with_beq_on_scalars (h : Heap) (n : Nat) (a b : Val)
     (ha : a.kind ≠ 5 ∧ a.kind ≠ 6 ∧ a.kind ≠ 7 ∧ a.kind ≠ 8 ∧ a.kind ≠ 12)
     (hb : b.kind ≠ 5 ∧ b.kind ≠ 6 ∧ b.kind ≠ 7 ∧ b.kind ≠ 8 ∧ b.kind ≠ 12) :

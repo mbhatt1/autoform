@@ -809,11 +809,9 @@ theorem evalExpr_field_obj (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a : Expr} {h₁ : Heap} {r : Ref} {o : Obj} {f : String} {v : Val}
     (ha : evalExpr ctx k h ρ a = (h₁, .val (.ref r)))
     (ho : h₁.get r = some o)
-    -- a plain object, not a boxed list/dict (which has no attributes)
-    (hp : o.payload = .none)
     (hf : o.fields.find? (·.1 == f) = some (f, v)) :
     evalExpr ctx (k+1) h ρ (.field a f) = (h₁, .val v) := by
-  simp [evalExpr, ha, ho, hp, hf, Payload.toVal]
+  simp [evalExpr, ha, ho, hf]
 
 theorem execStmt_setField_val (ctx : Ctx) (k : Nat) (h : Heap) (ρ : Env)
     {a e : Expr} {h₁ h₂ : Heap} {r : Ref} {f : String} {w : Val}
@@ -1867,7 +1865,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
   have hfield : evalExpr ctxT (j+2) h [("k", Val.int iv), ("self", Val.ref r)]
         ((Expr.name "self").field "n") = (h, .val (.int acc)) :=
     evalExpr_field_obj ctxT (j+1) h _
-      (evalExpr_name ctxT j h _ "self" hslf) ho hpl hfind
+      (evalExpr_name ctxT j h _ "self" hslf) ho hfind
   have hplus : evalExpr ctxT (j+3) h [("k", Val.int iv), ("self", Val.ref r)]
         (.binop "+" ((Expr.name "self").field "n") (.name "k"))
       = (h, .val (.int (acc + iv))) := by
@@ -1884,7 +1882,7 @@ theorem bump_step {h : Heap} {r : Ref} {acc iv : Int} {ρ : Env} (j : Nat)
       = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) :=
     execStmt_ret_val ctxT (j+3) _ _
       (evalExpr_field_obj ctxT (j+2) _ _
-        (evalExpr_name ctxT (j+1) _ _ "self" hslf) ho' hpl' hfind')
+        (evalExpr_name ctxT (j+1) _ _ "self" hslf) ho' hfind')
   have hbody : execStmt ctxT (j+5) h [("k", Val.int iv), ("self", Val.ref r)]
         f_counter_bump.body
       = (h.setField r "n" (.int (acc + iv)), .ret (.int (acc + iv))) := by
@@ -2021,7 +2019,7 @@ theorem total_run (ys : List Int) (fuel : Nat) (hf : ys.length + 13 ≤ fuel) :
   have hret : execStmt ctxT (G+10) h' ρ' (.ret ((Expr.name "c").field "n"))
       = (h', .ret (.int (isum ys))) :=
     execStmt_ret_val ctxT (G+9) _ _
-      (evalExpr_field_obj ctxT (G+8) _ _ (evalExpr_name ctxT (G+7) _ _ "c" hc') ho' hpl' hfind')
+      (evalExpr_field_obj ctxT (G+8) _ _ (evalExpr_name ctxT (G+7) _ _ "c" hc') ho' hfind')
   have hbody : execStmt ctxT (G+12) [] [("xs", Val.list (ys.map Val.int))] f_counter_total.body
       = (h', .ret (.int (isum ys))) := by
     simp only [f_counter_total]

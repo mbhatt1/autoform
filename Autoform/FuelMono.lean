@@ -163,6 +163,9 @@ private theorem fuelStep : ∀ k, FuelStep k := by
         -- allocation -- `boxNew`'s shape exactly.
         | boxContainer a =>
             simp only [evalExpr] at hy ⊢
+            by_cases hpy : (!ctx.dialect.isPython) = true
+            · rw [if_pos hpy] at hy ⊢; exact hy
+            rw [if_neg hpy] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
             rw [hA] at hy
             cases r₁ <;> first
