@@ -124,7 +124,28 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
 * **`Ctx.resolve` falls back from exact name to *unique* suffix match**, because Joern emits
   fully-qualified names (`pkg/mod.py:<module>.Cls.meth`) while call sites carry short ones.
   This is a heuristic, written so that an *ambiguous* match resolves to a hole rather than
-  to a guess. `Ctx.resolveMethod` prefers `Cls.meth` and falls back to any `.meth`.
+  to a guess. Without a class table, `Ctx.resolveMethod` prefers `Cls.meth` and falls back
+  to any `.meth` (`Ctx.resolveMethodLegacy`).
+* **A Python program with a class table follows Python's lookup rules** (`Program.pyClasses`,
+  STRATEGY.md §62; `Ctx.pyStrict`). The exporter records every class's bases in source
+  order (corpus classes by short name, outside bases as `<ext>dotted.name`) and the
+  class-body bindings that are not plain `def`s. Then:
+  * a method is looked up along the **C3 MRO** of the receiver's class (`Ctx.mro`,
+    `Ctx.lookupMethod`); the first class defining it wins, so a subclass override is
+    reached even from a base-class method calling `self.m()`;
+  * `super()` in a method of `C` is lowered by the exporter to `super("C", self)`, and
+    `super(C, self).m(…)` looks `m` up in `type(self).__mro__` *after* `C`;
+  * an unqualified name (call or read) is local, else module global, else builtin. The
+    function table is consulted only for names the exporter qualified, which it does when
+    Joern resolved the callee to a function a bare name can actually reach;
+  * whatever the table cannot answer is a hole: `mro:unknown-class:<C>` (a class absent from
+    the table — a test-suite subclass, an unresolvable base, an ambiguous short name, an
+    inconsistent C3 order), `mro:external-base:<B>.<m>` (lookup reached a base outside the
+    corpus), `mro:class-attribute:<C>.<m>` (an alias, `property`, `classmethod`, constant),
+    `name:unbound:<x>`.
+
+  A program without a table — every non-Python corpus, every Python export made before
+  §62 — keeps the legacy rules; `Ctx.resolveMethod_of_none` and its siblings state so.
 
 ### 2.1 Pointers: the C address model
 
@@ -344,7 +365,7 @@ The dialect currently controls:
   arithmetic conversions; the left operand only, for shifts) and the operation is
   performed at it, C tags under the configured C overflow policy and Java tags under
   `NumConfig.java32`/`java64`. An operation whose C type does not resolve is the hole
-  `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §62).
+  `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63).
 * `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
   `FConfig.cDouble`; §1).
 * `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)
@@ -469,6 +490,12 @@ or read `holesByLabel` in `ledger-<Module>.json`, which the pipeline regenerates
 | `mcall:<m>:non-object` | Method call on a value the modelled stdlib does not cover. |
 | `mcall:<m>:unboxed-container` | A *mutating* container method. Honouring it would update a temporary, because the CPG has already desugared `self.d.pop(k)` into `t = self.d; t.pop(k)`. |
 | `mcall:dangling-ref` | The receiver's ref is not in the heap. |
+| `mro:unknown-class:<C>` | Python with a class table: the receiver's class (or one of its bases) is not in the table, or has no C3 linearisation. |
+| `mro:external-base:<B>.<m>` | Python with a class table: method lookup reached a base defined outside the corpus before finding `m`. |
+| `mro:class-attribute:<C>.<m>` | Python with a class table: `m` is bound in `C`'s body by something other than a plain `def` (alias, `property`, `classmethod`, constant). |
+| `mro:ambiguous-method:<C>.<m>` | Two function-table entries end in `.C.m`. |
+| `super:<C>.<m>:absent`, `super:<C>:not-in-mro-of:<T>`, `super:<C>.<m>:receiver` | `super(C, self).m` finds nothing after `C`; `C` is not in `type(self).__mro__`; or `self` is not an instance Core can type (or carries captured bindings). |
+| `name:unbound:<x>` | Python with a class table: an identifier bound neither locally nor in the globals frame. CPython would find a builtin or raise `NameError`; Core cannot tell either from a binding its globals frame did not receive. |
 | `index:unsupported` | Subscript of something that is not a list, tuple or dict. |
 | `index:negative` | A negative list/tuple index outside `.python` (Python counts from the end: `xs[-1]` is the last element; no other dialect has a meaning Core models). |
 | `param:default-nonliteral` | A call that omits an argument whose default is this static hole (see above). |

@@ -1048,6 +1048,9 @@ structure Ctx where
   /-- Heap address of the module-level bindings frame. Globals must be mutable and must
   outlive any single call, so they live on the heap rather than in `Env`. -/
   globals : Ref := 0
+  /-- The Python class table — see `Program.pyClasses`. `none` keeps the legacy
+  name-suffix resolution; `some` selects Python's own lookup rules (`Ctx.pyStrict`). -/
+  pyClasses : Option (List PyClass) := none
 
 /-- Build a function table from a program. -/
 def Program.table (p : Program) : FuncTable := p.funcs.map (fun f => (f.name, f))
@@ -1344,11 +1347,302 @@ def classNameOfValue (g : String) : String :=
   let base := if g.endsWith "<meta>" then g.dropRight 6 else g
   (base.splitOn ".").getLastD base
 
-/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`. -/
-def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
+/-- Resolve a method on a class: prefer `Cls.meth`, else any `.meth`.
+
+This is the **legacy** rule, kept for every program without a class table
+(`Ctx.pyStrict` false): all non-Python corpora, and every Python export made before the
+exporter recorded classes. It knows nothing of inheritance -- a subclass instance's
+inherited method is found only through the any-`.meth` fallback, which takes *any*
+unique function of that name, and a subclass override of a method the base calls on
+`self` is reached only by accident. `docs/conformance.md` finding 3 is three wrong
+answers it produced. -/
+def Ctx.resolveMethodLegacy (ctx : Ctx) (cls meth : String) : Option Func :=
   match ctx.table.filter (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth)) with
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
+
+/-! ### Python method resolution (STRATEGY.md §62)
+
+With a class table (`Program.pyClasses`), a method is looked up the way CPython looks it
+up on an instance: along `type(obj).__mro__`, the C3 linearisation of the class and its
+bases, taking the first class that defines the name. Every step at which the table does
+not determine the answer is a hole, never a guess:
+
+* a class missing from the table (a test-suite subclass, a class the exporter dropped
+  because its bases were not resolvable or its short name is ambiguous) —
+  `mro:unknown-class:<C>`;
+* a base from outside the corpus (`<ext>…`) reached before the name is found: Core does
+  not know what `collections.abc.MutableMapping` defines — `mro:external-base:<B>.<m>`;
+* a class-body binding that is not a plain `def` (`get = __getitem__`, `property`,
+  `classmethod`) — `mro:class-attribute:<C>.<m>`;
+* a C3 failure (CPython raises `TypeError` at class creation, so no instance exists) —
+  also `mro:unknown-class`.
+
+A name found nowhere along a fully-known MRO is *absent*: `object` defines it or nothing
+does, and the callers keep their existing behaviour for that (`__init__` allocates a
+plain object; any other method is the hole `mcall:<C>.<m>`). -/
+
+/-- Python's own lookup rules are in force: a Python program carrying a class table. -/
+def Ctx.pyStrict (ctx : Ctx) : Bool :=
+  ctx.pyClasses.isSome && ctx.dialect == .python
+
+/-- The table entry for a short class name. A name with two entries is not a class Core
+can identify, so it is treated as missing (the exporter already drops such names; this
+makes a hand-built table obey the same rule). -/
+def Ctx.pyClass? (ctx : Ctx) (c : String) : Option PyClass :=
+  match ctx.pyClasses with
+  | none   => none
+  | some t => match t.filter (·.name == c) with
+              | [k] => some k
+              | _   => none
+
+/-- Prefix marking a base from outside the corpus. -/
+def extBasePrefix : String := "<ext>"
+
+/-- C3 merge: repeatedly take the first list head that is in no list's tail. `none` when
+no head qualifies (an inconsistent hierarchy — CPython's `TypeError`) or the fuel, the
+total length of the lists, runs out. -/
+def c3Merge : Nat → List (List String) → Option (List String)
+  | 0,   _  => none
+  | n+1, ls =>
+    let ls := ls.filter (fun l => !l.isEmpty)
+    if ls.isEmpty then some [] else
+    let good := ls.filterMap (fun l => match l with
+                  | c :: _ => if ls.any (fun l' => (l'.drop 1).contains c) then none else some c
+                  | []     => none)
+    match good with
+    | c :: _ => (c3Merge n (ls.map (fun l => l.filter (· != c)))).map (c :: ·)
+    | []     => none
+
+/-- The C3 linearisation of a class, by short name. An external base is a leaf: its own
+ancestors are unknown, and since lookup stops at the first external class it reaches
+(`Ctx.mroWalk`), the order of the classes *before* it is all that is ever used — and that
+prefix does not depend on what comes after an external class in its own MRO, because no
+corpus class can be an ancestor of an external one. -/
+def Ctx.mroAux (ctx : Ctx) : Nat → String → Option (List String)
+  | 0,   _ => none
+  | n+1, c =>
+    if c.startsWith extBasePrefix then some [c] else
+    match ctx.pyClass? c with
+    | none   => none
+    | some k =>
+      match k.bases.mapM (ctx.mroAux n) with
+      | none    => none
+      | some ls =>
+        let lists := ls ++ [k.bases]
+        (c3Merge (lists.foldl (fun a l => a + l.length) 0 + 1) lists).map (c :: ·)
+
+/-- `type(obj).__mro__` for a class of the table, by short name. The fuel bounds the
+inheritance depth by the number of classes, so a cyclic table is `none`, not a loop. -/
+def Ctx.mro (ctx : Ctx) (c : String) : Option (List String) :=
+  ctx.mroAux ((ctx.pyClasses.map List.length).getD 0 + 1) c
+
+/-- Keys of the function table that are a method `m` defined directly in class `c`. -/
+def Ctx.ownMethodKeys (ctx : Ctx) (c m : String) : List String :=
+  (ctx.table.filter (fun p => p.1.endsWith ("." ++ c ++ "." ++ m))).map (·.1)
+
+/-- Outcome of a method lookup along the MRO. -/
+inductive MLookup where
+  /-- Found: the qualified name of the defining function. -/
+  | found  (q : String)
+  /-- Not defined anywhere along a fully-known MRO. -/
+  | absent
+  /-- The table does not determine the answer. -/
+  | hole   (l : String)
+  deriving Repr, Inhabited, DecidableEq
+
+/-- Walk an MRO (already computed) for method `m`. -/
+def Ctx.mroWalk (ctx : Ctx) (m : String) : List String → MLookup
+  | []      => .absent
+  | c :: cs =>
+    if c.startsWith extBasePrefix then
+      .hole s!"mro:external-base:{c.drop extBasePrefix.length}.{m}"
+    else
+      let attrs := match ctx.pyClass? c with
+                   | some k => k.attrs
+                   | none   => []
+      if attrs.contains m then .hole s!"mro:class-attribute:{c}.{m}" else
+      match ctx.ownMethodKeys c m with
+      | [q] => .found q
+      | []  => ctx.mroWalk m cs
+      | _   => .hole s!"mro:ambiguous-method:{c}.{m}"
+
+/-- Look a method up on an instance of class `cls`, CPython's way. -/
+def Ctx.lookupMethod (ctx : Ctx) (cls m : String) : MLookup :=
+  match ctx.mro cls with
+  | none   => .hole s!"mro:unknown-class:{cls}"
+  | some l => ctx.mroWalk m l
+
+/-- A function whose only behaviour is to be the hole `l`, whatever it is called with:
+the variadic parameters accept any arguments, so `applyFunc` reaches the body, and the
+body is the hole. It is how a method lookup the table cannot answer surfaces as a hole
+at every call site without each one learning a new case. -/
+def holeFunc (l : String) : Func :=
+  { name := "<mro-hole>", params := ["<args>", "<kwargs>"], vararg := some "<args>"
+  , kwarg := some "<kwargs>", body := .hole l }
+
+/-- Method resolution under Python's rules. The reserved classes (`<module>…` module
+objects, `<function>` boxed functions, `<local>` cells, `<globals>`) are not classes of
+the program and keep `none`, which the callers already handle. -/
+def Ctx.resolveMethodPy (ctx : Ctx) (cls meth : String) : Option Func :=
+  if cls.startsWith "<" then none else
+  match ctx.lookupMethod cls meth with
+  | .found q => ctx.resolve q
+  | .absent  => none
+  | .hole l  => some (holeFunc l)
+
+/-- Resolve a method on an instance of class `cls`: Python's MRO rules when the program
+carries a class table, the legacy suffix rule otherwise. -/
+def Ctx.resolveMethod (ctx : Ctx) (cls meth : String) : Option Func :=
+  if ctx.pyStrict then ctx.resolveMethodPy cls meth else ctx.resolveMethodLegacy cls meth
+
+/-- Method resolution for `obj.m(…)` on a heap object. Under Python's rules an attribute
+in the INSTANCE's own `__dict__` shadows a method of its class (CPython consults the
+instance dictionary before non-data class attributes), and such an attribute is called
+without a receiver. Core does not call it -- it is the hole
+`mcall:<C>.<m>:instance-attribute` -- but it no longer calls the class's method in its
+place. Reserved classes and legacy programs are unchanged. -/
+def Ctx.resolveMethodOn (ctx : Ctx) (o : Obj) (meth : String) : Option Func :=
+  if ctx.pyStrict && !o.cls.startsWith "<" && o.fields.any (·.1 == meth) then
+    some (holeFunc s!"mcall:{o.cls}.{meth}:instance-attribute")
+  else ctx.resolveMethod o.cls meth
+
+theorem Ctx.resolveMethodOn_of_none {ctx : Ctx} {o : Obj} {m : String}
+    (h : ctx.pyClasses = none) : ctx.resolveMethodOn o m = ctx.resolveMethod o.cls m := by
+  simp [Ctx.resolveMethodOn, Ctx.pyStrict, h]
+
+/-- Does looking `meth` up on class `cls` *reach* something — a method, or a hole? The
+guard for calling a method through a class value (`Base.m(self, …)`): under Python's
+rules an inherited method counts; under the legacy rule only the class's own does
+(`classDefines`, below), so that an unrelated global of that name is never taken. -/
+def Ctx.classResponds (ctx : Ctx) (cls meth : String) : Bool :=
+  if ctx.pyStrict then
+    (match ctx.lookupMethod cls meth with
+     | .absent => false
+     | _       => true)
+  else ctx.table.any (fun p => p.1.endsWith ("." ++ cls ++ "." ++ meth))
+
+/-! ### `super()`
+
+The exporter lowers zero-argument `super()` in a method of class `C` to
+`super("C", self)` — CPython's own meaning of it, since the compiler supplies `__class__`
+and the first argument. The call evaluates to an inert proxy value (a `Val.clos` under a
+reserved name no source can spell: a field read on it is a `non-object` hole, calling it
+resolves to nothing), and `obj.m(…)` on the proxy looks `m` up along
+`type(self).__mro__` **after** `C`, then calls it with `self` as the receiver. -/
+
+/-- Reserved function name of a `super()` proxy. -/
+def superProxyName : String := "<super>"
+
+/-- Build a `super(C, self)` proxy, when this is that call under Python's rules. The class
+may arrive as a string (the exporter's lowering) or as a class value (`super(C, self)`
+written out, where `C` evaluates to the class's `<meta>` value). -/
+def Ctx.makeSuper (ctx : Ctx) (f : String) (vs : List Val) : Option Val :=
+  if ctx.pyStrict && f == "super" then
+    match vs with
+    | [.str c, s] => some (.clos superProxyName [("__thisclass__", .str c), ("__self__", s)])
+    | [.fn g,  s] => some (.clos superProxyName
+                             [("__thisclass__", .str (classNameOfValue g)), ("__self__", s)])
+    | _           => none
+  else none
+
+/-- The class and receiver of a `super()` proxy. -/
+def superParts? : Val → Option (String × Val)
+  | .clos g [("__thisclass__", .str c), ("__self__", s)] =>
+      if g == superProxyName then some (c, s) else none
+  | _ => none
+
+/-- Where `super(C, self).m` lands: the qualified name of the method, or a hole. `self`'s
+class is its heap object's class or its `bobj` class; an instance carrying captured
+bindings (a function-local class) is refused, because the ancestor's method may close over
+a different scope than the instance's class did. -/
+def Ctx.superTarget (ctx : Ctx) (h : Heap) (c : String) (s : Val) (m : String) :
+    Except String String :=
+  let tp : Option String := match s with
+    | .ref r    => match h.get r with
+                   | some o => if o.captured.isEmpty then some o.cls else none
+                   | none   => none
+    | .bobj b _ => some b
+    | _         => none
+  match tp with
+  | none    => .error s!"super:{c}.{m}:receiver"
+  | some tp =>
+    match ctx.mro tp with
+    | none   => .error s!"mro:unknown-class:{tp}"
+    | some l =>
+      match l.dropWhile (· != c) with
+      | _ :: rest =>
+        match ctx.mroWalk m rest with
+        | .found q => .ok q
+        | .absent  => .error s!"super:{c}.{m}:absent"
+        | .hole l  => .error l
+      | [] => .error s!"super:{c}:not-in-mro-of:{tp}"
+
+/-! ### Bare names under Python's rules
+
+A bare name is a local (or a closure's captured binding), else a module global, else a
+builtin. Legacy resolution consulted the **function table by suffix** first, so an
+unbound `f` reached any function whose qualified name ends in `.f` — a method of an
+unrelated class, a nested function of another scope. Under `pyStrict` the table is
+consulted only for names the exporter qualified (`file.py:<module>.f`), which it does
+exactly when Joern resolved the callee; an identifier is looked up by Python's scoping. -/
+
+/-- Is this a Python identifier (so the exporter left it unqualified)? -/
+def isPyIdent (s : String) : Bool :=
+  match s.toList with
+  | c :: cs => (c.isAlpha || c == '_') && cs.all (fun c => c.isAlphanum || c == '_')
+  | []      => false
+
+/-- Does Python scoping, rather than the function table, decide this name? -/
+def Ctx.scopedName (ctx : Ctx) (f : String) : Bool := ctx.pyStrict && isPyIdent f
+
+/-- The module-global binding of a name, if the globals frame has one. -/
+def Ctx.globalVal? (ctx : Ctx) (h : Heap) (x : String) : Option Val :=
+  match h.get ctx.globals with
+  | some g => match g.fields.find? (·.1 == x) with
+              | some (_, v) => some v
+              | none        => none
+  | none   => none
+
+/-- The function-table entry a call `f(…)` resolves to before any variable is consulted.
+Under Python's rules an identifier never does: it is a variable. -/
+def Ctx.resolveCallee (ctx : Ctx) (f : String) : Option Func :=
+  if ctx.scopedName f then none else ctx.resolve f
+
+/-- `resolveCallee` only ever answers what `resolve` answers. -/
+theorem Ctx.resolve_of_resolveCallee {ctx : Ctx} {f : String} {fn : Func}
+    (h : ctx.resolveCallee f = some fn) : ctx.resolve f = some fn := by
+  unfold Ctx.resolveCallee at h
+  split at h
+  · simp at h
+  · exact h
+
+/-- The value a called name holds. Legacy: the local environment only (`unit` if
+unbound). Under Python's rules: local, else module global, else `unit` — which sends the
+call to the builtins. A global bound to the builtin of the *same* name
+(`isinstance = __builtin.isinstance`, which module initialisers record) is that builtin,
+so it is also `unit` here. -/
+def Ctx.calleeVal (ctx : Ctx) (h : Heap) (ρ : Env) (f : String) : Val :=
+  if ctx.scopedName f then
+    match ρ.find? (·.1 == f) with
+    | some (_, v) => v
+    | none =>
+      match ctx.globalVal? h f with
+      | some (.fn g) =>
+          if g == "__builtin." ++ f || g == "__builtin." ++ f ++ "<meta>" then .unit else .fn g
+      | some v       => v
+      | none         => .unit
+  else ρ.get f
+
+/-- A bare name that is neither local nor global. Legacy: any function of that suffix, or
+`unit`. Under Python's rules the honest answer is a hole: CPython would find a builtin or
+raise `NameError`, and Core can tell neither apart from a binding its globals frame did
+not receive (a module initialiser that holed, an import it does not model). -/
+def Ctx.unboundName (ctx : Ctx) (x : String) : Val ⊕ String :=
+  if ctx.scopedName x then .inr s!"name:unbound:{x}" else
+  match ctx.resolve x with
+  | some _ => .inl (.fn x)
+  | none   => .inl .unit
 
 /-- Does this class define this method *itself*? Unlike `resolveMethod` there is no
 free-function fallback, so a global `__eq__` cannot be mistaken for a class's own. -/
@@ -1478,6 +1772,71 @@ def unboundBuiltinMethod (d : Dialect) (g : String) (vs : List Val) : Option ERe
       | _,        _        => none
   | _, _, _ => none
 
+/-! #### The legacy rules, as rewrites
+
+A program without a class table (every corpus exported before §62, every non-Python one)
+runs exactly the rules it always did. These equations say so per helper, as `simp` lemmas
+conditional on `ctx.pyClasses = none`, so that proofs about such programs evaluate through
+the new helpers without unfolding them. -/
+
+@[simp] theorem Ctx.pyStrict_of_none {ctx : Ctx} (h : ctx.pyClasses = none) :
+    ctx.pyStrict = false := by simp [Ctx.pyStrict, h]
+
+@[simp] theorem Ctx.scopedName_of_none {ctx : Ctx} {f : String} (h : ctx.pyClasses = none) :
+    ctx.scopedName f = false := by simp [Ctx.scopedName, h]
+
+@[simp] theorem Ctx.resolveCallee_of_none {ctx : Ctx} {f : String} (h : ctx.pyClasses = none) :
+    ctx.resolveCallee f = ctx.resolve f := by simp [Ctx.resolveCallee, h]
+
+@[simp] theorem Ctx.calleeVal_of_none {ctx : Ctx} {hp : Heap} {ρ : Env} {f : String}
+    (h : ctx.pyClasses = none) : ctx.calleeVal hp ρ f = ρ.get f := by
+  simp [Ctx.calleeVal, h]
+
+@[simp] theorem Ctx.unboundName_of_none {ctx : Ctx} {x : String} (h : ctx.pyClasses = none) :
+    ctx.unboundName x = (match ctx.resolve x with
+                         | some _ => .inl (.fn x)
+                         | none   => .inl .unit) := by
+  simp [Ctx.unboundName, h]
+
+@[simp] theorem Ctx.makeSuper_of_none {ctx : Ctx} {f : String} {vs : List Val}
+    (h : ctx.pyClasses = none) : ctx.makeSuper f vs = none := by
+  simp [Ctx.makeSuper, h]
+
+theorem Ctx.resolveMethod_of_none {ctx : Ctx} {c m : String}
+    (h : ctx.pyClasses = none) : ctx.resolveMethod c m = ctx.resolveMethodLegacy c m := by
+  simp [Ctx.resolveMethod, h]
+
+theorem Ctx.classResponds_of_none {ctx : Ctx} {c m : String}
+    (h : ctx.pyClasses = none) :
+    ctx.classResponds c m = ctx.table.any (fun p => p.1.endsWith ("." ++ c ++ "." ++ m)) := by
+  simp [Ctx.classResponds, h]
+
+/-- Calling a builtin held as a VALUE (`fn = len; fn(x)`). Module initialisers bind the
+builtins a module names (`len = __builtin.len`), so under Python's rules a name read as a
+value is `Val.fn "__builtin.len"`; calling that is calling `len`. Legacy programs never
+hold such a value through this path and keep their `call:` hole. -/
+def Ctx.builtinOfValue (ctx : Ctx) (h : Heap) (g : String) (vs : List Val) :
+    Option (Heap × EResult) :=
+  if ctx.pyStrict && g.startsWith "__builtin." then
+    let b0 := (g.drop "__builtin.".length).toString
+    let b  := if b0.endsWith "<meta>" then b0.dropRight "<meta>".length else b0
+    -- Exactly what a call of `b` by name does (the `Expr.call` fallthrough): boxed
+    -- containers are seen through only where that is exact, and a fresh container a
+    -- builtin builds is boxed.
+    if builtinRefused h b vs then some (h, .hole s!"call:{b}:boxed-key") else
+    match Stdlib.builtin ctx.dialect h b (builtinSeeThrough b (builtinArgs h b vs)) with
+    | some (h₂, .val v) =>
+        if ctx.dialect.isPython && freshBuiltins.contains b then
+          let (h₃, v') := h₂.boxFresh v
+          some (h₃, .val v')
+        else some (h₂, .val v)
+    | r => r
+  else none
+
+@[simp] theorem Ctx.builtinOfValue_of_none {ctx : Ctx} {h : Heap} {g : String} {vs : List Val}
+    (hn : ctx.pyClasses = none) : ctx.builtinOfValue h g vs = none := by
+  simp [Ctx.builtinOfValue, hn]
+
 mutual
 
 /-- Evaluate an expression, threading the heap. -/
@@ -1495,16 +1854,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- Item 5: a bare name that is not a local may still be a module-level function.
         -- Resolving it to a function value is what lets higher-order code (decorators,
         -- callbacks) be translated instead of holed.
+        -- Under Python's rules (`Ctx.pyStrict`) a name bound nowhere is a hole rather
+        -- than a same-suffix function: `Ctx.unboundName`.
         match h.get ctx.globals with
         | some g =>
           match g.fields.find? (·.1 == x) with
           | some (_, v) => (h, .val v)
-          | none        => match ctx.resolve x with
-                           | some _ => (h, .val (.fn x))
-                           | none   => (h, .val .unit)
-        | none => match ctx.resolve x with
-                  | some _ => (h, .val (.fn x))
-                  | none   => (h, .val .unit)
+          | none        => match ctx.unboundName x with
+                           | .inl v => (h, .val v)
+                           | .inr l => (h, .hole l)
+        | none => match ctx.unboundName x with
+                  | .inl v => (h, .val v)
+                  | .inr l => (h, .hole l)
   | _+1, h, _, .fnref f       => (h, .val (.fn f))
   | _+1, h, ρ, .closure f     => (h, .val (.clos f ρ))
   | _+1, h, ρ, .classClosure c => (h, .val (.clsClos c ρ))
@@ -1754,18 +2115,24 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
         -- `nonlocal` cell a hole. Only `.clos` values take this path: a plain `.fn` held
         -- in a variable keeps the existing resolution order, so no closure-free program
         -- changes meaning.
-        match (ρ.get f).closParts? with
+        --
+        -- Under Python's rules (`Ctx.pyStrict`) an unqualified name is a VARIABLE, full
+        -- stop: `calleeVal` is the local, else the module global, and `resolveCallee`
+        -- never consults the function table for it -- so a local `f` holding a function
+        -- value is that value, and an unbound `f` goes to the builtins, never to some
+        -- `...Cls.f` that happens to share the suffix.
+        match (ctx.calleeVal h₁ ρ f).closParts? with
         | some (g, cap) =>
           match ctx.resolve g with
           | some fn => applyClosure ctx n h₁ fn cap vs kws
           | none    => (h₁, .hole s!"call:{g}")
         | none =>
-        match ctx.resolve f with
+        match ctx.resolveCallee f with
         | some fn => applyFunc ctx n h₁ fn none vs kws
         | none    =>
           -- Not a statically known function: it may be a function value or closure held
           -- in a variable (`f = g; f(x)`, decorators, callbacks).
-          match ρ.get f with
+          match ctx.calleeVal h₁ ρ f with
           | .fn g      => match ctx.resolve g with
                           | some fn =>
                             -- An unbound method reached through a VARIABLE -- a decorator's
@@ -1784,7 +2151,11 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                             match (if kws.isEmpty then unboundBuiltinMethod ctx.dialect g vs
                                    else none) with
                             | some r => (h₁, r)
-                            | none   => (h₁, .hole s!"call:{g}")
+                            | none   =>
+                            match (if kws.isEmpty then ctx.builtinOfValue h₁ g vs
+                                   else none) with
+                            | some (h₂, r) => (h₂, r)
+                            | none         => (h₁, .hole s!"call:{g}")
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs kws
                           | none    => (h₁, .hole s!"call:{g}")
@@ -1807,6 +2178,9 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
+              match ctx.makeSuper f vs with
+              | some v => (h₁, .val v)
+              | none   =>
               -- A boxed container is seen through the heap only by the builtins for which
               -- that is exact (`Boxed.builtinArgs`); a fresh container a builtin builds is
               -- itself boxed under Python, because in CPython it is a new object.
@@ -1841,7 +2215,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                 if kws.isEmpty then boxedMethod ctx.dialect h₂ r (.dict ps) m vs
                 else (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
             | _ =>
-            match ctx.resolveMethod o.cls m with
+            match ctx.resolveMethodOn o m with
             | none    =>
               -- `keys.hashkey(x)` on a **module object**. A module has no methods, so
               -- `resolveMethod` finds nothing; what it has is a *field* holding a
@@ -1890,7 +2264,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
           -- function of that name, which for an opaque external module (`time.monotonic`)
           -- would invent a method out of an unrelated global. A hole is the right answer
           -- there; a plausible wrong one is not.
-          if ctx.classDefines short m then
+          if ctx.classResponds short m then
             match ctx.resolveMethod short m with
             | some fn =>
                 match vs with
@@ -1921,8 +2295,18 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
       | (h₁, .val recv) =>
         match evalList ctx n h₁ ρ args with
         | (h₂, .inl e)  => (h₂, e)
-        | (h₂, .inr (_, _ :: _)) => (h₂, .hole s!"mcall:{m}:keyword-to-builtin")
-        | (h₂, .inr (vs, [])) =>
+        | (h₂, .inr (vs, kws)) =>
+          -- `super().m(…)`: the proxy built by `Ctx.makeSuper`. Keyword arguments are
+          -- passed through, exactly as to any method.
+          match superParts? recv with
+          | some (c, s) =>
+            match ctx.superTarget h₂ c s m with
+            | .ok q    => match ctx.resolve q with
+                          | some fn => applyFunc ctx n h₂ fn (some s) vs kws
+                          | none    => (h₂, .hole s!"call:{q}")
+            | .error l => (h₂, .hole l)
+          | none =>
+          if !kws.isEmpty then (h₂, .hole s!"mcall:{m}:keyword-to-builtin") else
           match methodRefusal h₂ recv m vs with
           | some l => (h₂, .hole l)
           | none =>
@@ -2268,7 +2652,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
               | some o =>
                 match o.payload with
                 | .none =>
-                  if ctx.classDefines o.cls "__setitem__" then
+                  if ctx.classResponds o.cls "__setitem__" then
                     match ctx.resolveMethod o.cls "__setitem__" with
                     | some fn =>
                       match (if o.captured.isEmpty
@@ -2314,7 +2698,7 @@ def execStmt (ctx : Ctx) : Nat → Heap → Env → Stmt → Heap × Ctl
             | some o =>
               match o.payload with
               | .none =>
-                if ctx.classDefines o.cls "__delitem__" then
+                if ctx.classResponds o.cls "__delitem__" then
                   match ctx.resolveMethod o.cls "__delitem__" with
                   | some fn =>
                     match (if o.captured.isEmpty
@@ -2474,7 +2858,8 @@ for a self-contained function, and keeping it stable keeps the refinement layer'
 theorems meaningful. Use `runMain` when module-level bindings matter. -/
 def runFunc (p : Program) (fuel : Nat) (name : String) (args : List Val) : EResult :=
   let ctx : Ctx := { dialect := p.dialect, table := p.table,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   match ctx.resolve name with
   | none    => .hole s!"entry:{name}"
   | some fn => (applyFunc ctx fuel [] fn none args []).2
@@ -2488,7 +2873,8 @@ globals frame instead of the empty heap. Fresh objects must be allocated at indi
 def initGlobals (p : Program) (fuel : Nat) (inits : List Func) : Heap × Ref :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   let rec go : Nat → Heap → List Func → Heap
     | 0,   h, _       => h
     | _+1, h, []      => h
@@ -2510,7 +2896,8 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
     (args : List Val) : EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
-                     builtinBases := p.builtinBases }
+                     builtinBases := p.builtinBases,
+                     pyClasses := p.pyClasses }
   let rec runInits : Nat → Heap → List Func → Heap × Option String
     | 0,   h, _       => (h, some "initializers:outOfFuel")
     | _+1, h, []      => (h, none)

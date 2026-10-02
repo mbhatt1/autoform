@@ -194,11 +194,14 @@ theorem resolve_onProgram (τ : SImpl) (p : Program) (n : String) :
     simp only [Option.map_none]
     exact resolve_go_map τ _ p.table none
 
-theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String) :
+theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String)
+    (hp : p.pyClasses = none) :
     (ctxOf (τ.onProgram p)).resolveMethod cls meth
       = ((ctxOf p).resolveMethod cls meth).map τ.onFunc := by
   have hr := resolve_onProgram τ p meth
-  simp only [Ctx.resolveMethod, ctxOf, table_onProgram] at hr ⊢
+  have hp' : (τ.onProgram p).pyClasses = none := hp
+  simp only [Ctx.resolveMethod, Ctx.pyStrict, Ctx.resolveMethodLegacy, ctxOf, hp, hp',
+    Option.isSome_none, Bool.false_and, Bool.false_eq_true, if_false, table_onProgram] at hr ⊢
   rw [List.filter_map]
   simp only [Function.comp_def]
   cases hfl : List.filter (fun q => q.1.endsWith ("." ++ cls ++ "." ++ meth)) p.table with
@@ -675,11 +678,11 @@ theorem rrclear_under : UnderS Γslice P RRPost := by
     rw [classDefines_onProgram]; exact classDefines_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram, resolveMethod_cacheclear]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram, resolveMethod_sizeclear]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_sizeclear]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=
@@ -737,11 +740,11 @@ theorem rrclear_reaches_hole_of (τ : SImpl)
     rw [classDefines_onProgram]; exact classDefines_cacheclear
   have hcc : (ctxOf (τ.onProgram P)).resolveMethod "Cache" "clear"
       = some f_cachetools___init___py__module__Cache_clear := by
-    rw [resolveMethod_onProgram, resolveMethod_cacheclear]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_cacheclear]
     simp [SImpl.onFunc, f_cachetools___init___py__module__Cache_clear, fillS]
   have hsc : (ctxOf (τ.onProgram P)).resolveMethod "_DefaultSize" "clear"
       = some f_cachetools___init___py__module___DefaultSize_clear := by
-    rw [resolveMethod_onProgram, resolveMethod_sizeclear]
+    rw [resolveMethod_onProgram τ P _ _ rfl, resolveMethod_sizeclear]
     simp [SImpl.onFunc, f_cachetools___init___py__module___DefaultSize_clear, fillS]
   have hr1 : ((h.setPayload a (Payload.dict [])).setField r "_Cache__currsize" (Val.int 0)).get r
       = some { o with fields := ("_Cache__currsize", .int 0) :: o.fields } :=

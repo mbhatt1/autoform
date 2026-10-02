@@ -428,7 +428,7 @@ Per-type widths in Core (the exporter already resolves them for `>>`) are the fi
 
 ### Width-typed integers (item O)
 
-That fix is in (STRATEGY.md §62): the exporter names the C type of every integer
+That fix is in (STRATEGY.md §63): the exporter names the C type of every integer
 operation (`"*:i64"`, `"<:u32"`, `">>:u64"`), converts stores, and an operation whose type
 does not resolve is the hole `op:int:unresolved-type` instead of the 32-bit operator.
 Commands, 2026-10-02; "before" is the exporter at integration head `70401b4`, "after"

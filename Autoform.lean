@@ -11,6 +11,7 @@ import Autoform.Overflow
 import Autoform.FuelMono
 import Autoform.CallingConvention
 import Autoform.PyScoping
+import Autoform.PyMro
 import Autoform.CBoolInt
 import Autoform.CIntWidth
 import Autoform.JavaIntWidth

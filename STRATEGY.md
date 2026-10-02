@@ -3625,7 +3625,123 @@ so `===` between two of them is a hole. jssrc2cpg also maps `??` to `logicalOr`
 (`0 ?? 5` is `0`, `0 || 5` is `5`) — unfixed, and not recoverable the same way without a
 new Core operator.
 
-## 62. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
+## 62. Python method resolution along the C3 MRO, `super()`, and bare names by Python scoping
+
+*(Item M. The number is provisional; the merger renumbers.)*
+
+Finding 3 of `docs/conformance.md`, and the Core half of finding 2: both were Core
+resolving a *name* by suffix where Python resolves it by a *rule*.
+
+**What was wrong.** `Ctx.resolveMethod cls m` took `….cls.m`, else **any** unique `….m`. For
+the cachetools suite's `class DefaultCache(self.Cache)` (a class the corpus does not
+contain) `Cache.__getitem__`'s `self.__missing__(k)` reached `Cache.__missing__` and raised,
+where CPython runs the override (3 divergences). `Expr.call f` consulted the function table
+by suffix *before* a non-closure local, so `cache(self)` with `cache` a parameter called the
+property `_WrapperBase.cache` (11 divergences); and an unbound `Expr.name` read a
+same-suffix function, or `unit`.
+
+**What Core does now** (`Autoform/Lang/Core/Semantics.lean`, "Python method resolution"),
+only for a Python program that carries a class table (`Program.pyClasses`; `Ctx.pyStrict`):
+
+* methods resolve along the **C3 linearisation** (`Ctx.mro`, `c3Merge`; fuel-bounded, so a
+  cyclic or inconsistent table is `none`, not a loop) — multiple inheritance is modelled,
+  not holed;
+* `super()` in a method of `C` is lowered by the exporter to `super("C", self)`; the proxy
+  is an inert `Val.clos "<super>"`, and `super(C, self).m(…)` looks `m` up in
+  `type(self).__mro__` after `C` (so `Left`'s `super()` is `Right` for a `Bottom`);
+* an instance attribute shadows a method of the same name (`mcall:<C>.<m>:instance-attribute`,
+  a hole, where both rules used to call the class's method: `Cache(getsizeof=f)` stores
+  `self.getsizeof = f`);
+* a bare identifier is local, else module global, else builtin; the function table answers
+  only names the exporter qualified. Unbound is `name:unbound:<x>`, not `NameError`: Core's
+  globals frame is one frame for the whole program and initialisers may hole, so it cannot
+  tell a missing binding from one it never received;
+* G's `obj[k] = v` / `del obj[k]` dunder dispatch uses the MRO too (inherited `__setitem__`).
+
+Everything the table cannot answer is a named hole: `mro:unknown-class` (absent class: a
+test-suite subclass, an unresolvable base, an ambiguous short name, a C3 failure),
+`mro:external-base` (lookup reached a base outside the corpus — Core does not know what
+`collections.abc.MutableMapping` defines), `mro:class-attribute` (an alias, `property`,
+`classmethod`, a constant in the class body). `holeFunc` carries such a hole through every
+existing call site, so the interpreter's call sites did not change shape.
+
+**Legacy programs are untouched**, by construction: every new helper has a
+`…_of_none` equation (`ctx.pyClasses = none` → the old behaviour), and the committed
+corpora, specs and contracts (`Contracts`, `Refine`, `CachetoolsSpec`, `SpecsGen/*`) build
+against them. C, C++, Java and JS never get a table (`pyStrict_only_python`).
+
+**The exporter** (`cartographer/export_ast.sc`, "the Python class table") reads each class's
+bases from the `class` header in the source — the CPG's `inheritsFromTypeFullName` is eight
+mangled names per base — and resolves them by Python scoping: a visible corpus class
+(enclosing scope, or `from M import N [as A]` with `M` a corpus module), `<ext>dotted.name`
+for a name that matches no corpus class, and *drops the class* for anything else (a call,
+a subscript, `self.Cache`, a keyword other than `metaclass=ABCMeta`, an invisible corpus
+name). `object` and `abc.ABC` add nothing. A short name declared twice anywhere is dropped:
+`_cachedmethod.py` declares `Descriptor` and `Wrapper` six times each, and Core keys classes
+by the short name `Expr.alloc` carries. Class-body bindings that are not a plain `def` (or
+`staticmethod` of one) are recorded, mangled, as `attrs`. Separately, a bare-name call that
+Joern bound to a function no bare name can reach from the call site (a method, or a nested
+function of another scope) is emitted by its name; after item L this changes no cachetools
+call site, but it is what makes `case_unbound_name_is_not_a_method` a hole instead of a
+call of `Holder.orphan_fn`.
+
+**Evidence.** `Autoform/PyMro.lean`: hand-written programs pinning the legacy wrong answer
+next to the new one (`DefaultCache` → `KeyError` before, `mro:unknown-class` with a table
+that lacks it, `42` with one that has it; `orphan()` → `'method'` before, a hole after),
+C3 on a diamond and an inconsistent order; then the 23 `case_*` functions of
+`tests/fixtures/pymro/pymro_cases.py`, exported, rendered and pinned with `#guard_msgs`.
+`tests/test_pymro_cpython.py` runs them under CPython 3.11: 17 equal CPython's value
+(override reached from the base, diamond lookup, `super()` along the instance MRO and with
+arguments, inherited `__init__`/`__setitem__`, staticmethod through an instance, `abc.ABC`
+base, local function value, builtin held in a parameter); 6 are listed holes. The pyscoping
+fixture was re-exported with a class table and its 28 pins hold under the new rules.
+
+**cachetools `01af8e5`** — `python3.11 scripts/differential.py <ast> <cachetools> <Module> 5`,
+each AST against its own rendered module:
+
+| | committed `ast-Cachetools.json` (legacy rules) | fresh export with the class table |
+|---|--:|--:|
+| static holes / hole-free | 46 / 168 | 46 / 168 |
+| compared functions | 48 | 41 |
+| cases agreeing / compared | 225 / 237 | 215 / 215 |
+| divergences | 12 | **0** |
+| INCONCLUSIVE | 347 | 369 |
+
+The fresh export with the integration head's exporter is byte-identical to the committed
+AST; the class table adds 8 changed bodies (the `super()` lowering) and the `pyClasses`
+records. All 12 divergences are gone, none by exclusion: the 11 `cache(self)` calls now
+reach the harness's captured value — a lambda defined in the test suite, so the hole
+`call:<test>.<lambda>` (the function is not in the program) — and `Cache.__getitem__` on a
+`DefaultCache` is `mro:unknown-class:DefaultCache`. The 7 functions no longer compared are
+those 5 (`_locked`/`_unlocked`/`_condition` `wrapper`/`cache_clear`) plus `LRUCache.__init__`
+and `FIFOCache.__init__`, which allocate `collections.OrderedDict()`: legacy Core built an
+empty object of class `OrderedDict` and "agreed" on the `None` the constructor returns;
+that is now `mro:unknown-class:OrderedDict`. New INCONCLUSIVE reasons by label:
+`mro:unknown-class` 52, `name:unbound` 30 (`DeprecationWarning`, `NotImplementedError` read
+as values; legacy read `unit`), `super:Wrapper.__init__:receiver` 30 (an instance of a
+function-local class, refused because the ancestor's method may close over another scope),
+`mro:class-attribute` 12 (`_TimedCache.timer`, a property legacy *called*), 
+`mro:external-base` 2.
+
+### What remains
+
+* **Runtime-only holes.** `mro:*` and `name:unbound` depend on the receiver, so the static
+  ledger does not count them; a corpus can look hole-free and hole on every call.
+* **Instance attributes are not called.** `self.cb(x)` with `cb` an instance attribute is a
+  hole; CPython calls it without a receiver. Measured on its own before enabling.
+* **Short-name class identity.** `Obj.cls` and `Expr.alloc` carry short names, so
+  duplicate class names are dropped; qualified class identity would recover `Descriptor`/
+  `Wrapper` and their `super()` calls.
+* **External classes** have no model: `OrderedDict()` holes rather than allocating.
+* **Data descriptors and `__getattr__`**: `property` is a class attribute (hole), and an
+  absent method is `mcall:<C>.<m>`, not `AttributeError`.
+* **One globals frame** for all modules: a name bound in module A is visible from module B.
+* `ast-Cachetools.json` is not regenerated here (the brief leaves it to item L): doing so
+  switches cachetools to the new rules and moves the specs bound to its hash.
+* `synth_specs.py`'s context (`def C : Ctx := …`) omits `pyClasses`, like `builtinBases`;
+  harmless until a corpus with a class table is synthesised.
+
+## 63. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
 
 §28 item 5 recorded it and §38 left it standing: "`Dialect.cLike` is still 32-bit signed
 for *arithmetic*". Every C, C++ and Java integer operation ran at signed 32 bits
