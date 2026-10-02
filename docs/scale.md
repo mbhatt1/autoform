@@ -228,6 +228,135 @@ Joern is the other memory consumer and is better behaved: 5.2 GB parsing Django'
 165k lines, 4.8 GB exporting it, both well inside default JVM settings. **Joern never
 failed, never OOM'd and never timed out on any target.**
 
+## SQLite (C, full tree): generated header and a conformance sample
+
+Everything above is Python. This section is the one C corpus run at scale through the
+static census *and* the runtime oracle. Numbers are from the commands below, run on
+2026-10-02 against `sqlite/sqlite` 3.54.0 (`manifest.uuid` `52f84cfc…`), Joern 4.0.606.
+
+### Reproduce
+
+```sh
+scripts/sqlite_corpus.sh /opt/corpus/sqlite-src /opt/corpus/D/full all
+#   gen:    copy the tree, build autosetup/jimsh0.c and tool/mksourceid.c, run
+#           tool/mksqlite3h.tcl -> tree/src/sqlite3.h (no system tclsh needed)
+#   parse:  c2cpg with SQLITE_OS_UNIX, SQLITE_TEST and the linkage macros
+#   export: cartographer/export_ast.sc with the same cppDefines -> ast.json + metrics
+# amalgamation of the SAME checkout, for the C side of the sample:
+(cp -r <sqlite-src> amal && cd amal && ./configure && make sqlite3.c)
+scripts/sqlite_sample.py /opt/corpus/D/full/ast.json /opt/corpus/D/full/tree \
+    amal/sqlite3.c /opt/corpus/D/sample
+python3 cartographer/render_lean.py /opt/corpus/D/sample/ast-SqliteSample.json \
+    Autoform/Generated/SqliteSample.lean SqliteSample
+lake build Autoform.Generated.SqliteSample
+(cd /opt/corpus/D/sample && python3 <repo>/scripts/differential.py \
+    ast-SqliteSample.json csrc SqliteSample 20)
+```
+
+`tclsh` is not installed on the measurement box. Instead of substituting the
+amalgamation's header (the corpus copy at `/opt/corpus/sqlite/sqlite3.h` is 3.47.0, the
+tree is 3.54.0, so it would be the wrong header), `gen` runs SQLite's own generator
+under the Tcl interpreter SQLite ships for exactly this case. `make sqlite3.c` in a
+configured copy produced a byte-identical `sqlite3.h` (`cmp`).
+
+A bare `--define NAME` makes `NAME` defined but EMPTY in c2cpg: on a two-branch fixture
+`#if FOO` took the false branch under `--define FOO` and the true one under
+`--define FOO=1`. `SQLITE_OS_UNIX` and `SQLITE_TEST` are passed bare to match the
+published configuration, not because that is right.
+
+### Census
+
+| Run | Functions | Hole-free | Holes | `op:cast*` | `op:sizeOf*` |
+|---|--:|--:|--:|--:|--:|
+| checkout as is (`/opt/corpus/final/full`, exporter at `46c65fc`) | 7,772 | 5,054 (65.0%) | 11,759 | 1,511 | 1,083 |
+| generated `sqlite3.h` + linkage macros, same exporter | 8,105 | 5,736 (70.8%) | 10,451 | 404 | 652 |
+| plus the `<operators>.` normalization | 8,105 | 5,724 (70.6%) | 10,497 | 404 | 652 |
+
+Per function (keyed by file and name), between the first and last rows: 7,738 functions
+are in both; 441 became hole-free and 43 lost it. The 367 functions only in the new run
+(283 hole-free) are mostly `src/test*.c`, whose bodies c2cpg could not parse without the
+header. The 34 only in the old run are `<duplicate>N` names that were renumbered. Every
+loss checked is a more precise refusal: `sqlite3DbstatRegister`'s `sqlite3_module`
+initializer had been exported as a positional `listE` because the type was unknown and is
+now `op:arrayDecl:static-initializer`; `sqlite3_status`'s `*pCurrent = (int)iCur` had
+been a `cast:i32` of an unknown type and is now `assign:lhs:indirection`.
+
+The hole-free figure was more inflated than the census showed. Without the header,
+`SQLITE_OK`, `SQLITE_BUSY`, ... are not expanded, and a function that reads one is
+"hole-free" but reads an undefined name at run time. 1,597 hole-free functions did so
+before; 291 after. The rest are `TK_*` (156 functions) and `OP_*` (112), defined in
+`parse.h` and `opcodes.h`, which are also generated and still absent, and 49 `SQLITE_*`
+names. Generating those headers too is the next step.
+
+### Exporter fix: `<operators>.`
+
+Joern names six compound assignments with a plural prefix: `x |= 1` has
+`METHOD_FULL_NAME` `<operators>.assignmentOr` (also `.assignmentAnd`, `.assignmentXor`,
+`.assignmentShiftLeft`, `.assignmentArithmeticShiftRight`, `.assignmentModulo`), while
+`x += 1` is `<operator>.assignmentPlus`. Every operator test in `export_ast.sc` is a
+`<operator>.` key or `startsWith("<operator>")`, which `"<operators>.…"` fails, so these
+were exported as calls to a function of that name with the target passed by value. The
+function stayed hole-free and the write was lost. 157 hole-free SQLite functions had one.
+The exporter now renames them to the singular spelling on C CPGs, so they take the
+existing `augOps` / `>>=` path (the translation `x = x | m` already gets, with its
+single-evaluation guards). Of the 157, 145 now translate and 12 hole
+(`assign:aug-impure-target` 7, `op:shiftRight:64-bit-operand` 4, one `>>=` of unknown
+signedness). On a fixture of `|= &= ^= <<= %= >>=` the result agreed with `cc` on 40/40
+random cases. Python is deliberately left alone: there `a |= b` mutates a set in place,
+which `a = a | b` does not.
+
+### Conformance sample
+
+`scripts/sqlite_sample.py` keeps only what the C leg of `differential.py` can run with
+nothing invented. That leg passes and returns `c_int`, and the AST carries no C types,
+so a candidate must be hole-free, call-closed through other candidates, have integer
+parameter and return types, and contain no preprocessor line in its body, no free names,
+and no objects. Its file must be compiled by the default amalgamation of the same
+checkout. The C side is SQLite's own code: `csrc/sample.c` renames each function by
+macro, `#include`s the amalgamation unchanged, and exports an `int f(int…)` wrapper. The
+wrapper aborts (a skipped native call, never a comparison) on any argument the real
+parameter type cannot hold and any result `int` cannot hold. Selection is by sha256 of
+the name, so it is deterministic.
+
+Of 5,724 hole-free functions, 3,269 are in files the default amalgamation does not
+compile (`autosetup/jimsh0.c`, `tool/`, `ext/fts5`, `ext/jni`, `src/test*.c`, ...),
+1,143 return a non-integer type, 1,117 have a non-integer parameter (pointer, struct, float, ...), 122
+have a definition the signature reader could not match, and the remaining filters remove
+64 more (no parameters, several definitions, preprocessor lines, non-candidate callees, ...). **9 qualify**, so the sample is the whole population, short of the 50-100 the
+item asked for. The binding constraint is the oracle's `int`-only C calling convention,
+not the selection.
+
+| Function | Cases | Agree | Diverge | Inconclusive |
+|---|--:|--:|--:|--:|
+| `pwr10to2`, `pwr2to10`, `sqlite3AbsInt32`, `sqlite3LogEstAdd`, `sqlite3MemRoundup`, `vdbeSorterTreeDepth`, `walNextHash` | 140 | 140 | 0 | 0 |
+| `isFatalError` | 20 | 0 | 20 | 0 |
+| `validJulianDay` | 20 | 0 | 10 | 10 |
+| **total** (9/9 functions compared) | 180 | **140/170** | 30 | 10 |
+
+No native call aborted. The random arguments are `randint(-20, 20)`; `--wasm` (boundary
+values) was not usable because the wasm toolchain here is freestanding and the
+amalgamation needs libc.
+
+**All 30 divergences have one root cause.** Under `Dialect.cLike` a relational, equality,
+`&&`/`||` or `!` result is `Val.bool`, while C's is `int` 0/1 (C11 6.5.8-6.5.14,
+6.5.3.3). `return rc!=0 && rc!=5 && rc!=6` returns `bool true` where `cc` returns 1. At a
+function boundary this looks like a printing difference, but it is not one. Core's `==` on
+`bool` and `int` is `Val.beq`, which is false, and arithmetic on a `bool` holes
+(`applyBinop .cLike "+" (.bool true) (.int 1)` is `hole "binop:+"`). On a three-function
+fixture, `int t = (a < b); if (t == 1) return 7; return 3;` returned 3 in Lean and 7
+under `cc` for (3, 12): a silent wrong answer. `(a<b) == 1` likewise compares false.
+`(a<b) + (b<a)` holes. The fix belongs in Core rather than the exporter. Under `.cLike`,
+either produce `.int 0/1` from these operators or promote `.bool` to `0/1` in
+arithmetic and equality. C++ (`.cc` files share `.cLike`) needs the promotion form,
+since its `<` really is `bool`. It touches `Semantics.lean` and the C proofs that `simp`
+through `applyBinop`, so it is left for that change and not made here.
+
+**The 10 inconclusive cases** are `validJulianDay(iJD)` on `iJD >= 0`:
+`INT_464269060799999` is `((i64)0x1a640 << 32) | 0x1072fdff`. The exporter keeps the
+`cast:i64`, but Core's `cLike` integers are 32-bit, so `<< 32` is
+`ub:shift count out of range`, a hole and not a wrong answer. 64-bit arithmetic is
+unmodelled.
+
 ## What was *not* measured
 
 * **`Heap` as a `List` with `mapIdx` writes.** `Heap.setField` is `h.mapIdx …`, i.e. O(heap)
@@ -239,7 +368,8 @@ failed, never OOM'd and never timed out on any target.**
 * **`assure.sh`** end to end (axiom sweep, mutation gate, SACM) on a large corpus. Only
   the `autoform.sh` stages were run.
 * **Conformance percentages at scale.** The 100% figures in `README.md` remain
-  `cachetools`-only. Nothing here confirms or refutes them on a larger corpus.
+  `cachetools`-only for Python. The one large-corpus run, SQLite (above), compared 9
+  functions and found a real semantic divergence.
 
 ## Caveats on these runs
 

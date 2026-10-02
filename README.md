@@ -52,8 +52,9 @@ is invisible in the AST.
 
 Exporter-level hole census on the full `sqlite/sqlite` tree (7,772 functions, Joern
 4.0.606, `--define SQLITE_OS_UNIX --define SQLITE_TEST`). Hole-free here is the static
-upper bound (see above); these runs did not re-check call-closure or conformance, and no
-Lean was built for them.
+upper bound (see above); the census runs did not re-check call-closure or conformance,
+and no Lean was built for them. The conformance sample at the end of this section is the
+only part that did.
 
 | Exporter | Hole-free | Holes |
 |---|---|---|
@@ -71,11 +72,48 @@ as a byte cursor, and `int n; f(&n)` holed at run time.
 
 What remains is mostly the missing address model: `cstr:address-compare` (1,244 of
 1,478 are in one function, `sqlite3__wasm_enum_json`), `&buf[i]` into memory of unknown
-provenance, pointer↔integer casts, and `sqlite3VdbeExec`'s `goto`s. Most of the
-remaining cast/`sizeof` holes come from the checkout having no generated `sqlite3.h`.
-Generating it and defining SQLite's linkage macros (`--define "SQLITE_API= "`; the
-trailing space matters, because `c2cpg` crashes on an empty `NAME=`) raises the casts
-branch alone to 65.1%.
+provenance, pointer↔integer casts, and `sqlite3VdbeExec`'s `goto`s.
+
+**With the generated `sqlite3.h`** (`scripts/sqlite_corpus.sh`: SQLite's own
+`tool/mksqlite3h.tcl`, run by the `jimsh0` it ships for builds without `tclsh`; the
+result is byte-identical to `./configure && make sqlite3.c`'s header) and SQLite's
+linkage macros defined (`--define "SQLITE_API= "`; the trailing space matters, because
+`c2cpg` crashes on an empty `NAME=`):
+
+| Exporter / parse | Functions | Hole-free | Holes |
+|---|---|---|---|
+| after spec 011, checkout as is | 7,772 | 5,054 (65.0%) | 11,759 |
+| same exporter, generated `sqlite3.h` + linkage macros | 8,105 | 5,736 (70.8%) | 10,451 |
+| plus the `<operators>.` fix below | 8,105 | **5,724 (70.6%)** | 10,497 |
+
+With the header c2cpg parses 367 more function bodies (mostly `src/test*.c`; net +333,
+because some `<duplicate>N` names were renumbered); on the 7,738 present in both runs, 441 became hole-free and 43 lost it, all
+to more precise refusals now that the types are known (a `sqlite3_module` initializer
+had been a positional list; `*pOut = (int)iCur` with an unknown `sqlite3_int64`).
+`op:cast*` holes fell 1,511 → 404 and `op:sizeOf*` 1,083 → 652. The header also
+expanded the `SQLITE_OK`-style constants that hole-free functions had been reading as
+free names: 1,597 hole-free functions read an unexpanded `SQLITE_`/`TK_`/`OP_` name
+before, 291 after (`TK_`/`OP_` come from `parse.h`/`opcodes.h`, which are also
+generated and still absent).
+
+`<operators>.` fix: Joern names six compound assignments (`|=` `&=` `^=` `<<=` `>>=`
+`%=`) with a plural `<operators>.` prefix that every `startsWith("<operator>")` test in
+the exporter missed, so `x |= m` was exported as a call to a function of that name with
+`x` passed by value: no hole, write lost. 157 "hole-free" functions had one; they now
+translate like `x = x | m` (145) or hole honestly (12).
+
+**Conformance sample.** Hole-free is still only an upper bound. `scripts/sqlite_sample.py`
+selects the functions the C leg of `scripts/differential.py` can run without inventing
+anything: hole-free, call-closed through candidates only, every parameter and the return
+an integer type, no preprocessor line in the body, no free names, compiled by the default
+amalgamation of the same checkout. **9 of 5,724** qualify (most take a pointer or
+return `void`). Against `cc`, 20 random cases each: **140/170 agree, 30 diverge,
+10 inconclusive**. All 30 divergences are one root cause: Core comparisons return
+`Val.bool` where C returns `int` 0/1 (`isFatalError`, `validJulianDay`). This is a real
+wrong answer, not a printing difference: in a fixture, `int t = (a<b); if (t == 1) return
+7; return 3;` returns 3 in Lean and 7 under `cc`, because Core's `==` on `bool`/`int` is
+false. The 10 inconclusive are `validJulianDay`'s `(i64)0x1a640 << 32`, which Core's
+32-bit `cLike` int holes as `ub:shift count out of range`. See `docs/scale.md`.
 
 ## The oracle
 
