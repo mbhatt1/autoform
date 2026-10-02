@@ -318,6 +318,24 @@ private theorem fuelStep : ∀ k, FuelStep k := by
                 cases r₂ <;> first
                   | (cases hy; exact absurd rfl hne)
                   | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
+        -- The C address model: `ptrOp` -- same shape as `index`, two sequential
+        -- `evalExpr` calls and then the fuel-free `applyPtrOp`.
+        | ptrOp op esz a b =>
+            simp only [evalExpr] at hy ⊢
+            rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩
+            rw [hA] at hy
+            cases r₁ with
+            | exn v => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | hole l => rw [ihE _ hctx _ _ _ _ _ hA (by simp)]; exact hy
+            | outOfFuel => cases hy; exact absurd rfl hne
+            | val x =>
+                rw [ihE _ hctx _ _ _ _ _ hA (by simp)]
+                dsimp only at hy ⊢
+                rcases hB : evalExpr ctx k h₁ ρ b with ⟨h₂, r₂⟩
+                rw [hB] at hy
+                cases r₂ <;> first
+                  | (cases hy; exact absurd rfl hne)
+                  | (rw [ihE _ hctx _ _ _ _ _ hB (by simp)]; exact hy)
         | index a b =>
             simp only [evalExpr] at hy ⊢
             rcases hA : evalExpr ctx k h ρ a with ⟨h₁, r₁⟩

@@ -508,6 +508,27 @@ inductive Expr where
   `""` in Python and `s.drop 999` is `[]` in Lean -- no undefined behaviour to
   guard against on that side, unlike `strByte`'s own out-of-range READ. -/
   | strFrom : Expr → Expr → Expr
+  /-- **The C address model** (`docs/core-language.md` §2.1): a binary pointer
+  operation, evaluated left then right like `binop`, but answered by
+  `applyPtrOp` (`Semantics.lean`), which -- unlike `applyBinop` -- reads the HEAP, because
+  every rule of C pointer comparison and arithmetic is a statement about the object a
+  pointer points into: its extent (one-past-the-end is a valid pointer, two-past is not)
+  and, for arithmetic, its element size.
+
+  A C pointer is modelled CompCert-style as a *block plus an offset*: `Val.iref r (.idx i)`
+  is element `i` of heap block `r`, `Val.ref r` the whole object `r`, `Val.unit`/`Val.int 0`
+  the null pointer, `Val.str s` a `char*` under the string model (the bytes up to the
+  terminator, no identity), `Val.fn f` a function. The `String` is the operator:
+  `"=="`, `"!="`, `"<"`, `"<="`, `">"`, `">="` (stride-free: comparing two offsets in one
+  block never needs the element size), `"+"` / `"-"` (pointer ± integer, left operand
+  the pointer) and `"diff"` (pointer − pointer). The `Nat` is the STATIC pointee size in
+  bytes at the operation site, which `"+"`/`"-"`/`"diff"` check against the size the
+  block was allocated with (`Heap.elemSize`): a pointer that reached here through a
+  pointee-changing cast has a different stride, and stepping it by block elements would
+  be a wrong answer, so it is a hole. Relations ignore it (the exporter writes `0`).
+  Everything C leaves undefined or unspecified is a hole, never a value: see
+  `applyPtrOp`. -/
+  | ptrOp : String → Nat → Expr → Expr → Expr
   deriving Repr, Inhabited
 
 /-- Statements. -/
@@ -642,6 +663,7 @@ def holes : Expr → List String
   | .irefIndex a i => holes a ++ holes i
   | .irefField a _ => holes a
   | .derefIref a   => holes a
+  | .ptrOp _ _ a b => holes a ++ holes b
   | _             => []
 
 /-- Holes across a list of expressions. -/
@@ -680,6 +702,7 @@ def size : Expr → Nat
   | .irefIndex a i => 1 + size a + size i
   | .irefField a _ => 1 + size a
   | .derefIref a   => 1 + size a
+  | .ptrOp _ _ a b => 1 + size a + size b
   | _             => 1
 
 /-- Node count across a list of expressions. -/
