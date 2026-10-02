@@ -1344,7 +1344,7 @@ def Ctx.resolveMethodLegacy (ctx : Ctx) (cls meth : String) : Option Func :=
   | (_, f) :: _ => some f
   | []          => ctx.resolve meth
 
-/-! ### Python method resolution (STRATEGY.md §59)
+/-! ### Python method resolution (STRATEGY.md §60)
 
 With a class table (`Program.pyClasses`), a method is looked up the way CPython looks it
 up on an instance: along `type(obj).__mro__`, the C3 linearisation of the class and its
@@ -1757,7 +1757,7 @@ def unboundBuiltinMethod (d : Dialect) (g : String) (vs : List Val) : Option ERe
 
 /-! #### The legacy rules, as rewrites
 
-A program without a class table (every corpus exported before §59, every non-Python one)
+A program without a class table (every corpus exported before §60, every non-Python one)
 runs exactly the rules it always did. These equations say so per helper, as `simp` lemmas
 conditional on `ctx.pyClasses = none`, so that proofs about such programs evaluate through
 the new helpers without unfolding them. -/

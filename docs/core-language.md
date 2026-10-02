@@ -127,7 +127,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
   to a guess. Without a class table, `Ctx.resolveMethod` prefers `Cls.meth` and falls back
   to any `.meth` (`Ctx.resolveMethodLegacy`).
 * **A Python program with a class table follows Python's lookup rules** (`Program.pyClasses`,
-  STRATEGY.md §59; `Ctx.pyStrict`). The exporter records every class's bases in source
+  STRATEGY.md §60; `Ctx.pyStrict`). The exporter records every class's bases in source
   order (corpus classes by short name, outside bases as `<ext>dotted.name`) and the
   class-body bindings that are not plain `def`s. Then:
   * a method is looked up along the **C3 MRO** of the receiver's class (`Ctx.mro`,
@@ -145,7 +145,7 @@ structure Ctx where dialect : Dialect; table : FuncTable; builtinBases : …; gl
     `name:unbound:<x>`.
 
   A program without a table — every non-Python corpus, every Python export made before
-  §59 — keeps the legacy rules; `Ctx.resolveMethod_of_none` and its siblings state so.
+  §60 — keeps the legacy rules; `Ctx.resolveMethod_of_none` and its siblings state so.
 
 ## 3. Expressions (`Expr`)
 

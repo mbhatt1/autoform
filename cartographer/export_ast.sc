@@ -645,7 +645,7 @@ import scala.annotation.tailrec
     builtinBaseRows.filterNot(r => conflictingBaseNames.contains(r._2))
       .groupBy(_._1).map { case (f, rs) => f -> rs.map(r => r._2 -> r._3).toMap }
 
-  // ---- the Python class table (STRATEGY.md §59) ------------------------------
+  // ---- the Python class table (STRATEGY.md §60) ------------------------------
   //
   // Core resolves a method along `type(obj).__mro__` when the program carries a class
   // table (`Program.pyClasses`); without one it falls back to a name-suffix rule that
@@ -9032,7 +9032,7 @@ import scala.annotation.tailrec
             // Zero-argument `super()` directly in a method of class `C` whose receiver is
             // `self` IS `super(C, self)`: the compiler supplies `__class__` and the first
             // argument. Core has no `__class__` cell, so the exporter writes the class in
-            // (`Ctx.makeSuper`, STRATEGY.md §59). Anywhere else -- a nested function, a
+            // (`Ctx.makeSuper`, STRATEGY.md §60). Anywhere else -- a nested function, a
             // `classmethod` whose first parameter is `cls` -- it stays `super()`, which Core
             // holes as `call:super`.
             case None if pyFile && c.name == "super" && mfn == "__builtin.super" &&
@@ -9092,7 +9092,7 @@ import scala.annotation.tailrec
               // `_cachedmethod.py` to the property `_WrapperBase.cache` rather than the
               // enclosing function's parameter (docs/conformance.md finding 2). Such a target
               // is dropped and the call is emitted by its NAME, which Core then resolves the
-              // way CPython does (local, global, builtin; STRATEGY.md §59).
+              // way CPython does (local, global, builtin; STRATEGY.md §60).
               else if (pyFile && methodByName.contains(mfn) &&
                        callee.exists(_.isInstanceOf[Identifier]) &&
                        !pyBareNameReaches(mfn, currentMethodFull))

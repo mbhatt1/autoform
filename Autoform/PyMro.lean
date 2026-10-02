@@ -2,7 +2,7 @@ import Autoform.PyMroProgram
 import Autoform.PyScoping
 
 /-!
-# Python method resolution and name scoping, checked against CPython (STRATEGY.md §59)
+# Python method resolution and name scoping, checked against CPython (STRATEGY.md §60)
 
 Two rules Core used to approximate by matching names on their suffix
 (`docs/conformance.md`, finding 3):

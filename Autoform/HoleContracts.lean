@@ -196,7 +196,7 @@ theorem resolve_onProgram (τ : SImpl) (p : Program) (n : String) :
 
 /-- For a program under the legacy lookup rules (`hp`: no class table). With a class table
 an unanswerable lookup is `holeFunc`, whose hole an implementation may fill, so the
-equation would not hold as stated (STRATEGY.md §59). -/
+equation would not hold as stated (STRATEGY.md §60). -/
 theorem resolveMethod_onProgram (τ : SImpl) (p : Program) (cls meth : String)
     (hp : p.pyClasses = none) :
     (ctxOf (τ.onProgram p)).resolveMethod cls meth

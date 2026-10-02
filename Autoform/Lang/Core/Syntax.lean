@@ -689,7 +689,7 @@ structure Program where
   represented; the exporter drops such a name entirely rather than guessing, which
   degrades to the pre-existing opaque-reference behaviour. -/
   builtinBases : List (String × BuiltinBase) := []
-  /-- The Python class table, when the exporter recorded one (STRATEGY.md §59). `none`
+  /-- The Python class table, when the exporter recorded one (STRATEGY.md §60). `none`
   for every program exported before it did, and for every non-Python program: those keep
   the name-suffix method resolution and name lookup they always had, so no existing
   corpus changes meaning. `some` switches a Python program to Python's own rules --

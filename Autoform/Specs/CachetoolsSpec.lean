@@ -504,7 +504,7 @@ in §4. -/
 `Expr.name` case — local, global, function value, unbound — returns a value. Needed
 because `NotImplementedError` is an unbound builtin, and `Ctx.resolve` on a 233-entry
 table does not reduce in the kernel. Only under the legacy rules (`hs`): with a class
-table, an unbound identifier is the hole `name:unbound:x` (STRATEGY.md §59). -/
+table, an unbound identifier is the hole `name:unbound:x` (STRATEGY.md §60). -/
 theorem evalExpr_name_isVal (ctx : Ctx) (n : Nat) (h : Heap) (ρ : Env) (x : String)
     (hs : ctx.scopedName x = false) :
     ∃ v, evalExpr ctx (n + 1) h ρ (.name x) = (h, .val v) := by

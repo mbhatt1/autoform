@@ -2710,7 +2710,7 @@ def main():
               # harness refusing to look at a value Core was fixed to produce correctly,
               # because the harness dropped the field on the way in.
               # `pyClasses` likewise: without it a program exported with a class table
-              # would be replayed under the legacy suffix rules (STRATEGY.md §59).
+              # would be replayed under the legacy suffix rules (STRATEGY.md §60).
               "private def dctx : Ctx := "
               "{ dialect := program.dialect, table := program.table, globals := gref, "
               "builtinBases := program.builtinBases, pyClasses := program.pyClasses }",

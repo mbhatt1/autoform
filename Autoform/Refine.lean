@@ -269,7 +269,7 @@ theorem evalExpr_name_free (x : String)
   simp [evalExpr, hx, hf, hg, Ctx.unboundName, hs]
 
 /-- Under Python's rules an identifier bound neither locally nor globally is a hole, never
-a same-suffix function and never `unit` (STRATEGY.md §59). -/
+a same-suffix function and never `unit` (STRATEGY.md §60). -/
 theorem evalExpr_name_unbound_py (x : String)
     (hx : ρ.find? (·.1 == x) = none) (hg : h.get ctx.globals = none)
     (hs : ctx.scopedName x = true) :

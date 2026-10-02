@@ -681,7 +681,7 @@ def _run_main():
     bb = ", ".join("({}, {})".format(lean_str(c), base_ctor[bases[c]])
                    for c in sorted(bases))
 
-    # The Python class table (STRATEGY.md §59), recorded by the exporter on every Python
+    # The Python class table (STRATEGY.md §60), recorded by the exporter on every Python
     # module initializer -- present, possibly empty, exactly when the export knows classes.
     # Its presence is what selects Python's lookup rules in Core (`Program.pyClasses`), so
     # an AST without the key renders exactly as before. A short name recorded twice is
@@ -714,7 +714,7 @@ def _run_main():
                    + ("" if py_classes is not None else " -/"))
     if py_classes is not None:
         out.append("`pyClasses` is the class table: methods resolve along the C3 MRO, and bare")
-        out.append("names by Python scoping (STRATEGY.md §59). -/")
+        out.append("names by Python scoping (STRATEGY.md §60). -/")
     out.append("def program : Program := { " + fields + ", funcs := [")
     out.append(",\n".join("  " + n for n in names))
     out.append("] }")
