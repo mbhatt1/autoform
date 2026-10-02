@@ -3046,8 +3046,8 @@ Initializer order is the caller's responsibility: the transpiler cannot recover 
 cross-file dependency order from the CPG, so a module that reads another module's globals
 must be listed after it. That is a real limitation, not a detail — it is recorded as an
 open item rather than papered over with a guessed ordering. -/
-def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
-    (args : List Val) : EResult :=
+def runMainH (p : Program) (fuel : Nat) (inits : List Func) (name : String)
+    (args : List Val) : Heap × EResult :=
   let (h₀, g) := Heap.alloc ([] : Heap) { cls := "<globals>", fields := [] }
   let ctx : Ctx := { dialect := p.dialect, table := p.table, globals := g,
                      builtinBases := p.builtinBases,
@@ -3063,11 +3063,18 @@ def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
                                                   -- whatever it bound before raising
         | (h₁, .outOfFuel) => (h₁, some "initializers:outOfFuel")
   match runInits (inits.length + 1) h₀ inits with
-  | (_,  some l) => .hole l
+  | (h₁, some l) => (h₁, .hole l)
   | (h₁, none)   =>
     match ctx.resolve name with
-    | none    => .hole s!"entry:{name}"
-    | some fn => (applyFunc ctx fuel h₁ fn none args []).2
+    | none    => (h₁, .hole s!"entry:{name}")
+    | some fn => applyFunc ctx fuel h₁ fn none args []
+
+/-- `runMainH`'s result with the final heap dropped: all that is needed when the answer is a
+scalar or an immutable value. A result that is a boxed list/dict is a `Val.ref`, and to
+print or compare it you need the heap -- use `runMainH`. -/
+def runMain (p : Program) (fuel : Nat) (inits : List Func) (name : String)
+    (args : List Val) : EResult :=
+  (runMainH p fuel inits name args).2
 
 /-! ## C and C++ pointers, end to end
 

@@ -209,9 +209,35 @@ def showR : EResult → String
   | .hole l         => "hole " ++ l
   | .outOfFuel      => "outOfFuel"
 
+/-- `showV`, reading a boxed list/dict through the heap. Under Python a list or dict display
+is a heap object (a `Val.ref`), and `a, *b = xs` binds `b` to a NEW one, so a result that
+contains either cannot be printed without the heap. Anything else is `showV`'s. -/
+def showVH (h : Heap) : Nat → Val → String
+  | 0, _ => "…"
+  | n + 1, .ref r =>
+      match h.payload r with
+      | .list vs  => "[" ++ ", ".intercalate (vs.map (showVH h n)) ++ "]"
+      | .dict kvs =>
+          "{" ++ ", ".intercalate (kvs.map fun kv => showVH h n kv.1 ++ ": " ++ showVH h n kv.2) ++ "}"
+      | _         => "<unprintable>"
+  | n + 1, .tuple [v] => "(" ++ showVH h n v ++ ",)"
+  | n + 1, .tuple vs => "(" ++ ", ".intercalate (vs.map (showVH h n)) ++ ")"
+  | n + 1, .list vs => "[" ++ ", ".intercalate (vs.map (showVH h n)) ++ "]"
+  | n + 1, .dict kvs =>
+      "{" ++ ", ".intercalate (kvs.map fun kv => showVH h n kv.1 ++ ": " ++ showVH h n kv.2) ++ "}"
+  | n + 1, v => showV (n + 1) v
+
+def showRH (h : Heap) : EResult → String
+  | .val v          => showVH h 50 v
+  | .exn (.str e)   => "raise " ++ e
+  | .exn v          => "raise " ++ showVH h 50 v
+  | .hole l         => "hole " ++ l
+  | .outOfFuel      => "outOfFuel"
+
 open Autoform.Generated.PyScoping in
 def pyRun (c : String) : String :=
-  showR (runMain program 400 moduleInits ("pyscoping_cases.py:<module>." ++ c) [])
+  let (h, r) := runMainH program 400 moduleInits ("pyscoping_cases.py:<module>." ++ c) []
+  showRH h r
 
 -- CPython: (1, 10, None, 's', True, (), -3, float(bits=4602678819172646912))
 /-- info: "(1, 10, None, 's', True, (), -3, float(bits=4602678819172646912))" -/
