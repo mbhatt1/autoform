@@ -750,6 +750,11 @@ import scala.annotation.tailrec
     val scope  = parentScope(d.full)
     b match {
       case "object" => Right(None)
+      // `abc.ABC` is `class ABC(metaclass=ABCMeta): __slots__ = ()`: it defines no
+      // attribute an instance lookup can find, so it adds nothing to the MRO walk. Only
+      // when the name is not also a corpus class (or imported from the corpus).
+      case "ABC" | "abc.ABC" if !pyShortCount.contains("ABC") && !pyImports(d.file).contains("ABC") =>
+        Right(None)
       case kw(k, v) =>
         if (k == "metaclass" && v.trim.split('.').last == "ABCMeta") Right(None)
         else Left(s"keyword:$k")
