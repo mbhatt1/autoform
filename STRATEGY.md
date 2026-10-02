@@ -3474,10 +3474,15 @@ V8Base render, `check_specs_fresh` (0), proof inventory, FuelMono guard, the
 `C_not_tfFree` grep, the pinned cachetools clone. `taskset -c 0 lake build` was attempted
 in the clone and one `SpecsGen/V8Base/Part*` was OOM-killed (exit 137) with the shared
 4-core/15 GB box at 13 GB used by other builds — an environment limit here, not a
-verdict on the 7 GB runner, which the existing `taskset` comment addresses. The steps that
-need the full build (trust audit, conformance oracle, ledger, `check_docs`,
-`check_specs.py Basis`, demo) are reported in the commit/hand-off with whatever this
-machine could run.
+verdict on the 7 GB runner, which the existing `taskset` comment addresses (nine
+`V8Base/Part*` jobs were killed this way before the attempt was stopped). On the partial
+build: ledger regeneration exit 0, `check_docs` exit 0 (10 figures match),
+`check_specs.py Basis` exit 0 (21 theorems), conformance oracle `60 COMPARED` (passes the
+`> 0` gate). Not run here: the trust audit (`audit_all.py --strict` replays every
+`.olean`) and the demo, which imports the root `Autoform` module and so needs the full
+build. These were simulated on `86a161b` content plus this branch's scripts, before the
+merge of round-1 item G, whose `Ledger`/`HoleContracts` build failures are being fixed
+separately.
 
 ### JavaScript: three erased operator pairs
 
