@@ -366,12 +366,16 @@ The dialect currently controls:
   `c32` surfacing undefined behaviour, or `c32Wrapv` matching what `cc` actually does — is
   a recorded choice, not a default: see §8 and `Numeric.lean`.) That 32-bit config is
   only the meaning of an *untyped* `.cLike` operator. The exporter names the type of every
-  C/C++ and Java integer operation in the operator itself — `"*:i64"`, `"<:u32"`,
-  `">>:u64"`, `"+:j64"` (`TypedInt.lean`): operands are converted to that type (the usual
-  arithmetic conversions; the left operand only, for shifts) and the operation is
-  performed at it, C tags under the configured C overflow policy and Java tags under
-  `NumConfig.java32`/`java64`. An operation whose C type does not resolve is the hole
-  `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63).
+  C/C++, Java, Go and Kotlin integer operation in the operator itself — `"*:i64"`,
+  `"<:u32"`, `">>:u64"`, `"+:j64"`, Go `"*:g64"` / `"-:w08"` (signed / unsigned, at the
+  operand's own width: Go has no integer promotion), Kotlin `"*:k64"` / `"-:q32"`
+  (`TypedInt.lean`): operands are converted to that type (the usual arithmetic
+  conversions; the left operand only, for shifts) and the operation is performed at it,
+  C tags under the configured C overflow policy, Java and Kotlin tags under
+  `NumConfig.java32`/`java64` (wrap, masked shift counts, `ArithmeticException`), Go tags
+  under `NumConfig.go64` (wrap, a shift count at or above the width gives 0 / -1, a
+  negative one or a zero divisor panics). An operation whose type does not resolve is the
+  hole `op:int:unresolved-type`, not the untyped operator (STRATEGY.md §63, §64).
 * `Dialect.toFConfig` — the float format and rules (`FConfig.python` or
   `FConfig.cDouble`; §1).
 * `Dialect.comparesIntFloatExactly` — whether `int`/`float` comparison is exact (Python)

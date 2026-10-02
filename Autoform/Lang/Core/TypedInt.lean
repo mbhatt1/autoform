@@ -39,6 +39,14 @@ so hole-freedom, fuel monotonicity, rendering and the ledger need no new case.
    division or remainder by zero, `MIN / -1` and `MIN % -1`, a shift count outside
    `[0, width)`. Java: `NumConfig.java32`/`java64` — wraps, shift counts masked, `MIN /
    -1 = MIN`, division by zero throws `ArithmeticException`.
+   Go (`g08`..`g64` signed, `w08`..`w64` unsigned; operations are performed AT the
+   operand type, never widened — Go has no integer promotion): overflow wraps (Go spec,
+   "Integer overflow"), `MIN / -1 = MIN`, `MIN % -1 = 0`, division by zero panics, a shift
+   count at or above the width gives 0 (or -1 for `>>` of a negative value; NOT masked
+   as in Java), a negative count panics. Kotlin (`k32`/`k64` signed, `q32`/`q64` unsigned;
+   `Byte`/`Short` promote to `Int` as in Java): overflow wraps, `shl`/`shr`/`ushr` count
+   masked, `MIN / -1 = MIN`, division by zero throws `ArithmeticException`, unsigned
+   operations wrap at their own width.
 
 Anything else is a hole: an operand that is not an integer (or C `bool`), an unknown
 type tag, an unknown operator. The exporter emits a typed operator only when it resolved
@@ -51,6 +59,8 @@ namespace Autoform.Core
 inductive IntLang where
   | c
   | java
+  | go
+  | kotlin
   deriving Repr, Inhabited, DecidableEq
 
 /-- The static type a typed operator is performed at. -/
@@ -61,9 +71,9 @@ structure IntTag where
 
 namespace IntTag
 
-/-- The type tags the exporter emits. Arithmetic in C and Java is never performed below
-`int` (the integer promotions / binary numeric promotion widen first), so 32 and 64 are
-the only widths. -/
+/-- The type tags the exporter emits. Arithmetic in C, Java and Kotlin is never performed
+below `int` (the integer promotions / binary numeric promotion widen first), so 32 and 64
+are the only widths there; Go performs it at the operand type, so it has all four. -/
 def ofString : String → Option IntTag
   | "i32" => some ⟨.c, .signed .w32⟩
   | "i64" => some ⟨.c, .signed .w64⟩
@@ -71,6 +81,18 @@ def ofString : String → Option IntTag
   | "u64" => some ⟨.c, .unsigned .w64⟩
   | "j32" => some ⟨.java, .signed .w32⟩
   | "j64" => some ⟨.java, .signed .w64⟩
+  | "g08" => some ⟨.go, .signed .w8⟩
+  | "g16" => some ⟨.go, .signed .w16⟩
+  | "g32" => some ⟨.go, .signed .w32⟩
+  | "g64" => some ⟨.go, .signed .w64⟩
+  | "w08" => some ⟨.go, .unsigned .w8⟩
+  | "w16" => some ⟨.go, .unsigned .w16⟩
+  | "w32" => some ⟨.go, .unsigned .w32⟩
+  | "w64" => some ⟨.go, .unsigned .w64⟩
+  | "k32" => some ⟨.kotlin, .signed .w32⟩
+  | "k64" => some ⟨.kotlin, .signed .w64⟩
+  | "q32" => some ⟨.kotlin, .unsigned .w32⟩
+  | "q64" => some ⟨.kotlin, .unsigned .w64⟩
   | _     => none
 
 /-- The arithmetic configuration of this tag. C takes its policies from
@@ -80,6 +102,10 @@ def config (t : IntTag) : NumConfig :=
   match t.lang with
   | .c    => { Dialect.cLike.toNumConfig with type := t.type }
   | .java => { NumConfig.java32 with type := t.type }
+  -- Go: wrapping, `MIN / -1 = MIN`. Its shift is not a `NumConfig` policy: `goShift`.
+  | .go   => { NumConfig.go64 with type := t.type }
+  -- Kotlin on the JVM: Java's `int`/`long` rules (and `UInt`/`ULong` modulo 2^n).
+  | .kotlin => { NumConfig.java32 with type := t.type }
 
 end IntTag
 
@@ -99,13 +125,16 @@ def typedOperand : Val → Option Int
   | _       => none
 
 /-- A `NumResult` as an evaluation result, under the tag's language. C division by zero
-is undefined (C11 6.5.5p5), so it is a hole, not an exception; Java throws. -/
+is undefined (C11 6.5.5p5), so it is a hole, not an exception; Java and Kotlin throw
+`ArithmeticException`; Go panics (a run-time panic is not a value: an exception here). -/
 def typedNumToE (t : IntTag) : NumResult → EResult
   | .ok v    => .val (.int v)
   | .divZero =>
       match t.lang with
       | .c    => .hole "ub:division by zero"
       | .java => .exn (.str "ArithmeticException")
+      | .kotlin => .exn (.str "ArithmeticException")
+      | .go   => .exn (.str "panic: integer divide by zero")
   | .trap r  => .exn (.str r)
   | .ub r    => .hole s!"ub:{r}"
 
@@ -118,6 +147,18 @@ def typedDivMod (t : IntTag) (isDiv : Bool) (x y : Int) : EResult :=
   else if t.lang == .c && !nc.type.inRange (nc.quot x y) then
     .hole "ub:signed division overflow (MIN / -1)"
   else typedNumToE t (if isDiv then nc.div x y else nc.mod x y)
+
+/-- Go's shifts (https://go.dev/ref/spec#Operators, "Shifts"): "Shifts behave as if the
+left operand is shifted n times by 1", so a count at or above the width gives 0, or -1 for
+`>>` of a negative signed value (the sign fills); a negative count (possible only for a
+signed count) panics at run time. The count is the operand's own value, not converted to
+the left operand's type. In-range counts are `NumConfig`'s `shl`/`shr` at the width. -/
+def goShift (t : IntTag) (left : Bool) (x k : Int) : EResult :=
+  let nc := t.config
+  if k < 0 then .exn (.str "panic: negative shift amount")
+  else if (nc.type.bits : Int) ≤ k then
+    .val (.int (if left then 0 else if x < 0 then -1 else 0))
+  else typedNumToE t (if left then nc.shl x k else nc.shr x k)
 
 /-- The typed binary operators. `none` when `op` carries no type tag, so the caller's
 untyped behaviour is untouched. -/
@@ -137,10 +178,15 @@ def typedIntBinop (op : String) (a b : Val) : Option EResult :=
       | "&"   => typedNumToE t (nc.band x y)
       | "|"   => typedNumToE t (nc.bor x y)
       | "^"   => typedNumToE t (nc.bxor x y)
+      -- Go's AND NOT (`x &^ y` is `x & ^y`).
+      | "&^"  => if t.lang == .go then typedNumToE t (nc.band x (nc.type.wrap (-y - 1)))
+                 else .hole s!"binop:{op}"
       -- Shifts: the count `y0` is NOT converted to the left operand's type.
-      | "<<"  => typedNumToE t (nc.shl x y0)
-      | ">>"  => typedNumToE t (nc.shr x y0)
-      | ">>>" => typedNumToE t ({ nc with negRightShift := .logical }.shr x y0)
+      | "<<"  => if t.lang == .go then goShift t true x y0 else typedNumToE t (nc.shl x y0)
+      | ">>"  => if t.lang == .go then goShift t false x y0 else typedNumToE t (nc.shr x y0)
+      -- Go has no `>>>`.
+      | ">>>" => if t.lang == .go then .hole s!"binop:{op}"
+                 else typedNumToE t ({ nc with negRightShift := .logical }.shr x y0)
       | "<"   => .val (.bool (x < y))
       | "<="  => .val (.bool (x ≤ y))
       | ">"   => .val (.bool (x > y))
@@ -172,6 +218,9 @@ private def intOf : Option EResult → Option Int
   | _ => none
 private def boolOf : Option EResult → Option Bool
   | some (.val (.bool v)) => some v
+  | _ => none
+private def excOf : Option EResult → Option String
+  | some (.exn (.str l)) => some l
   | _ => none
 private def holeOf : Option EResult → Option String
   | some (.hole l) => some l
@@ -217,6 +266,52 @@ private def holeOf : Option EResult → Option String
 #guard intOf (typedIntBinop "<<:j64" (.int 1) (.int 65)) == some 2
 #guard intOf (typedIntBinop ">>>:j32" (.int (-1)) (.int 28)) == some 15
 #guard intOf (typedIntBinop ">>>:j64" (.int (-1)) (.int 60)) == some 15
+-- Go (item S; every value below is `go run`'s, tests/fixtures/gointwidth): `int` is 64 bits,
+-- arithmetic is at the operand type (no promotion), overflow wraps.
+#guard intOf (typedIntBinop "*:g64" (.int 100000) (.int 100000)) == some 10000000000
+#guard intOf (typedIntBinop "*:g32" (.int 100000) (.int 100000)) == some 1410065408
+#guard intOf (typedIntBinop "+:g64" (.int 9223372036854775807) (.int 1))
+        == some (-9223372036854775808)
+#guard intOf (typedIntBinop "+:g08" (.int 127) (.int 1)) == some (-128)
+#guard intOf (typedIntBinop "-:w08" (.int 0) (.int 1)) == some 255
+#guard intOf (typedIntBinop "*:w64" (.int 9223372036854775808) (.int 2)) == some 0
+#guard intOf (typedIntBinop "-:w64" (.int 0) (.int 1)) == some 18446744073709551615
+#guard intOf (typedIntUnop "-:w16" (.int 1)) == some 65535
+#guard intOf (typedIntUnop "~:w08" (.int 5)) == some 250
+#guard intOf (typedIntBinop "&^:w08" (.int 255) (.int 15)) == some 240
+-- `MIN / -1` and `MIN % -1` are defined (and do not panic); division by zero panics.
+#guard intOf (typedIntBinop "/:g64" (.int (-9223372036854775808)) (.int (-1)))
+        == some (-9223372036854775808)
+#guard intOf (typedIntBinop "%:g64" (.int (-9223372036854775808)) (.int (-1))) == some 0
+#guard intOf (typedIntBinop "/:g08" (.int (-128)) (.int (-1))) == some (-128)
+#guard intOf (typedIntBinop "/:g64" (.int (-7)) (.int 2)) == some (-3)
+#guard intOf (typedIntBinop "%:g64" (.int (-7)) (.int 3)) == some (-1)
+#guard excOf (typedIntBinop "/:g64" (.int 1) (.int 0)) == some "panic: integer divide by zero"
+#guard excOf (typedIntBinop "%:w08" (.int 1) (.int 0)) == some "panic: integer divide by zero"
+-- Go shifts: a count at or above the width gives 0 / -1 (Java would mask it); negative panics.
+#guard intOf (typedIntBinop "<<:g32" (.int 1) (.int 33)) == some 0
+#guard intOf (typedIntBinop "<<:g32" (.int 1) (.int 31)) == some (-2147483648)
+#guard intOf (typedIntBinop ">>:g32" (.int (-8)) (.int 40)) == some (-1)
+#guard intOf (typedIntBinop ">>:g32" (.int 8) (.int 40)) == some 0
+#guard intOf (typedIntBinop ">>:g32" (.int (-16)) (.int 2)) == some (-4)
+#guard intOf (typedIntBinop ">>:w32" (.int 4294967295) (.int 28)) == some 15
+#guard intOf (typedIntBinop "<<:w08" (.int 255) (.int 4)) == some 240
+#guard intOf (typedIntBinop "<<:g64" (.int 1) (.int 63)) == some (-9223372036854775808)
+#guard excOf (typedIntBinop "<<:g64" (.int 1) (.int (-1))) == some "panic: negative shift amount"
+#guard holeOf (typedIntBinop ">>>:g32" (.int 1) (.int 1)) == some "binop:>>>:g32"
+-- Kotlin (item S): Int/Long as Java, UInt/ULong modular, shift counts masked.
+#guard intOf (typedIntBinop "*:k64" (.int 100000) (.int 100000)) == some 10000000000
+#guard intOf (typedIntBinop "*:k32" (.int 100000) (.int 100000)) == some 1410065408
+#guard intOf (typedIntBinop "-:q32" (.int 0) (.int 1)) == some 4294967295
+#guard intOf (typedIntBinop "*:q64" (.int 18446744073709551615) (.int 2)) == some 18446744073709551614
+#guard intOf (typedIntBinop "<<:k32" (.int 1) (.int 33)) == some 2
+#guard intOf (typedIntBinop "<<:k64" (.int 1) (.int 65)) == some 2
+#guard intOf (typedIntBinop ">>>:k32" (.int (-1)) (.int 28)) == some 15
+#guard intOf (typedIntBinop ">>:k32" (.int (-16)) (.int 1)) == some (-8)
+#guard intOf (typedIntBinop ">>:q32" (.int 4294967295) (.int 1)) == some 2147483647
+#guard intOf (typedIntBinop "/:k32" (.int (-2147483648)) (.int (-1))) == some (-2147483648)
+#guard excOf (typedIntBinop "/:k32" (.int 1) (.int 0)) == some "ArithmeticException"
+#guard excOf (typedIntBinop "%:q64" (.int 1) (.int 0)) == some "ArithmeticException"
 -- A C `bool` (comparison result) is 0/1; a string is not an integer.
 #guard intOf (typedIntBinop "+:i64" (.bool true) (.int 1)) == some 2
 #guard holeOf (typedIntBinop "+:i64" (.str "x") (.int 1)) == some "binop:+:i64"

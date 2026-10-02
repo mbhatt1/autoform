@@ -33,13 +33,22 @@ Binaries (`ghidra2cpg`), C#, PHP, Ruby, Rust and Swift were **not tested**.
 | Python | yes | yes | yes | `.python` ✅ | 209 | 80% | 99 (47%) | 0.8% | **yes** (CPython) |
 | C | yes | yes | yes | `.cLike` ✅ | 59 | 17 (29%) | 8 (13%) | 11% | crashed (see below) |
 | Java | yes | yes | yes | `.cLike` ⚠️ | 669 | 350 (52%) | 191 (28%) | 6% | **none** |
-| Go | yes | yes | yes | `.cLike` ⚠️ | 83 | 21 (25%) | 6 (7%) | 4% | **none** |
+| Go | yes | yes | yes | `.cLike` ⚠️ | 82 | 20 (24%) | not re-measured | 4.1% | **none** (integer arithmetic: a `go`-checked fixture, §64) |
 | TypeScript | yes | yes | yes | `.cLike` ⚠️ | 86 | 44 (51%) | 18 (21%) | 4% | **none** |
 | JavaScript | yes | yes | yes | `.cLike` ⚠️ | 14 | 5 (35%) | 1 (7%) | 5% | **none** |
 | JavaScript (lodash) | yes | **no** | n/a | `.cLike` ⚠️ | 693 | 419 (60%) | — | 1.8% | **none** |
 | Kotlin (real repo) | **no** | n/a | n/a | n/a | — | — | — | — | **none** |
-| Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (66%) | 2 (66%) | 4% | **none** |
+| Kotlin (toy) | yes | yes | yes | `.cLike` ⚠️ | 3 | 2 (67%) | not re-measured | 3.4% | **none** (integer arithmetic: a Kotlin-compiler-checked fixture, §64) |
 | `.tsx` / `.jsx` | yes | yes | yes | **`.python` ❌ WRONG** | — | — | — | — | none |
+
+**Go and Kotlin rows re-exported (item S, STRATEGY.md §64).** `ast-LangGo.json` and
+`ast-LangKt.json` were re-exported with provenance (`provenance/ast-LangGo.json.prov.json`,
+`ast-LangKt.json.prov.json`): Go from `kelseyhightower/envconfig` at `7834011` (82
+functions; the earlier artifact, 83 functions, came from an unrecorded revision), the Kotlin
+toy from `tests/fixtures/langkt/T.kt`. Their Functions / Hole-free / Holes-per-node cells
+are `scripts/lang_matrix.py ast-LangGo.json ast-LangKt.json` on the new files; the
+*Verifiable core* cells were not re-measured (they need the ledger, which was not re-run),
+and the Go hole-cause row below is that tool's count for the new file.
 
 Percentages are from the ledger the pipeline printed (`ledger-Lang*.json`);
 `scripts/lang_matrix.py` recomputes them from the exported AST independently and agrees
@@ -69,7 +78,12 @@ maps to the single `.cLike` constructor, which is 32-bit truncating C. See below
   run stops after `==> [1/6] parsing` printing **no error at all**. A CPG file is still
   written; running `export_ast.sc` on it crashes with the same exception. A hand-written
   two-function Kotlin file goes end to end, so this is the frontend on real Kotlin, not
-  the corpus.
+  the corpus. (Item S, 2026-10-02: kotlin2cpg 4.0.606 itself *does* parse
+  `kotlinx-datetime` `core/common/src` — 66 files, `c73ca37` — and writes a CPG; the crash is
+  in Joern's `ReachingDefPass`, one of the default overlays `joern --script` applies
+  before `export_ast.sc` runs, so the exporter is not involved: the unmodified exporter and
+  the item-S exporter fail identically on it. Real Kotlin therefore still cannot be
+  exported end to end, and the Kotlin width fix is exercised on fixtures only.)
 * **JavaScript at scale — does not render.** lodash exports 693 functions (25 MB of AST)
   and then `render_lean.py` dies:
   `RecursionError: maximum recursion depth exceeded while decoding a JSON object`.
@@ -100,7 +114,7 @@ translation. They are not the same set across languages, which is direct evidenc
 |---|---|
 | C | `op:indirection` 28, `op:cast` 18, `control:SWITCH` 14, `assign:lhs:indirectIndexAccess` 12, `op:indirectIndexAccess` 12, `assign:lhs:indirection` 12, `cstr:address-equality` 11, `op:postIncrement` 11, `op:postDecrement` 8, `control:FOR` 7, `control:GOTO` 5, `op:sizeOf` 5 |
 | Java | `op:alloc` 166, `control:THROW` 125, `op:cast` 123, `op:instanceOf` 90, `op:arrayInitializer` 43, `control:FOR` 30, `expr:BLOCK-impure` 20, `control:SWITCH` 15, `op:postIncrement` 15, `op:sizeOf` 13, `control:TRY-multiCatch` 4 |
-| Go | `op:addressOf` 44, `stmt:IMPORT` 39, `lit:unquoted` 17, `stmt:TYPE_DECL` 13, `op:indirection` 12, `assign:arity` 7 (multi-return `a, b := f()`), `control:FOR` 6 |
+| Go | `stmt:empty-ast-children` 134, `stmt:IMPORT` 39, `assign:arity` 16 (multi-return `a, b := f()`), `lit:unquoted` 15, `op:indirection:opaque-type` 12, `expr:empty-block` 4 |
 | TypeScript | `op:assignment` 26, `op:notNullAssert` 11, `control:THROW` 10, `stmt:TYPE_DECL` 9, `op:alloc` 7, `op:await` 7, `op:instanceOf` 5, `op:spread` 2 |
 | JavaScript (lodash) | `op:assignment` 111, `op:instanceOf` 100, `op:preIncrement` 91, `expr:BLOCK-impure` 44, `op:postIncrement` 44, `op:alloc` 27, `op:and` 23, `control:THROW` 16, `op:iterator` 6 |
 | Kotlin (toy) | `stmt:METHOD` 2 |
@@ -142,7 +156,7 @@ original measurement, not re-run.
 | 4 | JS `1 === "1"` | `false` | `bool false` | **fixed** — `===`/`!==` are Core operators of their own, recovered by the exporter from source text (jssrc2cpg erases them) |
 | 4 | JS `null == 0` | `false` | `bool false` | **fixed** (was `true` by reading the exporter, not measured on a JS CPG: `pointerNullTest` keys on `cLikeFile`, which includes `.js`/`.ts`, and rewrote `x == null` to `x in (None, 0)`) |
 | 7 | JS `1 << 32`, `-1 >>> 0`, `~2147483648` | `1`, `4294967295`, `2147483647` | same | **fixed** (`jsBitwise`/`jsBitNot`: ToInt32/ToUint32; operands beyond 2^53 are a hole). Was `4294967296`, a `ub` hole, `-2147483649` |
-| 5 | Java `long` / Go `int` | 64-bit | 32-bit `.cLike` | **still wrong** — `.java`/`.go` still map to `.cLike` |
+| 5 | Java `long` / Go `int` / Kotlin `Long` | 64-bit | typed operators (`*:j64`, `*:g64`, `*:k64`) | **fixed** — Java in §63, Go and Kotlin in §64: the exporter names the operand type in the operator; the dialect is still `.cLike` |
 | 6 | JS `"a" + "b"` | `"ab"` | `str "ab"` | **fixed** (`Dialect.stringsAreValues`) |
 
 ### 1. `and` / `or` return an operand, not a boolean (Python, JS, TS) — NEW, and it hits the flagship corpus
@@ -237,6 +251,18 @@ nodes are therefore read as LOOSE equality, which is exact on same-type operands
 hole otherwise, never a wrong answer.
 
 ### 5. Java `long` and Go `int` are 64-bit; Core models them as 32-bit
+
+> **Fixed for integer arithmetic** — Java by STRATEGY.md §63, Go and Kotlin by §64. The
+> exporter names the type each integer operation is performed at inside the operator
+> (`"*:j64"`, Go `"*:g64"` / `"-:w08"`, Kotlin `"*:k64"` / `"-:q32"`); `TypedInt.lean` gives
+> each language its own overflow, shift and division rules (Go: a shift count at or above
+> the width gives 0/-1, division by zero panics; Kotlin: masked counts,
+> `ArithmeticException`); a type that does not resolve is the hole
+> `op:int:unresolved-type`. Measured against the real runtimes on 56 Go cases (`go`
+> 1.24.7) and 61 Kotlin cases (Kotlin compiler 2.3.21): before, Go 15 agree / 20 wrong /
+> 21 holes and Kotlin 20 / 20 / 21; after, Go 55 agree + 1 hole (`1 << n` with an untyped
+> constant, whose type comes from a context the exporter cannot see) and Kotlin 61/61. The
+> section below is the original measurement, kept as recorded.
 
 `.java`/`.go` → `.cLike` → `c32Wrapv`. `Numeric.lean` *already defines* `java32`,
 `java64` and `go64` configs — but `Dialect` has only two constructors (`python`,

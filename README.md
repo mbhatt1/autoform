@@ -11,8 +11,9 @@ JavaScript, Python, Kotlin and binaries normalize to one node vocabulary, so one
 and one exporter cover all of them. There is no per-language transpiler. How far that
 holds is measured per language in `docs/languages.md`: Python is checked against CPython,
 and C against `cc` only on integer-argument functions (the harness crashed on `sds`'s
-`char *` API); Java, Go, JS and TS translate but have no runtime oracle, real Kotlin
-fails in the Joern frontend, and binaries were not tested.
+`char *` API); Java, Go, JS and TS translate but have no runtime oracle beyond
+integer-width fixtures (§63, §64), real Kotlin cannot be exported (Joern's dataflow overlay
+crashes on it), and binaries were not tested.
 
 ## Use
 
@@ -149,6 +150,11 @@ mostly members of nested/anonymous structs). Full tree with both: **5,295 of 8,1
 hole-free; there is no full-tree run isolating each change. Fixtures pin both against the
 real compilers: 282/282 address cases agree with `cc` (38 refused as undefined
 behaviour), 23/23 C width cases with `cc -fwrapv`, 22/22 Java cases with `java`.
+Go and Kotlin integer arithmetic got the same treatment (STRATEGY.md §64): operators carry
+their operand type (Go `*:g64`, `-:w08`; Kotlin `*:k64`, `-:q32`) with each language's own
+overflow, shift and division rules, and the fixtures pin them against the real runtimes: 55
+of 56 Go cases agree with `go` (the 56th is a documented hole) and 61 of 61 Kotlin cases
+with the Kotlin compiler; with the previous exporter the same CPGs gave 15 and 20 agreeing.
 
 ## The oracle
 

@@ -1,0 +1,3544 @@
+[
+ {
+  "name": "case_int_mul_wraps:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:k32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_mul:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "100000"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:k64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_mixed_mul:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "*:k64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_literal_is_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:k64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_add_wraps:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "2147483647"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:k32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_add_wraps:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "9223372036854775807"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:k64",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "1"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_accumulate:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "i"
+         },
+         "b": {
+          "k": "int",
+          "v": "3"
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "binop",
+           "op": "+:k64",
+           "a": {
+            "k": "name",
+            "v": "s"
+           },
+           "b": {
+            "k": "int",
+            "v": "2000000000"
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "i",
+          "e": {
+           "k": "binop",
+           "op": "+:k32",
+           "a": {
+            "k": "name",
+            "v": "i"
+           },
+           "b": {
+            "k": "int",
+            "v": 1
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_accumulate:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "i",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "loop",
+        "c": {
+         "k": "binop",
+         "op": "<",
+         "a": {
+          "k": "name",
+          "v": "i"
+         },
+         "b": {
+          "k": "int",
+          "v": "3"
+         }
+        },
+        "body": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "s",
+          "e": {
+           "k": "binop",
+           "op": "+:k32",
+           "a": {
+            "k": "name",
+            "v": "s"
+           },
+           "b": {
+            "k": "int",
+            "v": "2000000000"
+           }
+          }
+         },
+         "b": {
+          "k": "assign",
+          "x": "i",
+          "e": {
+           "k": "binop",
+           "op": "+:k32",
+           "a": {
+            "k": "name",
+            "v": "i"
+           },
+           "b": {
+            "k": "int",
+            "v": 1
+           }
+          }
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "s"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_byte_incr:byte()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "cast:i8",
+       "a": {
+        "k": "binop",
+        "op": "+:k32",
+        "a": {
+         "k": "name",
+         "v": "b"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_byte_plus_promotes:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "127"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+:k32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_short_decr:short()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "s",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "32768"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "s",
+      "e": {
+       "k": "unop",
+       "op": "cast:i16",
+       "a": {
+        "k": "binop",
+        "op": "-:k32",
+        "a": {
+         "k": "name",
+         "v": "s"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "s"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ubyte_incr:kotlin.UByte()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "b",
+     "e": {
+      "k": "int",
+      "v": "255"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "b",
+      "e": {
+       "k": "unop",
+       "op": "cast:u8",
+       "a": {
+        "k": "binop",
+        "op": "+:q32",
+        "a": {
+         "k": "name",
+         "v": "b"
+        },
+        "b": {
+         "k": "int",
+         "v": 1
+        }
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "b"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ubyte_plus_promotes:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "255"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "255"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+:q32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shl_masked_int:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:k32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "33"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shl_masked_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:k64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "65"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shl_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:k64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "33"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shr_int:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "16"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:k32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shr_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "int",
+       "v": "4294967296"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:k64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "4"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ushr_int:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>>:k32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "28"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ushr_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>>:k64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      },
+      "b": {
+       "k": "int",
+       "v": "60"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_shr_assign_style:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "16"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": ">>:k32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "2"
+       }
+      }
+     },
+     "b": {
+      "k": "ret",
+      "e": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_sub_wraps:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "-:q32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ulong_sub_wraps:kotlin.ULong()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "-:q64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_mul_wraps:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "65536"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:q32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ulong_mul_wraps:kotlin.ULong()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "18446744073709551615"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "*:q64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_div:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "2"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:q32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_rem:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "10"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:q32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_shr:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:q32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_shl_masked:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "<<:q32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "33"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ulong_shr:kotlin.ULong()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "18446744073709551615"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": ">>:q64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      },
+      "b": {
+       "k": "int",
+       "v": "60"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_min_div:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "binop",
+      "op": "-:k32",
+      "a": {
+       "k": "unop",
+       "op": "-:k32",
+       "a": {
+        "k": "int",
+        "v": "2147483647"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "unop",
+        "op": "-:k32",
+        "a": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:k32",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_min_rem:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "binop",
+      "op": "-:k32",
+      "a": {
+       "k": "unop",
+       "op": "-:k32",
+       "a": {
+        "k": "int",
+        "v": "2147483647"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "unop",
+        "op": "-:k32",
+        "a": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:k32",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_min_div:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "m",
+     "e": {
+      "k": "binop",
+      "op": "-:k64",
+      "a": {
+       "k": "unop",
+       "op": "-:k64",
+       "a": {
+        "k": "int",
+        "v": "9223372036854775807"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "d",
+       "e": {
+        "k": "unop",
+        "op": "-:k64",
+        "a": {
+         "k": "int",
+         "v": "1"
+        }
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:k64",
+        "a": {
+         "k": "name",
+         "v": "m"
+        },
+        "b": {
+         "k": "name",
+         "v": "d"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_div:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "d",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "int",
+       "v": "7000000000"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "binop",
+      "op": "/:k64",
+      "a": {
+       "k": "name",
+       "v": "d"
+      },
+      "b": {
+       "k": "int",
+       "v": "2"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_rem_sign:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "7"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "3"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:k32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_neg_min:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "binop",
+      "op": "-:k32",
+      "a": {
+       "k": "unop",
+       "op": "-:k32",
+       "a": {
+        "k": "int",
+        "v": "2147483647"
+       }
+      },
+      "b": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "name",
+       "v": "y"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_neg:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "y",
+     "e": {
+      "k": "int",
+      "v": "5"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "name",
+       "v": "y"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_div_zero:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:k32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_rem_zero:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "%:k64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_div_zero:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "1"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "/:q32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_inv:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "5"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:k32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_inv:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:k64",
+      "a": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_inv:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "0"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "~:q32",
+      "a": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_ubyte_inv:kotlin.UByte()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "5"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u8",
+      "a": {
+       "k": "unop",
+       "op": "~:q32",
+       "a": {
+        "k": "name",
+        "v": "a"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_and_or_xor:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "12"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "10"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "+:k32",
+        "a": {
+         "k": "binop",
+         "op": "+:k32",
+         "a": {
+          "k": "binop",
+          "op": "&:k32",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         "b": {
+          "k": "binop",
+          "op": "*:k32",
+          "a": {
+           "k": "binop",
+           "op": "|:k32",
+           "a": {
+            "k": "name",
+            "v": "a"
+           },
+           "b": {
+            "k": "name",
+            "v": "b"
+           }
+          },
+          "b": {
+           "k": "int",
+           "v": "100"
+          }
+         }
+        },
+        "b": {
+         "k": "binop",
+         "op": "*:k32",
+         "a": {
+          "k": "binop",
+          "op": "^:k32",
+          "a": {
+           "k": "name",
+           "v": "a"
+          },
+          "b": {
+           "k": "name",
+           "v": "b"
+          }
+         },
+         "b": {
+          "k": "int",
+          "v": "10000"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_and:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "4294967295"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "&:k64",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_xor:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "255"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": "^:q32",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_to_int_trunc:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4294967297"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_to_long_sign_extends:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "5"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_to_byte_trunc:byte()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "300"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i8",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_to_uint_reinterpret:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_to_ulong_sign_extends:kotlin.ULong()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k32",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_to_int:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_to_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:i64",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_long_to_uint:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "unop",
+      "op": "-:k64",
+      "a": {
+       "k": "int",
+       "v": "1"
+      }
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "unop",
+      "op": "cast:u32",
+      "a": {
+       "k": "name",
+       "v": "x"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_uint_gt:boolean()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "4294967295"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_int_long_compare:boolean()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "3000000000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "skip"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "b",
+       "e": {
+        "k": "int",
+        "v": "1"
+       }
+      },
+      "b": {
+       "k": "ret",
+       "e": {
+        "k": "binop",
+        "op": ">",
+        "a": {
+         "k": "name",
+         "v": "a"
+        },
+        "b": {
+         "k": "name",
+         "v": "b"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_conditional:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "a",
+     "e": {
+      "k": "int",
+      "v": "100000"
+     }
+    },
+    "b": {
+     "k": "ret",
+     "e": {
+      "k": "cond",
+      "c": {
+       "k": "binop",
+       "op": ">",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "int",
+        "v": "0"
+       }
+      },
+      "t": {
+       "k": "binop",
+       "op": "*:k64",
+       "a": {
+        "k": "name",
+        "v": "a"
+       },
+       "b": {
+        "k": "name",
+        "v": "a"
+       }
+      },
+      "e": {
+       "k": "name",
+       "v": "a"
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_compound_int:int()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "100"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:k32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "5"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "binop",
+        "op": "*:k32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "int",
+         "v": "2"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "binop",
+         "op": "-:k32",
+         "a": {
+          "k": "name",
+          "v": "x"
+         },
+         "b": {
+          "k": "int",
+          "v": "1"
+         }
+        }
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "assign",
+         "x": "x",
+         "e": {
+          "k": "binop",
+          "op": "/:k32",
+          "a": {
+           "k": "name",
+           "v": "x"
+          },
+          "b": {
+           "k": "int",
+           "v": "3"
+          }
+         }
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "assign",
+          "x": "x",
+          "e": {
+           "k": "binop",
+           "op": "%:k32",
+           "a": {
+            "k": "name",
+            "v": "x"
+           },
+           "b": {
+            "k": "int",
+            "v": "7"
+           }
+          }
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "assign",
+           "x": "x",
+           "e": {
+            "k": "binop",
+            "op": "<<:k32",
+            "a": {
+             "k": "name",
+             "v": "x"
+            },
+            "b": {
+             "k": "int",
+             "v": "29"
+            }
+           }
+          },
+          "b": {
+           "k": "ret",
+           "e": {
+            "k": "name",
+            "v": "x"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_compound_long:long()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4611686018427387904"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:k64",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "name",
+        "v": "x"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "binop",
+        "op": "*:k64",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "int",
+         "v": "2"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "binop",
+         "op": "%:k64",
+         "a": {
+          "k": "name",
+          "v": "x"
+         },
+         "b": {
+          "k": "int",
+          "v": "1000"
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "case_compound_uint:kotlin.UInt()",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "skip"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "assign",
+     "x": "x",
+     "e": {
+      "k": "int",
+      "v": "4000000000"
+     }
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "assign",
+      "x": "x",
+      "e": {
+       "k": "binop",
+       "op": "+:q32",
+       "a": {
+        "k": "name",
+        "v": "x"
+       },
+       "b": {
+        "k": "int",
+        "v": "500000000"
+       }
+      }
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "assign",
+       "x": "x",
+       "e": {
+        "k": "binop",
+        "op": "*:q32",
+        "a": {
+         "k": "name",
+         "v": "x"
+        },
+        "b": {
+         "k": "int",
+         "v": "3"
+        }
+       }
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "assign",
+        "x": "x",
+        "e": {
+         "k": "binop",
+         "op": "%:q32",
+         "a": {
+          "k": "name",
+          "v": "x"
+         },
+         "b": {
+          "k": "int",
+          "v": "1000"
+         }
+        }
+       },
+       "b": {
+        "k": "ret",
+        "e": {
+         "k": "name",
+         "v": "x"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "cases.kt:<global>.global",
+  "file": "cases.kt",
+  "params": [],
+  "body": {
+   "k": "seq",
+   "a": {
+    "k": "holeS",
+    "label": "stmt:METHOD"
+   },
+   "b": {
+    "k": "seq",
+    "a": {
+     "k": "holeS",
+     "label": "stmt:METHOD"
+    },
+    "b": {
+     "k": "seq",
+     "a": {
+      "k": "holeS",
+      "label": "stmt:METHOD"
+     },
+     "b": {
+      "k": "seq",
+      "a": {
+       "k": "holeS",
+       "label": "stmt:METHOD"
+      },
+      "b": {
+       "k": "seq",
+       "a": {
+        "k": "holeS",
+        "label": "stmt:METHOD"
+       },
+       "b": {
+        "k": "seq",
+        "a": {
+         "k": "holeS",
+         "label": "stmt:METHOD"
+        },
+        "b": {
+         "k": "seq",
+         "a": {
+          "k": "holeS",
+          "label": "stmt:METHOD"
+         },
+         "b": {
+          "k": "seq",
+          "a": {
+           "k": "holeS",
+           "label": "stmt:METHOD"
+          },
+          "b": {
+           "k": "seq",
+           "a": {
+            "k": "holeS",
+            "label": "stmt:METHOD"
+           },
+           "b": {
+            "k": "seq",
+            "a": {
+             "k": "holeS",
+             "label": "stmt:METHOD"
+            },
+            "b": {
+             "k": "seq",
+             "a": {
+              "k": "holeS",
+              "label": "stmt:METHOD"
+             },
+             "b": {
+              "k": "seq",
+              "a": {
+               "k": "holeS",
+               "label": "stmt:METHOD"
+              },
+              "b": {
+               "k": "seq",
+               "a": {
+                "k": "holeS",
+                "label": "stmt:METHOD"
+               },
+               "b": {
+                "k": "seq",
+                "a": {
+                 "k": "holeS",
+                 "label": "stmt:METHOD"
+                },
+                "b": {
+                 "k": "seq",
+                 "a": {
+                  "k": "holeS",
+                  "label": "stmt:METHOD"
+                 },
+                 "b": {
+                  "k": "seq",
+                  "a": {
+                   "k": "holeS",
+                   "label": "stmt:METHOD"
+                  },
+                  "b": {
+                   "k": "seq",
+                   "a": {
+                    "k": "holeS",
+                    "label": "stmt:METHOD"
+                   },
+                   "b": {
+                    "k": "seq",
+                    "a": {
+                     "k": "holeS",
+                     "label": "stmt:METHOD"
+                    },
+                    "b": {
+                     "k": "seq",
+                     "a": {
+                      "k": "holeS",
+                      "label": "stmt:METHOD"
+                     },
+                     "b": {
+                      "k": "seq",
+                      "a": {
+                       "k": "holeS",
+                       "label": "stmt:METHOD"
+                      },
+                      "b": {
+                       "k": "seq",
+                       "a": {
+                        "k": "holeS",
+                        "label": "stmt:METHOD"
+                       },
+                       "b": {
+                        "k": "seq",
+                        "a": {
+                         "k": "holeS",
+                         "label": "stmt:METHOD"
+                        },
+                        "b": {
+                         "k": "seq",
+                         "a": {
+                          "k": "holeS",
+                          "label": "stmt:METHOD"
+                         },
+                         "b": {
+                          "k": "seq",
+                          "a": {
+                           "k": "holeS",
+                           "label": "stmt:METHOD"
+                          },
+                          "b": {
+                           "k": "seq",
+                           "a": {
+                            "k": "holeS",
+                            "label": "stmt:METHOD"
+                           },
+                           "b": {
+                            "k": "seq",
+                            "a": {
+                             "k": "holeS",
+                             "label": "stmt:METHOD"
+                            },
+                            "b": {
+                             "k": "seq",
+                             "a": {
+                              "k": "holeS",
+                              "label": "stmt:METHOD"
+                             },
+                             "b": {
+                              "k": "seq",
+                              "a": {
+                               "k": "holeS",
+                               "label": "stmt:METHOD"
+                              },
+                              "b": {
+                               "k": "seq",
+                               "a": {
+                                "k": "holeS",
+                                "label": "stmt:METHOD"
+                               },
+                               "b": {
+                                "k": "seq",
+                                "a": {
+                                 "k": "holeS",
+                                 "label": "stmt:METHOD"
+                                },
+                                "b": {
+                                 "k": "seq",
+                                 "a": {
+                                  "k": "holeS",
+                                  "label": "stmt:METHOD"
+                                 },
+                                 "b": {
+                                  "k": "seq",
+                                  "a": {
+                                   "k": "holeS",
+                                   "label": "stmt:METHOD"
+                                  },
+                                  "b": {
+                                   "k": "seq",
+                                   "a": {
+                                    "k": "holeS",
+                                    "label": "stmt:METHOD"
+                                   },
+                                   "b": {
+                                    "k": "seq",
+                                    "a": {
+                                     "k": "holeS",
+                                     "label": "stmt:METHOD"
+                                    },
+                                    "b": {
+                                     "k": "seq",
+                                     "a": {
+                                      "k": "holeS",
+                                      "label": "stmt:METHOD"
+                                     },
+                                     "b": {
+                                      "k": "seq",
+                                      "a": {
+                                       "k": "holeS",
+                                       "label": "stmt:METHOD"
+                                      },
+                                      "b": {
+                                       "k": "seq",
+                                       "a": {
+                                        "k": "holeS",
+                                        "label": "stmt:METHOD"
+                                       },
+                                       "b": {
+                                        "k": "seq",
+                                        "a": {
+                                         "k": "holeS",
+                                         "label": "stmt:METHOD"
+                                        },
+                                        "b": {
+                                         "k": "seq",
+                                         "a": {
+                                          "k": "holeS",
+                                          "label": "stmt:METHOD"
+                                         },
+                                         "b": {
+                                          "k": "seq",
+                                          "a": {
+                                           "k": "holeS",
+                                           "label": "stmt:METHOD"
+                                          },
+                                          "b": {
+                                           "k": "seq",
+                                           "a": {
+                                            "k": "holeS",
+                                            "label": "stmt:METHOD"
+                                           },
+                                           "b": {
+                                            "k": "seq",
+                                            "a": {
+                                             "k": "holeS",
+                                             "label": "stmt:METHOD"
+                                            },
+                                            "b": {
+                                             "k": "seq",
+                                             "a": {
+                                              "k": "holeS",
+                                              "label": "stmt:METHOD"
+                                             },
+                                             "b": {
+                                              "k": "seq",
+                                              "a": {
+                                               "k": "holeS",
+                                               "label": "stmt:METHOD"
+                                              },
+                                              "b": {
+                                               "k": "seq",
+                                               "a": {
+                                                "k": "holeS",
+                                                "label": "stmt:METHOD"
+                                               },
+                                               "b": {
+                                                "k": "seq",
+                                                "a": {
+                                                 "k": "holeS",
+                                                 "label": "stmt:METHOD"
+                                                },
+                                                "b": {
+                                                 "k": "seq",
+                                                 "a": {
+                                                  "k": "holeS",
+                                                  "label": "stmt:METHOD"
+                                                 },
+                                                 "b": {
+                                                  "k": "seq",
+                                                  "a": {
+                                                   "k": "holeS",
+                                                   "label": "stmt:METHOD"
+                                                  },
+                                                  "b": {
+                                                   "k": "seq",
+                                                   "a": {
+                                                    "k": "holeS",
+                                                    "label": "stmt:METHOD"
+                                                   },
+                                                   "b": {
+                                                    "k": "seq",
+                                                    "a": {
+                                                     "k": "holeS",
+                                                     "label": "stmt:METHOD"
+                                                    },
+                                                    "b": {
+                                                     "k": "seq",
+                                                     "a": {
+                                                      "k": "holeS",
+                                                      "label": "stmt:METHOD"
+                                                     },
+                                                     "b": {
+                                                      "k": "seq",
+                                                      "a": {
+                                                       "k": "holeS",
+                                                       "label": "stmt:METHOD"
+                                                      },
+                                                      "b": {
+                                                       "k": "seq",
+                                                       "a": {
+                                                        "k": "holeS",
+                                                        "label": "stmt:METHOD"
+                                                       },
+                                                       "b": {
+                                                        "k": "seq",
+                                                        "a": {
+                                                         "k": "holeS",
+                                                         "label": "stmt:METHOD"
+                                                        },
+                                                        "b": {
+                                                         "k": "seq",
+                                                         "a": {
+                                                          "k": "holeS",
+                                                          "label": "stmt:METHOD"
+                                                         },
+                                                         "b": {
+                                                          "k": "seq",
+                                                          "a": {
+                                                           "k": "holeS",
+                                                           "label": "stmt:METHOD"
+                                                          },
+                                                          "b": {
+                                                           "k": "seq",
+                                                           "a": {
+                                                            "k": "holeS",
+                                                            "label": "stmt:METHOD"
+                                                           },
+                                                           "b": {
+                                                            "k": "seq",
+                                                            "a": {
+                                                             "k": "holeS",
+                                                             "label": "stmt:METHOD"
+                                                            },
+                                                            "b": {
+                                                             "k": "seq",
+                                                             "a": {
+                                                              "k": "holeS",
+                                                              "label": "stmt:METHOD"
+                                                             },
+                                                             "b": {
+                                                              "k": "seq",
+                                                              "a": {
+                                                               "k": "holeS",
+                                                               "label": "stmt:METHOD"
+                                                              },
+                                                              "b": {
+                                                               "k": "holeS",
+                                                               "label": "stmt:METHOD"
+                                                              }
+                                                             }
+                                                            }
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      }
+                                                     }
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                }
+                                               }
+                                              }
+                                             }
+                                            }
+                                           }
+                                          }
+                                         }
+                                        }
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  }
+                                 }
+                                }
+                               }
+                              }
+                             }
+                            }
+                           }
+                          }
+                         }
+                        }
+                       }
+                      }
+                     }
+                    }
+                   }
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

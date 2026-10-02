@@ -484,6 +484,10 @@ the real runtime by pytest: `tests/fixtures/cintwidth` (23 C cases: before 4 agr
 `tests/fixtures/javaintwidth` (22 Java cases through javasrc2cpg 4.0.606 assembled from
 Maven Central: before 7 agree with `java`, 11 wrong, 4 holes; after 22/22). The cboolint
 fixture was re-exported with typed operators and its 15 pins are unchanged.
+Item S (STRATEGY.md §64) adds `tests/fixtures/gointwidth` (56 Go cases through gosrc2cpg
+4.0.606, checked with `go` 1.24.7: before 15 agree, 20 wrong, 21 holes; after 55 agree and one
+documented hole) and `tests/fixtures/kotlinintwidth` (61 cases through kotlin2cpg 4.0.606,
+checked with the Kotlin 2.3.21 compiler: before 20 agree, 20 wrong, 21 holes; after 61/61).
 
 ## What was *not* measured
 
