@@ -25,12 +25,18 @@ import json, sys, os, glob, collections
 
 sys.setrecursionlimit(100000)
 
-# Same extension -> dialect table as `cartographer/render_lean.py`. Duplicated
-# deliberately: this script measures the pipeline, so it must not import from it and
-# inherit a change silently.
+# Same extension -> dialect table as `cartographer/render_lean.py` (without the leading
+# dot on the dialect name). Duplicated deliberately: this script measures the pipeline,
+# so it must not import from it and inherit a change silently. The price of duplicating
+# is that the copies drift, which is exactly what happened -- this table still sent
+# `.js`/`.ts` to `cLike` after the renderer moved them to `javascript`, so the matrix
+# reported the wrong dialect for them. `tests/test_lang_matrix.py` now fails if the two
+# tables differ, so a change to one has to be made to the other.
 DIALECT = {".py": "python", ".c": "cLike", ".h": "cLike", ".cpp": "cLike",
-           ".java": "cLike", ".js": "cLike", ".ts": "cLike", ".kt": "cLike",
-           ".go": "cLike"}
+           ".cc": "cLike", ".cxx": "cLike", ".hh": "cLike", ".hpp": "cLike",
+           ".java": "cLike", ".kt": "cLike", ".go": "cLike",
+           ".js": "javascript", ".ts": "javascript", ".tsx": "javascript",
+           ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript"}
 
 def walk(node):
     """Yield every dict node in an AST, iteratively (the JS ASTs are deep)."""
