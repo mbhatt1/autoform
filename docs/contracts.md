@@ -181,8 +181,12 @@ structure SContract where
   `del self[key]` in `Cache.pop` dispatches to `__delitem__` and writes
   `_Cache__currsize`. A label-wide contract would be false at one of them.
 * **Footprint and result relation live in `post`.** `AttrFrame h h'` is the standard
-  footprint (every pre-existing object keeps its class, attributes and captured bindings;
-  container payloads may change). `completesOrRaisesFramed` is the standard contract:
+  footprint (every pre-existing object keeps its class, attributes, captured bindings
+  and *kind* — a builtin container stays one, an ordinary instance stays one; container
+  contents may change). The kind clause was added when boxed containers entered Core:
+  attribute access on an object with a `list`/`dict` payload now holes
+  (`field:…:builtin-container`), so a footprint that let a hole turn `self` into a container
+  would not protect the attributes it claims to protect. `completesOrRaisesFramed` is the standard contract:
   normal completion with the environment unchanged, or a raise, plus `AttrFrame`.
 * **The wrapper is a hypothesis, not an axiom.**
   `UnderS Γ p Q := ∀ τ, ConsistentS Γ p τ → TotalS Γ τ → Q (τ.onProgram p)`. `Q` is any
@@ -215,12 +219,28 @@ def __delitem__(self, key):
 The theorems are about `Autoform.Generated.Cachetools.program` itself — all 209
 functions, imported, not a slice.
 
+> **Tied to the committed AST.** This example is about `Autoform/Generated/Cachetools.lean`
+> as rendered from the *committed* `ast-Cachetools.json`, where `del self.__data[key]` is
+> still `Stmt.hole "op:delete-index"`. The merged exporter translates Python `del e[i]` to
+> `Stmt.delIndex` (`docs/boxed-containers.md`), so once the AST is regenerated
+> `Cache.__delitem__` is hole-free, the `op:delete-index` site disappears, and these
+> theorems stop elaborating (the generated `Func` no longer has the hole they fill). That
+> is the intended outcome — the function should then get an *unconditional* theorem, as
+> `methodkey` did — and the example should be re-pointed at a hole that survives. The
+> best candidate is **`op:delete-slice`** in `RRCache.clear` / `TLRUCache.clear`
+> (`del x[:]`; the exporter still emits `holeS("op:delete-" …)` for slice deletion, and both
+> functions are conditionally verifiable today): a statement hole whose natural contract is
+> exactly a footprint — it empties one container and touches no attribute. For an
+> expression-hole example via `Contracts.lean`, `call:computed-callee` in the six
+> `cachetools/func.py` decorators is the remaining candidate.
+
 * `delitem_reaches_hole` — today, on every `Cache`-shaped receiver, the generated function
   reaches `hole "op:delete-index"`. No unconditional statement about it exists.
 * `satisfiable_delContract` — the one assumption, `delContract` (site `Cache.__delitem__`,
   `completesOrRaisesFramed`), can be met; witness `skip`.
-* `delitem_under : UnderS Γdel P DelitemPost` — for a `Cache` whose size table is a
-  `_DefaultSize` and whose `_Cache__currsize` is `c`, at every fuel ≥ 12, `__delitem__`
+* `delitem_under : UnderS Γdel P DelitemPost` — for a `Cache` (an ordinary instance, not
+  a builtin container) whose size table is a `_DefaultSize` instance and whose
+  `_Cache__currsize` is `c`, at every fuel ≥ 12, `__delitem__`
   **either returns `None` with `_Cache__currsize = c - 1`, or raises with
   `_Cache__currsize = c`**, for every implementation of the hole meeting the contract.
   The footprint is load-bearing: without `AttrFrame` the hole could rewrite
@@ -237,8 +257,11 @@ functions, imported, not a slice.
 `__hash__`/`__eq__` have none; the domain fixes `_Cache__size` as a `_DefaultSize`
 *instance attribute*, whereas real `cachetools` reaches `_DefaultSize` through a class
 attribute that the translation does not model (`Cache.__init__` only sets the field when
-`getsizeof` is given); and a `dict` size table is out of scope because `dict.pop` on a
-value receiver is itself a hole (`mcall:pop:unboxed-container`).
+`getsizeof` is given); and a boxed `dict` size table is out of scope of this theorem
+(its `pop` goes through `boxedMethod`, a different path, not covered by the domain).
+After boxed containers were merged, `CacheShape` gained two clauses — the receiver and the
+size table have `payload = .none` — because the semantics now dispatches on payload; the
+conclusion is unchanged.
 
 ## Conditionally verifiable and conditionally verified — separate numbers
 

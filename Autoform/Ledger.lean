@@ -297,6 +297,7 @@ def sHoleSites : Stmt → List (Bool × String)
   | .assign _ e      => e.holes.map (false, ·)
   | .setField r _ v  => (r.holes ++ v.holes).map (false, ·)
   | .setIndex r i v  => (r.holes ++ i.holes ++ v.holes).map (false, ·)
+  | .delIndex r i    => (r.holes ++ i.holes).map (false, ·)
   | .setDerefIref p v => (p.holes ++ v.holes).map (false, ·)
   | .seq a b         => sHoleSites a ++ sHoleSites b
   | .ifte c a b      => c.holes.map (false, ·) ++ sHoleSites a ++ sHoleSites b
