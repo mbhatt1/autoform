@@ -4,7 +4,7 @@ import Autoform.JavaIntWidthProgram
 # Width-typed Java integer arithmetic, checked against `java`
 
 Java shares `.cLike` with C, so until item O Java `long` arithmetic was computed at 32
-bits (STRATEGY §28 item 5: `100000L * 100000L` gave 1410065408). The exporter now types
+bits (STRATEGY §29 item 5: `100000L * 100000L` gave 1410065408). The exporter now types
 Java integer operators by binary numeric promotion (`"*:j64"`, `"+:j32"`;
 `Lang/Core/TypedInt.lean`: wrapping, shift counts masked, `MIN / -1 = MIN`) and narrows
 compound assignments back to `byte`/`short`/`char`/`int` (JLS 15.26.2).

@@ -10,7 +10,7 @@
  "joern_version": "4.0.606",
  "frontend": "c2cpg (Joern 4.0.606, /opt/joern/joern-cli/c2cpg.sh), no defines",
  "exporter": "cartographer/export_ast.sc",
- "exporter_sha256": "1f016f63873a3ec67f26d0775c7d03b6f52117764e3f62241e4e91f095ab7e37",
+ "exporter_sha256": "c024b0ea6d062f7990871baa128f00324b265d31a3c3c458c52809edc51f62c7",
  "command": [
   "c2cpg.sh <a directory holding only cboolint_cases.c> --output cpg.bin",
   "joern --script cartographer/export_ast.sc --param cpgPath=cpg.bin --param out=tests/fixtures/cboolint/ast.json",

@@ -3743,7 +3743,7 @@ function-local class, refused because the ancestor's method may close over anoth
 
 ## 63. Width-typed integer arithmetic: `long` is not `int`, and Java's `>>` was `>>>`
 
-§28 item 5 recorded it and §38 left it standing: "`Dialect.cLike` is still 32-bit signed
+§29 item 5 recorded it and §38 left it standing: "`Dialect.cLike` is still 32-bit signed
 for *arithmetic*". Every C, C++ and Java integer operation ran at signed 32 bits
 (`Dialect.toNumConfig .cLike = c32Wrapv`), whatever its type. `100000L * 100000L` was
 1410065408; `unsigned u = -1; long long y = u;` held -1; `0u - 1 > 0` was false; SQLite's
@@ -3760,7 +3760,7 @@ value-preserving or modular and nothing else; only the left operand of a shift),
 `NumConfig` operation at that width. C tags take their overflow policy from
 `Dialect.toNumConfig .cLike`, so §16's one switch still flips every width; division by
 zero and `MIN / -1` are `ub` holes at every policy (`-fwrapv` defines neither). Java tags
-use `java32`/`java64`, which §28 found unreachable. Typed operators are claimed in
+use `java32`/`java64`, which §29 found unreachable. Typed operators are claimed in
 `binopTail`'s and `applyUnop`'s catch-all arms, after every literal arm, through a
 `List Char` split that reduces by `rfl`: no existing theorem, `simp` set or `rfl` example
 changed, and `Refine`, `Overflow`, `FuelMono`, `SpecsGen.Basis`, `V8Spec`, `CppCastSpec`
@@ -3810,7 +3810,7 @@ exporter: C 4 agree, 16 silent wrong answers, 2 holes, 1 `outOfFuel`; Java 7 agr
 wrong, 4 holes. Now 23/23 and 22/22.
 
 **Not done.** Kotlin and Go (`.kt`, `.go`) keep untyped 32-bit operators; Go's `int`
-is 64-bit, so Go arithmetic is still §28 item 5's wrong answer (no Go frontend here to
+is 64-bit, so Go arithmetic is still §29 item 5's wrong answer (no Go frontend here to
 test against). Argument conversion at call sites. Nested/anonymous aggregate members
 (the bulk of the remaining unresolved types) need the struct text parsed, as
 `activeStructText` does for `sizeof`. Untyped `.cLike` arithmetic survives in byte-cursor

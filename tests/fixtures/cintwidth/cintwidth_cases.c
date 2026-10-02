@@ -7,7 +7,7 @@
  * and `-fwrapv` is the configured policy Core models (`Dialect.toNumConfig .cLike`). */
 #include <stddef.h>
 
-/* STRATEGY.md §28 item 5: `100000L * 100000L`. */
+/* STRATEGY.md §29 item 5: `100000L * 100000L`. */
 long long case_long_mul(void) {
   long a = 100000;
   long b = 100000;

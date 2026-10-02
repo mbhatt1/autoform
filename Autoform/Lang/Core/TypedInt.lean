@@ -9,7 +9,7 @@ import Autoform.Lang.Core.Numeric
 `int` and silently wrong for everything wider or unsigned: `100000L * 100000L` was
 `1410065408` (Java: `10000000000`), SQLite's `(i64)0x1a640 << 32` was a shift-count hole,
 and `vdbeSorterTreeDepth`'s `i64` loop wrapped at `2^32` and ran out of fuel
-(`docs/scale.md`, STRATEGY §28 item 5).
+(`docs/scale.md`, STRATEGY §29 item 5).
 
 A `Val.int` carries no type, so the width cannot be recovered at run time. The exporter
 knows it statically (it already resolves C types for casts, `sizeof` and the signedness
@@ -181,7 +181,7 @@ private def holeOf : Option EResult → Option String
 #guard (typedIntBinop "+" (.int 1) (.int 2)).isNone
 #guard (typedIntUnop "cast:u8" (.int 1)).isNone
 #guard (typedIntBinop "+:i16" (.int 1) (.int 2)).isNone
--- STRATEGY §28 item 5: Java `100000L*100000L` is 10^10; the untyped (32-bit) answer was
+-- STRATEGY §29 item 5: Java `100000L*100000L` is 10^10; the untyped (32-bit) answer was
 -- 1410065408, which is what `int` still gives.
 #guard intOf (typedIntBinop "*:j64" (.int 100000) (.int 100000)) == some 10000000000
 #guard intOf (typedIntBinop "*:j32" (.int 100000) (.int 100000)) == some 1410065408

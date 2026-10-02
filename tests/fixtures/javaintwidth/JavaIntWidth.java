@@ -3,7 +3,7 @@
 // `tests/test_javaintwidth_java.py` compares with the Core pins in
 // `Autoform/JavaIntWidth.lean`.
 class JavaIntWidth {
-  // STRATEGY.md §28 item 5: Core used to compute this at 32 bits (1410065408).
+  // STRATEGY.md §29 item 5: Core used to compute this at 32 bits (1410065408).
   static long case_long_mul() { long a = 100000L; long b = 100000L; return a * b; }
   static long case_int_mul_wraps() { int a = 100000; int b = 100000; return a * b; }
   static long case_mixed_mul() { long a = 3000000000L; int b = 2; return a * b; }
