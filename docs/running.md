@@ -126,12 +126,16 @@ somewhere that path resolves.
 Python 3 is required for the transpiler's printer, the oracles and the assurance-case
 emitter. **Some corpora need a specific interpreter**: the differential and execution
 oracles import and run the target repository's own test suite in-process, so they must run
-under a Python the corpus supports. `cachetools`' suite needs **Python 3.11**, and the
-oracles say so when they detect a mismatch:
+under a Python the corpus supports, with `pytest` installed for it. `cachetools` at the
+pinned `01af8e5` declares `requires-python >= 3.10`; its 312 tests pass under 3.11.15,
+which is the interpreter the recorded measurements use. The oracles say so when they
+detect a mismatch, and `differential.py` warns when the suite does not pass under tracing:
 
 ```sh
 python3.11 scripts/differential.py ast-Cachetools.json ~/src/cachetools Cachetools 5
 ```
+
+See [`conformance.md`](conformance.md) for what is recorded and how to read the result.
 
 A C compiler (`cc`) is needed only for the C conformance corpus.
 

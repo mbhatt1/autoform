@@ -168,7 +168,7 @@ Every link is mechanically checked, and each check is a different kind of oracle
 
 | link | oracle | status |
 |---|---|---|
-| semantics matches the real runtime | differential testing vs CPython / `cc` | **0 divergences**, but over **30 of 208** `cachetools` functions — coverage, not agreement, is the limit |
+| semantics matches the real runtime | differential testing vs CPython / `cc`, inputs recorded from the corpus's own test suite | **57 of 209** `cachetools` functions compared, **14 divergences**, all root-caused: 11 are an exporter call misbinding, 3 are Core method dispatch with no class hierarchy ([docs/conformance.md](docs/conformance.md)) |
 | specifications constrain behaviour | source-level mutation gate | **78/88 (88.6%)** on the translated module; 10 survivors, all analysed |
 | proofs depend on no unsound axiom | axiom sweep over every declaration | clean, 1,696 decls |
 | `.olean`s match a kernel replay | `leanchecker --fresh` | VERIFIED |
@@ -186,11 +186,20 @@ UNSUPPORTED rather than suppressing the equivalent mutants to turn it green.
 
 The first row used to read "100% on all corpora", which was wrong in both directions.
 
-It was wrong to say 100%, because the denominator is small: only 30 of 208 `cachetools`
-functions are compared. Everything else is INCONCLUSIVE — a value the harness cannot
-encode, a receiver it cannot build, or a hole. **The limit is reach, not agreement.** A
-conformance rate quoted without its coverage is the self-flattering metric this project
-keeps finding.
+It was wrong to say 100%, because the denominator is small. Only 57 of 209 `cachetools`
+functions are compared (`python3.11 scripts/differential.py ast-Cachetools.json
+<cachetools@01af8e5> Cachetools 5`). The rest are INCONCLUSIVE, and each one carries a
+counted reason in `conformance.json`: a value the harness cannot encode, a receiver it
+cannot build, or a hole. **The limit is reach, not agreement.** A conformance rate quoted
+without its coverage is the self-flattering metric this project keeps finding.
+
+The "0 divergences" this row also used to show was partly the recorder's doing. It wrote
+down generator yields as return values, and that agreed with an exporter that translates
+`yield` as `return`, so `TLRUCache.__iter__` counted as an agreement. It also replayed
+closures without their captured variables, and it refused, as parameter mismatches, the
+calls that would have exposed an exporter call misbinding. With the recorder fixed, the
+same corpus at the same commit gives 14 divergences. They are three findings, not noise.
+See [docs/conformance.md](docs/conformance.md).
 
 It was then briefly wrong in the other direction: an intermediate run reported 5
 divergences, and this file attributed them to `class _HashedTuple(tuple)`. That
