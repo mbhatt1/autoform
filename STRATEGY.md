@@ -3213,3 +3213,90 @@ excluded, measured after: 0 lines from worktree paths, `VERDICT: PASS` unchanged
 The worktrees are mine, created during this session's work. The contamination was
 self-inflicted and the fix belongs in the gate regardless -- a checkout of the repository
 inside the repository is a thing that will happen again.
+
+## 57. Builtin bases, finished: the oracle compared a value that had lost its class
+
+The item as briefed ("`_HashedTuple` instances are opaque `Val.ref`; surfaces as
+`representation:value-vs-object` INCONCLUSIVE") described the tree before §35/§45. On
+`origin/main` 46c65fc the Lean side already had `Val.bobj`, the exporter already emitted
+`classBases`, and the measured `representation:value-vs-object` count was **0**. What was
+left were three faults of the kind §45 names -- the semantics was mostly right and the
+apparatus around it was not -- plus one silent-wrong shape in the semantics itself.
+
+**Measurement.** `scripts/differential.py ast-Cachetools.json <cachetools>/src Cachetools 5
+--tests <cachetools>/tests`, cachetools cloned at **v7.1.7** (01af8e5). `provenance/` does
+not name a revision (`ast-Cachetools.json` is "not reproduced"); v7.1.7 was identified by
+matching the AST's 192 distinct qualified function names (lambdas excluded) against every tag (v7.1.7..v7.2.0 and HEAD
+all match by name) and then by body: the AST's `Cache.__init__` has no `maxsize < 0`
+check (added in v7.1.8) and `_cached._wrapper` has no `warnings.warn` (v7.2.0).
+
+                                   before (46c65fc)   after
+    compared functions                  48 / 209       51 / 209
+    agree / total                     246 / 248      256 / 258
+    divergences                              2              2   (TLRUCache.__getitem__, pre-existing, unrelated)
+    INCONCLUSIVE                           290            295
+      representation:value-vs-object         0              0
+      field:_HashedTuple__hashvalue:non-object  --         5   (new: __hash__ now attempted)
+    skip_self_not_object                 1,358              0
+    _HashedTuple.__add__/__radd__/__getstate__   skipped    compared, agree
+    _HashedTuple.__hash__                skipped           hole (field write on a value)
+
+INCONCLUSIVE rose by 5 because `__hash__` went from *not attempted* to *attempted and
+holed*; that is the honest direction (§45). The full per-label table is
+`conformance.json`'s `inconclusive_detail` from each run.
+
+### What was wrong
+
+1. **The oracle dropped the class on both sides.** CPython's `_HashedTuple((0,))` was
+   encoded as a bare tuple, and Core's `Val.bobj "_HashedTuple" (...)` was unwrapped to
+   its payload before comparison. Every `hashkey` "agreement" was therefore a comparison
+   of contents only: a Core answer that returned a *plain* `(0,)` -- observably different
+   via `type()`, `isinstance(k, _HashedTuple)` and `k + t` -- would have scored as
+   agreement, and so would the reverse. The encoder now reads `classBases` from the AST
+   (same drop-on-conflict rule as `render_lean.py`) and emits `("bobj", cls, payload)`;
+   `same` requires both class and payload; a class on one side only is a divergence, not
+   a shape clash. The payload is read through the *base* type's methods so a subclass's
+   `__str__`/`keys` cannot change what is encoded.
+2. **`_HashedTuple` receivers were never tried.** `skip_self_not_object` refused any
+   receiver that was not a heap `ref` -- 1,358 calls, all of them `_HashedTuple` methods.
+   A `bobj` receiver is exactly what `Expr.mcall` binds, so it is now passed.
+3. **`tuple.__add__` held in a default argument** (`def __add__(self, other,
+   add=tuple.__add__)`) was `call:tuple.__add__`. `unboundBuiltinMethod` answers it on two
+   tuples (either possibly a `bobj`) with a plain tuple, as CPython does, and nothing else:
+   a non-tuple `other` gets `NotImplemented` in CPython, which Core has no value for.
+   Note the harness passes `add` explicitly (CPython's frame holds it as a local); Core
+   still does not fill in omitted defaults, so a Core-internal `k.__add__(t)` holes as
+   `call:add` -- pinned in `Autoform/BuiltinBase.lean` §4.2.
+4. **Silent wrong, in Core.** `allocBuiltin` refused a class overriding `__init__` or
+   `__eq__`, but indexing, `len`, iteration, `in` and truthiness of a `bobj` all go to the
+   payload directly. `class A(tuple)` with its own `__getitem__` would have indexed as a
+   plain tuple. The refusal list is now `builtinBaseRefusedDunders` (`__init__`, `__eq__`,
+   `__new__`, `__ne__`, `__getitem__`, `__len__`, `__iter__`, `__contains__`, `__bool__`,
+   `__getattribute__`); the harness mirrors it (a pytest pins the two lists equal) and
+   refuses to *encode* such an instance as a `bobj`. `__hash__` is accepted on a stated
+   assumption (hash consistent with `__eq__`), recorded in `docs/core-language.md`.
+
+`len` of a `bobj` -- §35's one named gap -- is answered at the interpreter's builtin call
+site (`builtinSeeThrough`), not in `Stdlib.builtinCore`, so `builtin_heap_unchanged` is
+untouched; it is faithful only because `__len__` overrides are refused.
+
+### What remains
+
+* `_HashedTuple.__hash__`: `self.__hashvalue = ...` is a field write on a value. A `bobj`
+  has no attributes by design (§35). Modelling this needs either attributes on `bobj` or
+  `hash()`; neither is done.
+* `typedkey`: `key += tuple(...)` is `binop:+` on a `bobj`; `applyBinop` has no dunder
+  dispatch for any class. `typedmethodkey`: `expr:genExp`.
+* `int`/`float` bases: not modelled (`BuiltinBase` has no constructor; the exporter records
+  nothing, so instances stay opaque `ref`s). cachetools has no such class.
+* Mutable bases (`list`/`dict` subclasses) keep value semantics, so mutation holes
+  (`mcall:<m>:unboxed-container`, `setIndex:immutable-containers`) until the boxed-container
+  work in `docs/boxed-containers.md` lands. cachetools' `Cache` is a `MutableMapping`, not a
+  `dict` subclass, so this corpus does not reach it.
+* Default argument values are not filled in by Core (see 3).
+
+Tests: `Autoform/BuiltinBase.lean` §4.1/§4.2 (`len`, every refusal with its own label,
+`__hash__`/`__add__`/`__radd__`/`__getstate__` accepted, `_HashedTuple.__add__`/`__radd__`
+end to end keep the class), `tests/test_builtin_base_oracle.py` (26 tests: encoding,
+refusals, class-aware comparison, and reconstructions of the old class-dropping
+behaviour).

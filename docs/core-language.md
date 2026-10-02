@@ -54,6 +54,30 @@ to build a `bobj` for a class that defines its own `__eq__` (or its own `__init_
 emitting `alloc:builtin-base:<cls>:own-__eq__` instead — `Val.beq` has no dunder dispatch,
 so honouring such a class would mean silently ignoring the override.
 
+The same holds for every other operation Core performs on a `bobj`'s payload directly —
+indexing, `len`, iteration, `in` and truthiness — so a class overriding any dunder in
+`builtinBaseRefusedDunders` (`__init__`, `__eq__`, `__new__`, `__ne__`, `__getitem__`,
+`__len__`, `__iter__`, `__contains__`, `__bool__`, `__getattribute__`) is refused with
+`alloc:builtin-base:<cls>:own-<dunder>`. `len(x)` of a `bobj` is the payload's length
+(`builtinSeeThrough`, at the interpreter's builtin call site). Arithmetic dunders need no
+refusal: `applyBinop` has no `bobj` case, so `+` on one is already `binop:+`.
+
+**Assumption, not checked:** `__hash__` overrides are accepted (`_HashedTuple` has one).
+Core's `dict` lookup is by `Val.beq` alone, which agrees with CPython for every class
+keeping Python's documented invariant `a == b → hash(a) == hash(b)`; a class that breaks
+it would get the builtin's lookup rather than its own.
+
+**Mutable bases.** A `list`/`dict` base is modelled with value semantics, exactly like
+Core's own containers: a mutating method on one is `mcall:<m>:unboxed-container` and
+`x[k] = v` is `setIndex:immutable-containers`. Faithful mutable subclasses
+(`class Cache(dict)` with in-place updates) wait on the boxed-container work in
+`docs/boxed-containers.md`. `int`/`float` bases are not modelled at all (`BuiltinBase` has
+no constructor for them; the exporter records nothing, so instances stay opaque `ref`s):
+an `int` payload would need `Val.beq`, `applyBinop` and the numeric tower to see through
+the wrapper. `cachetools` (v7.1.7) has no such class: `_HashedTuple(tuple)` is its only
+class with a builtin base, and `Cache` derives from `collections.abc.MutableMapping`, not
+`dict`.
+
 **Floats are partially wired.** `Val.float` and `Lit.float` exist; the exporter emits
 float literals and `render_lean.py` encodes them as exact binary64 bit patterns. Evaluated:
 `+ - * / %` (an `int` operand is promoted; a failed promotion is Python's `OverflowError`),
@@ -63,8 +87,8 @@ holes: float `//` (`binop://:float-floordiv`), float `**` (`float:pow`), C casts
 floating type (`op:cast:float`), and `float()`/`str()`/`repr()` (the stdlib model has no
 float builtins). Known wrong answers rather than holes: Python `/` on two ints floors,
 because the exporter maps `//` onto `/` (see "Floating point" in `Semantics.lean`); and float
-`%` is Python's floored remainder in every dialect, which is wrong for JavaScript
-(`-5.5 % 2.0` is `-1.5` in JS, `0.5` here). The differential harness refuses float
+`%` is Python's floored remainder under `.cLike` as well as `.python`, which is wrong for
+Java (`-5.5 % 2.0` is `-1.5`); `.javascript` uses the truncated remainder. The differential harness refuses float
 arguments, so none of this is oracle-checked yet.
 
 ## 2. The memory model: `Heap`, `Obj`, `Env`, `Ctx`

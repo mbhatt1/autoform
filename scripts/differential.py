@@ -122,6 +122,58 @@ class Unencodable(Exception):
     pass
 
 
+# Classes whose single base is a builtin type, by short class name, exactly as Core's
+# `Program.builtinBases` holds them (filled by `main` from the AST's `classBases`, with
+# the same drop-on-conflict rule as `render_lean.py`). Core turns an instance of such a
+# class into `Val.bobj cls payload`; the encoder must do the same with a CPython instance,
+# or the oracle compares a value that has lost its class against one that kept it.
+BUILTIN_BASES = {}
+
+# Mirror of `Core.builtinBaseRefusedDunders` (Semantics.lean). Core refuses to build a
+# `bobj` for a class overriding any of these, because every one names an operation Core
+# performs on the payload directly; an instance of such a class handed to Core *as* a
+# `bobj` would have the override silently bypassed, so the encoder refuses it too.
+BUILTIN_BASE_REFUSED_DUNDERS = (
+    "__init__", "__eq__", "__new__", "__ne__", "__getitem__", "__len__", "__iter__",
+    "__contains__", "__bool__", "__getattribute__")
+
+_BUILTIN_BASE_TYPES = {"tuple": tuple, "list": list, "dict": dict, "str": str}
+
+
+def builtin_bases_of(funcs):
+    """`{short class name: base}` from the AST's `classBases`, dropping any name that two
+    entries give different bases -- the rule `render_lean.py` applies, so the harness
+    and the rendered `Program.builtinBases` agree by construction."""
+    bases, conflicts = {}, set()
+    for f in funcs:
+        for cls, base in sorted((f.get("classBases") or {}).items()):
+            if cls in bases and bases[cls] != base:
+                conflicts.add(cls)
+            bases[cls] = base
+    for c in conflicts:
+        bases.pop(c, None)
+    return {c: b for c, b in bases.items() if b in _BUILTIN_BASE_TYPES}
+
+
+def builtin_base_of(v):
+    """`(short class name, builtin type)` when `v` is an instance of a class Core models
+    as `Val.bobj`, else None. Raises `Unencodable` for an instance Core *would* model as a
+    `bobj` but only by bypassing one of its overrides."""
+    t = type(v)
+    if t in (bool, int, str, list, tuple, dict) or t.__name__ not in BUILTIN_BASES:
+        return None
+    base = _BUILTIN_BASE_TYPES[BUILTIN_BASES[t.__name__]]
+    if t.__bases__ != (base,):
+        # Same short name, different shape (another module's class, a transitive or a
+        # multiple base). Core keys `builtinBases` by short name and cannot tell them
+        # apart, so neither encoding is known to be the one Core would use.
+        raise Unencodable("builtin-base-mismatch:%s" % t.__name__)
+    for d in BUILTIN_BASE_REFUSED_DUNDERS:
+        if d in t.__dict__:
+            raise Unencodable("builtin-base-override:%s.%s" % (t.__name__, d))
+    return t.__name__, base
+
+
 class Encoder:
     """Python value -> Core `Val`, with one encoding per value in *every* position.
 
@@ -147,16 +199,31 @@ class Encoder:
     def enc(self, v, depth=0, in_key=False):
         if depth > MAX_DEPTH: raise Unencodable("depth")
         if v is None: return ("unit",)
+        bb = builtin_base_of(v)
+        if bb is not None:
+            # `class _HashedTuple(tuple)`: CPython's instance IS a tuple *and* a
+            # `_HashedTuple`. Encode both halves -- the class Core keeps in `Val.bobj` and
+            # the payload as the base type sees it. Instance attributes (the memoised
+            # `_HashedTuple__hashvalue`) are not carried: a `bobj` has none, and Core
+            # answers every attribute read on one with the hole `field:<f>:non-object`,
+            # so the omission can produce a hole and never an answer.
+            # The payload is read through the BASE type's own methods, so no override on
+            # the subclass (`__str__`, `keys`, ...) can change what is encoded.
+            name, base = bb
+            raw = {tuple: lambda x: tuple(tuple.__iter__(x)), list: list.copy,
+                   dict: dict.copy, str: str.__str__}[base](v)
+            return ("bobj", name, self.enc(raw, depth + 1, in_key))
         if isinstance(v, bool): return ("bool", v)
         if isinstance(v, int): return ("int", v)
         if isinstance(v, str): return ("str", v)
         if isinstance(v, (list, tuple)):
-            # Subclasses (`_HashedTuple`, `OrderedDict`) encode structurally: that is
-            # faithful for every operation Core can perform on data it was *handed*
-            # (index, len, membership, iteration order). Where Core instead *allocates*
-            # such a value itself it produces a `Val.ref`, and that shape disagreement
-            # is ruled INCONCLUSIVE at comparison time rather than refused here — see
-            # `compare_outcome`.
+            # Subclasses Core does NOT model as `Val.bobj` (stdlib classes such as
+            # `OrderedDict`, and corpus classes the exporter recorded no base for) encode
+            # structurally: that is faithful for every operation Core can perform on data
+            # it was *handed* (index, len, membership, iteration order). Where Core
+            # instead *allocates* such a value itself it produces a `Val.ref`, and that
+            # shape disagreement is ruled INCONCLUSIVE at comparison time rather than
+            # refused here. Recorded classes (`_HashedTuple`) took the `bobj` branch above.
             if len(v) > MAX_ELEMS: raise Unencodable("wide")
             k = "tuple" if isinstance(v, tuple) else "list"
             return (k, [self.enc(x, depth + 1, in_key) for x in v])
@@ -232,6 +299,7 @@ def lean_val(v):
     if t == "str":  return "Val.str " + json.dumps(v[1])
     if t == "ref":  return "Val.ref (base + %d)" % v[1]
     if t == "fn":   return "Val.fn " + json.dumps(v[1])
+    if t == "bobj": return "Val.bobj %s (%s)" % (json.dumps(v[1]), lean_val(v[2]))
     if t in ("list", "tuple"):
         return "Val.%s [%s]" % (t, ", ".join(lean_val(x) for x in v[1]))
     if t == "dict":
@@ -350,21 +418,25 @@ def parse_result(line):
 
 # ---------------------------------------------------------------------- comparison
 
-def unwrap_bobj(v):
-    """A `Val.bobj cls payload` compares as its payload.
+def same_bobj(py, ln, base):
+    """Compare two sides of which at least one is a `bobj`: `None` when neither is.
 
-    `class _HashedTuple(tuple)` translates to `Val.bobj "_HashedTuple" (tuple …)`, and
-    Core's `Val.beq` compares such a value BY CONTENTS, ignoring the class — which is
-    CPython's answer for a builtin subclass that does not override `__eq__`
-    (`hashkey(0) == (0,)` is `True`). CPython hands the oracle a plain tuple, so comparing
-    the payload is the same relation the semantics implements, not a convenience.
+    `class _HashedTuple(tuple)` translates to `Val.bobj "_HashedTuple" (tuple ...)`, and
+    the encoder turns CPython's `_HashedTuple` instance into the same shape (see
+    `builtin_base_of`). So both halves are compared: the **class**, because `type(k)`,
+    `isinstance(k, _HashedTuple)` and the class's own methods (`__add__`) observe it, and
+    the **payload**, structurally.
 
-    Before this the harness had no `bobj` case at all: `hashkey` and `methodkey` came back
-    `representation:value-vs-object` and were counted INCONCLUSIVE — the oracle refusing to
-    look at a value Core had been fixed to produce correctly."""
-    while isinstance(v, tuple) and len(v) == 3 and v[0] == "bobj":
-        v = v[2]
-    return v
+    The harness used to strip the Lean side's class and compare the payload against a
+    CPython value encoded *without* its class. That agreed with Core's `Val.beq` (which
+    ignores the class, as `tuple.__eq__` does) but it also scored a Core answer that had
+    lost the class -- a plain `tuple` where CPython returns a `_HashedTuple` -- as
+    agreement, and the reverse. A class on one side only is now a divergence."""
+    if py[0] != "bobj" and ln[0] != "bobj":
+        return None
+    if py[0] != "bobj" or ln[0] != "bobj":
+        return False
+    return py[1] == ln[1] and same(py[2], ln[2], base)
 
 
 def same(py, ln, base):
@@ -373,7 +445,9 @@ def same(py, ln, base):
     Dicts compare order-insensitively: Core's `Val.dict` is an association list whose
     order is observable, but Python's insertion order is not part of the contract we
     are checking here, and pretending otherwise would manufacture divergences."""
-    ln = unwrap_bobj(ln)
+    sb = same_bobj(py, ln, base)
+    if sb is not None:
+        return sb
     if py[0] != ln[0]:
         # Core has no separate tuple/list distinction at some call sites; still, do not
         # paper over it — report as a mismatch.
@@ -414,8 +488,16 @@ def same(py, ln, base):
 
 
 def shape_clash(py, ln):
-    """True when the two sides disagree about value-vs-object representation."""
-    ln = unwrap_bobj(ln)
+    """True when the two sides disagree about value-vs-object representation.
+
+    A `bobj` on both sides recurses into the payloads. A `bobj` on ONE side is not a
+    representation clash: the class is in `BUILTIN_BASES`, so Core and the oracle both
+    model it as a builtin-based value, and an opaque `ref` (or a bare container) on the
+    other side is a real disagreement for `same` to report."""
+    if py[0] == "bobj" and ln[0] == "bobj":
+        return shape_clash(py[2], ln[2])
+    if py[0] == "bobj" or ln[0] == "bobj":
+        return False
     containers = ("list", "tuple", "dict")
     if py[0] == "ref" and ln[0] in containers: return True
     if ln[0] == "ref" and py[0] in containers: return True
@@ -432,6 +514,7 @@ def show(v):
     if t in ("list", "tuple"): return "%s[%s]" % (t, ", ".join(show(x) for x in v[1]))
     if t == "dict": return "{%s}" % ", ".join("%s: %s" % (show(a), show(b))
                                               for a, b in v[1])
+    if t == "bobj": return "%s(%s)" % (v[1], show(v[2]))
     return str(v)
 
 
@@ -644,9 +727,11 @@ def trace_tests(src_root, test_dirs, index, wanted, limit_per_fn, stats,
             r[k] = r.get(k, 0) + 1
             return None
         if self_name is not None:
-            if slf is None or slf[0] != "ref":
-                # e.g. a `tuple` subclass: the receiver is a value, not an object with
-                # fields, and Core has no such receiver.
+            if slf is None or slf[0] not in ("ref", "bobj"):
+                # e.g. a `tuple` subclass Core has no `builtinBases` entry for: the
+                # receiver is a value, not an object with fields, and Core has no such
+                # receiver. A recorded one (`_HashedTuple`) encodes as `bobj`, which is
+                # exactly the receiver `Expr.mcall` binds for a method on it.
                 stats["skip_self_not_object"] = \
                     stats.get("skip_self_not_object", 0) + 1
                 return None
@@ -1045,7 +1130,7 @@ def constructed_cases(methods, reached, live, pool, stats, ncases):
             enc = Encoder()
             try:
                 slf = enc.enc(inst)
-                if slf[0] != "ref": raise Unencodable("self-not-object")
+                if slf[0] not in ("ref", "bobj"): raise Unencodable("self-not-object")
                 eargs = [enc.enc(a) for a in argv]
             except Unencodable as e:
                 why[qual] = "unencodable receiver/arguments: %s" % (e.args[0],)
@@ -1623,6 +1708,8 @@ def main():
     ncases = int(argv[3]) if len(argv) > 3 else 5
     funcs = json.load(open(ast_path))
     module_tag = lean_mod
+    BUILTIN_BASES.clear()
+    BUILTIN_BASES.update(builtin_bases_of(funcs))
 
     # ---- which real runtime does this corpus need?
     lang, exts = detect_language(funcs)
@@ -2107,8 +2194,8 @@ def main():
               # A boxed function object (Core section 47) is REPORTED AS THE FUNCTION IT
               # CARRIES. `wrapper.cache_clear = f` makes `wrapper` a heap object, and Core
               # returns a `Val.ref` to it where CPython returns the function -- a shape
-              # clash, not a disagreement. This is the same move `unwrap_bobj` makes on the
-              # Python side, and it hides the same thing: object identity and the attributes
+              # clash, not a disagreement. (The harness used to make the same move on
+              # `Val.bobj`, dropping the class; it no longer does.) It hides the same thing: object identity and the attributes
               # written to it. Neither side's test compares those here; if one ever does,
               # this has to compare them rather than unbox.
               "private def unboxRes (h : Heap) (r : EResult) : EResult :=",

@@ -863,24 +863,44 @@ def unboxFn (h : Heap) (addr : Ref) : Option Val :=
   | some o => if o.cls == funcObjCls then o.fields.lookup funcObjField else none
   | none   => none
 
+/-- Dunders a class with a builtin base may **not** override and still be a `Val.bobj`:
+every one of them is an operation Core performs on the payload directly, so an override
+would be silently bypassed. Order matters only for which label a class that overrides
+several gets; `__init__` and `__eq__` come first so existing labels are unchanged. -/
+def builtinBaseRefusedDunders : List String :=
+  [ "__init__", "__eq__", "__new__", "__ne__", "__getitem__", "__len__", "__iter__"
+  , "__contains__", "__bool__", "__getattribute__" ]
+
 /-- Construct an instance of a class whose base is a builtin type: `X(iterable)` for
 `class X(tuple)` / `class X(list)`, `X(d)` for `class X(dict)`, `X(s)` for
 `class X(str)`, and `X()` for the empty instance.
 
-Deliberately **refuses** two shapes rather than approximating them:
+Deliberately **refuses** a class that overrides any dunder in
+`builtinBaseRefusedDunders`, rather than approximating it:
 
-* a class that defines its own `__init__` — Core would have to run it against a value
-  that has no mutable attributes, so whatever it did would be lost;
-* a class that defines its own `__eq__` — `Val.beq` compares `bobj`s by contents and
-  has no dunder dispatch, so an overridden `__eq__` would be silently ignored. That is
-  precisely the silent-wrong outcome this representation is supposed to avoid, so it is
-  a hole instead.
+* its own `__init__`/`__new__` — Core would have to run it against a value that has no
+  mutable attributes, so whatever it did would be lost;
+* its own `__eq__`/`__ne__` — `Val.beq` compares `bobj`s by contents and has no dunder
+  dispatch, so an overridden `__eq__` would be silently ignored;
+* its own `__getitem__`, `__len__`, `__iter__`, `__contains__`, `__bool__` or
+  `__getattribute__` — indexing, `len`, iteration, `in` and truthiness of a `bobj` go
+  straight to the payload (`Val.unbuiltin`, `Val.iterable`, `Stdlib.elems`, `valIn`,
+  `Val.truthy`), so an override would be bypassed exactly as `__eq__` would be.
 
-Both refusals are *holes*, i.e. counted ignorance, not wrong answers. -/
+That is precisely the silent-wrong outcome this representation is supposed to avoid, so
+each is a hole instead (`alloc:builtin-base:<cls>:own-<dunder>`).
+
+`__hash__` is **not** refused: Core's `dict` lookup is by `Val.beq` alone, which agrees
+with CPython for every class that keeps Python's documented invariant `a == b →
+hash(a) == hash(b)` (`_HashedTuple.__hash__` memoises `tuple.__hash__`, so it does).
+A class that breaks the invariant gets the builtin's lookup, not its own — recorded as an
+assumption in `docs/core-language.md`, not checked here. Arithmetic dunders (`__add__`,
+`__radd__`, …) need no refusal: `applyBinop` has no `bobj` case, so `+` on one is
+already `binop:+`, a hole. -/
 def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : EResult :=
-  if ctx.classDefines cls "__init__" then .hole s!"alloc:builtin-base:{cls}:own-__init__"
-  else if ctx.classDefines cls "__eq__" then .hole s!"alloc:builtin-base:{cls}:own-__eq__"
-  else
+  match builtinBaseRefusedDunders.find? (ctx.classDefines cls ·) with
+  | some d => .hole s!"alloc:builtin-base:{cls}:own-{d}"
+  | none =>
     match vs with
     | []  => .val (.bobj cls b.empty)
     | [v] =>
@@ -900,6 +920,34 @@ def allocBuiltin (ctx : Ctx) (cls : String) (b : BuiltinBase) (vs : List Val) : 
         | .str,   .str t    => .val (.bobj cls (.str t))
         | .str,   _         => .hole s!"alloc:builtin-base:{cls}:str-of-non-str"
     | _ => .hole s!"alloc:builtin-base:{cls}:multiple-args"
+
+/-- `len(A((0,)))` is `1` in CPython for `class A(tuple)`: `len` of a builtin-based
+instance is `len` of its payload. Done here, at the call site, rather than as a `bobj`
+case in `Stdlib.builtinCore`, because a case there defeats the branch enumeration in
+`Stdlib.builtin_heap_unchanged` (STRATEGY.md §35). Faithful because `allocBuiltin`
+refuses any class that overrides `__len__` (`builtinBaseRefusedDunders`), so the
+builtin's `len` is the one CPython would call. Every other builtin sees its arguments
+unchanged: the ones that iterate already see through the base via `Stdlib.elems`, and
+the rest must not be told a `bobj` is a plain container. -/
+def builtinSeeThrough (f : String) (vs : List Val) : List Val :=
+  if f == "len" then vs.map Val.unbuiltin else vs
+
+/-- An unbound builtin method called through a variable: `add(self, other)` where
+`add=tuple.__add__` is a default argument, which is how `cachetools`' `_HashedTuple`
+concatenates without re-entering its own `__add__`.
+
+Only `tuple.__add__` on two tuples (either possibly builtin-based) is answered, and the
+result is a **plain** `tuple`, as in CPython: `tuple.__add__(A((0,)), (1,))` is `(0, 1)`
+of type `tuple`, and the class is re-applied only by the caller's own `A(...)`. Every other
+shape is `none` (a `call:<g>` hole): a non-tuple `other` makes CPython return
+`NotImplemented` rather than raise, which Core has no value for. -/
+def unboundBuiltinMethod (d : Dialect) (g : String) (vs : List Val) : Option EResult :=
+  match d, g, vs with
+  | .python, "tuple.__add__", [a, b] =>
+      match a.unbuiltin, b.unbuiltin with
+      | .tuple x, .tuple y => some (.val (.tuple (x ++ y)))
+      | _,        _        => none
+  | _, _, _ => none
 
 mutual
 
@@ -1139,7 +1187,12 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
                                && vs.length == fn.params.length + 1 then
                               applyFunc ctx n h₁ fn (some (vs.headD .unit)) vs.tail kws
                             else applyFunc ctx n h₁ fn none vs kws
-                          | none    => (h₁, .hole s!"call:{g}")
+                          | none    =>
+                            -- `add=tuple.__add__` held in a variable (`_HashedTuple`).
+                            match (if kws.isEmpty then unboundBuiltinMethod ctx.dialect g vs
+                                   else none) with
+                            | some r => (h₁, r)
+                            | none   => (h₁, .hole s!"call:{g}")
           | .clos g cap => match ctx.resolve g with
                           | some fn => applyClosure ctx n h₁ fn cap vs kws
                           | none    => (h₁, .hole s!"call:{g}")
@@ -1162,7 +1215,7 @@ def evalExpr (ctx : Ctx) : Nat → Heap → Env → Expr → Heap × EResult
             -- `Stdlib.builtin` takes positional arguments only: a keyword argument to a
             -- builtin is *not* passed silently, it is a named hole.
             if kws.isEmpty then
-              match Stdlib.builtin ctx.dialect h₁ f vs with
+              match Stdlib.builtin ctx.dialect h₁ f (builtinSeeThrough f vs) with
               | some (h₂, r) => (h₂, r)
               | none         => (h₁, .hole s!"call:{f}")
             else (h₁, .hole s!"call:{f}:keyword-to-builtin")
